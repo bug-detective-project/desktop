@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "description": "A desktop game where developers practice debugging a real app.",
   "author": "Bug Detective",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/bug-detective-project/desktop.git"
+  },
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -23,7 +28,7 @@
     "test:e2e": "npm run build && playwright test",
     "dist:win": "npm run build && electron-builder --win nsis --publish never",
     "postinstall": "npm ci --prefix tools/lint --no-audit --no-fund",
-    "prepare": "cd .. && husky desktop/.husky",
+    "prepare": "husky",
     "lint": "node tools/lint/node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node tools/lint/node_modules/eslint/bin/eslint.js . --fix",
     "pretest:integration": "npm run prepare:resources && npm run build:stages",

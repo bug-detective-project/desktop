@@ -122,14 +122,14 @@ npm run lint        # check
 npm run lint:fix    # fix what can be fixed
 ```
 
-Husky installs two hooks in the repository root (`prepare` runs `husky desktop/.husky`; the git root is the folder above `desktop/`):
+Husky installs two hooks in this repository (`prepare` runs `husky`, which points `core.hooksPath` at `.husky/_`):
 
 | Hook | Runs | Blocks when |
 | --- | --- | --- |
 | `pre-commit` | lint-staged: `eslint --fix` on the staged `.ts/.tsx/.js/.mjs/.cjs` files, fixes re-staged | an error remains after `--fix` (warnings pass) |
 | `pre-push` | `npm run verify:push`: typecheck, unit tests, integration tests with real Docker (about 2–3 minutes) | anything fails, including Docker not running |
 
-The hooks need Node.js 26 on the `PATH` of the shell that runs git. If you commit from an editor whose git does not load nvm, create `~/.config/husky/init.sh` with `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`. To skip the hooks once (not recommended): `git commit --no-verify` / `git push --no-verify`. The VS Code ESLint extension must use the toolchain in `tools/lint`: set `"eslint.nodePath": "desktop/tools/lint/node_modules"` in the workspace settings.
+The hooks need Node.js 26 on the `PATH` of the shell that runs git. If you commit from an editor whose git does not load nvm, create `~/.config/husky/init.sh` with `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`. To skip the hooks once (not recommended): `git commit --no-verify` / `git push --no-verify`. The VS Code ESLint extension must use the toolchain in `tools/lint`: set `"eslint.nodePath": "tools/lint/node_modules"` in the workspace settings (`"desktop/tools/lint/node_modules"` when the workspace is the parent folder).
 
 ## Installer
 
@@ -173,3 +173,7 @@ Nothing is published automatically. To publish a content release:
 - A strict CSP (`default-src 'none'`, scripts, styles and fonts from `'self'` only); no remote content, navigation and new windows blocked, permission requests denied.
 - External commands run with `spawn` and argument arrays only. The few shell scripts run inside containers are constants; data reaches them only as positional arguments.
 - `shell.openExternal` only for the four help pages in `EXTERNAL_LINKS` and the workspace app on `http://127.0.0.1:<published port>/`.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE): free for noncommercial use; redistributions must keep the license and its `Required Notice:` line (the credit). Commercial use needs a separate license from the author.
