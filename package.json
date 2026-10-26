@@ -12,27 +12,28 @@
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
+  "packageManager": "pnpm@12.15.0",
   "engines": {
-    "node": ">=26.12.1"
+    "node": ">=26.12.1",
+    "pnpm": ">=12.15.0"
   },
   "scripts": {
     "electron:install": "install-electron --no",
     "prepare:resources": "node tools/prepare-resources.ts",
     "build:stages": "node tools/build-stage-packages.ts",
-    "predev": "npm run prepare:resources && npm run build:stages",
+    "predev": "pnpm run prepare:resources && pnpm run build:stages",
     "dev": "electron-vite dev",
-    "build": "npm run prepare:resources && npm run build:stages && electron-vite build",
+    "build": "pnpm run prepare:resources && pnpm run build:stages && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:e2e": "npm run build && playwright test",
-    "dist:win": "npm run build && electron-builder --win nsis --publish never",
-    "postinstall": "npm ci --prefix tools/lint --no-audit --no-fund",
+    "test:e2e": "pnpm run build && playwright test",
+    "dist:win": "pnpm run build && electron-builder --win nsis --publish never",
     "prepare": "husky",
     "lint": "node tools/lint/node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node tools/lint/node_modules/eslint/bin/eslint.js . --fix",
-    "pretest:integration": "npm run prepare:resources && npm run build:stages",
-    "verify:push": "npm run typecheck && npm test && npm run test:integration"
+    "pretest:integration": "pnpm run prepare:resources && pnpm run build:stages",
+    "verify:push": "pnpm run typecheck && pnpm test && pnpm run test:integration"
   },
   "dependencies": {
     "fflate": "0.8.3",
@@ -64,9 +65,6 @@
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"
-  },
-  "allowScripts": {
-    "electron-winstaller": false
   },
   "bugDetective": {
     "contentRepository": "bug-detective-project/supportdesk",

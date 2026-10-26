@@ -35,18 +35,18 @@ test/unit|integration|e2e|manual
 
 - Windows 10/11 with WSL 2 and Docker Desktop (WSL 2 backend)
 - VS Code (the app installs the Dev Containers extension)
-- For development: Node.js 26.12.1 on Windows; optionally Node.js 26.12.1 in WSL for unit tests
+- For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
 - `../supportdesk` next to this folder (the SupportDesk repository with the `stage-N` branches)
 
 ## Development on Windows
 
 ```powershell
-npm ci
-npm run electron:install   # downloads the Electron binary (Electron 45 does it lazily)
-npm run dev                # prepares build/docker and build/stage-packages, then starts Electron
+pnpm install --frozen-lockfile
+pnpm run electron:install  # downloads the Electron binary (Electron 45 does it lazily)
+pnpm run dev               # prepares build/docker and build/stage-packages, then starts Electron
 ```
 
-`npm run dev` and `npm run build` first run:
+`pnpm run dev` and `pnpm run build` first run:
 
 - `tools/prepare-resources.ts`: copies `docker/` and the QA CLI (`../supportdesk/qa` without `stages/`) into `build/docker/` and writes content-addressed image tags to `build/docker/images.json`;
 - `tools/build-stage-packages.ts`: builds `build/stage-packages/` (one zip per stage + `manifest.json`), which the local content source verifies against.
@@ -55,7 +55,7 @@ npm run dev                # prepares build/docker and build/stage-packages, the
 
 The app also runs as a Linux app inside WSL 2, shown on the Windows desktop through WSLg. Requirements:
 
-- Windows 11 (or Windows 10 with WSLg) and Node.js 26.12.1 in the distro (`nvm use`).
+- Windows 11 (or Windows 10 with WSLg) and Node.js 26.12.1 in the distro (`nvm use`), with pnpm 12.15.0 (`npm install -g pnpm@12.15.0`).
 - Docker Desktop with **WSL integration enabled for this distro** (Settings → Resources → WSL integration), so `docker` works inside WSL. Docker Engine installed in the distro also works.
 - Electron's system libraries, once: `sudo apt-get install -y libgtk-3-0 libasound2 libnss3 libgbm1 libxss1`.
 - VS Code on Windows with the Dev Containers extension (the app installs it).
@@ -63,9 +63,9 @@ The app also runs as a Linux app inside WSL 2, shown on the Windows desktop thro
 ```sh
 cd desktop
 nvm use                    # 26.12.1
-npm ci
-npm run electron:install   # downloads the Linux Electron binary
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run electron:install  # downloads the Linux Electron binary
+pnpm run dev
 ```
 
 How the Linux platform module (`src/main/platform/linux.ts`) behaves inside WSL:
@@ -88,19 +88,19 @@ To run the Windows app (and build the installer) from a WSL terminal, Electron, 
 ```sh
 # Linux side: unit tests (and SupportDesk/QA work)
 nvm use            # 26.12.1
-npm ci
-npm test
+pnpm install --frozen-lockfile
+pnpm test
 
 # Windows side: sync to C:\Users\<you>\bugdetective-dev, then run there with Windows Node
 tools/sync-windows.sh
-tools/win.sh npm ci
-tools/win.sh npm run electron:install
-tools/win.sh npm run dev
-tools/win.sh npm run test:e2e
-tools/win.sh npm run dist:win
+tools/win.sh pnpm install --frozen-lockfile
+tools/win.sh pnpm run electron:install
+tools/win.sh pnpm run dev
+tools/win.sh pnpm run test:e2e
+tools/win.sh pnpm run dist:win
 ```
 
-`tools/win.sh` expects a Windows Node.js 26.12.1 in `%USERPROFILE%\bugdetective-dev\tools\node-v26.12.1-win-x64` (the official portable zip), or set `BUGDETECTIVE_WIN_NODE`. Run `tools/sync-windows.sh` after every change.
+`tools/win.sh` expects a Windows Node.js 26.12.1 in `%USERPROFILE%\bugdetective-dev\tools\node-v26.12.1-win-x64` (the official portable zip), or set `BUGDETECTIVE_WIN_NODE`. Install pnpm there once with `tools/win.sh npm install -g pnpm@12.15.0` (it lands next to `node.exe`). Run `tools/sync-windows.sh` after every change.
 
 Docker is shared: `docker.exe` on Windows and the WSL integration talk to the same engine.
 
@@ -108,18 +108,18 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Command | Where | What |
 | --- | --- | --- |
-| `npm test` | WSL or Windows | Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller |
-| `npm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA. Uses the `bugdetective-test-*` resources only. Run `npm run build` first. |
-| `npm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, language, restart |
-| `npx playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
+| `pnpm test` | WSL or Windows | Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller |
+| `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA. Uses the `bugdetective-test-*` resources only. Run `pnpm run build` first. |
+| `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, language, restart |
+| `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
 
 ## Lint and git hooks
 
-ESLint 10 with typescript-eslint, plus the React Hooks and React Refresh rules for the renderer. The toolchain lives in `tools/lint/` with its own `package.json`, because typescript-eslint needs the TypeScript JavaScript API and TypeScript 7 (the app's compiler) no longer ships it: the lint package pins TypeScript 6.0 for the parser only. `npm install` in `desktop/` installs it too (`postinstall`), and `eslint.config.js` re-exports `tools/lint/config.js`.
+ESLint 10 with typescript-eslint, plus the React Hooks and React Refresh rules for the renderer. The toolchain lives in `tools/lint/` with its own `package.json`, because typescript-eslint needs the TypeScript JavaScript API and TypeScript 7 (the app's compiler) no longer ships it: the lint package pins TypeScript 6.0 for the parser only. It is a package of the pnpm workspace (`pnpm-workspace.yaml`), so `pnpm install` in `desktop/` installs it too, and `eslint.config.js` re-exports `tools/lint/config.js`.
 
 ```sh
-npm run lint        # check
-npm run lint:fix    # fix what can be fixed
+pnpm run lint       # check
+pnpm run lint:fix   # fix what can be fixed
 ```
 
 Husky installs two hooks in this repository (`prepare` runs `husky`, which points `core.hooksPath` at `.husky/_`):
@@ -127,14 +127,14 @@ Husky installs two hooks in this repository (`prepare` runs `husky`, which point
 | Hook | Runs | Blocks when |
 | --- | --- | --- |
 | `pre-commit` | lint-staged: `eslint --fix` on the staged `.ts/.tsx/.js/.mjs/.cjs` files, fixes re-staged | an error remains after `--fix` (warnings pass) |
-| `pre-push` | `npm run verify:push`: typecheck, unit tests, integration tests with real Docker (about 2–3 minutes) | anything fails, including Docker not running |
+| `pre-push` | `pnpm run verify:push`: typecheck, unit tests, integration tests with real Docker (about 2–3 minutes) | anything fails, including Docker not running |
 
 The hooks need Node.js 26 on the `PATH` of the shell that runs git. If you commit from an editor whose git does not load nvm, create `~/.config/husky/init.sh` with `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`. To skip the hooks once (not recommended): `git commit --no-verify` / `git push --no-verify`. The VS Code ESLint extension must use the toolchain in `tools/lint`: set `"eslint.nodePath": "tools/lint/node_modules"` in the workspace settings (`"desktop/tools/lint/node_modules"` when the workspace is the parent folder).
 
 ## Installer
 
 ```powershell
-npm run dist:win     # dist\Bug-Detective-Setup-<version>.exe (not signed)
+pnpm run dist:win    # dist\Bug-Detective-Setup-<version>.exe (not signed)
 ```
 
 The installer is per-user (no admin rights), lets the player choose the folder, and adds Start menu and desktop shortcuts. The packaged app carries `resources/docker/` (Dockerfiles, the QA CLI, `images.json`); images are built on the player's machine the first time, with the player's consent.
@@ -156,7 +156,7 @@ Each game project has two repositories in the `bug-detective-project` organizati
 Nothing is published automatically. To publish a content release:
 
 1. Push every branch to the private repository (`git push origin --all`) and the `stage-1` … `stage-4` branches to the public one (`git push public stage-1 stage-2 stage-3 stage-4`). Keep `qa/` off the stage branches.
-2. `npm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk --version 1.0.0`).
+2. `pnpm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk --version 1.0.0`).
 3. Create a GitHub Release on the public repository and upload every file of `build/stage-packages/`: `gh release create v1.0.0 -R bug-detective-project/supportdesk --target stage-1 build/stage-packages/*`.
 4. The app downloads `releases/latest/download/manifest.json`, then the package of the unlocked stage and `archive/refs/heads/stage-N.zip`. It checks the package's SHA-256 and the stage files' digest against the manifest before using anything. If a branch moves after the release, its digest no longer matches: publish a new release.
 

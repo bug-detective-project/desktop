@@ -12,7 +12,7 @@ export interface Launched {
 }
 
 /**
- * Launches the built app (npm run build) with the fake runtime: prerequisites and QA outcomes
+ * Launches the built app (pnpm run build) with the fake runtime: prerequisites and QA outcomes
  * come from the scenario, content comes from the local SupportDesk checkout.
  */
 export async function launch(scenario: object = {}, options: { userData?: string } = {}): Promise<Launched> {

@@ -3,7 +3,7 @@
  * checklist, unlock, VS Code attach, QA fail, hints, solution, fix, QA pass, review, Done, for
  * all four tickets; restart during QA; export, volume deletion and restore.
  *
- *   npm run build && npx playwright test --config playwright.manual.config.ts
+ *   pnpm run build && pnpm exec playwright test --config playwright.manual.config.ts
  *
  * Uses the real "bugdetective-*" Docker resources, and a fresh data folder per run.
  */

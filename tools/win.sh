@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs a command in the synced Windows copy of desktop/ with the Windows Node.js 26 toolchain.
 #
-#   desktop/tools/win.sh npm ci
-#   desktop/tools/win.sh npm run test:e2e
+#   desktop/tools/win.sh pnpm install --frozen-lockfile
+#   desktop/tools/win.sh pnpm run test:e2e
 #
 # BUGDETECTIVE_WIN_NODE points at a Windows folder with node.exe (default: the portable Node.js
 # in %USERPROFILE%\bugdetective-dev\tools\node-v<.nvmrc>-win-x64). Extra environment variables
@@ -24,7 +24,7 @@ script="run-$$.cmd"
   echo '@echo off'
   echo "cd /d \"$dev\\desktop\""
   echo "set \"PATH=$node_dir;%PATH%\""
-  # npm runs scripts through %ComSpec%, which is not always set when started from WSL.
+  # pnpm runs scripts through %ComSpec%, which is not always set when started from WSL.
   echo 'set "ComSpec=%SystemRoot%\System32\cmd.exe"'
   for assignment in ${BD_WIN_ENV:-}; do
     echo "set \"$assignment\""

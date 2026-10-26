@@ -1,2 +1,2 @@
 # Typecheck, unit tests and the real-Docker integration test (Docker must be running).
-npm run verify:push
+pnpm run verify:push

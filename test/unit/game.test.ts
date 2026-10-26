@@ -11,7 +11,7 @@ import { runCommand } from '../../src/main/services/process.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 
-// The real SupportDesk checkout and the manifest from `npm run build:stages`.
+// The real SupportDesk checkout and the manifest from `pnpm run build:stages`.
 const root = resolve(import.meta.dirname, '..', '..');
 const localSource = () =>
   new LocalContentSource({

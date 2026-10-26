@@ -4,7 +4,7 @@
  *   workspace container → QA again (both gates pass), plus timeout, export/restore and
  *   interrupted QA. Uses the "bugdetective-test" resource prefix, never the player's volumes.
  *
- *   npm run build && npm run test:integration
+ *   pnpm run build && pnpm run test:integration
  */
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

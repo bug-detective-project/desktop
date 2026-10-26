@@ -1,0 +1,8 @@
+# The ESLint toolchain is its own package (it pins TypeScript 6 for typescript-eslint).
+packages:
+  - tools/lint
+
+# Packages allowed to run install scripts. Electron downloads its binary lazily
+# (`pnpm run electron:install`), so no package needs one.
+allowBuilds:
+  electron-winstaller: false
