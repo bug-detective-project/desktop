@@ -15,7 +15,7 @@ import * as rules from '../../src/shared/kanban.ts';
 const root = resolve(import.meta.dirname, '..', '..');
 const localSource = () =>
   new LocalContentSource({
-    repoPath: resolve(root, '..', 'supportdesk'),
+    repoPath: resolve(root, '..', 'supportdesk-private'),
     manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),
     runner: runCommand,
   });

@@ -4,7 +4,7 @@
  *   qa/         the QA image (docker/qa/) with a copy of the SupportDesk QA CLI, without stages/
  * and writes build/docker/images.json with content-addressed image tags.
  *
- *   node tools/prepare-resources.ts [--repo ../supportdesk]
+ *   node tools/prepare-resources.ts [--repo ../supportdesk-private]
  */
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join, relative, resolve, sep } from 'node:path';
@@ -12,7 +12,7 @@ import { parseArgs } from 'node:util';
 import { sha256Hex } from '../src/main/services/content/archive.ts';
 
 const root = resolve(import.meta.dirname, '..');
-const { values } = parseArgs({ options: { repo: { type: 'string', default: resolve(root, '..', 'supportdesk') } } });
+const { values } = parseArgs({ options: { repo: { type: 'string', default: resolve(root, '..', 'supportdesk-private') } } });
 const qaSource = join(resolve(values.repo!), 'qa');
 const out = join(root, 'build', 'docker');
 const QA_EXCLUDED = new Set(['node_modules', 'stages', 'test-results', 'playwright-report', '.gitignore']);

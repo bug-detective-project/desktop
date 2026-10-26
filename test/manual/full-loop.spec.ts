@@ -16,7 +16,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard } from '../e2e/fixtures.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk');
+const supportdesk = resolve(root, '..', 'supportdesk-private');
 const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 

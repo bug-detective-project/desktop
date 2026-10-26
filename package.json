@@ -25,6 +25,7 @@
     "dev": "electron-vite dev",
     "build": "pnpm run prepare:resources && pnpm run build:stages && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "pnpm run build:stages",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",

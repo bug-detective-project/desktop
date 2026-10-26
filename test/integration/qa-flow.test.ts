@@ -22,7 +22,7 @@ import { Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk');
+const supportdesk = resolve(root, '..', 'supportdesk-private');
 const PREFIX = 'bugdetective-test';
 const platform = currentPlatform();
 

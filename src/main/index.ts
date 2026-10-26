@@ -51,7 +51,7 @@ function contentSource(): ContentSource {
     ? { kind: 'github', repository: packageJson.bugDetective.contentRepository, release: packageJson.bugDetective.contentRelease }
     : {
         kind: 'local',
-        repoPath: process.env.BUGDETECTIVE_SUPPORTDESK ?? resolve(appRoot, '..', 'supportdesk'),
+        repoPath: process.env.BUGDETECTIVE_SUPPORTDESK ?? resolve(appRoot, '..', 'supportdesk-private'),
         manifestPath: process.env.BUGDETECTIVE_MANIFEST ?? join(appRoot, 'build', 'stage-packages', 'manifest.json'),
       };
   if (existsSync(configFile)) {

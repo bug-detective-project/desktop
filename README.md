@@ -36,7 +36,7 @@ test/unit|integration|e2e|manual
 - Windows 10/11 with WSL 2 and Docker Desktop (WSL 2 backend)
 - VS Code (the app installs the Dev Containers extension)
 - For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
-- `../supportdesk` next to this folder (the SupportDesk repository with the `stage-N` branches)
+- `../supportdesk-private` next to this folder (the SupportDesk repository with the `stage-N` branches)
 
 ## Development on Windows
 
@@ -48,7 +48,7 @@ pnpm run dev               # prepares build/docker and build/stage-packages, the
 
 `pnpm run dev` and `pnpm run build` first run:
 
-- `tools/prepare-resources.ts`: copies `docker/` and the QA CLI (`../supportdesk/qa` without `stages/`) into `build/docker/` and writes content-addressed image tags to `build/docker/images.json`;
+- `tools/prepare-resources.ts`: copies `docker/` and the QA CLI (`../supportdesk-private/qa` without `stages/`) into `build/docker/` and writes content-addressed image tags to `build/docker/images.json`;
 - `tools/build-stage-packages.ts`: builds `build/stage-packages/` (one zip per stage + `manifest.json`), which the local content source verifies against.
 
 ## Running directly in WSL 2 (Linux)
@@ -108,7 +108,7 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Command | Where | What |
 | --- | --- | --- |
-| `pnpm test` | WSL or Windows | Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller |
+| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs `../supportdesk-private` with its `stage-N` branches), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller |
 | `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA. Uses the `bugdetective-test-*` resources only. Run `pnpm run build` first. |
 | `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, language, restart |
 | `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
@@ -151,12 +151,12 @@ The installer is per-user (no admin rights), lets the player choose the folder, 
 
 ## Publishing stages (GitHub)
 
-Each game project has two repositories in the `bug-detective-project` organization: a private one with the source, the QA suite and every branch (`supportdesk-private`, remote `origin` in `../supportdesk`) and a public one with only the `stage-N` branches and the content releases (`supportdesk`, remote `public`). The installed app reads the public one (`bugDetective.contentRepository`).
+Each game project has two repositories in the `bug-detective-project` organization: a private one with the source, the QA suite and every branch (`supportdesk-private`, remote `origin` in `../supportdesk-private`) and a public one with only the `stage-N` branches and the content releases (`supportdesk`, remote `public`). The installed app reads the public one (`bugDetective.contentRepository`).
 
 Nothing is published automatically. To publish a content release:
 
 1. Push every branch to the private repository (`git push origin --all`) and the `stage-1` … `stage-4` branches to the public one (`git push public stage-1 stage-2 stage-3 stage-4`). Keep `qa/` off the stage branches.
-2. `pnpm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk --version 1.0.0`).
+2. `pnpm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk-private --version 1.0.0`).
 3. Create a GitHub Release on the public repository and upload every file of `build/stage-packages/`: `gh release create v1.0.0 -R bug-detective-project/supportdesk --target stage-1 build/stage-packages/*`.
 4. The app downloads `releases/latest/download/manifest.json`, then the package of the unlocked stage and `archive/refs/heads/stage-N.zip`. It checks the package's SHA-256 and the stage files' digest against the manifest before using anything. If a branch moves after the release, its digest no longer matches: publish a new release.
 

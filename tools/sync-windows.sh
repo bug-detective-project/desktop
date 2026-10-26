@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Syncs desktop/ and supportdesk/ from WSL to a Windows folder, where Windows Node runs Electron,
+# Syncs desktop/ and supportdesk-private/ from WSL to a Windows folder, where Windows Node runs Electron,
 # the e2e tests and the installer build. node_modules is never shared between Linux and Windows.
 #
 #   desktop/tools/sync-windows.sh            (default target: /mnt/c/Users/<you>/bugdetective-dev)
@@ -20,6 +20,6 @@ rsync -a --delete \
 # The whole repository, including .git (LocalContentSource reads the stage branches).
 rsync -a --delete \
   --exclude node_modules --exclude 'qa/.package-*' --exclude 'server/data/*.db*' \
-  "$root/supportdesk/" "$target/supportdesk/"
+  "$root/supportdesk-private/" "$target/supportdesk-private/"
 
 echo "Synced to $target"
