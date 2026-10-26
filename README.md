@@ -151,11 +151,13 @@ The installer is per-user (no admin rights), lets the player choose the folder, 
 
 ## Publishing stages (GitHub)
 
+Each game project has two repositories in the `bug-detective-project` organization: a private one with the source, the QA suite and every branch (`supportdesk-private`, remote `origin` in `../supportdesk`) and a public one with only the `stage-N` branches and the content releases (`supportdesk`, remote `public`). The installed app reads the public one (`bugDetective.contentRepository`).
+
 Nothing is published automatically. To publish a content release:
 
-1. Push the `stage-1` … `stage-4` branches to the public repository (for example `pleaobraga/supportdesk-qa`). Keep `qa/` off those branches.
+1. Push every branch to the private repository (`git push origin --all`) and the `stage-1` … `stage-4` branches to the public one (`git push public stage-1 stage-2 stage-3 stage-4`). Keep `qa/` off the stage branches.
 2. `npm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk --version 1.0.0`).
-3. Create a GitHub Release (tag `v1.0.0`) and upload every file of `build/stage-packages/`: `manifest.json` and `stage-N-v1.0.0.zip`.
+3. Create a GitHub Release on the public repository and upload every file of `build/stage-packages/`: `gh release create v1.0.0 -R bug-detective-project/supportdesk --target stage-1 build/stage-packages/*`.
 4. The app downloads `releases/latest/download/manifest.json`, then the package of the unlocked stage and `archive/refs/heads/stage-N.zip`. It checks the package's SHA-256 and the stage files' digest against the manifest before using anything. If a branch moves after the release, its digest no longer matches: publish a new release.
 
 ## How the workspace and VS Code fit together

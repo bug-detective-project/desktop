@@ -69,7 +69,7 @@
     "electron-winstaller": false
   },
   "bugDetective": {
-    "contentRepository": "pleaobraga/supportdesk-qa",
+    "contentRepository": "bug-detective-project/supportdesk",
     "contentRelease": "latest"
   },
   "lint-staged": {
