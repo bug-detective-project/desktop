@@ -10,13 +10,7 @@
   "header": {
     "theme": "Tema",
     "toggleTheme": "Alternar entre o tema claro e o escuro",
-    "me": "EU",
-    "docker": {
-      "running": "Docker em execução",
-      "starting": "Iniciando o Docker…",
-      "notRunning": "Docker parado",
-      "notInstalled": "Docker não instalado"
-    }
+    "me": "EU"
   },
   "common": {
     "checkAgain": "Verificar de novo",

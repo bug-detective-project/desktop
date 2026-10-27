@@ -15,27 +15,7 @@ const NAV: { id: Exclude<View, 'review'>; icon: IconName }[] = [
   { id: 'settings', icon: 'settings' },
 ];
 
-function DockerPill({ snapshot }: { snapshot: Snapshot }) {
-  const { t } = useTranslation();
-  const state = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState;
-  if (state === null) {
-    return null;
-  }
-  const look = {
-    running: { dot: 'bg-emerald-500', text: 'text-foreground' },
-    starting: { dot: 'bg-amber-500 animate-pulse', text: 'text-amber-600 dark:text-amber-400' },
-    notRunning: { dot: 'bg-destructive', text: 'text-destructive' },
-    notInstalled: { dot: 'bg-destructive', text: 'text-destructive' },
-  }[state];
-  return (
-    <div className="hidden items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm md:flex" data-testid="docker-pill" data-state={state}>
-      <span className={`size-2 rounded-full ${look.dot}`} aria-hidden />
-      <span className={`font-medium whitespace-nowrap ${look.text}`}>{t(`header.docker.${state}`)}</span>
-    </div>
-  );
-}
-
-/** The persistent app header: brand, navigation, system health, inbox, theme and the player. */
+/** The persistent app header: brand, navigation, inbox, theme and the player. Docker problems show in the banner below it. */
 export function AppHeader({
   snapshot,
   view,
@@ -99,7 +79,6 @@ export function AppHeader({
               {t('header.theme')}: <span className="font-semibold text-primary">{t(dark ? 'settings.themes.dark' : 'settings.themes.light')}</span>
             </span>
           </button>
-          <DockerPill snapshot={snapshot} />
           <button
             type="button"
             onClick={() => onNavigate('dashboard')}

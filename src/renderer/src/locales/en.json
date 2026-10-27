@@ -10,13 +10,7 @@
   "header": {
     "theme": "Theme",
     "toggleTheme": "Switch between the light and dark theme",
-    "me": "ME",
-    "docker": {
-      "running": "Docker running",
-      "starting": "Docker starting…",
-      "notRunning": "Docker stopped",
-      "notInstalled": "Docker not installed"
-    }
+    "me": "ME"
   },
   "common": {
     "checkAgain": "Check again",
