@@ -11,7 +11,6 @@ const TONE = {
   interrupted: 'warn',
   error: 'warn',
   branchWarning: 'warn',
-  branchWarningDetached: 'warn',
 } as const;
 
 export function QaCommentView({ comment }: { comment: Comment }) {

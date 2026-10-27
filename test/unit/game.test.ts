@@ -235,7 +235,7 @@ describe('Game', () => {
     await game.nextAssignment();
     expect(claim).toHaveBeenCalledWith(game.current.createdAt);
     expect(await claim.mock.results[0].value).toBe(1);
-    expect(game.snapshot().log.some((line) => line.includes('Archived 1 branch'))).toBe(true);
+    expect(game.snapshot().log.some((line) => line.includes('Kept the code of a previous game'))).toBe(true);
     expect(game.current.currentTicket).toBe(1);
   });
 

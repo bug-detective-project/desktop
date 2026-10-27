@@ -6,7 +6,7 @@ import type { QaComment } from './types.ts';
 
 export interface QaMessage {
   /** i18n key under "qa.comment". */
-  key: 'gate1Failed' | 'gate2Failed' | 'timeout' | 'passed' | 'interrupted' | 'error' | 'branchWarning' | 'branchWarningDetached';
+  key: 'gate1Failed' | 'gate2Failed' | 'timeout' | 'passed' | 'interrupted' | 'error' | 'branchWarning';
   params: Record<string, string | number>;
   /** Failing tests to list under the message, with their errors. */
   failing: { name: string; error?: string }[];
@@ -44,8 +44,7 @@ export function qaMessage(comment: QaComment): QaMessage {
     case 'error':
       return { key: 'error', params: { detail: comment.detail ?? '' }, failing: [], unfinished: [], gate: null };
     case 'branchWarning':
-      return comment.branch
-        ? { key: 'branchWarning', params: { branch: comment.branch }, failing: [], unfinished: [], gate: null }
-        : { key: 'branchWarningDetached', params: {}, failing: [], unfinished: [], gate: null };
+      // The branch is kept in the state but never shown: the UI talks about tickets, not git branches.
+      return { key: 'branchWarning', params: {}, failing: [], unfinished: [], gate: null };
   }
 }

@@ -73,8 +73,9 @@ describe('QA comment and message selection', () => {
     expect(qaMessage({ ...base, kind: 'passed' })).toMatchObject({ key: 'passed' });
     expect(qaMessage({ ...base, kind: 'interrupted' })).toMatchObject({ key: 'interrupted' });
     expect(qaMessage({ ...base, kind: 'error', detail: 'Docker stopped' })).toMatchObject({ key: 'error', params: { detail: 'Docker stopped' } });
-    expect(qaMessage({ ...base, kind: 'branchWarning', branch: 'main' } as QaComment)).toMatchObject({ key: 'branchWarning', params: { branch: 'main' } });
-    expect(qaMessage({ ...base, kind: 'branchWarning', branch: null } as QaComment)).toMatchObject({ key: 'branchWarningDetached' });
+    // Never the branch name, whether HEAD is on another branch or detached.
+    expect(qaMessage({ ...base, kind: 'branchWarning', branch: 'main' } as QaComment)).toMatchObject({ key: 'branchWarning', params: {} });
+    expect(qaMessage({ ...base, kind: 'branchWarning', branch: null } as QaComment)).toMatchObject({ key: 'branchWarning', params: {} });
   });
 
   it('trims long errors', () => {

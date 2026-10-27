@@ -285,6 +285,6 @@ describe('QA with real Docker', () => {
       expect(archived.some((name) => name.endsWith(`/${branch}`))).toBe(true);
     }
     expect(await ws.git(['stash', 'list'])).toContain('uncommitted work from a previous game');
-    expect(fresh.snapshot().log.join('\n')).toMatch(/Archived \d+ branch/);
+    expect(fresh.snapshot().log.join('\n')).toMatch(/Kept the code of a previous game in the workspace history \(\d+ ticket/);
   });
 });

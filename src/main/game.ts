@@ -243,13 +243,13 @@ export class Game {
       // The volume outlives the saved game: work from another game is archived, never reused.
       const archived = await this.options.runtime.claimWorkspace(this.state.createdAt);
       if (archived > 0) {
-        this.appendLog(`» Archived ${archived} branch(es) from a previous game (archive/…)`);
+        this.appendLog(`» Kept the code of a previous game in the workspace history (${archived} ticket(s))`);
       }
       const commit = await this.options.runtime.importStage(ticket, fetched.codeFiles, fetched.entry.commitMessage);
       await this.options.runtime.claimWorkspace(this.state.createdAt);
       this.appendLog(`» Imported as commit ${commit.slice(0, 12)}`);
       await this.options.runtime.checkoutPlayerBranch(ticket);
-      this.appendLog(`» Checked out ${playerBranch(ticket)}`);
+      this.appendLog(`» Workspace ready for ticket ${ticket}`);
       await this.options.runtime.resetDatabase().catch(() => {});
       await this.commit(this.apply((state, ctx) => rules.unlockTicket(state, ticket, commit, ctx)));
       await this.loadTicketMeta();

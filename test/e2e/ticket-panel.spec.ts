@@ -14,6 +14,8 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
     await expect(panel.getByTestId('open-vscode')).toBeEnabled();
     await expect(panel.getByTestId('open-browser')).toContainText(':5173');
+    // The workspace is on player/ticket-1, but git branch names are never shown.
+    await expect(panel).not.toContainText('player/');
 
     // Hints only from In Progress.
     await panel.getByTestId('tab-senior').click();

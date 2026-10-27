@@ -4,7 +4,7 @@ The desktop UI follows the approved **B-Refined** layout (`../layout-tests/UI_SP
 
 ## Tone
 
-Calm, realistic internal developer tool in someone's first week. No points, streaks, confetti, countdowns or game HUD. **Never show how many tickets exist** (no "1 of 4", no roadmap of locked tickets): the UI shows the current assignment, or that the next one is queued.
+Calm, realistic internal developer tool in someone's first week. No points, streaks, confetti, countdowns or game HUD. **Never show how many tickets exist** (no "1 of 4", no roadmap of locked tickets): the UI shows the current assignment, or that the next one is queued. **Never show git branch names** (`player/ticket-N`, `archive/…`): the UI talks about tickets; branches stay internal to the workspace.
 
 ## Tokens
 
@@ -23,7 +23,7 @@ Defined once in `src/renderer/src/styles.css` (Tailwind CSS 4, shadcn-style name
 | `border` / `input` / `ring` | `border-border`, `border-input`, `ring-ring/50` | Lines, form fields, focus rings |
 | `radius` (0.5rem) | `rounded-md`, `rounded-lg`, `rounded-xl` | `rounded-xl` for cards, `rounded-lg` for buttons and inner boxes |
 
-Fonts: **Inter** for the UI, **JetBrains Mono** for code, logs, branches and IDs (`font-mono`). Both are bundled locally (`@fontsource-variable/*`); the app loads nothing remote.
+Fonts: **Inter** for the UI, **JetBrains Mono** for code, logs, versions and IDs (`font-mono`). Both are bundled locally (`@fontsource-variable/*`); the app loads nothing remote.
 
 The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles `.dark` on `<html>`. The header's theme button switches between Light and Dark.
 
@@ -66,7 +66,7 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 
 - **Dashboard** (`screens/Dashboard.tsx`), a 3-column desk (`lg:grid-cols-12`, max width `7xl`):
   - Column 1 (3): Directives & Inbox (selected thread `border-primary/40 bg-primary/5`, unread dot and bold primary sender), the Lanternfish Labs card, the client card (emerald dot, `Client` tag, SupportDesk stack).
-  - Column 2 (6): the open directive (avatar, sender and e-mail, role and date, `ID: msg-…` chip, subject, markdown body) and the **action dock**, which follows the game state in this order: downloads needed (`environment-panel`), unlocking (progress and log), an older directive of a done ticket (emerald "done & merged", return to the active task), the active ticket (stage pill, branch, the stage's primary action), next assignment queued (or blocked while Docker is stopped), onboarding complete.
+  - Column 2 (6): the open directive (avatar, sender and e-mail, role and date, `ID: msg-…` chip, subject, markdown body) and the **action dock**, which follows the game state in this order: downloads needed (`environment-panel`), unlocking (progress and log), an older directive of a done ticket (emerald "done & merged", return to the active task), the active ticket (stage pill, the stage's primary action), next assignment queued (or blocked while Docker is stopped), onboarding complete.
   - Column 3 (3): Current assignment (active ticket, or "Queued" with **Get next assignment**), Client reporters & mentors (from `content/story.*.json`), Local environment (Docker and each download item).
 - **Board**: five columns with stage dots and counters on `bg-muted/40`; cards `bg-card rounded-xl border p-4 shadow-sm` with the key in `font-mono text-primary`. Only unlocked tickets appear.
 - **Ticket panel**: key, stage pill, title; workspace actions with icons; QA running in an amber notice.

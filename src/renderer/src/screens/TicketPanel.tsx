@@ -84,8 +84,7 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
       <p className="text-xs text-muted-foreground">{t('ticket.vscodeHint')}</p>
       {status && (
         <p className="text-xs text-muted-foreground">
-          {status.branch && <span className="font-mono text-foreground">{t('ticket.branch', { branch: status.branch })}</span>}
-          {!status.devServerUp && <span className="ml-2">{t('ticket.devServerDown')}</span>}
+          {!status.devServerUp && <span>{t('ticket.devServerDown')}</span>}
         </p>
       )}
     </div>
@@ -189,7 +188,6 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
                     {attempt.result.status !== 'passed' && ` · ${t('qa.gate', { gate: attempt.result.gate })}`}
                   </Badge>
                   <span className="text-muted-foreground">{t('ticket.testsSummary', { passed, failed })}</span>
-                  {attempt.branch && <span className="font-mono text-xs text-muted-foreground">{attempt.branch}</span>}
                   <time className="ml-auto text-xs text-muted-foreground">{new Date(attempt.finishedAt).toLocaleString(locale)}</time>
                 </li>
               );

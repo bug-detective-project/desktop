@@ -105,7 +105,7 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('assignment-card')).toContainText('SD-214');
     await expect(page.getByTestId('assignment-card').locator('[data-stage]')).toHaveAttribute('data-stage', 'todo');
-    await expect(page.getByTestId('action-dock')).toContainText('player/ticket-1');
+    await expect(page.getByTestId('action-dock')).not.toContainText('player/');
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
     // The header's theme toggle switches the theme everywhere.
