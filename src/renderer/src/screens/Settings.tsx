@@ -27,7 +27,6 @@ const locale = (language: string) => (language === 'pt' ? 'pt-BR' : 'en-US');
 
 const card = 'rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xs md:p-8';
 const pane = `space-y-6 ${card}`;
-const actionButton = 'px-4 py-2';
 
 /** Runs an action with its own busy flag; errors become toasts. */
 function useAction() {
@@ -51,7 +50,7 @@ function PaneHeader({ title, help, aside }: { title: string; help: string; aside
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h2 className="text-base font-bold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{help}</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{help}</p>
       </div>
       {aside}
     </div>
@@ -63,8 +62,8 @@ function Row({ title, help, children }: { title: string; help: string; children:
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-8">
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{help}</p>
+        <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{help}</p>
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -90,7 +89,7 @@ function Flag({ language }: { language: Language }) {
 }
 
 /** "2 tickets completed · SD-238 (In Progress)": story terms only, never branches or totals. */
-function useProgressText(snapshot: Snapshot) {
+function useProgressText(snapshot: Snapshot): { done: string; current: { key: string; stage: string } | null } {
   const { t, i18n } = useTranslation();
   const { tickets, currentTicket } = snapshot.state;
   if (tickets.length === 0) {
@@ -98,7 +97,7 @@ function useProgressText(snapshot: Snapshot) {
   }
   const done = t('settings.ticketsDone', { count: tickets.filter((ticket) => ticket.status === 'done').length });
   const active = tickets.find((ticket) => ticket.ticket === currentTicket && ticket.status !== 'done');
-  const current = active ? `${ticketTitle(snapshot, active.ticket, i18n.language as Language).key} (${t(`board.columns.${active.status}`)})` : null;
+  const current = active ? { key: ticketTitle(snapshot, active.ticket, i18n.language as Language).key, stage: t(`board.columns.${active.status}`) } : null;
   return { done, current };
 }
 
@@ -137,7 +136,7 @@ function QaTimeout({ seconds }: { seconds: number }) {
   const typed = parseDuration(text);
   const base = inRange(typed) ? typed : seconds;
   const step = (delta: number) => save(Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, base + delta)));
-  const stepButton = 'rounded-md border border-border bg-secondary px-2 py-1 font-mono text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
+  const stepButton = 'rounded-md border border-border bg-secondary px-2 py-1 text-xs font-medium text-foreground tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="flex flex-col items-start gap-1.5 md:items-end">
@@ -147,7 +146,7 @@ function QaTimeout({ seconds }: { seconds: number }) {
           inputMode="text"
           aria-label={t('settings.qaTimeout')}
           aria-invalid={invalid}
-          className={`w-32 rounded-lg border bg-background px-3 py-1.5 font-mono text-xs font-medium text-foreground focus:ring-2 focus:outline-hidden ${invalid ? 'border-destructive focus:ring-destructive/40' : 'border-border focus:ring-ring'}`}
+          className={`w-32 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-foreground tabular-nums focus:ring-2 focus:outline-hidden ${invalid ? 'border-destructive focus:ring-destructive/40' : 'border-border focus:ring-ring'}`}
           value={text}
           onChange={(event) => setText(event.target.value)}
           onBlur={commit}
@@ -188,7 +187,7 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
                 role="radio"
                 aria-checked={selected}
                 onClick={() => void api.updateSettings({ language })}
-                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
                   selected ? 'border-primary/50 bg-primary/5 font-semibold text-foreground ring-1 ring-primary/30' : 'border-border font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                 }`}
                 data-testid={`language-${language}`}
@@ -212,7 +211,7 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
                 role="radio"
                 aria-checked={selected}
                 onClick={() => void api.updateSettings({ theme })}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-all ${
                   selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
                 }`}
                 data-testid={`theme-${theme}`}
@@ -288,11 +287,11 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
   return (
     <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid="disk-usage">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xs font-bold text-foreground">{t('settings.disk')}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{t('settings.disk')}</h3>
         <span className="text-xs text-muted-foreground">{t('settings.diskHelp')}</span>
       </div>
       {!running ? (
-        <p className="text-xs text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
+        <p className="text-sm text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const).map((id) => {
@@ -300,7 +299,7 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
             return (
               <div key={id} className="min-w-0 rounded-lg border border-border/60 bg-card p-3" data-testid={`disk-${id}`}>
                 <span className="block truncate text-xs font-semibold text-muted-foreground">{t(`settings.diskItems.${id}.name`)}</span>
-                <span className="mt-0.5 block font-mono text-sm font-bold text-foreground">
+                <span className="mt-0.5 block text-base font-bold text-foreground tabular-nums">
                   {items === null ? t('settings.diskMeasuring') : typeof item?.bytes === 'number' ? formatBytes(item.bytes, i18n.language) : '—'}
                 </span>
                 <span className="block text-xs text-muted-foreground">{item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}</span>
@@ -391,7 +390,7 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
                   <span className="text-sm font-semibold text-foreground">{t(`checklist.${id}.title`)}</span>
                   {check.version && <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">v{check.version}</span>}
                 </div>
-                {problem && <p className="mt-1 text-xs text-muted-foreground">{problem}</p>}
+                {problem && <p className="mt-1 text-sm text-muted-foreground">{problem}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Badge tone={status.tone}>{t(`settings.toolStatus.${status.label}`)}</Badge>
@@ -436,7 +435,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
   const [pending, setPending] = useState<{ token: string; summary: SaveSummary } | null>(null);
   const [confirmNewGame, setConfirmNewGame] = useState(false);
   const progress = useProgressText(snapshot);
-  const progressText = [progress.done, progress.current].filter(Boolean).join(' · ');
+  const progressText = progress.current ? `${progress.done} · ${progress.current.key} (${progress.current.stage})` : progress.done;
   const last = snapshot.state.lastExport;
   const lastFile = last && splitPath(last.path);
   const outdated = backupStatus(snapshot.state) === 'outdated';
@@ -449,7 +448,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       {locked && (
         <Notice data-testid="settings-locked">
           <p className="font-semibold">{t('settings.locked.title', { task: t(`settings.locked.tasks.${task}`) })}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('settings.locked.body')}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t('settings.locked.body')}</p>
         </Notice>
       )}
       <div className={pane}>
@@ -465,13 +464,13 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             )
           }
         />
-        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-xs" data-testid="last-export">
+        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-sm" data-testid="last-export">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <dt className="text-muted-foreground">{t('settings.lastExport')}</dt>
             <dd className="min-w-0 text-right">
               {last && lastFile ? (
                 <>
-                  <span className="font-mono font-semibold text-foreground">{lastFile.name}</span>
+                  <span className="font-mono text-xs font-semibold text-foreground">{lastFile.name}</span>
                   <span className="text-muted-foreground">
                     {' · '}
                     {ago(last.at, now, i18n.language)} ({new Date(last.at).toLocaleDateString(locale(i18n.language), { dateStyle: 'medium' })})
@@ -485,7 +484,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
           {lastFile && (
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <dt className="text-muted-foreground">{t('settings.exportFolder')}</dt>
-              <dd className="min-w-0 font-mono break-all text-foreground">{lastFile.folder}</dd>
+              <dd className="min-w-0 font-mono text-xs break-all text-foreground">{lastFile.folder}</dd>
             </div>
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border/60 pt-2.5">
@@ -495,18 +494,19 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
               {progress.current && (
                 <>
                   {' · '}
-                  <span className="font-mono font-medium text-primary">{progress.current}</span>
+                  <span className="font-medium text-primary">
+                    <span className="font-mono">{progress.current.key}</span> ({progress.current.stage})
+                  </span>
                 </>
               )}
             </dd>
           </div>
         </dl>
-        {dockerDown && !locked && <p className="text-xs text-muted-foreground">{t('settings.needsDocker')}</p>}
+        {dockerDown && !locked && <p className="text-sm text-muted-foreground">{t('settings.needsDocker')}</p>}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
-            size="sm"
-            className={actionButton}
+           
             busy={busy === 'export' || task === 'exporting'}
             disabled={task !== null || dockerDown}
             onClick={() =>
@@ -517,11 +517,11 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             }
             data-testid="export-progress"
           >
-            <Icon name="download" className="size-3.5" />
+            <Icon name="download" />
             {t('settings.export')}
           </Button>
-          <Button size="sm" className={actionButton} busy={busy === 'inspect'} disabled={task !== null || dockerDown} onClick={() => run('inspect', async () => setPending(await api.inspectSave()))} data-testid="restore-progress">
-            <Icon name="rotateCcw" className="size-3.5" />
+          <Button busy={busy === 'inspect'} disabled={task !== null || dockerDown} onClick={() => run('inspect', async () => setPending(await api.inspectSave()))} data-testid="restore-progress">
+            <Icon name="rotateCcw" />
             {t('settings.restore')}
           </Button>
         </div>
@@ -532,10 +532,10 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
         <div className="min-w-0 space-y-4">
           <div>
             <h2 className="text-base leading-tight font-bold tracking-tight text-destructive">{t('settings.dangerZone')}</h2>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
           </div>
-          <Button variant="dangerOutline" size="sm" className={actionButton} disabled={task !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
-            <Icon name="rotateCcw" className="size-3.5" />
+          <Button variant="dangerOutline" disabled={task !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
+            <Icon name="rotateCcw" />
             {t('settings.newGame')}
           </Button>
         </div>
@@ -544,7 +544,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       {confirmNewGame && (
         <Modal title={t('settings.newGameTitle')} icon={<Icon name="rotateCcw" className="size-5 text-destructive" />} onClose={() => setConfirmNewGame(false)}>
           <Notice>
-            <p className="text-xs leading-relaxed">{t('settings.newGameWarning')}</p>
+            <p className="text-sm leading-relaxed">{t('settings.newGameWarning')}</p>
           </Notice>
           <div className="mt-5 flex justify-end gap-2">
             <Button onClick={() => setConfirmNewGame(false)}>{t('common.cancel')}</Button>
@@ -566,23 +566,23 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       )}
       {pending && (
         <Modal title={t('settings.restoreTitle')} onClose={() => setPending(null)} data-testid="restore-dialog">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-xs">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-sm">
             <dt className="text-muted-foreground">{t('settings.restoreFile')}</dt>
-            <dd className="font-mono font-semibold break-all">{pending.summary.fileName}</dd>
+            <dd className="font-mono text-xs font-semibold break-all">{pending.summary.fileName}</dd>
             <dt className="text-muted-foreground">{t('settings.restoreCreated')}</dt>
             <dd>{new Date(pending.summary.createdAt).toLocaleString(locale(i18n.language), { dateStyle: 'medium', timeStyle: 'short' })}</dd>
             <dt className="text-muted-foreground">{t('settings.restoreVersion')}</dt>
-            <dd className="font-mono">Bug Detective {pending.summary.appVersion}</dd>
+            <dd>Bug Detective <span className="font-mono text-xs">{pending.summary.appVersion}</span></dd>
             <dt className="text-muted-foreground">{t('settings.restoreProgress')}</dt>
             <dd className="font-semibold">{t('settings.ticketsDone', { count: pending.summary.ticketsDone })}</dd>
           </dl>
           {pending.summary.overwritesProgress && (
-            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200" data-testid="restore-warning">
+            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200" data-testid="restore-warning">
               <p className="flex items-start gap-2 font-medium">
-                <Icon name="alertTriangle" className="mt-px size-3.5 text-amber-500" />
+                <Icon name="alertTriangle" className="mt-0.5 size-4 text-amber-500" />
                 {t('settings.restoreWarning')}
               </p>
-              <p className="pl-5.5">{t('settings.restoreCurrent', { progress: progressText })}</p>
+              <p className="pl-6">{t('settings.restoreCurrent', { progress: progressText })}</p>
             </div>
           )}
           <div className="mt-5 flex justify-end gap-2">
@@ -613,7 +613,7 @@ function Restoring({ log }: { log: string[] }) {
   const { t } = useTranslation();
   return (
     <Modal title={t('settings.restoringTitle')} icon={<Icon name="spinner" className="size-5 text-primary" />} data-testid="restoring">
-      <p className="text-xs text-muted-foreground">{t('settings.restoringHelp')}</p>
+      <p className="text-sm text-muted-foreground">{t('settings.restoringHelp')}</p>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-busy>
         <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
       </div>
@@ -645,19 +645,19 @@ function About({ snapshot }: { snapshot: Snapshot }) {
               v{snapshot.appVersion}
             </span>
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('settings.aboutTagline')}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t('settings.aboutTagline')}</p>
         </div>
       </div>
       <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-foreground">{t('settings.runtime')}</span>
+          <span className="text-sm font-semibold text-foreground">{t('settings.runtime')}</span>
           <span className="font-mono text-xs text-muted-foreground">{t('settings.runtimeHost')}</span>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {parts.map((part) => (
             <div key={part.id} className="rounded-lg border border-border/60 bg-card p-3">
-              <span className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase">{part.name}</span>
-              <span className="mt-0.5 block font-mono text-xs font-bold text-foreground">v{part.version}</span>
+              <span className="block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">{part.name}</span>
+              <span className="mt-0.5 block font-mono text-sm font-bold text-foreground">v{part.version}</span>
               <span className="text-xs text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
             </div>
           ))}
@@ -681,7 +681,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
     <div className="mx-auto max-w-4xl px-6 py-8" data-testid="settings">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('settings.title')}</h1>
-        <p className="mt-1 text-xs text-muted-foreground">{t('settings.subtitle')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
       <div className="mb-8 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
@@ -694,12 +694,12 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-colors ${
                 active ? 'bg-primary font-semibold text-primary-foreground shadow-xs' : 'font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               }`}
               data-testid={`settings-tab-${id}`}
             >
-              <Icon name={icon} className="size-3.5" />
+              <Icon name={icon} className="size-4" />
               {t(`settings.tabs.${id}`)}
               {id === 'backup' && outdated && (
                 <span

@@ -6,6 +6,7 @@ import { app, BrowserWindow, session, shell } from 'electron';
 import { z } from 'zod';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
+import { attachDevToolsShortcuts, loadReactDevTools } from './devtools.ts';
 import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
 import { channelName, registerIpc } from './ipc.ts';
@@ -28,6 +29,8 @@ if (process.env.BUGDETECTIVE_USER_DATA) {
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;
 const appRoot = app.getAppPath();
 const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+// Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
+const devTools = !app.isPackaged && !isE2E;
 
 const contentConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('local'), repoPath: z.string(), manifestPath: z.string() }),
@@ -125,6 +128,9 @@ function createWindow(): BrowserWindow {
     },
   });
   window.once('ready-to-show', () => window.show());
+  if (devTools) {
+    attachDevToolsShortcuts(window);
+  }
   if (devRendererUrl) {
     void window.loadURL(devRendererUrl);
   } else {
@@ -156,6 +162,9 @@ async function main(): Promise<void> {
   await game.init(language);
 
   registerIpc(game, devRendererUrl ? new URL(devRendererUrl).origin : null, openUrl);
+  if (devTools) {
+    await loadReactDevTools();
+  }
   window = createWindow();
 
   app.on('second-instance', () => {

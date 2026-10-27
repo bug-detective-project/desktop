@@ -23,7 +23,7 @@ Defined once in `src/renderer/src/styles.css` (Tailwind CSS 4, shadcn-style name
 | `border` / `input` / `ring` | `border-border`, `border-input`, `ring-ring/50` | Lines, form fields, focus rings |
 | `radius` (0.5rem) | `rounded-md`, `rounded-lg`, `rounded-xl` | `rounded-xl` for cards, `rounded-lg` for buttons and inner boxes |
 
-Fonts: **Inter** for the UI, **JetBrains Mono** for code, logs, versions and IDs (`font-mono`). Both are bundled locally (`@fontsource-variable/*`); the app loads nothing remote.
+Fonts: **Inter** for the UI, **JetBrains Mono** for IDs, versions, paths, code and logs (see Typography). Both are bundled locally (`@fontsource-variable/*`); the app loads nothing remote.
 
 The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles `.dark` on `<html>`. The header's theme button switches between Light and Dark.
 
@@ -35,10 +35,26 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 
 ## Typography
 
-- Page titles: `text-2xl font-bold tracking-tight`. Message subjects: `text-lg font-bold tracking-tight`.
-- Card titles: `text-[11px] font-bold uppercase tracking-wider text-foreground` (`SectionTitle`).
-- Metadata: `text-xs text-muted-foreground` (`text-[10px]`/`text-[11px]` in dense rails).
-- Markdown (`Markdown.tsx`): paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips. The container sets the size (`className="text-xs"` for directives, `text-sm` elsewhere).
+Every screen uses the same two families and the same size scale, taken from the Board:
+
+| Family | Utility | Use |
+| --- | --- | --- |
+| **Inter Variable** (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` as fallback) | `font-sans`, set on `body` | All UI text |
+| **JetBrains Mono Variable** (`ui-monospace, monospace` as fallback) | `font-mono` | Only ticket keys and message IDs (`SD-214`, `msg-…`), versions, file names and paths, e-mail addresses, code and logs. Never for sentences, labels, stage names or numbers (use `tabular-nums` for sizes and durations) |
+
+| Role | Classes | Examples |
+| --- | --- | --- |
+| Page title | `text-2xl font-bold tracking-tight` | "Board", "Settings" |
+| Subject | `text-lg font-bold tracking-tight` | Directive subject, About app name |
+| Card heading | `text-base font-bold tracking-tight` | Settings pane titles, Danger zone, the Lanternfish Labs and client cards, the current assignment title |
+| Setting title | `text-base font-semibold tracking-tight` | Preferences rows (Language, Theme, QA time limit), with the help below in `text-sm text-muted-foreground` |
+| Reading text (default) | `text-sm` | Card titles, directive body, list items, help texts, dialog text, inputs, tabs |
+| Metadata | `text-xs text-muted-foreground` | Dates, ticket keys, secondary lines, badges, chips, small buttons |
+| Section label | `text-[11px] font-bold uppercase tracking-wider` (`SectionTitle`) | Board column titles |
+| Card label (Dashboard rails) | `text-xs font-bold uppercase tracking-wider` | "Directives & inbox", "Current assignment", "Client reporters & mentors", "Local environment" |
+| Counter chip | `text-[10px] font-bold` | Board column counts, unread counter |
+
+Nothing smaller than `text-xs` except section labels and counter chips. Markdown (`Markdown.tsx`): paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-sm`.
 
 ## Workflow stage colors
 
@@ -59,7 +75,7 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 - `Button` (`ui.tsx`): `variant` `primary` (`bg-primary`), `secondary` (`bg-secondary border`), `ghost`, `danger` (`bg-destructive`); `size` `sm` (docks, rails, banners) or `md`. `busy` shows a spinner.
 - **Icons** (`icons.tsx`): inline Lucide shapes drawn with `currentColor`. Icons inside buttons always inherit the button's text color: never give them their own color (no green icon inside a primary button).
 - `Card`, `SectionTitle`, `Badge` (tones `neutral`, `ok`, `warn`, `danger`, `brand`), `StagePill`, `StatusIcon`, `Tabs`, `LogView` (`bg-muted/60 font-mono text-[11px]`), `Modal`, `Notice` (amber warning or destructive block).
-- `AppHeader.tsx`: the shell on every screen after the checklist. Left: the app logo (`assets/logo.png`, 32 px), app name, `Lanternfish Labs`. Nav: Dashboard, Board, Settings (active `bg-primary/10 text-primary`). Right: theme toggle, Docker health pill (green running, amber starting, red stopped), inbox button with the unread counter, `ME` avatar. The Docker banner (`DockerBanner` in `Checklist.tsx`) sits right below it while Docker is down.
+- `AppHeader.tsx`: the shell on every screen after the checklist, 64 px high (`h-16`). Text follows the scale: app name `text-base font-bold`, company, navigation and pills `text-sm`, icons `size-4`, unread counter `text-xs`; below `xl` the company name and the pill labels hide (icons and values stay). Left: the app logo (`assets/logo.png`, 36 px), app name, `Lanternfish Labs`. Nav: Dashboard, Board, Settings (active `bg-primary/10 text-primary`). Right: theme toggle, Docker health pill (green running, amber starting, red stopped), inbox button with the unread counter, `ME` avatar. The Docker banner (`DockerBanner` in `Checklist.tsx`) sits right below it while Docker is down.
 - Toasts (`toast.tsx`): `bg-popover` with a primary (info) or destructive (error) left edge.
 
 ## Screens
@@ -67,7 +83,7 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 - **Dashboard** (`screens/Dashboard.tsx`), a 3-column desk (`lg:grid-cols-12`, max width `7xl`):
   - Column 1 (3): Directives & Inbox (selected thread `border-primary/40 bg-primary/5`, unread dot and bold primary sender), the Lanternfish Labs card, the client card (emerald dot, `Client` tag, SupportDesk stack).
   - Column 2 (6): the open directive (avatar, sender and e-mail, role and date, `ID: msg-…` chip, subject, markdown body) and the **action dock**, which follows the game state in this order: downloads needed (`environment-panel`), unlocking (progress and log), an older directive of a done ticket (emerald "done & merged", return to the active task), the active ticket (stage pill, the stage's primary action), next assignment queued (or blocked while Docker is stopped), onboarding complete.
-  - Column 3 (3): Current assignment (active ticket, or "Queued" with **Get next assignment**), Client reporters & mentors (from `content/story.*.json`), Local environment (Docker and each download item).
+  - Column 3 (3): Current assignment (active ticket, or "Queued" with **Get next assignment**), Client reporters & mentors (from `content/story.*.json`; name, then "role · company" in `text-sm`, the mentor tag next to the senior's name), Local environment (Docker and each download item).
 - **Board**: five columns with stage dots and counters on `bg-muted/40`; cards `bg-card rounded-xl border p-4 shadow-sm` with the key in `font-mono text-primary`. Only unlocked tickets appear.
 - **Ticket panel**: key, stage pill, title; workspace actions with icons; QA running in an amber notice.
 - **Code review**: key and stage pill above the title; accept button primary with a `checkCircle` icon.
@@ -77,7 +93,7 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
   - Progress & backup: last export (file, age, folder) and current progress in story terms (never branch names or totals), "Backup outdated" badge and an age chip on the tab; Export / Restore; Danger zone card with an outline destructive New game button. While a long task runs, a notice says which one and the actions are disabled; while Docker is stopped, Export and Restore are disabled with the reason.
   - About: logo, version and the Electron / Node.js / Chromium versions.
   - Dialogs (`Modal`, `bg-black/60 backdrop-blur-xs`): restore confirmation (save summary, amber overwrite warning), new game, and the restore in progress (no close button, terminal log).
-- Badges are `text-xs`; nothing smaller than `text-xs` in Settings.
+- Badges are `text-xs`; reading text and help are `text-sm`, like the rest of the app.
 
 ## Text
 

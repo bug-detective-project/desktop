@@ -74,7 +74,7 @@ function Panel({
 }) {
   return (
     <section
-      className={`rounded-xl border border-border bg-card p-4 text-xs shadow-sm ${className}`}
+      className={`rounded-xl border border-border bg-card p-4 text-sm shadow-sm ${className}`}
       {...props}
     >
       {children}
@@ -95,7 +95,7 @@ function Tag({
       : 'bg-muted font-medium text-muted-foreground'
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap ${look}`}
+      className={`rounded px-1.5 py-0.5 text-xs whitespace-nowrap ${look}`}
     >
       {children}
     </span>
@@ -157,14 +157,14 @@ function Dock({
         <div className="min-w-0 flex-1">
           {label && (
             <div
-              className={`mb-0.5 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wider uppercase ${look.label}`}
+              className={`mb-0.5 flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-wider uppercase ${look.label}`}
             >
               {label}
             </div>
           )}
           <h4 className="text-sm font-bold text-foreground">{title}</h4>
           {body && (
-            <p className="mt-0.5 text-xs text-muted-foreground">{body}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
           )}
         </div>
         {aside}
@@ -316,7 +316,7 @@ function ActionDock({
           {environment.items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-2 text-xs"
+              className="flex items-center gap-2 text-sm"
               data-testid={`env-${item.id}`}
               data-ready={item.ready}
             >
@@ -681,7 +681,7 @@ function MessageView({
                   <h2 className="text-sm font-bold text-foreground">
                     {manager.name}
                   </h2>
-                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                     &lt;{manager.email}&gt;
                   </span>
                 </div>
@@ -700,7 +700,7 @@ function MessageView({
           </header>
 
           {previous && (
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs">
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm">
               <div className="flex items-center gap-2">
                 <span
                   className="size-2 shrink-0 rounded-full bg-emerald-500"
@@ -718,7 +718,7 @@ function MessageView({
                 </span>
               </div>
               {active && (
-                <span className="shrink-0 rounded border border-primary/30 bg-background px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+                <span className="shrink-0 rounded border border-primary/30 bg-background px-2 py-0.5 font-mono text-xs font-bold text-primary">
                   {t('dashboard.activeChip', { key: activeKey })}
                 </span>
               )}
@@ -730,7 +730,7 @@ function MessageView({
           </h1>
           <Markdown
             testId="inbox-body"
-            className="text-xs"
+            className="text-sm"
           >
             {text.body}
           </Markdown>
@@ -782,17 +782,17 @@ function AssignmentCard({
         {heading(
           <StagePill
             status={active.status}
-            className="text-[10px]"
+            className="text-xs"
           />,
         )}
         <div className="space-y-1.5">
-          <span className="block font-mono text-xs font-bold text-primary">
+          <span className="block font-mono text-sm font-bold text-primary">
             {key}
           </span>
-          <p className="text-xs leading-snug font-semibold text-foreground">
+          <p className="text-base leading-snug font-semibold text-foreground">
             {text}
           </p>
-          <div className="space-y-0.5 pt-1 text-[11px] text-muted-foreground">
+          <div className="space-y-0.5 pt-1 text-sm text-muted-foreground">
             <div>
               {t('dashboard.client')}:{' '}
               <span className="font-medium text-foreground">
@@ -878,36 +878,31 @@ function ContactsCard({ language }: { language: Language }) {
   const senior = content.people.senior
   return (
     <Panel>
-      <h3 className="mb-2.5 text-[11px] font-bold tracking-wider text-foreground uppercase">
+      <h3 className="mb-2.5 text-xs font-bold tracking-wider text-foreground uppercase">
         {t('dashboard.contacts')}
       </h3>
-      <ul className="space-y-2">
+      <ul className="divide-y divide-border/40">
         {content.client.reporters.map((person) => (
           <li
             key={person.name}
-            className="flex items-center justify-between gap-2 border-b border-border/40 py-1"
+            className="py-2 first:pt-0"
           >
-            <div className="min-w-0">
-              <span className="block font-medium text-foreground">
-                {person.name}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {content.client.name}
-              </span>
-            </div>
-            <Tag>{person.role}</Tag>
+            <span className="block font-semibold text-foreground">
+              {person.name}
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              {person.role} · {content.client.name}
+            </span>
           </li>
         ))}
-        <li className="flex items-center justify-between gap-2 py-1 pt-1.5">
-          <div className="min-w-0">
-            <span className="block font-medium text-primary">
-              {senior.name}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {senior.role} · {content.company.name}
-            </span>
+        <li className="pt-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-primary">{senior.name}</span>
+            <Tag tone="primary">{t('dashboard.mentorTag')}</Tag>
           </div>
-          <Tag tone="primary">{t('dashboard.mentorTag')}</Tag>
+          <span className="block text-sm text-muted-foreground">
+            {senior.role} · {content.company.name}
+          </span>
         </li>
       </ul>
     </Panel>
@@ -942,7 +937,7 @@ function EnvironmentCard({ snapshot }: { snapshot: Snapshot }) {
   }
   return (
     <Panel data-testid="environment-card">
-      <h3 className="mb-2.5 text-[11px] font-bold tracking-wider text-foreground uppercase">
+      <h3 className="mb-2.5 text-xs font-bold tracking-wider text-foreground uppercase">
         {t('dashboard.environment')}
       </h3>
       <dl className="space-y-2">
@@ -1059,7 +1054,7 @@ export function Dashboard({
             <h3 className="text-xs font-bold tracking-wider text-foreground uppercase">
               {t('dashboard.inbox')}
             </h3>
-            <span className="text-[11px] font-medium whitespace-nowrap text-muted-foreground">
+            <span className="text-xs font-medium whitespace-nowrap text-muted-foreground">
               {t('dashboard.inboxCount', { count: threads.length })}
             </span>
           </div>
@@ -1088,11 +1083,11 @@ export function Dashboard({
                   >
                     <span className="mb-1 flex items-center justify-between gap-1">
                       <span
-                        className={`truncate text-xs ${message.read ? 'font-semibold text-foreground' : 'font-bold text-primary'}`}
+                        className={`truncate text-sm ${message.read ? 'font-semibold text-foreground' : 'font-bold text-primary'}`}
                       >
                         {content.people.manager.name}
                       </span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {threadDate(message.at, language)}
                       </span>
                     </span>
@@ -1103,11 +1098,11 @@ export function Dashboard({
                           title={t('dashboard.unread')}
                         />
                       )}
-                      <span className="truncate text-xs font-semibold text-foreground">
+                      <span className="truncate text-sm font-semibold text-foreground">
                         {text.subject}
                       </span>
                     </span>
-                    <span className="block truncate text-[11px] text-muted-foreground">
+                    <span className="block truncate text-sm text-muted-foreground">
                       {preview(text.body)}
                     </span>
                   </button>
@@ -1118,10 +1113,10 @@ export function Dashboard({
         </Panel>
 
         <Panel className="p-3.5">
-          <span className="mb-1 block font-bold text-foreground">
+          <span className="mb-1 block text-base font-bold tracking-tight text-foreground">
             {content.company.name}
           </span>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {content.company.summary}
           </p>
         </Panel>
@@ -1132,15 +1127,15 @@ export function Dashboard({
               className="size-2 rounded-full bg-emerald-500"
               aria-hidden
             />
-            <span className="font-bold text-foreground">
+            <span className="text-base font-bold tracking-tight text-foreground">
               {content.client.name}
             </span>
             <Tag>{t('dashboard.clientTag')}</Tag>
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {content.client.about}
           </p>
-          <p className="border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
+          <p className="border-t border-border/50 pt-2 text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">
               {content.project.name}:
             </span>{' '}

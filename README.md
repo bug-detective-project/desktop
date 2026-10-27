@@ -17,6 +17,7 @@ src/main/              Electron main process
   game.ts              game controller (Kanban rules + runtime), independent of Electron
   runtime.ts           GameRuntime interface and DockerRuntime
   fake-runtime.ts      in-memory runtime for the e2e tests (development builds only)
+  devtools.ts          Chrome DevTools shortcuts and React Developer Tools (development builds only)
   services/            prerequisites, docker, workspace, content/, qa, vscode, state, backup, process
   platform/            OS-specific code: types.ts (interface), windows.ts, linux.ts (Linux and WSL 2)
 src/preload/           the typed window.bugDetective bridge
@@ -52,6 +53,15 @@ pnpm run dev               # prepares build/docker and build/stage-packages, the
 
 - `tools/prepare-resources.ts`: copies `docker/` and the QA CLI (`../supportdesk-private/qa` without `stages/`) into `build/docker/` and writes content-addressed image tags to `build/docker/images.json`;
 - `tools/build-stage-packages.ts`: builds `build/stage-packages/` (one zip per stage + `manifest.json`), which the local content source verifies against.
+
+## Inspecting the UI (Chrome and React DevTools)
+
+Development builds (`pnpm run dev`, or `out/` started without packaging) have:
+
+- **Chrome DevTools**: `F12` or `Ctrl+Shift+I` (`Cmd+Option+I` on macOS) toggles them: Elements (DOM and Tailwind classes, computed styles), Console, Network, Sources, Performance. `BUGDETECTIVE_DEVTOOLS=1` opens them in their own window at start (`BUGDETECTIVE_DEVTOOLS=1 pnpm run dev` in WSL, `$env:BUGDETECTIVE_DEVTOOLS=1; pnpm run dev` in PowerShell).
+- **React Developer Tools**: the **Components** tab (component tree, props, state, hooks; select a component to jump to its DOM node) and **Profiler**, inside the same DevTools window. `src/main/devtools.ts` downloads the extension from the Chrome Web Store on the first start (internet needed once; cached in `<userData>/extensions`) and loads it before the window opens. Offline without a cached copy, the app starts without it and logs a warning.
+
+Neither is set up in the packaged app or in the e2e tests (`BUGDETECTIVE_E2E=1`); the download code is excluded from the installer (`electron-builder.yml`).
 
 ## Running directly in WSL 2 (Linux)
 

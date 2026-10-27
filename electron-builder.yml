@@ -10,6 +10,8 @@ files:
   # The window icon (Linux); Windows takes resources/icon.png as the executable and installer icon.
   - resources/icon.png
   - '!**/*.map'
+  # React Developer Tools download (src/main/devtools.ts): development only, never loaded when packaged.
+  - '!out/main/chunks/downloadChromeExtension-*.js'
 # Docker build contexts (workspace and QA images, with the QA CLI) and their tags.
 extraResources:
   - from: build/docker
