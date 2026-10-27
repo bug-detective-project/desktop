@@ -22,6 +22,9 @@ const windowsRunner = async (command: string, args: readonly string[]) => {
   if (command.endsWith('cmd.exe')) {
     return ok('C:\\Users\\João Silva\\AppData\\Local|C:\\Program Files|C:\\WINDOWS\r\n');
   }
+  if (command.endsWith('wsl.exe') && args[0] === '--version') {
+    return ok(Buffer.from('WSL version: 2.3.24.0\r\n', 'utf16le').toString('latin1'));
+  }
   if (command.endsWith('tasklist.exe')) {
     return ok(args.includes('IMAGENAME eq Docker Desktop.exe') ? '"Docker Desktop.exe","1234","Console"\r\n' : '');
   }
@@ -83,8 +86,8 @@ describe('Linux platform on WSL 2', () => {
     expect(await noWindowsCode.locateVSCode()).toBeNull();
   });
 
-  it('checks WSL 2 from the kernel', async () => {
-    expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true });
+  it('checks WSL 2 from the kernel and reads the WSL release through interop', async () => {
+    expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true, version: '2.3.24.0' });
     const wsl1 = createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs({ ...wslFiles, '/proc/version': 'Linux version 4.4.0-19041-Microsoft' }) });
     expect(await wsl1.checkWsl()).toMatchObject({ installed: true, version2: false });
   });
@@ -106,7 +109,7 @@ describe('Linux platform on plain Linux', () => {
   });
 
   it('does not need WSL and uses the default browser opener', async () => {
-    expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true });
+    expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true, notNeeded: true });
     expect(platform().browserCommand('http://127.0.0.1:5173/')).toBeNull();
   });
 });

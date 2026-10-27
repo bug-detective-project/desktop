@@ -128,6 +128,13 @@ export interface Settings {
   theme: Theme;
 }
 
+/** The last successful export. Kept in the state, so a save also knows the export it came from. */
+export interface LastExport {
+  at: string;
+  /** Full path of the .bdsave file, as the operating system's save dialog returned it. */
+  path: string;
+}
+
 export const SCHEMA_VERSION = 2;
 
 export interface GameState {
@@ -140,4 +147,24 @@ export interface GameState {
   activity: ActivityEntry[];
   inbox: InboxMessage[];
   settings: Settings;
+  /** Added after version 2 shipped; optional, so older state files stay valid. */
+  lastExport?: LastExport | null;
+}
+
+/**
+ * Whether the work is protected by an export: 'none' before the first ticket (nothing to lose),
+ * 'outdated' when the game changed after the last export (or was never exported).
+ */
+export function backupStatus(state: GameState): 'none' | 'current' | 'outdated' {
+  if (state.tickets.length === 0) {
+    return 'none';
+  }
+  const since = state.lastExport?.at;
+  if (!since) {
+    return 'outdated';
+  }
+  const changed =
+    state.activity.some((entry) => entry.at > since) ||
+    state.tickets.some((ticket) => ticket.conversation.some((entry) => entry.at > since) || ticket.attempts.some((attempt) => attempt.finishedAt > since));
+  return changed ? 'outdated' : 'current';
 }

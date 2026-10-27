@@ -1,6 +1,6 @@
 /** The first-run checklist: Docker Desktop, WSL2, VS Code and the Dev Containers extension. */
 import type { CheckResult, EngineState, PrerequisiteReport } from '../../shared/api.ts';
-import type { Platform, VSCodeCli } from '../platform/types.ts';
+import type { Platform, VSCodeCli, WslStatus } from '../platform/types.ts';
 import { Docker } from './docker.ts';
 import { VSCode } from './vscode.ts';
 
@@ -46,29 +46,34 @@ export class Prerequisites {
 
   async check(environment?: Environment): Promise<PrerequisiteReport> {
     const env = environment ?? (await this.locate());
-    const [dockerState, wsl, devcontainers] = await Promise.all([
+    // Versions are extra information: a failure to read one never fails a check.
+    const [dockerState, dockerVersion, wsl, vscodeVersion, devcontainers] = await Promise.all([
       this.dockerState(env),
-      this.platform.checkWsl().catch((error: Error) => ({ installed: false, version2: false, detail: error.message })),
-      env.vscode?.hasDevContainers().catch(() => null) ?? Promise.resolve(null),
+      env.docker?.versionInfo().catch(() => null) ?? Promise.resolve(null),
+      this.platform.checkWsl().catch((error: Error): WslStatus => ({ installed: false, version2: false, detail: error.message })),
+      env.vscode?.version().catch(() => null) ?? Promise.resolve(null),
+      // undefined: the extensions could not be listed.
+      env.vscode?.devContainersVersion().catch(() => undefined) ?? Promise.resolve(undefined),
     ]);
+    const version = (value: string | null | undefined) => (value ? { version: value } : {});
     const checks: CheckResult[] = [
       dockerState === 'running'
-        ? { id: 'docker', status: 'ok' }
+        ? { id: 'docker', status: 'ok', ...version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine)) }
         : { id: 'docker', status: dockerState === 'starting' ? 'pending' : 'missing', reason: dockerState },
       !wsl.installed
         ? { id: 'wsl', status: 'missing', reason: 'notFound', detail: wsl.detail }
         : wsl.version2
-          ? { id: 'wsl', status: 'ok', detail: wsl.detail }
-          : { id: 'wsl', status: 'missing', reason: 'wsl1Only', detail: wsl.detail },
+          ? { id: 'wsl', status: 'ok', detail: wsl.detail, ...(wsl.notNeeded && { reason: 'notNeeded' }), ...version(wsl.version) }
+          : { id: 'wsl', status: 'missing', reason: 'wsl1Only', detail: wsl.detail, ...version(wsl.version) },
       env.vscodeCli
-        ? { id: 'vscode', status: 'ok', detail: env.vscodeCli.launcher }
+        ? { id: 'vscode', status: 'ok', detail: env.vscodeCli.launcher, ...version(vscodeVersion) }
         : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
-      devcontainers === true
-        ? { id: 'devcontainers', status: 'ok' }
+      typeof devcontainers === 'string'
+        ? { id: 'devcontainers', status: 'ok', ...version(devcontainers) }
         : {
             id: 'devcontainers',
             status: 'missing',
-            reason: devcontainers === null && env.vscode ? 'checkFailed' : 'extensionMissing',
+            reason: devcontainers === undefined && env.vscode ? 'checkFailed' : 'extensionMissing',
           },
     ];
     return { checks, allOk: checks.every((check) => check.status === 'ok'), dockerState };

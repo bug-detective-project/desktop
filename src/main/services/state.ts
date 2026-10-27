@@ -109,6 +109,7 @@ export const gameStateSchema = z.object({
     qaTimeoutSeconds: z.number().int().min(MIN_QA_TIMEOUT_SECONDS).max(MAX_QA_TIMEOUT_SECONDS),
     theme: z.enum(THEMES),
   }),
+  lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
 });
 
 // ---------------------------------------------------------------------------

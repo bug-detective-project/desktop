@@ -9,6 +9,8 @@ export interface CheckResult {
   status: 'ok' | 'missing' | 'warning' | 'pending';
   reason?: string;
   detail?: string;
+  /** Version of the tool, when it could be read (Docker Desktop or engine, VS Code, the extension, WSL). */
+  version?: string;
 }
 
 export interface PrerequisiteReport {
@@ -27,6 +29,14 @@ export interface EnvironmentItem {
 export interface EnvironmentReport {
   items: EnvironmentItem[];
   ready: boolean;
+}
+
+export type DiskItemId = 'workspaceVolume' | 'workspaceImage' | 'qaImage' | 'qaCache';
+
+export interface DiskUsageItem {
+  id: DiskItemId;
+  /** Size on disk, or null when the image or volume does not exist yet. */
+  bytes: number | null;
 }
 
 export type BusyTask = 'unlocking' | 'starting' | 'installing' | 'qa' | 'exporting' | 'restoring' | 'startingDocker' | null;
@@ -83,6 +93,8 @@ export interface BugDetectiveApi {
 
   refreshEnvironment(): Promise<EnvironmentReport>;
   installEnvironment(): Promise<EnvironmentReport>;
+  /** Disk space used by the game's images and volumes. Needs Docker running; can take a few seconds. */
+  diskUsage(): Promise<DiskUsageItem[]>;
 
   nextAssignment(): Promise<void>;
   move(ticket: number, to: Column): Promise<void>;

@@ -1,38 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { SaveSummary, Snapshot } from '@shared/api.ts';
-import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES } from '@shared/types.ts';
+import type { CheckResult, DiskUsageItem, ExternalLink, SaveSummary, Snapshot } from '@shared/api.ts';
+import { formatDuration, parseDuration } from '@shared/duration.ts';
+import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, backupStatus } from '@shared/types.ts';
+import type { Language, Theme } from '@shared/types.ts';
+import logo from '../assets/logo.png';
 import { api } from '../api.ts';
 import { Icon } from '../components/icons.tsx';
-import { Badge, Button, Card, LogView, Modal, Notice } from '../components/ui.tsx';
+import type { IconName } from '../components/icons.tsx';
+import { ticketTitle } from '../components/ticketTitle.ts';
+import { Badge, Button, Modal, Notice } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
-const LANGUAGE_NAMES = { en: 'English', pt: 'Português (Brasil)' };
+type Tab = 'preferences' | 'environment' | 'backup' | 'about';
+const TABS: { id: Tab; icon: IconName }[] = [
+  { id: 'preferences', icon: 'settings' },
+  { id: 'environment', icon: 'server' },
+  { id: 'backup', icon: 'hardDrive' },
+  { id: 'about', icon: 'info' },
+];
 
-/** A settings section: its title and help on the left, its controls on the right. */
-function Group({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-4 md:grid-cols-[16rem_1fr]">
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {help && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{help}</p>}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </section>
-  );
-}
+const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', pt: 'Português (Brasil)' };
+const THEME_ICONS: Record<Theme, IconName> = { system: 'laptop', light: 'sun', dark: 'moon' };
+const locale = (language: string) => (language === 'pt' ? 'pt-BR' : 'en-US');
 
-export function Settings({ snapshot }: { snapshot: Snapshot }) {
-  const { t, i18n } = useTranslation();
+const card = 'rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xs md:p-8';
+const pane = `space-y-6 ${card}`;
+const actionButton = 'px-4 py-2';
+
+/** Runs an action with its own busy flag; errors become toasts. */
+function useAction() {
   const toast = useToast();
-  const { settings } = snapshot.state;
-  const [timeout, setTimeoutValue] = useState(String(settings.qaTimeoutSeconds));
-  const [pending, setPending] = useState<{ token: string; summary: SaveSummary } | null>(null);
-  const [confirmNewGame, setConfirmNewGame] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-
-  const run = async (id: string, action: () => Promise<void>) => {
+  const run = async (id: string, action: () => Promise<unknown>) => {
     setBusy(id);
     try {
       await action();
@@ -42,156 +43,509 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
       setBusy(null);
     }
   };
+  return { busy, run };
+}
 
-  const check = (id: string) => snapshot.prerequisites?.checks.find((item) => item.id === id);
-  const saveTimeout = () => {
-    const value = Number(timeout);
-    if (Number.isInteger(value) && value >= MIN_QA_TIMEOUT_SECONDS && value <= MAX_QA_TIMEOUT_SECONDS) {
+function PaneHeader({ title, help, aside }: { title: string; help: string; aside?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="text-base font-bold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{help}</p>
+      </div>
+      {aside}
+    </div>
+  );
+}
+
+/** One preference: its title and help on the left, the control on the right. */
+function Row({ title, help, children }: { title: string; help: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-8">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{help}</p>
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function Flag({ language }: { language: Language }) {
+  return language === 'en' ? (
+    <svg className="h-3 w-4 shrink-0 rounded-xs shadow-2xs" viewBox="0 0 20 15" fill="none" aria-hidden>
+      <rect width="20" height="15" fill="#B22234" rx="1" />
+      <path d="M0 2.3h20M0 4.6h20M0 6.9h20M0 9.2h20M0 11.5h20M0 13.8h20" stroke="#fff" strokeWidth="1.15" />
+      <rect width="8" height="7" fill="#3C3B6E" />
+      <circle cx="4" cy="3.5" r="1.5" fill="#fff" />
+    </svg>
+  ) : (
+    <svg className="h-3 w-4 shrink-0 rounded-xs shadow-2xs" viewBox="0 0 20 15" fill="none" aria-hidden>
+      <rect width="20" height="15" fill="#009C3B" rx="1" />
+      <polygon points="10,2 18,7.5 10,13 2,7.5" fill="#FFDF00" />
+      <circle cx="10" cy="7.5" r="3" fill="#002776" />
+      <path d="M7.5 7.5a3 3 0 0 1 5 0" stroke="#fff" strokeWidth="0.6" />
+    </svg>
+  );
+}
+
+/** "2 tickets completed · SD-238 (In Progress)": story terms only, never branches or totals. */
+function useProgressText(snapshot: Snapshot) {
+  const { t, i18n } = useTranslation();
+  const { tickets, currentTicket } = snapshot.state;
+  if (tickets.length === 0) {
+    return { done: t('settings.noTickets'), current: null };
+  }
+  const done = t('settings.ticketsDone', { count: tickets.filter((ticket) => ticket.status === 'done').length });
+  const active = tickets.find((ticket) => ticket.ticket === currentTicket && ticket.status !== 'done');
+  const current = active ? `${ticketTitle(snapshot, active.ticket, i18n.language as Language).key} (${t(`board.columns.${active.status}`)})` : null;
+  return { done, current };
+}
+
+// ---------------------------------------------------------------------------
+// Preferences
+
+function QaTimeout({ seconds }: { seconds: number }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [text, setText] = useState(formatDuration(seconds));
+  const [invalid, setInvalid] = useState(false);
+  const [saved, setSaved] = useState(seconds);
+  // The value can also change from outside (another window, a restore).
+  if (seconds !== saved) {
+    setSaved(seconds);
+    setText(formatDuration(seconds));
+    setInvalid(false);
+  }
+
+  const inRange = (value: number | null): value is number => value !== null && value >= MIN_QA_TIMEOUT_SECONDS && value <= MAX_QA_TIMEOUT_SECONDS;
+  const save = (value: number) => {
+    setText(formatDuration(value));
+    setInvalid(false);
+    if (value !== seconds) {
       void api.updateSettings({ qaTimeoutSeconds: value }).catch(toast.error);
-    } else {
-      setTimeoutValue(String(settings.qaTimeoutSeconds));
     }
   };
-
-  const field = 'rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none';
+  const commit = () => {
+    const value = parseDuration(text);
+    if (inRange(value)) {
+      save(value);
+    } else {
+      setInvalid(true);
+    }
+  };
+  const typed = parseDuration(text);
+  const base = inRange(typed) ? typed : seconds;
+  const step = (delta: number) => save(Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, base + delta)));
+  const stepButton = 'rounded-md border border-border bg-secondary px-2 py-1 font-mono text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-6 py-8" data-testid="settings">
-      <h1 className="text-2xl font-bold tracking-tight">{t('settings.title')}</h1>
+    <div className="flex flex-col items-start gap-1.5 md:items-end">
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          inputMode="text"
+          aria-label={t('settings.qaTimeout')}
+          aria-invalid={invalid}
+          className={`w-32 rounded-lg border bg-background px-3 py-1.5 font-mono text-xs font-medium text-foreground focus:ring-2 focus:outline-hidden ${invalid ? 'border-destructive focus:ring-destructive/40' : 'border-border focus:ring-ring'}`}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => event.key === 'Enter' && commit()}
+          data-testid="qa-timeout"
+        />
+        <div className="flex items-center gap-1.5">
+          <button type="button" className={stepButton} onClick={() => step(-30)} disabled={base <= MIN_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutLess')}>
+            -30s
+          </button>
+          <button type="button" className={stepButton} onClick={() => step(30)} disabled={base >= MAX_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutMore')}>
+            +30s
+          </button>
+        </div>
+      </div>
+      {invalid && (
+        <p className="text-xs font-medium text-destructive" role="alert" data-testid="qa-timeout-error">
+          {t('settings.qaTimeoutInvalid')}
+        </p>
+      )}
+    </div>
+  );
+}
 
-      <Group title={t('settings.preferences')} help={t('settings.preferencesHelp')}>
-        <Card className="divide-y divide-border p-0">
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span className="text-sm font-medium">{t('settings.language')}</span>
-            <select
-              className={field}
-              value={settings.language}
-              onChange={(event) => void api.updateSettings({ language: event.target.value as 'en' | 'pt' })}
-              data-testid="language-select"
-            >
-              {LANGUAGES.map((language) => (
-                <option key={language} value={language}>
-                  {LANGUAGE_NAMES[language]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span className="text-sm font-medium">{t('settings.theme')}</span>
-            <select
-              className={field}
-              value={settings.theme}
-              onChange={(event) => void api.updateSettings({ theme: event.target.value as 'system' })}
-              data-testid="theme-select"
-            >
-              {THEMES.map((theme) => (
-                <option key={theme} value={theme}>
-                  {t(`settings.themes.${theme}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span>
-              <span className="block text-sm font-medium">{t('settings.qaTimeout')}</span>
-              <span className="block text-xs text-muted-foreground">{t('settings.qaTimeoutHelp')}</span>
-            </span>
-            <input
-              type="number"
-              min={MIN_QA_TIMEOUT_SECONDS}
-              max={MAX_QA_TIMEOUT_SECONDS}
-              className={`w-28 font-mono ${field}`}
-              value={timeout}
-              onChange={(event) => setTimeoutValue(event.target.value)}
-              onBlur={saveTimeout}
-              data-testid="qa-timeout"
-            />
-          </label>
-        </Card>
-      </Group>
+function Preferences({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation();
+  const { settings } = snapshot.state;
+  return (
+    <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-preferences">
+      <Row title={t('settings.language')} help={t('settings.languageHelp')}>
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t('settings.language')} data-testid="language-select">
+          {LANGUAGES.map((language) => {
+            const selected = settings.language === language;
+            return (
+              <button
+                key={language}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => void api.updateSettings({ language })}
+                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  selected ? 'border-primary/50 bg-primary/5 font-semibold text-foreground ring-1 ring-primary/30' : 'border-border font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                }`}
+                data-testid={`language-${language}`}
+              >
+                <Flag language={language} />
+                <span className="whitespace-nowrap">{LANGUAGE_NAMES[language]}</span>
+                {selected && <Icon name="check" className="ml-auto size-3.5 text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      </Row>
+      <Row title={t('settings.theme')} help={t('settings.themeHelp')}>
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1" role="radiogroup" aria-label={t('settings.theme')} data-testid="theme-select">
+          {THEMES.map((theme) => {
+            const selected = settings.theme === theme;
+            return (
+              <button
+                key={theme}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => void api.updateSettings({ theme })}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs whitespace-nowrap transition-all ${
+                  selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
+                }`}
+                data-testid={`theme-${theme}`}
+              >
+                <Icon name={THEME_ICONS[theme]} className="size-3.5" />
+                {t(`settings.themes.${theme}`)}
+              </button>
+            );
+          })}
+        </div>
+      </Row>
+      <Row title={t('settings.qaTimeout')} help={t('settings.qaTimeoutHelp')}>
+        <QaTimeout seconds={settings.qaTimeoutSeconds} />
+      </Row>
+    </div>
+  );
+}
 
-      <Group title={t('settings.status')}>
-        <Card>
-          <dl className="grid grid-cols-[10rem_1fr] items-center gap-y-3 text-sm">
-            <dt className="text-muted-foreground">{t('settings.docker')}</dt>
-            <dd>
-              <Badge tone={snapshot.dockerState === 'running' ? 'ok' : 'danger'}>{t(`header.docker.${snapshot.dockerState ?? 'notRunning'}`)}</Badge>
-            </dd>
-            <dt className="text-muted-foreground">{t('settings.vscode')}</dt>
-            <dd className="flex flex-wrap gap-2">
-              <Badge tone={check('vscode')?.status === 'ok' ? 'ok' : 'danger'}>{t(`checklist.status.${check('vscode')?.status ?? 'missing'}`)}</Badge>
-              <Badge tone={check('devcontainers')?.status === 'ok' ? 'ok' : 'danger'}>Dev Containers</Badge>
-            </dd>
-          </dl>
-          <Button className="mt-4" size="sm" onClick={() => run('check', async () => void (await api.checkPrerequisites()))} busy={busy === 'check'}>
+// ---------------------------------------------------------------------------
+// Developer tools and status
+
+const TOOLS: { id: CheckResult['id']; link: ExternalLink }[] = [
+  { id: 'docker', link: 'dockerDesktop' },
+  { id: 'vscode', link: 'vscode' },
+  { id: 'devcontainers', link: 'devContainers' },
+  { id: 'wsl', link: 'wsl' },
+];
+
+type Tone = 'ok' | 'warn' | 'danger';
+
+function toolStatus(snapshot: Snapshot, check: CheckResult): { label: string; tone: Tone } {
+  if (check.id === 'docker') {
+    const state = snapshot.dockerState ?? 'notRunning';
+    return {
+      running: { label: 'running', tone: 'ok' as const },
+      starting: { label: 'starting', tone: 'warn' as const },
+      notRunning: { label: 'stopped', tone: 'danger' as const },
+      notInstalled: { label: 'notInstalled', tone: 'danger' as const },
+    }[state];
+  }
+  if (check.status === 'ok') {
+    return { label: check.id === 'devcontainers' ? 'installed' : 'ready', tone: 'ok' };
+  }
+  if (check.id === 'devcontainers') {
+    return { label: check.reason === 'checkFailed' ? 'checkFailed' : 'missing', tone: 'warn' };
+  }
+  return { label: 'missing', tone: 'danger' };
+}
+
+function formatBytes(bytes: number, language: string): string {
+  const [value, unit] = bytes >= 1e9 ? [bytes / 1e9, 'GB'] : bytes >= 1e6 ? [bytes / 1e6, 'MB'] : [bytes / 1e3, 'kB'];
+  return `${new Intl.NumberFormat(locale(language), { maximumFractionDigits: 1 }).format(value)} ${unit}`;
+}
+
+function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number }) {
+  const { t, i18n } = useTranslation();
+  const [items, setItems] = useState<DiskUsageItem[] | null>(null);
+  const running = snapshot.dockerState === 'running';
+  useEffect(() => {
+    if (!running) {
+      return;
+    }
+    let live = true;
+    api
+      .diskUsage()
+      .then((usage) => live && setItems(usage))
+      .catch(() => live && setItems([]));
+    return () => {
+      live = false;
+    };
+  }, [running, refresh]);
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid="disk-usage">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-bold text-foreground">{t('settings.disk')}</h3>
+        <span className="text-xs text-muted-foreground">{t('settings.diskHelp')}</span>
+      </div>
+      {!running ? (
+        <p className="text-xs text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const).map((id) => {
+            const item = items?.find((entry) => entry.id === id);
+            return (
+              <div key={id} className="min-w-0 rounded-lg border border-border/60 bg-card p-3" data-testid={`disk-${id}`}>
+                <span className="block truncate text-xs font-semibold text-muted-foreground">{t(`settings.diskItems.${id}.name`)}</span>
+                <span className="mt-0.5 block font-mono text-sm font-bold text-foreground">
+                  {items === null ? t('settings.diskMeasuring') : typeof item?.bytes === 'number' ? formatBytes(item.bytes, i18n.language) : '—'}
+                </span>
+                <span className="block text-xs text-muted-foreground">{item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Environment({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation();
+  const { busy, run } = useAction();
+  const [refresh, setRefresh] = useState(0);
+  const checks = (snapshot.prerequisites?.checks ?? []).filter((check) => check.reason !== 'notNeeded');
+  const vscodeFound = checks.some((check) => check.id === 'vscode' && check.status === 'ok');
+
+  const action = (check: CheckResult): ReactNode => {
+    const link = TOOLS.find((tool) => tool.id === check.id)!.link;
+    if (check.id === 'docker') {
+      if (snapshot.dockerState === 'notRunning') {
+        return (
+          <Button variant="primary" size="sm" busy={snapshot.busy === 'startingDocker'} disabled={snapshot.busy !== null} onClick={() => run('docker', () => api.startDocker())} data-testid="start-docker">
+            {t('checklist.docker.start')}
+          </Button>
+        );
+      }
+      if (snapshot.dockerState !== 'notInstalled') {
+        return null;
+      }
+    } else if (check.status === 'ok') {
+      return null;
+    }
+    if (check.id === 'devcontainers' && vscodeFound) {
+      return (
+        <Button size="sm" busy={busy === 'devcontainers'} onClick={() => run('devcontainers', () => api.installDevContainers())} data-testid="install-devcontainers">
+          {t('settings.installDevContainers')}
+        </Button>
+      );
+    }
+    return (
+      <Button size="sm" variant="ghost" onClick={() => void api.openExternal(link)}>
+        <Icon name="externalLink" className="size-3.5" />
+        {t('common.learnMore')}
+      </Button>
+    );
+  };
+
+  return (
+    <div className={pane} data-testid="settings-pane-environment">
+      <PaneHeader
+        title={t('settings.environment')}
+        help={t('settings.environmentHelp')}
+        aside={
+          <Button
+            size="sm"
+            busy={busy === 'check'}
+            onClick={() =>
+              run('check', async () => {
+                await api.checkPrerequisites();
+                setRefresh((value) => value + 1);
+              })
+            }
+            data-testid="check-again"
+          >
             {busy !== 'check' && <Icon name="refresh" className="size-3.5" />}
             {t('common.checkAgain')}
           </Button>
-        </Card>
-      </Group>
+        }
+      />
+      <div className="divide-y divide-border/70 rounded-xl border border-border">
+        {TOOLS.map(({ id }) => {
+          const check = checks.find((item) => item.id === id);
+          if (!check) {
+            return null;
+          }
+          const status = toolStatus(snapshot, check);
+          const problem =
+            check.id === 'docker'
+              ? snapshot.dockerState && snapshot.dockerState !== 'running' && t(`checklist.docker.${snapshot.dockerState}`)
+              : check.status !== 'ok' && t(`checklist.${check.id}.${check.reason ?? 'notFound'}`);
+          return (
+            <div key={id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between" data-testid={`tool-${id}`} data-status={status.label}>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">{t(`checklist.${id}.title`)}</span>
+                  {check.version && <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">v{check.version}</span>}
+                </div>
+                {problem && <p className="mt-1 text-xs text-muted-foreground">{problem}</p>}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge tone={status.tone}>{t(`settings.toolStatus.${status.label}`)}</Badge>
+                {action(check)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <DiskUsage snapshot={snapshot} refresh={refresh} />
+    </div>
+  );
+}
 
-      <Group title={t('settings.progress')} help={t('settings.exportHelp')}>
-        <Card>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              busy={busy === 'export' || snapshot.busy === 'exporting'}
-              disabled={snapshot.busy !== null}
-              onClick={() =>
-                run('export', async () => {
-                  const result = await api.exportProgress();
-                  if (result.saved) toast.info(t('settings.exported', { path: result.path }));
-                })
-              }
-              data-testid="export-progress"
-            >
-              <Icon name="download" />
-              {t('settings.export')}
-            </Button>
-            <Button
-              busy={busy === 'inspect' || snapshot.busy === 'restoring'}
-              disabled={snapshot.busy !== null}
-              onClick={() => run('inspect', async () => setPending(await api.inspectSave()))}
-              data-testid="restore-progress"
-            >
-              <Icon name="refresh" />
-              {t('settings.restore')}
-            </Button>
+// ---------------------------------------------------------------------------
+// Progress and backup
+
+function ago(at: string, now: number, language: string): string {
+  const seconds = Math.max(0, (now - Date.parse(at)) / 1000);
+  const format = new Intl.RelativeTimeFormat(locale(language), { numeric: 'auto' });
+  if (seconds < 60) return format.format(0, 'second');
+  if (seconds < 3600) return format.format(-Math.floor(seconds / 60), 'minute');
+  if (seconds < 86_400) return format.format(-Math.floor(seconds / 3600), 'hour');
+  return format.format(-Math.floor(seconds / 86_400), 'day');
+}
+
+/** Short age for the tab indicator: "3d", "5h", "<1h". */
+function shortAge(at: string, now: number): string {
+  const hours = Math.max(0, (now - Date.parse(at)) / 3_600_000);
+  return hours >= 24 ? `${Math.floor(hours / 24)}d` : hours >= 1 ? `${Math.floor(hours)}h` : '<1h';
+}
+
+function splitPath(file: string): { name: string; folder: string } {
+  const name = file.split(/[\\/]/).pop() ?? file;
+  return { name, folder: file.slice(0, file.length - name.length) };
+}
+
+function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const { busy, run } = useAction();
+  const [pending, setPending] = useState<{ token: string; summary: SaveSummary } | null>(null);
+  const [confirmNewGame, setConfirmNewGame] = useState(false);
+  const progress = useProgressText(snapshot);
+  const progressText = [progress.done, progress.current].filter(Boolean).join(' · ');
+  const last = snapshot.state.lastExport;
+  const lastFile = last && splitPath(last.path);
+  const outdated = backupStatus(snapshot.state) === 'outdated';
+  const task = snapshot.busy;
+  const locked = task !== null && task !== 'exporting' && task !== 'restoring';
+  const dockerDown = snapshot.dockerState !== 'running';
+
+  return (
+    <div className="space-y-6" data-testid="settings-pane-backup">
+      {locked && (
+        <Notice data-testid="settings-locked">
+          <p className="font-semibold">{t('settings.locked.title', { task: t(`settings.locked.tasks.${task}`) })}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('settings.locked.body')}</p>
+        </Notice>
+      )}
+      <div className={pane}>
+        <PaneHeader
+          title={t('settings.backup')}
+          help={t('settings.backupHelp')}
+          aside={
+            outdated && (
+              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs leading-none font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400" data-testid="backup-outdated">
+                <Icon name="alertTriangle" className="size-3 text-amber-500" />
+                {t('settings.backupOutdated')}
+              </span>
+            )
+          }
+        />
+        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-xs" data-testid="last-export">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <dt className="text-muted-foreground">{t('settings.lastExport')}</dt>
+            <dd className="min-w-0 text-right">
+              {last && lastFile ? (
+                <>
+                  <span className="font-mono font-semibold text-foreground">{lastFile.name}</span>
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {ago(last.at, now, i18n.language)} ({new Date(last.at).toLocaleDateString(locale(i18n.language), { dateStyle: 'medium' })})
+                  </span>
+                </>
+              ) : (
+                <span className="font-semibold text-foreground">{t('settings.neverExported')}</span>
+              )}
+            </dd>
           </div>
-          {snapshot.busy === 'restoring' && (
-            <div className="mt-3">
-              <LogView lines={snapshot.log} />
+          {lastFile && (
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <dt className="text-muted-foreground">{t('settings.exportFolder')}</dt>
+              <dd className="min-w-0 font-mono break-all text-foreground">{lastFile.folder}</dd>
             </div>
           )}
-        </Card>
-      </Group>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border/60 pt-2.5">
+            <dt className="text-muted-foreground">{t('settings.campaign')}</dt>
+            <dd className="font-semibold text-foreground" data-testid="campaign-progress">
+              {progress.done}
+              {progress.current && (
+                <>
+                  {' · '}
+                  <span className="font-mono font-medium text-primary">{progress.current}</span>
+                </>
+              )}
+            </dd>
+          </div>
+        </dl>
+        {dockerDown && !locked && <p className="text-xs text-muted-foreground">{t('settings.needsDocker')}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            className={actionButton}
+            busy={busy === 'export' || task === 'exporting'}
+            disabled={task !== null || dockerDown}
+            onClick={() =>
+              run('export', async () => {
+                const result = await api.exportProgress();
+                if (result.saved) toast.info(t('settings.exported', { path: result.path }));
+              })
+            }
+            data-testid="export-progress"
+          >
+            <Icon name="download" className="size-3.5" />
+            {t('settings.export')}
+          </Button>
+          <Button size="sm" className={actionButton} busy={busy === 'inspect'} disabled={task !== null || dockerDown} onClick={() => run('inspect', async () => setPending(await api.inspectSave()))} data-testid="restore-progress">
+            <Icon name="rotateCcw" className="size-3.5" />
+            {t('settings.restore')}
+          </Button>
+        </div>
+      </div>
 
-      <Group title={t('settings.dangerZone')} help={t('settings.newGameHelp')}>
-        <Card className="border-destructive/30">
-          <Button variant="danger" disabled={snapshot.busy !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
+      <div className="relative flex items-start gap-3 overflow-hidden rounded-2xl border border-destructive/30 bg-card p-6 shadow-xs md:p-8">
+        <Icon name="alertTriangle" className="mt-0.5 size-4 text-destructive" />
+        <div className="min-w-0 space-y-4">
+          <div>
+            <h2 className="text-base leading-tight font-bold tracking-tight text-destructive">{t('settings.dangerZone')}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
+          </div>
+          <Button variant="dangerOutline" size="sm" className={actionButton} disabled={task !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
+            <Icon name="rotateCcw" className="size-3.5" />
             {t('settings.newGame')}
           </Button>
-        </Card>
-      </Group>
-
-      <Group title={t('settings.about')}>
-        <Card>
-          <dl className="grid grid-cols-[10rem_1fr] gap-y-2 text-sm">
-            <dt className="text-muted-foreground">{t('app.name')}</dt>
-            <dd className="font-mono text-xs">{snapshot.appVersion}</dd>
-            <dt className="text-muted-foreground">{t('settings.versions')}</dt>
-            <dd className="font-mono text-xs">
-              Electron {snapshot.versions.electron} · Node {snapshot.versions.node} · Chromium {snapshot.versions.chrome}
-            </dd>
-            <dt className="text-muted-foreground">{t('settings.contentSource')}</dt>
-            <dd className="font-mono text-xs break-all">{snapshot.contentSource}</dd>
-          </dl>
-        </Card>
-      </Group>
+        </div>
+      </div>
 
       {confirmNewGame && (
-        <Modal title={t('settings.newGameTitle')} onClose={() => setConfirmNewGame(false)}>
-          <Notice>{t('settings.newGameWarning')}</Notice>
+        <Modal title={t('settings.newGameTitle')} icon={<Icon name="rotateCcw" className="size-5 text-destructive" />} onClose={() => setConfirmNewGame(false)}>
+          <Notice>
+            <p className="text-xs leading-relaxed">{t('settings.newGameWarning')}</p>
+          </Notice>
           <div className="mt-5 flex justify-end gap-2">
             <Button onClick={() => setConfirmNewGame(false)}>{t('common.cancel')}</Button>
             <Button
@@ -211,17 +565,24 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
         </Modal>
       )}
       {pending && (
-        <Modal title={t('settings.restoreTitle')} onClose={() => setPending(null)}>
-          <p className="text-sm">
-            {t('settings.restoreSummary', {
-              file: pending.summary.fileName,
-              date: new Date(pending.summary.createdAt).toLocaleString(i18n.language === 'pt' ? 'pt-BR' : 'en-US'),
-              done: pending.summary.ticketsDone,
-            })}
-          </p>
+        <Modal title={t('settings.restoreTitle')} onClose={() => setPending(null)} data-testid="restore-dialog">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-xs">
+            <dt className="text-muted-foreground">{t('settings.restoreFile')}</dt>
+            <dd className="font-mono font-semibold break-all">{pending.summary.fileName}</dd>
+            <dt className="text-muted-foreground">{t('settings.restoreCreated')}</dt>
+            <dd>{new Date(pending.summary.createdAt).toLocaleString(locale(i18n.language), { dateStyle: 'medium', timeStyle: 'short' })}</dd>
+            <dt className="text-muted-foreground">{t('settings.restoreVersion')}</dt>
+            <dd className="font-mono">Bug Detective {pending.summary.appVersion}</dd>
+            <dt className="text-muted-foreground">{t('settings.restoreProgress')}</dt>
+            <dd className="font-semibold">{t('settings.ticketsDone', { count: pending.summary.ticketsDone })}</dd>
+          </dl>
           {pending.summary.overwritesProgress && (
-            <div className="mt-3">
-              <Notice data-testid="restore-warning">{t('settings.restoreWarning')}</Notice>
+            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-900 dark:text-amber-200" data-testid="restore-warning">
+              <p className="flex items-start gap-2 font-medium">
+                <Icon name="alertTriangle" className="mt-px size-3.5 text-amber-500" />
+                {t('settings.restoreWarning')}
+              </p>
+              <p className="pl-5.5">{t('settings.restoreCurrent', { progress: progressText })}</p>
             </div>
           )}
           <div className="mt-5 flex justify-end gap-2">
@@ -238,11 +599,126 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               }}
               data-testid="confirm-restore"
             >
-              {t('settings.restoreConfirm')}
+              {t(pending.summary.overwritesProgress ? 'settings.restoreConfirmOverwrite' : 'settings.restoreConfirm')}
             </Button>
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** The restore cannot be interrupted, so its progress is a dialog without a close button. */
+function Restoring({ log }: { log: string[] }) {
+  const { t } = useTranslation();
+  return (
+    <Modal title={t('settings.restoringTitle')} icon={<Icon name="spinner" className="size-5 text-primary" />} data-testid="restoring">
+      <p className="text-xs text-muted-foreground">{t('settings.restoringHelp')}</p>
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-busy>
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+      </div>
+      <pre className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-border/80 bg-black p-3.5 font-mono text-xs whitespace-pre-wrap text-emerald-400 shadow-inner">
+        {log.length > 0 ? log.join('\n') : '»'}
+      </pre>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// About
+
+function About({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation();
+  const parts = [
+    { id: 'electron', name: 'Electron', version: snapshot.versions.electron },
+    { id: 'node', name: 'Node.js', version: snapshot.versions.node },
+    { id: 'chrome', name: 'Chromium', version: snapshot.versions.chrome },
+  ] as const;
+  return (
+    <div className={pane} data-testid="settings-pane-about">
+      <div className="flex items-start gap-4">
+        <img src={logo} alt="" className="size-12 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold tracking-tight">{t('app.name')}</h2>
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary" data-testid="app-version">
+              v{snapshot.appVersion}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('settings.aboutTagline')}</p>
+        </div>
+      </div>
+      <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold text-foreground">{t('settings.runtime')}</span>
+          <span className="font-mono text-xs text-muted-foreground">{t('settings.runtimeHost')}</span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {parts.map((part) => (
+            <div key={part.id} className="rounded-lg border border-border/60 bg-card p-3">
+              <span className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase">{part.name}</span>
+              <span className="mt-0.5 block font-mono text-xs font-bold text-foreground">v{part.version}</span>
+              <span className="text-xs text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+export function Settings({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<Tab>('preferences');
+  // Ages ("3 days ago") are measured from when the screen opened.
+  const [now] = useState(() => Date.now());
+  const last = snapshot.state.lastExport;
+  const outdated = backupStatus(snapshot.state) === 'outdated';
+
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-8" data-testid="settings">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('settings.title')}</h1>
+        <p className="mt-1 text-xs text-muted-foreground">{t('settings.subtitle')}</p>
+      </div>
+
+      <div className="mb-8 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
+        {TABS.map(({ id, icon }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs whitespace-nowrap transition-colors ${
+                active ? 'bg-primary font-semibold text-primary-foreground shadow-xs' : 'font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+              }`}
+              data-testid={`settings-tab-${id}`}
+            >
+              <Icon name={icon} className="size-3.5" />
+              {t(`settings.tabs.${id}`)}
+              {id === 'backup' && outdated && (
+                <span
+                  className={`rounded-full border px-1.5 py-0.5 text-xs leading-none font-semibold ${active ? 'border-transparent bg-amber-400 text-amber-950' : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300'}`}
+                  data-testid="backup-age"
+                >
+                  {last ? shortAge(last.at, now) : '!'}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'preferences' && <Preferences snapshot={snapshot} />}
+      {tab === 'environment' && <Environment snapshot={snapshot} />}
+      {tab === 'backup' && <Backup snapshot={snapshot} now={now} />}
+      {tab === 'about' && <About snapshot={snapshot} />}
+      {snapshot.busy === 'restoring' && <Restoring log={snapshot.log} />}
     </div>
   );
 }

@@ -71,7 +71,13 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 - **Board**: five columns with stage dots and counters on `bg-muted/40`; cards `bg-card rounded-xl border p-4 shadow-sm` with the key in `font-mono text-primary`. Only unlocked tickets appear.
 - **Ticket panel**: key, stage pill, title; workspace actions with icons; QA running in an amber notice.
 - **Code review**: key and stage pill above the title; accept button primary with a `checkCircle` icon.
-- **Settings**: centered (`max-w-5xl`), each group with its title and help on the left and a card on the right: Preferences, Status, Progress, Start over (destructive), About.
+- **Settings** (`screens/Settings.tsx`, approved spec `../layout-tests/SETTINGS_UI_SPECIFICATION_B_REFINED.md`): centered (`max-w-4xl`), title and subtitle, then segmented top tabs (`bg-secondary/50 rounded-2xl` bar; active tab `bg-primary text-primary-foreground`):
+  - Preferences: language as flag cards, theme as a System / Light / Dark toggle group, QA time limit as a text field ("3 min 00 s", also accepts `2:30`, `90s`, `5m`) with -30s / +30s and an inline error outside 30 s–30 min.
+  - Developer tools & status: one row per tool with its version chip and status badge; actions only where they exist (Start Docker Desktop, Install in VS Code, install links); Check again; disk usage of the game's images and volumes (measured on demand, needs Docker).
+  - Progress & backup: last export (file, age, folder) and current progress in story terms (never branch names or totals), "Backup outdated" badge and an age chip on the tab; Export / Restore; Danger zone card with an outline destructive New game button. While a long task runs, a notice says which one and the actions are disabled; while Docker is stopped, Export and Restore are disabled with the reason.
+  - About: logo, version and the Electron / Node.js / Chromium versions.
+  - Dialogs (`Modal`, `bg-black/60 backdrop-blur-xs`): restore confirmation (save summary, amber overwrite warning), new game, and the restore in progress (no close button, terminal log).
+- Badges are `text-xs`; nothing smaller than `text-xs` in Settings.
 
 ## Text
 

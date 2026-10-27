@@ -175,6 +175,7 @@ test('the full game loop with real Docker and VS Code', async () => {
     dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as never;
   }, save);
   await page.getByTestId('nav-settings').click();
+  await page.getByTestId('settings-tab-backup').click();
   await page.getByTestId('export-progress').click();
   await expect(page.getByTestId('toast-info')).toContainText('Progress saved', { timeout: 120_000 });
   const head = docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim();

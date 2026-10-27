@@ -37,6 +37,7 @@ const api: BugDetectiveApi = {
   installDevContainers: () => call('installDevContainers'),
   refreshEnvironment: () => call('refreshEnvironment'),
   installEnvironment: () => call('installEnvironment'),
+  diskUsage: () => call('diskUsage'),
   nextAssignment: () => call('nextAssignment'),
   move: (ticket, to) => call('move', ticket, to),
   askSenior: (ticket) => call('askSenior', ticket),

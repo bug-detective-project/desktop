@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
-import type { EnvironmentItem, EnvironmentReport } from '../shared/api.ts';
+import type { DiskUsageItem, EnvironmentItem, EnvironmentReport } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
 import { DockerUnavailableError } from './services/docker.ts';
@@ -36,6 +36,7 @@ export interface GameRuntime {
   environment(): Promise<EnvironmentReport>;
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
+  diskUsage(): Promise<DiskUsageItem[]>;
 
   /**
    * Makes the workspace repository belong to the game `gameId`, archiving player branches left by
@@ -208,6 +209,22 @@ export class DockerRuntime implements GameRuntime {
       onLine('» npm run db:reset');
       await workspace.resetDatabase((line) => onLine(line));
     }
+  }
+
+  async diskUsage(): Promise<DiskUsageItem[]> {
+    const docker = await this.docker();
+    const tags = await this.imageTags();
+    const [workspaceImage, qaImage, volumes] = await Promise.all([
+      docker.imageSize(tags.workspace),
+      docker.imageSize(tags.qa),
+      docker.volumeSizes([this.names.volume, this.names.cacheVolume]),
+    ]);
+    return [
+      { id: 'workspaceVolume', bytes: volumes[this.names.volume] ?? null },
+      { id: 'workspaceImage', bytes: workspaceImage },
+      { id: 'qaImage', bytes: qaImage },
+      { id: 'qaCache', bytes: volumes[this.names.cacheVolume] ?? null },
+    ];
   }
 
   async claimWorkspace(gameId: string) {

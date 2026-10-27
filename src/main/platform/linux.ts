@@ -11,6 +11,7 @@ import { posix as path, win32 } from 'node:path';
 import { runCommand } from '../services/process.ts';
 import type { CommandRunner } from '../services/process.ts';
 import type { DockerLocations, Platform, VSCodeCli, WslStatus } from './types.ts';
+import { decodeWslOutput, parseWslVersion } from './windows.ts';
 
 export interface LinuxDeps {
   env: NodeJS.ProcessEnv;
@@ -162,7 +163,7 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
 
     async checkWsl(): Promise<WslStatus> {
       if (!wsl) {
-        return { installed: true, version2: true, detail: 'Not needed on Linux' };
+        return { installed: true, version2: true, detail: 'Not needed on Linux', notNeeded: true };
       }
       let kernel = '';
       try {
@@ -172,7 +173,10 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       }
       // WSL 1 has no real Linux kernel; its /proc/version says "Microsoft" without "WSL2".
       const version2 = /WSL2|microsoft-standard/i.test(kernel);
-      return { installed: true, version2, detail: `${env.WSL_DISTRO_NAME ?? 'WSL'} (WSL ${version2 ? 2 : 1})` };
+      const side = await windows();
+      const release = side ? await runner(path.join(side.system32, 'wsl.exe'), ['--version'], { timeoutMs: 15_000 }) : null;
+      const version = release?.code === 0 ? parseWslVersion(decodeWslOutput(release.stdout)) : null;
+      return { installed: true, version2, detail: `${env.WSL_DISTRO_NAME ?? 'WSL'} (WSL ${version2 ? 2 : 1})`, ...(version && { version }) };
     },
 
     async locateVSCode() {

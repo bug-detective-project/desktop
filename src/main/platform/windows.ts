@@ -38,6 +38,12 @@ export function decodeWslOutput(buffer: Buffer): string {
   return (utf16 ? buffer.toString('utf16le') : buffer.toString('utf8')).replace(/^\uFEFF/, '').replace(/\0/g, '');
 }
 
+/** The release number on the first line of `wsl --version` ("WSL version: 2.3.24.0", localized). */
+export function parseWslVersion(text: string): string | null {
+  const firstLine = text.split(/\r?\n/).find((line) => line.trim()) ?? '';
+  return /\b(\d+\.\d+\.\d+(?:\.\d+)?)\b/.exec(firstLine)?.[1] ?? null;
+}
+
 /** Parses `wsl -l -v`. Returns the distros with their WSL version. */
 export function parseWslList(text: string): { name: string; version: number }[] {
   return text
@@ -148,7 +154,9 @@ export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Pla
       const defaultIs2 = /:\s*2\s*$/m.test(statusText);
       const version2 = distros.some((distro) => distro.version === 2) || defaultIs2;
       const detail = distros.map((distro) => `${distro.name} (WSL ${distro.version})`).join(', ');
-      return { installed: true, version2, detail };
+      const release = await runner(wsl, ['--version'], { env: wslEnv, timeoutMs: 20_000 });
+      const version = release.code === 0 ? parseWslVersion(decodeWslOutput(release.stdout)) : null;
+      return { installed: true, version2, detail, ...(version && { version }) };
     },
 
     async locateVSCode() {

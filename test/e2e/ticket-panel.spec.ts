@@ -69,7 +69,7 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
     const first = await launch({}, { userData });
     await startFirstTicket(first.page);
     await first.page.getByTestId('nav-settings').click();
-    await first.page.getByTestId('language-select').selectOption('pt');
+    await first.page.getByTestId('language-pt').click();
     await expect(first.page.getByTestId('nav-board')).toHaveText('Quadro');
     await first.close();
 

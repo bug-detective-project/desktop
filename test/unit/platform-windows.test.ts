@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWindowsPlatform, decodeWslOutput, parseWslList } from '../../src/main/platform/windows.ts';
+import { createWindowsPlatform, decodeWslOutput, parseWslList, parseWslVersion } from '../../src/main/platform/windows.ts';
 import type { RunResult } from '../../src/main/services/process.ts';
 import { attachedContainerUri } from '../../src/main/services/vscode.ts';
 
@@ -112,11 +112,21 @@ describe('WSL detection', () => {
     ]);
   });
 
-  it('checks WSL 2 through exit codes and the distro list', async () => {
+  it('checks WSL 2 through exit codes and the distro list, and reads its release', async () => {
     const runner = async (_command: string, args: readonly string[]) =>
-      args[0] === '--status' ? ok(Buffer.from('Default Version: 2\r\n', 'utf16le')) : ok(Buffer.from(list, 'utf16le'));
+      args[0] === '--status'
+        ? ok(Buffer.from('Default Version: 2\r\n', 'utf16le'))
+        : args[0] === '--version'
+          ? ok(Buffer.from('WSL version: 2.3.24.0\r\nKernel version: 5.15.153.1-2\r\n', 'utf16le'))
+          : ok(Buffer.from(list, 'utf16le'));
     const platform = createWindowsPlatform({ env: { SystemRoot: 'C:\\Windows' }, runner, ...fakeFs({}) });
-    expect(await platform.checkWsl()).toMatchObject({ installed: true, version2: true });
+    expect(await platform.checkWsl()).toEqual({ installed: true, version2: true, detail: 'Ubuntu-22.04 (WSL 2), docker-desktop (WSL 2)', version: '2.3.24.0' });
+  });
+
+  it('reads the WSL release in any language, and nothing from WSL builds without --version', () => {
+    expect(parseWslVersion('Versão do WSL: 2.1.5.0\r\nVersão do kernel: 5.15.146.1-2\r\n')).toBe('2.1.5.0');
+    expect(parseWslVersion('\r\nWSL-Version: 2.0.9.0\r\n')).toBe('2.0.9.0');
+    expect(parseWslVersion('Invalid command line option: --version\r\nUsage: wsl.exe [Argument]\r\n')).toBeNull();
   });
 
   it('reports WSL as missing when wsl --status fails', async () => {

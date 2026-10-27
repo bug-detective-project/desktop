@@ -38,16 +38,25 @@ export class VSCode {
     return result.code === 0 ? (result.stdout.toString('utf8').split(/\r?\n/)[0] ?? null) : null;
   }
 
-  async listExtensions(): Promise<string[]> {
-    const result = await this.run(['--list-extensions'], 60_000);
+  /** Installed extensions (lowercase ids) and their versions. */
+  async listExtensions(): Promise<Map<string, string>> {
+    const result = await this.run(['--list-extensions', '--show-versions'], 60_000);
     if (result.code !== 0) {
       throw new Error(`code --list-extensions failed: ${result.stderr.trim()}`);
     }
-    return result.stdout.toString('utf8').split(/\r?\n/).map((line) => line.trim().toLowerCase()).filter(Boolean);
+    const extensions = new Map<string, string>();
+    for (const line of result.stdout.toString('utf8').split(/\r?\n/)) {
+      const [id, version = ''] = line.trim().toLowerCase().split('@');
+      if (id) {
+        extensions.set(id, version);
+      }
+    }
+    return extensions;
   }
 
-  async hasDevContainers(): Promise<boolean> {
-    return (await this.listExtensions()).includes(DEV_CONTAINERS_EXTENSION);
+  /** The installed Dev Containers version, or null when the extension is missing. */
+  async devContainersVersion(): Promise<string | null> {
+    return (await this.listExtensions()).get(DEV_CONTAINERS_EXTENSION) ?? null;
   }
 
   async installDevContainers(): Promise<void> {

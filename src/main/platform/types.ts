@@ -20,6 +20,10 @@ export interface WslStatus {
   /** True when WSL 2 is available (a version 2 distro exists, or the default version is 2). */
   version2: boolean;
   detail: string;
+  /** The WSL release from `wsl --version` (for example 2.3.24.0); older WSL builds do not report one. */
+  version?: string;
+  /** Plain Linux: WSL does not apply. */
+  notNeeded?: boolean;
 }
 
 export interface DockerLocations {

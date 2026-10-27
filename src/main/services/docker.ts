@@ -59,6 +59,37 @@ export class Docker {
     return result.code === 0 && version ? version : null;
   }
 
+  /** The engine version and, under Docker Desktop, the Desktop release; null when the engine does not answer. */
+  async versionInfo(timeoutMs = 15_000): Promise<{ engine: string; desktop: string | null } | null> {
+    const result = await this.run(['version', '--format', '{{.Server.Version}}|{{.Server.Platform.Name}}'], { timeoutMs });
+    const [engine, platform = ''] = result.stdout.toString('utf8').trim().split('|');
+    if (result.code !== 0 || !engine) {
+      return null;
+    }
+    return { engine, desktop: /Docker Desktop (\d+\.\d+\.\d+)/.exec(platform)?.[1] ?? null };
+  }
+
+  /** Size of an image in bytes, or null when it does not exist. */
+  async imageSize(tag: string): Promise<number | null> {
+    const result = await this.run(['image', 'inspect', '--format', '{{.Size}}', tag], { timeoutMs: 30_000 });
+    const size = Number(result.stdout.toString('utf8').trim());
+    return result.code === 0 && Number.isFinite(size) ? size : null;
+  }
+
+  /** Sizes in bytes of the given volumes that exist (`docker system df -v` measures them, which takes a few seconds). */
+  async volumeSizes(names: readonly string[]): Promise<Record<string, number>> {
+    const result = await this.checked(['system', 'df', '--verbose', '--format', '{{json .Volumes}}'], { timeoutMs: 120_000 });
+    const volumes = JSON.parse(result.stdout.toString('utf8').trim() || '[]') as { Name: string; Size: string }[] | null;
+    const sizes: Record<string, number> = {};
+    for (const volume of volumes ?? []) {
+      const bytes = parseDockerSize(volume.Size);
+      if (names.includes(volume.Name) && bytes !== null) {
+        sizes[volume.Name] = bytes;
+      }
+    }
+    return sizes;
+  }
+
   async imageExists(tag: string): Promise<boolean> {
     return (await this.run(['image', 'inspect', '--format', '{{.Id}}', tag], { timeoutMs: 30_000 })).code === 0;
   }
@@ -154,6 +185,14 @@ export class Docker {
     }
     return result;
   }
+}
+
+const SIZE_UNITS: Record<string, number> = { B: 1, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12 };
+
+/** Parses the sizes docker prints ("80.31MB", "1.2GB", "0B"; decimal units). Null for "N/A". */
+export function parseDockerSize(text: string): number | null {
+  const match = /^([\d.]+)\s*([kKMGT]?B)$/.exec(text.trim());
+  return match ? Math.round(Number(match[1]) * SIZE_UNITS[match[2].toUpperCase()]) : null;
 }
 
 /** Formats one `--mount` value. Fields with commas or quotes are quoted CSV-style, as docker expects. */

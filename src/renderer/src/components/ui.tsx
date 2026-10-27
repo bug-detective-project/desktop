@@ -5,7 +5,7 @@ import type { Column } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
 import { STAGE } from './stage.ts';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
 type Size = 'sm' | 'md';
 
 // Icons inside buttons always inherit the button's text color (currentColor).
@@ -14,6 +14,7 @@ const VARIANTS: Record<Variant, string> = {
   secondary: 'border border-border bg-secondary text-secondary-foreground hover:bg-muted disabled:opacity-60',
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60',
   danger: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-95 disabled:opacity-50',
+  dangerOutline: 'border border-destructive/50 text-destructive shadow-2xs hover:bg-destructive/10 disabled:opacity-60',
 };
 
 const SIZES: Record<Size, string> = {
@@ -143,15 +144,33 @@ export function LogView({ lines }: { lines: string[] }) {
   );
 }
 
-export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+/** A dialog. Without onClose it cannot be dismissed (used while a task must finish). */
+export function Modal({
+  title,
+  icon,
+  children,
+  onClose,
+  ...props
+}: {
+  title: string;
+  icon?: ReactNode;
+  children: ReactNode;
+  onClose?: () => void;
+  'data-testid'?: string;
+}) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-6 backdrop-blur-[2px]" role="dialog" aria-modal aria-label={title}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" role="dialog" aria-modal aria-label={title} {...props}>
       <div className="w-full max-w-lg rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 className="text-lg font-bold tracking-tight">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
-            <Icon name="x" />
-          </button>
+          <h2 className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
+            {icon}
+            {title}
+          </h2>
+          {onClose && (
+            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
+              <Icon name="x" />
+            </button>
+          )}
         </div>
         {children}
       </div>

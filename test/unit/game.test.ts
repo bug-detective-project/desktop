@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,8 @@ import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
+import { backupStatus } from '../../src/shared/types.ts';
+import { readZip } from '../../src/main/services/content/archive.ts';
 
 // The real SupportDesk checkout and the manifest from `pnpm run build:stages`.
 const root = resolve(import.meta.dirname, '..', '..');
@@ -235,6 +237,40 @@ describe('Game', () => {
     expect(await claim.mock.results[0].value).toBe(1);
     expect(game.snapshot().log.some((line) => line.includes('Archived 1 branch'))).toBe(true);
     expect(game.current.currentTicket).toBe(1);
+  });
+
+  it('records the last export in the state and in the save, and forgets it on a new game', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    expect(backupStatus(game.current)).toBe('outdated');
+
+    const file = join(dir, 'Meus saves', 'bug-detective-2026-10-24.bdsave');
+    await mkdir(join(dir, 'Meus saves'));
+    await game.exportProgress(file);
+    expect(game.current.lastExport).toEqual({ at: expect.any(String), path: file });
+    expect(backupStatus(game.current)).toBe('current');
+    // Saved with the game, and inside the save itself.
+    expect(JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')).lastExport.path).toBe(file);
+    const saved = readZip(new Uint8Array(await readFile(file))).find((entry) => entry.path === 'state.json')!;
+    expect(JSON.parse(Buffer.from(saved.data).toString('utf8')).lastExport).toEqual(game.current.lastExport);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await game.move(1, 'inProgress');
+    expect(backupStatus(game.current)).toBe('outdated');
+
+    await game.newGame();
+    expect(game.current.lastExport).toBeUndefined();
+    expect(backupStatus(game.current)).toBe('none');
+  });
+
+  it('measures disk usage only while Docker runs', async () => {
+    const { game } = createGame({ scenario: { docker: 'notRunning' } });
+    await game.init();
+    await expect(game.diskUsage()).rejects.toMatchObject({ code: 'dockerUnavailable' });
+    const running = createGame().game;
+    await running.init();
+    expect((await running.diskUsage()).map((item) => item.id)).toEqual(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache']);
   });
 
   it('clamps the QA timeout setting', async () => {

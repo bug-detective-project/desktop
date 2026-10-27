@@ -4,7 +4,7 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { EngineState, EnvironmentReport, PrerequisiteReport } from '../shared/api.ts';
+import type { DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
@@ -49,11 +49,11 @@ export class FakeRuntime implements GameRuntime {
   async checkPrerequisites(): Promise<PrerequisiteReport> {
     const { docker, wsl, vscode, devcontainers } = this.scenario;
     const checks: PrerequisiteReport['checks'] = [
-      docker === 'running' ? { id: 'docker', status: 'ok' } : { id: 'docker', status: 'missing', reason: docker },
-      wsl ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)' } : { id: 'wsl', status: 'missing', reason: 'notFound' },
-      vscode ? { id: 'vscode', status: 'ok' } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
+      docker === 'running' ? { id: 'docker', status: 'ok', version: '4.37.1' } : { id: 'docker', status: 'missing', reason: docker },
+      wsl ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)', version: '2.3.24.0' } : { id: 'wsl', status: 'missing', reason: 'notFound' },
+      vscode ? { id: 'vscode', status: 'ok', version: '1.95.1' } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       devcontainers && vscode
-        ? { id: 'devcontainers', status: 'ok' }
+        ? { id: 'devcontainers', status: 'ok', version: '0.388.0' }
         : { id: 'devcontainers', status: 'missing', reason: 'extensionMissing' },
     ];
     return { checks, allOk: checks.every((check) => check.status === 'ok'), dockerState: docker };
@@ -92,6 +92,16 @@ export class FakeRuntime implements GameRuntime {
     onLine('» docker build bugdetective-workspace (fake)');
     onLine('» docker build bugdetective-qa (fake)');
     this.scenario.environmentReady = true;
+  }
+
+  async diskUsage(): Promise<DiskUsageItem[]> {
+    const ready = this.scenario.environmentReady;
+    return [
+      { id: 'workspaceVolume', bytes: this.stages.size > 0 ? 1_120_000_000 : null },
+      { id: 'workspaceImage', bytes: ready ? 1_240_000_000 : null },
+      { id: 'qaImage', bytes: ready ? 3_010_000_000 : null },
+      { id: 'qaCache', bytes: ready ? 412_000_000 : null },
+    ];
   }
 
   /** Records which game owns the fake workspace, like the real repository config. */

@@ -4,7 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import type { BusyTask, EngineState, EnvironmentReport, PrerequisiteReport, SaveSummary, Snapshot, TicketContent } from '../shared/api.ts';
+import type { BusyTask, DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport, SaveSummary, Snapshot, TicketContent } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
 import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS } from '../shared/types.ts';
@@ -205,6 +205,11 @@ export class Game {
     this.environment = await this.options.runtime.environment();
     this.emit();
     return this.environment;
+  }
+
+  async diskUsage(): Promise<DiskUsageItem[]> {
+    await this.requireDocker();
+    return this.options.runtime.diskUsage();
   }
 
   async installEnvironment(): Promise<EnvironmentReport> {
@@ -441,8 +446,11 @@ export class Game {
         packages.set(ticket.ticket, await this.options.packages.readZip(ticket.ticket));
       }
       const bundle = await this.options.runtime.bundle();
-      const save = createSave({ state: this.state, bundle, packages }, this.options.appVersion, this.ctx().now);
-      await writeFileAtomic(file, save);
+      const at = this.ctx().now;
+      // The save carries its own export record, so a restored game starts as backed up.
+      const state = { ...this.state, lastExport: { at, path: file } };
+      await writeFileAtomic(file, createSave({ state, bundle, packages }, this.options.appVersion, at));
+      await this.commit(state);
     });
   }
 
