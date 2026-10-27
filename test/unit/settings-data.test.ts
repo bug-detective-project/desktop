@@ -1,31 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, parseDuration } from '../../src/shared/duration.ts';
+import { parseMinutes, toMinutes } from '../../src/shared/duration.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
 
 const ctx = (now: string) => ({ now, id: (() => { let n = 0; return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`; })() });
 
-describe('QA time limit text', () => {
-  it('formats seconds as minutes and seconds', () => {
-    expect(formatDuration(180)).toBe('3 min 00 s');
-    expect(formatDuration(30)).toBe('0 min 30 s');
-    expect(formatDuration(1805)).toBe('30 min 05 s');
+describe('QA time limit in minutes', () => {
+  it('shows seconds as minutes', () => {
+    expect(toMinutes(180)).toBe('3');
+    expect(toMinutes(30)).toBe('0.5');
+    expect(toMinutes(1800)).toBe('30');
+    expect(toMinutes(45)).toBe('0.75');
   });
 
-  it('reads what the player types back into seconds', () => {
-    expect(parseDuration('3 min 00 s')).toBe(180);
-    expect(parseDuration(formatDuration(1830))).toBe(1830);
-    expect(parseDuration('  90 ')).toBe(90);
-    expect(parseDuration('2:30')).toBe(150);
-    expect(parseDuration('5m')).toBe(300);
-    expect(parseDuration('1.5 min')).toBe(90);
-    expect(parseDuration('45s')).toBe(45);
-    expect(parseDuration('2 minutos 10 segundos')).toBe(130);
+  it('reads the minutes back into seconds, with a dot or a comma', () => {
+    expect(parseMinutes('3')).toBe(180);
+    expect(parseMinutes(' 2.5 ')).toBe(150);
+    expect(parseMinutes('2,5')).toBe(150);
+    expect(parseMinutes(toMinutes(45))).toBe(45);
   });
 
-  it('rejects text that is not a duration', () => {
-    for (const text of ['', 'abc', '3 hours', '2:75', 'min', '1.33 min']) {
-      expect(parseDuration(text)).toBeNull();
+  it('rejects text that is not a number of minutes', () => {
+    for (const text of ['', 'abc', '-1', '3 min', '1e2', '.5']) {
+      expect(parseMinutes(text)).toBeNull();
     }
   });
 });

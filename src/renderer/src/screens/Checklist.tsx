@@ -34,11 +34,11 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
   return (
     <main className="mx-auto flex min-h-full max-w-2xl flex-col justify-center gap-6 p-8" data-testid="checklist">
       <div>
-        <p className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground">
+        <p className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
           <img src={logo} alt="" className="size-8 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
           {t('app.name')}
         </p>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">{t('checklist.title')}</h1>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight">{t('checklist.title')}</h1>
         <p className="mt-2 text-muted-foreground">{t('checklist.intro')}</p>
       </div>
       <Card className="divide-y divide-border p-0">
@@ -49,10 +49,10 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
               <StatusIcon status={check.status} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="text-sm font-semibold">{t(`checklist.${check.id}.title`)}</h2>
-                  <span className="text-xs text-muted-foreground">{t(`checklist.status.${check.status}`)}</span>
+                  <h2 className="text-base font-semibold">{t(`checklist.${check.id}.title`)}</h2>
+                  <span className="text-sm text-muted-foreground">{t(`checklist.status.${check.status}`)}</span>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{t(`checklist.${check.id}.${reason}`)}</p>
+                <p className="mt-1 text-base text-muted-foreground">{t(`checklist.${check.id}.${reason}`)}</p>
                 {check.status !== 'ok' && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {check.id === 'docker' && check.reason !== 'notInstalled' && (
@@ -91,7 +91,7 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
           {t('common.checkAgain')}
         </Button>
         <div className="flex items-center gap-3">
-          {report?.allOk && <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          {report?.allOk && <span className="flex items-center gap-1.5 text-base font-medium text-emerald-600 dark:text-emerald-400">
               <Icon name="checkCircle" /> {t('checklist.allOk')}
             </span>}
           <Button variant="primary" disabled={!report?.allOk} onClick={onContinue} data-testid="start-playing">
@@ -117,7 +117,7 @@ export function DockerBanner({ snapshot }: { snapshot: Snapshot }) {
       role="alert"
       data-testid="docker-banner"
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-xs">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-sm">
         <span className="flex items-center gap-2 font-medium text-foreground">
           <Icon name={starting ? 'spinner' : 'alertTriangle'} className={`size-4 ${starting ? 'text-amber-500' : 'text-destructive'}`} />
           {starting ? t('banner.dockerStarting') : t('banner.dockerStopped')}

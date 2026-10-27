@@ -51,8 +51,8 @@ function TicketCard({
         draggable ? 'cursor-grab border-primary/30 active:cursor-grabbing' : 'cursor-pointer border-border'
       }`}
     >
-      <p className="font-mono text-xs font-bold text-primary">{ticketKey}</p>
-      <p className="mt-1 text-sm leading-snug font-semibold text-foreground">{title}</p>
+      <p className="font-mono text-sm font-bold text-primary">{ticketKey}</p>
+      <p className="mt-1 text-base leading-snug font-semibold text-foreground">{title}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2 empty:hidden">
         {ticket.status === 'inQa' && (
           <Badge tone="warn">
@@ -104,8 +104,8 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-6" data-testid="board">
       <header className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight">{t('board.title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{state.tickets.length === 0 ? t('board.empty') : t('board.hint')}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('board.title')}</h1>
+        <p className="mt-1 text-base text-muted-foreground">{state.tickets.length === 0 ? t('board.empty') : t('board.hint')}</p>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-5 gap-4">
         {COLUMNS.map((column) => {
@@ -133,12 +133,12 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                 dragging && allowed ? 'border-primary ring-2 ring-primary/30' : 'border-border'
               } ${dragging && !allowed ? 'opacity-60' : ''} ${over === column && allowed ? 'bg-primary/10' : 'bg-muted/40'}`}
             >
-              <h2 className="flex items-center justify-between gap-2 px-3 py-3 text-[11px] font-bold tracking-wider text-foreground uppercase">
+              <h2 className="flex items-center justify-between gap-2 px-3 py-3 text-xs font-bold tracking-wider text-foreground uppercase">
                 <span className="flex items-center gap-2">
                   <span className={`size-2 rounded-full ${STAGE[column].dot}`} aria-hidden />
                   {t(`board.columns.${column}`)}
                 </span>
-                <span className="rounded-full border border-border bg-card px-1.5 text-[10px] font-semibold text-muted-foreground">{tickets.length}</span>
+                <span className="rounded-full border border-border bg-card px-1.5 text-xs font-semibold text-muted-foreground">{tickets.length}</span>
               </h2>
               <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
                 {tickets.map((ticket) => (

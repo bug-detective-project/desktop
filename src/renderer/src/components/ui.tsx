@@ -18,8 +18,8 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: 'gap-1.5 rounded-md px-3 py-1.5 text-xs',
-  md: 'gap-2 rounded-lg px-3.5 py-2 text-sm',
+  sm: 'gap-1.5 rounded-md px-3 py-1.5 text-sm',
+  md: 'gap-2 rounded-lg px-3.5 py-2 text-base',
 };
 
 export function Button({
@@ -33,7 +33,7 @@ export function Button({
   return (
     <button
       type="button"
-      className={`inline-flex items-center justify-center font-medium transition-all focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       disabled={busy || props.disabled}
       {...props}
     >
@@ -58,7 +58,7 @@ export function Card({ children, className = '', ...props }: { children: ReactNo
 export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-2">
-      <h2 className="text-[11px] font-bold tracking-wider text-foreground uppercase">{children}</h2>
+      <h2 className="text-xs font-bold tracking-wider text-foreground uppercase">{children}</h2>
       {aside}
     </div>
   );
@@ -73,14 +73,14 @@ const TONES = {
 };
 
 export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}>{children}</span>;
 }
 
 export function StagePill({ status, className = '' }: { status: Column; className?: string }) {
   const { t } = useTranslation();
   const stage = STAGE[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${stage.pill} ${className}`} data-stage={status}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${stage.pill} ${className}`} data-stage={status}>
       {stage.pulse && <span className={`size-1.5 animate-pulse rounded-full ${stage.dot}`} aria-hidden />}
       {t(`board.columns.${status}`)}
     </span>
@@ -121,7 +121,7 @@ export function Tabs<T extends string>({
           aria-selected={tab.id === active}
           data-testid={`tab-${tab.id}`}
           onClick={() => onChange(tab.id)}
-          className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-base font-medium transition-colors ${
             tab.id === active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -136,7 +136,7 @@ export function Tabs<T extends string>({
 export function LogView({ lines }: { lines: string[] }) {
   return (
     <pre
-      className="max-h-56 overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-[11px] leading-relaxed text-foreground"
+      className="max-h-56 overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-xs leading-relaxed text-foreground"
       data-testid="log-view"
     >
       {lines.slice(-200).join('\n') || '…'}
@@ -162,7 +162,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" role="dialog" aria-modal aria-label={title} {...props}>
       <div className="w-full max-w-lg rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
+          <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
             {icon}
             {title}
           </h2>
@@ -185,7 +185,7 @@ export function Notice({ tone = 'warn', children, ...props }: { tone?: 'warn' | 
     danger: 'border-destructive/40 bg-destructive/5 text-foreground',
   };
   return (
-    <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-sm ${styles[tone]}`} {...props}>
+    <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-base ${styles[tone]}`} {...props}>
       <Icon name="alertTriangle" className={`mt-0.5 size-4 ${tone === 'warn' ? 'text-amber-500' : 'text-destructive'}`} />
       <div className="min-w-0">{children}</div>
     </div>

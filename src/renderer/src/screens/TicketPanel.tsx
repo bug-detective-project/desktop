@@ -60,7 +60,7 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   };
 
   if (ticket.status === 'done') {
-    return <p className="text-sm text-muted-foreground">{t('ticket.readOnly')}</p>;
+    return <p className="text-base text-muted-foreground">{t('ticket.readOnly')}</p>;
   }
   return (
     <div className="space-y-2">
@@ -72,7 +72,7 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
         <Button disabled={!dockerUp} busy={busy === 'browser'} onClick={() => run('browser', () => api.openAppInBrowser())} data-testid="open-browser">
           {busy !== 'browser' && <Icon name="externalLink" />}
           {t('ticket.openBrowser')}
-          {status?.ports && <span className="font-mono text-xs text-muted-foreground">:{status.ports.client}</span>}
+          {status?.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
         </Button>
         {status && !status.devServerUp && (
           <Button variant="ghost" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
@@ -81,9 +81,9 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
           </Button>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">{t('ticket.vscodeHint')}</p>
+      <p className="text-sm text-muted-foreground">{t('ticket.vscodeHint')}</p>
       {status && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {!status.devServerUp && <span>{t('ticket.devServerDown')}</span>}
         </p>
       )}
@@ -127,8 +127,8 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
       );
     return (
       <div key={index} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid={`chat-${entry.kind}`}>
-        <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'border border-border bg-muted text-foreground'}`}>
-          {!mine && <p className="mb-1 text-xs font-semibold text-primary">{senior}</p>}
+        <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-base ${mine ? 'bg-primary text-primary-foreground' : 'border border-border bg-muted text-foreground'}`}>
+          {!mine && <p className="mb-1 text-sm font-semibold text-primary">{senior}</p>}
           {body}
         </div>
       </div>
@@ -137,7 +137,7 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
 
   return (
     <div className="space-y-4" data-testid="conversation">
-      <p className="text-sm text-muted-foreground">{t('ticket.senior.intro', { name: senior })}</p>
+      <p className="text-base text-muted-foreground">{t('ticket.senior.intro', { name: senior })}</p>
       <div className="space-y-3">{ticket.conversation.map(bubble)}</div>
       {canAsk ? (
         <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
@@ -147,18 +147,18 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
             </Button>
           ) : !ticket.solutionRevealed ? (
             <>
-              <span className="text-sm text-muted-foreground">{t('ticket.senior.noMoreHints')}</span>
+              <span className="text-base text-muted-foreground">{t('ticket.senior.noMoreHints')}</span>
               <Button variant="primary" busy={busy} onClick={() => act(() => api.revealSolution(ticket.ticket))} data-testid="reveal-solution">
                 {t('ticket.senior.askSolution')}
               </Button>
             </>
           ) : null}
-          <span className="ml-auto text-xs text-muted-foreground" data-testid="hints-used">
+          <span className="ml-auto text-sm text-muted-foreground" data-testid="hints-used">
             {t('ticket.hintsUsed', { used: ticket.hintsRevealed, total })}
           </span>
         </div>
       ) : (
-        ticket.status !== 'done' && <p className="text-sm text-muted-foreground">{t('ticket.senior.onlyInProgress')}</p>
+        ticket.status !== 'done' && <p className="text-base text-muted-foreground">{t('ticket.senior.onlyInProgress')}</p>
       )}
     </div>
   );
@@ -172,23 +172,23 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="mb-2 text-sm font-semibold">{t('ticket.attemptHistory')}</h3>
+        <h3 className="mb-2 text-base font-semibold">{t('ticket.attemptHistory')}</h3>
         {ticket.attempts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('ticket.noAttempts')}</p>
+          <p className="text-base text-muted-foreground">{t('ticket.noAttempts')}</p>
         ) : (
           <ol className="space-y-2" data-testid="attempts">
             {ticket.attempts.map((attempt) => {
               const passed = attempt.result.tests.filter((test) => test.status === 'passed').length;
               const failed = attempt.result.tests.filter((test) => test.status === 'failed').length;
               return (
-                <li key={attempt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm" data-testid="attempt">
+                <li key={attempt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-base" data-testid="attempt">
                   <span className="font-medium">{t('ticket.attempt', { number: attempt.number })}</span>
                   <Badge tone={attempt.result.status === 'passed' ? 'ok' : 'danger'}>
                     {t(`ticket.attemptResult.${attempt.result.status}`)}
                     {attempt.result.status !== 'passed' && ` · ${t('qa.gate', { gate: attempt.result.gate })}`}
                   </Badge>
                   <span className="text-muted-foreground">{t('ticket.testsSummary', { passed, failed })}</span>
-                  <time className="ml-auto text-xs text-muted-foreground">{new Date(attempt.finishedAt).toLocaleString(locale)}</time>
+                  <time className="ml-auto text-sm text-muted-foreground">{new Date(attempt.finishedAt).toLocaleString(locale)}</time>
                 </li>
               );
             })}
@@ -196,20 +196,20 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
         )}
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">{t('ticket.activity')}</h3>
-        <ol className="space-y-1.5 text-sm" data-testid="activity">
+        <h3 className="mb-2 text-base font-semibold">{t('ticket.activity')}</h3>
+        <ol className="space-y-1.5 text-base" data-testid="activity">
           {activity.map((entry, index) => (
             <li key={index} className="flex gap-3" data-testid="activity-entry">
-              <time className="w-40 shrink-0 text-xs text-muted-foreground">{new Date(entry.at).toLocaleString(locale)}</time>
+              <time className="w-40 shrink-0 text-sm text-muted-foreground">{new Date(entry.at).toLocaleString(locale)}</time>
               <span>
                 {entry.from ? t('ticket.transition', { from: column(entry.from), to: column(entry.to) }) : t('ticket.created', { to: column(entry.to) })}
-                <span className="ml-2 text-xs text-muted-foreground">({t(`ticket.actor.${entry.actor}`)})</span>
+                <span className="ml-2 text-sm text-muted-foreground">({t(`ticket.actor.${entry.actor}`)})</span>
               </span>
             </li>
           ))}
         </ol>
       </section>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         {t('ticket.hintsUsed', { used: ticket.hintsRevealed, total: snapshot.hintsTotal[ticket.ticket] ?? 3 })}
         {ticket.solutionRevealed && ` · ${t('ticket.solutionRevealed')}`}
       </p>
@@ -256,10 +256,10 @@ export function TicketPanel({
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-primary">{ticketTitle(snapshot, ticket.ticket, language).key}</span>
+                <span className="font-mono text-sm font-bold text-primary">{ticketTitle(snapshot, ticket.ticket, language).key}</span>
                 <StagePill status={ticket.status} />
               </div>
-              <h2 className="mt-2 text-lg font-bold tracking-tight" data-testid="ticket-title">
+              <h2 className="mt-2 text-xl font-bold tracking-tight" data-testid="ticket-title">
                 {snapshot.titles[ticket.ticket]?.[language]}
               </h2>
             </div>
@@ -292,7 +292,7 @@ export function TicketPanel({
           {tab === 'qa' && (
             <div className="space-y-3" data-testid="qa-comments">
               {qaRunning && (
-                <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm" data-testid="qa-running">
+                <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-base" data-testid="qa-running">
                   <p className="flex items-center gap-2 font-medium text-foreground">
                     <Icon name="spinner" className="size-4 text-amber-500" />
                     {t('qa.running')}
@@ -300,7 +300,7 @@ export function TicketPanel({
                   {snapshot.busy === 'qa' && <LogView lines={snapshot.log} />}
                 </div>
               )}
-              {ticket.comments.length === 0 && !qaRunning && <p className="text-sm text-muted-foreground">{t('ticket.noComments')}</p>}
+              {ticket.comments.length === 0 && !qaRunning && <p className="text-base text-muted-foreground">{t('ticket.noComments')}</p>}
               {[...ticket.comments].reverse().map((comment) => (
                 <QaCommentView key={comment.id} comment={comment} />
               ))}

@@ -18,20 +18,20 @@ export function QaCommentView({ comment }: { comment: Comment }) {
   const message = qaMessage(comment);
   return (
     <article className="rounded-lg border border-border bg-card p-4" data-testid="qa-comment" data-kind={comment.kind}>
-      <header className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+      <header className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
         <Badge tone={TONE[message.key]}>{message.gate ? t('qa.gate', { gate: message.gate }) : 'QA'}</Badge>
         <time>{new Date(comment.at).toLocaleString(i18n.language === 'pt' ? 'pt-BR' : 'en-US')}</time>
       </header>
-      <p className="text-sm">{t(`qa.comment.${message.key}`, message.params)}</p>
+      <p className="text-base">{t(`qa.comment.${message.key}`, message.params)}</p>
       {message.failing.length > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-semibold text-muted-foreground">{t('qa.failingTests')}</p>
+          <p className="text-sm font-semibold text-muted-foreground">{t('qa.failingTests')}</p>
           <ul className="mt-1 space-y-2">
             {message.failing.map((test) => (
               <li key={test.name} data-testid="qa-failing-test">
-                <p className="text-sm font-medium">• {test.name}</p>
+                <p className="text-base font-medium">• {test.name}</p>
                 {test.error && (
-                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{test.error}</pre>
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono text-sm whitespace-pre-wrap text-muted-foreground">{test.error}</pre>
                 )}
               </li>
             ))}
@@ -40,8 +40,8 @@ export function QaCommentView({ comment }: { comment: Comment }) {
       )}
       {message.unfinished.length > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-semibold text-muted-foreground">{t('qa.unfinishedTests')}</p>
-          <ul className="mt-1 list-disc pl-5 text-sm">
+          <p className="text-sm font-semibold text-muted-foreground">{t('qa.unfinishedTests')}</p>
+          <ul className="mt-1 list-disc pl-5 text-base">
             {message.unfinished.map((name) => (
               <li key={name}>{name}</li>
             ))}

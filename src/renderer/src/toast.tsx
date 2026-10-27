@@ -38,7 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={toast.id}
             role={toast.tone === 'error' ? 'alert' : 'status'}
             data-testid={toast.tone === 'error' ? 'toast-error' : 'toast-info'}
-            className={`pointer-events-auto rounded-xl border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg ${
+            className={`pointer-events-auto rounded-xl border bg-popover px-4 py-3 text-base text-popover-foreground shadow-lg ${
               toast.tone === 'error' ? 'border-destructive/40 border-l-4 border-l-destructive' : 'border-border border-l-4 border-l-primary'
             }`}
           >

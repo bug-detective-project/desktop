@@ -60,8 +60,8 @@ export function AppHeader({
           <div className="flex items-center gap-2.5">
             <img src={logo} alt="" className="size-9 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
             <div className="flex items-center whitespace-nowrap">
-              <span className="text-base font-bold tracking-tight text-foreground">{t('app.name')}</span>
-              <span className="ml-2.5 hidden border-l border-border pl-2.5 text-sm text-muted-foreground xl:inline">{company}</span>
+              <span className="text-lg font-bold tracking-tight text-foreground">{t('app.name')}</span>
+              <span className="ml-2.5 hidden border-l border-border pl-2.5 text-sm text-muted-foreground 2xl:inline">{company}</span>
             </div>
           </div>
           <nav className="flex items-center gap-1" aria-label="Main">
@@ -74,7 +74,7 @@ export function AppHeader({
                   onClick={() => onNavigate(item.id)}
                   data-testid={`nav-${item.id}`}
                   aria-current={active ? 'page' : undefined}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-base transition-colors ${
                     active ? 'bg-primary/10 font-semibold text-primary' : 'font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                   }`}
                 >
@@ -95,7 +95,7 @@ export function AppHeader({
             data-testid="theme-toggle"
           >
             <Icon name="sunMoon" className="size-4 text-muted-foreground" />
-            <span className="hidden xl:inline">
+            <span className="hidden 2xl:inline">
               {t('header.theme')}: <span className="font-semibold text-primary">{t(dark ? 'settings.themes.dark' : 'settings.themes.light')}</span>
             </span>
           </button>

@@ -35,26 +35,23 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 
 ## Typography
 
-Every screen uses the same two families and the same size scale, taken from the Board:
+**Base size: 16px.** Normal text is `text-base` (1rem = 16px, the browser default set on `body`); every other size steps from it. Two families on every screen:
 
 | Family | Utility | Use |
 | --- | --- | --- |
 | **Inter Variable** (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` as fallback) | `font-sans`, set on `body` | All UI text |
 | **JetBrains Mono Variable** (`ui-monospace, monospace` as fallback) | `font-mono` | Only ticket keys and message IDs (`SD-214`, `msg-…`), versions, file names and paths, e-mail addresses, code and logs. Never for sentences, labels, stage names or numbers (use `tabular-nums` for sizes and durations) |
 
-| Role | Classes | Examples |
-| --- | --- | --- |
-| Page title | `text-2xl font-bold tracking-tight` | "Board", "Settings" |
-| Subject | `text-lg font-bold tracking-tight` | Directive subject, About app name |
-| Card heading | `text-base font-bold tracking-tight` | Settings pane titles, Danger zone, the Lanternfish Labs and client cards, the current assignment title |
-| Setting title | `text-base font-semibold tracking-tight` | Preferences rows (Language, Theme, QA time limit), with the help below in `text-sm text-muted-foreground` |
-| Reading text (default) | `text-sm` | Card titles, directive body, list items, help texts, dialog text, inputs, tabs |
-| Metadata | `text-xs text-muted-foreground` | Dates, ticket keys, secondary lines, badges, chips, small buttons |
-| Section label | `text-[11px] font-bold uppercase tracking-wider` (`SectionTitle`) | Board column titles |
-| Card label (Dashboard rails) | `text-xs font-bold uppercase tracking-wider` | "Directives & inbox", "Current assignment", "Client reporters & mentors", "Local environment" |
-| Counter chip | `text-[10px] font-bold` | Board column counts, unread counter |
+| Role | Size | Classes | Examples |
+| --- | --- | --- | --- |
+| Page title | 30px | `text-3xl font-bold tracking-tight` | "Board", "Settings", "Before you start", the code review title |
+| Subject | 20px | `text-xl font-bold tracking-tight` | Directive subject, ticket panel title, dialog titles, About app name |
+| Card heading | 18px | `text-lg font-bold tracking-tight` (or `font-semibold`) | Settings pane titles and setting titles, Danger zone, Lanternfish Labs and client cards, current assignment title, app name in the header |
+| **Normal text** | **16px** | `text-base` | Card titles, directive and ticket body, list items, help texts, dialog text, inputs, tabs, navigation, buttons (`md`) |
+| Secondary | 14px | `text-sm text-muted-foreground` | Dates, ticket keys, secondary lines, badges, chips, header pills, small buttons (`sm`) |
+| Label | 12px | `text-xs font-bold uppercase tracking-wider` | Board column titles, Dashboard card labels ("Current assignment", "Local environment"), counters |
 
-Nothing smaller than `text-xs` except section labels and counter chips. Markdown (`Markdown.tsx`): paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-sm`.
+Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap`). Markdown (`Markdown.tsx`): `h1` 24px, paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-base`.
 
 ## Workflow stage colors
 
@@ -72,10 +69,10 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 
 ## Components (`src/renderer/src/components/`)
 
-- `Button` (`ui.tsx`): `variant` `primary` (`bg-primary`), `secondary` (`bg-secondary border`), `ghost`, `danger` (`bg-destructive`); `size` `sm` (docks, rails, banners) or `md`. `busy` shows a spinner.
+- `Button` (`ui.tsx`): `variant` `primary` (`bg-primary`), `secondary` (`bg-secondary border`), `ghost`, `danger` (`bg-destructive`); `size` `sm` (14px: docks, rails, banners) or `md` (16px). `busy` shows a spinner.
 - **Icons** (`icons.tsx`): inline Lucide shapes drawn with `currentColor`. Icons inside buttons always inherit the button's text color: never give them their own color (no green icon inside a primary button).
-- `Card`, `SectionTitle`, `Badge` (tones `neutral`, `ok`, `warn`, `danger`, `brand`), `StagePill`, `StatusIcon`, `Tabs`, `LogView` (`bg-muted/60 font-mono text-[11px]`), `Modal`, `Notice` (amber warning or destructive block).
-- `AppHeader.tsx`: the shell on every screen after the checklist, 64 px high (`h-16`). Text follows the scale: app name `text-base font-bold`, company, navigation and pills `text-sm`, icons `size-4`, unread counter `text-xs`; below `xl` the company name and the pill labels hide (icons and values stay). Left: the app logo (`assets/logo.png`, 36 px), app name, `Lanternfish Labs`. Nav: Dashboard, Board, Settings (active `bg-primary/10 text-primary`). Right: theme toggle, Docker health pill (green running, amber starting, red stopped), inbox button with the unread counter, `ME` avatar. The Docker banner (`DockerBanner` in `Checklist.tsx`) sits right below it while Docker is down.
+- `Card`, `SectionTitle`, `Badge` (tones `neutral`, `ok`, `warn`, `danger`, `brand`), `StagePill`, `StatusIcon`, `Tabs`, `LogView` (`bg-muted/60 font-mono text-xs`), `Modal`, `Notice` (amber warning or destructive block).
+- `AppHeader.tsx`: the shell on every screen after the checklist, 64 px high (`h-16`). Text follows the scale: app name 18px bold, navigation 16px, company and pills 14px, icons `size-4`, unread counter 12px; below `2xl` (1536px) the company name and the theme label hide, below `xl` the inbox label too (icons and values stay). Left: the app logo (`assets/logo.png`, 36 px), app name, `Lanternfish Labs`. Nav: Dashboard, Board, Settings (active `bg-primary/10 text-primary`). Right: theme toggle, Docker health pill (green running, amber starting, red stopped), inbox button with the unread counter, `ME` avatar. The Docker banner (`DockerBanner` in `Checklist.tsx`) sits right below it while Docker is down.
 - Toasts (`toast.tsx`): `bg-popover` with a primary (info) or destructive (error) left edge.
 
 ## Screens
@@ -83,17 +80,17 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 - **Dashboard** (`screens/Dashboard.tsx`), a 3-column desk (`lg:grid-cols-12`, max width `7xl`):
   - Column 1 (3): Directives & Inbox (selected thread `border-primary/40 bg-primary/5`, unread dot and bold primary sender), the Lanternfish Labs card, the client card (emerald dot, `Client` tag, SupportDesk stack).
   - Column 2 (6): the open directive (avatar, sender and e-mail, role and date, `ID: msg-…` chip, subject, markdown body) and the **action dock**, which follows the game state in this order: downloads needed (`environment-panel`), unlocking (progress and log), an older directive of a done ticket (emerald "done & merged", return to the active task), the active ticket (stage pill, the stage's primary action), next assignment queued (or blocked while Docker is stopped), onboarding complete.
-  - Column 3 (3): Current assignment (active ticket, or "Queued" with **Get next assignment**), Client reporters & mentors (from `content/story.*.json`; name, then "role · company" in `text-sm`, the mentor tag next to the senior's name), Local environment (Docker and each download item).
+  - Column 3 (3): Current assignment (active ticket, or "Queued" with **Get next assignment**), Client reporters & mentors (from `content/story.*.json`; name, then "role · company" in `text-base text-muted-foreground`, the mentor tag next to the senior's name), Local environment (Docker and each download item).
 - **Board**: five columns with stage dots and counters on `bg-muted/40`; cards `bg-card rounded-xl border p-4 shadow-sm` with the key in `font-mono text-primary`. Only unlocked tickets appear.
 - **Ticket panel**: key, stage pill, title; workspace actions with icons; QA running in an amber notice.
 - **Code review**: key and stage pill above the title; accept button primary with a `checkCircle` icon.
-- **Settings** (`screens/Settings.tsx`, approved spec `../layout-tests/SETTINGS_UI_SPECIFICATION_B_REFINED.md`): centered (`max-w-4xl`), title and subtitle, then segmented top tabs (`bg-secondary/50 rounded-2xl` bar; active tab `bg-primary text-primary-foreground`):
-  - Preferences: language as flag cards, theme as a System / Light / Dark toggle group, QA time limit as a text field ("3 min 00 s", also accepts `2:30`, `90s`, `5m`) with -30s / +30s and an inline error outside 30 s–30 min.
+- **Settings** (`screens/Settings.tsx`, approved spec `../layout-tests/SETTINGS_UI_SPECIFICATION_B_REFINED.md`): centered (`max-w-5xl`), title and subtitle, then segmented top tabs (`bg-secondary/50 rounded-2xl` bar; active tab `bg-primary text-primary-foreground`):
+  - Preferences: language (flag + name) and theme (System / Light / Dark) as the same switch-like segmented control (`Segmented` in `Settings.tsx`: `bg-secondary/50` track, selected option raised in `bg-card` with a ring), QA time limit as a number field in minutes (its arrows and ↑/↓ step 1 minute; half minutes such as 2.5 or 2,5 can be typed) with the "minutes" label, -1m / +1m buttons and an inline error outside 0.5–30 minutes (the setting is stored in seconds, 30–1800).
   - Developer tools & status: one row per tool with its version chip and status badge; actions only where they exist (Start Docker Desktop, Install in VS Code, install links); Check again; disk usage of the game's images and volumes (measured on demand, needs Docker).
   - Progress & backup: last export (file, age, folder) and current progress in story terms (never branch names or totals), "Backup outdated" badge and an age chip on the tab; Export / Restore; Danger zone card with an outline destructive New game button. While a long task runs, a notice says which one and the actions are disabled; while Docker is stopped, Export and Restore are disabled with the reason.
   - About: logo, version and the Electron / Node.js / Chromium versions.
   - Dialogs (`Modal`, `bg-black/60 backdrop-blur-xs`): restore confirmation (save summary, amber overwrite warning), new game, and the restore in progress (no close button, terminal log).
-- Badges are `text-xs`; reading text and help are `text-sm`, like the rest of the app.
+- Badges are 14px; reading text and help are 16px, like the rest of the app.
 
 ## Text
 

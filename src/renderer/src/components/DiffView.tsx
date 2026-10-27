@@ -14,7 +14,7 @@ export function DiffView({ diff, testId, emptyText }: { diff: string | null; tes
   const files = diff ? parseDiff(diff) : [];
   if (files.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground" data-testid={testId}>
+      <p className="text-base text-muted-foreground" data-testid={testId}>
         {emptyText ?? t('diff.empty')}
       </p>
     );
@@ -23,9 +23,9 @@ export function DiffView({ diff, testId, emptyText }: { diff: string | null; tes
     <div className="space-y-4" data-testid={testId}>
       {files.map((file) => (
         <div key={file.path} className="overflow-hidden rounded-lg border border-border">
-          <div className="border-b border-border bg-muted px-3 py-1.5 font-mono text-xs font-semibold text-foreground">{file.path}</div>
+          <div className="border-b border-border bg-muted px-3 py-1.5 font-mono text-sm font-semibold text-foreground">{file.path}</div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse font-mono text-xs leading-5">
+            <table className="w-full border-collapse font-mono text-sm leading-5">
               <tbody>
                 {file.lines.map((line, index) => (
                   <tr key={index} className={ROW[line.kind]} data-kind={line.kind}>

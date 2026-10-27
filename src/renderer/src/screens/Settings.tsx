@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CheckResult, DiskUsageItem, ExternalLink, SaveSummary, Snapshot } from '@shared/api.ts';
-import { formatDuration, parseDuration } from '@shared/duration.ts';
+import { parseMinutes, toMinutes } from '@shared/duration.ts';
 import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, backupStatus } from '@shared/types.ts';
 import type { Language, Theme } from '@shared/types.ts';
 import logo from '../assets/logo.png';
@@ -49,8 +49,8 @@ function PaneHeader({ title, help, aside }: { title: string; help: string; aside
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h2 className="text-base font-bold tracking-tight text-foreground">{title}</h2>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{help}</p>
+        <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
+        <p className="mt-1 text-base leading-relaxed text-muted-foreground">{help}</p>
       </div>
       {aside}
     </div>
@@ -62,8 +62,8 @@ function Row({ title, help, children }: { title: string; help: string; children:
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-8">
       <div className="min-w-0">
-        <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
-        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{help}</p>
+        <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+        <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">{help}</p>
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -107,66 +107,111 @@ function useProgressText(snapshot: Snapshot): { done: string; current: { key: st
 function QaTimeout({ seconds }: { seconds: number }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const [text, setText] = useState(formatDuration(seconds));
+  const [text, setText] = useState(toMinutes(seconds));
   const [invalid, setInvalid] = useState(false);
   const [saved, setSaved] = useState(seconds);
   // The value can also change from outside (another window, a restore).
   if (seconds !== saved) {
     setSaved(seconds);
-    setText(formatDuration(seconds));
+    setText(toMinutes(seconds));
     setInvalid(false);
   }
 
   const inRange = (value: number | null): value is number => value !== null && value >= MIN_QA_TIMEOUT_SECONDS && value <= MAX_QA_TIMEOUT_SECONDS;
   const save = (value: number) => {
-    setText(formatDuration(value));
+    setText(toMinutes(value));
     setInvalid(false);
     if (value !== seconds) {
       void api.updateSettings({ qaTimeoutSeconds: value }).catch(toast.error);
     }
   };
   const commit = () => {
-    const value = parseDuration(text);
+    const value = parseMinutes(text);
     if (inRange(value)) {
       save(value);
     } else {
       setInvalid(true);
     }
   };
-  const typed = parseDuration(text);
+  const typed = parseMinutes(text);
   const base = inRange(typed) ? typed : seconds;
   const step = (delta: number) => save(Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, base + delta)));
-  const stepButton = 'rounded-md border border-border bg-secondary px-2 py-1 text-xs font-medium text-foreground tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
+  const stepButton = 'rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm font-medium text-foreground tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="flex flex-col items-start gap-1.5 md:items-end">
       <div className="flex items-center gap-3">
-        <input
-          type="text"
-          inputMode="text"
-          aria-label={t('settings.qaTimeout')}
-          aria-invalid={invalid}
-          className={`w-32 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-foreground tabular-nums focus:ring-2 focus:outline-hidden ${invalid ? 'border-destructive focus:ring-destructive/40' : 'border-border focus:ring-ring'}`}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => event.key === 'Enter' && commit()}
-          data-testid="qa-timeout"
-        />
+        <label className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            // The arrows step whole minutes. No min attribute: HTML counts steps from it (0.5, 1.5, …);
+            // the 0.5 minimum is checked on commit, and half minutes can still be typed.
+            max={MAX_QA_TIMEOUT_SECONDS / 60}
+            step={1}
+            aria-invalid={invalid}
+            className={`w-20 rounded-lg border bg-background px-3 py-1.5 text-right text-base font-medium text-foreground tabular-nums focus:ring-2 focus:outline-hidden ${invalid ? 'border-destructive focus:ring-destructive/40' : 'border-border focus:ring-ring'}`}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => event.key === 'Enter' && commit()}
+            data-testid="qa-timeout"
+          />
+          <span className="text-base text-muted-foreground">{t('settings.qaTimeoutUnit')}</span>
+        </label>
         <div className="flex items-center gap-1.5">
-          <button type="button" className={stepButton} onClick={() => step(-30)} disabled={base <= MIN_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutLess')}>
-            -30s
+          <button type="button" className={stepButton} onClick={() => step(-60)} disabled={base <= MIN_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutLess')}>
+            -1m
           </button>
-          <button type="button" className={stepButton} onClick={() => step(30)} disabled={base >= MAX_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutMore')}>
-            +30s
+          <button type="button" className={stepButton} onClick={() => step(60)} disabled={base >= MAX_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutMore')}>
+            +1m
           </button>
         </div>
       </div>
       {invalid && (
-        <p className="text-xs font-medium text-destructive" role="alert" data-testid="qa-timeout-error">
+        <p className="text-sm font-medium text-destructive" role="alert" data-testid="qa-timeout-error">
           {t('settings.qaTimeoutInvalid')}
         </p>
       )}
+    </div>
+  );
+}
+
+/** A switch-like group of options (language, theme): `<testId>-select` on the group, `<testId>-<value>` on each option. */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  testId,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; icon: ReactNode; text: string }[];
+  onChange: (value: T) => void;
+  testId: string;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1" role="radiogroup" aria-label={label} data-testid={`${testId}-select`}>
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-base whitespace-nowrap transition-all ${
+              selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
+            }`}
+            data-testid={`${testId}-${option.value}`}
+          >
+            {option.icon}
+            {option.text}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -177,51 +222,22 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
   return (
     <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-preferences">
       <Row title={t('settings.language')} help={t('settings.languageHelp')}>
-        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t('settings.language')} data-testid="language-select">
-          {LANGUAGES.map((language) => {
-            const selected = settings.language === language;
-            return (
-              <button
-                key={language}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => void api.updateSettings({ language })}
-                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  selected ? 'border-primary/50 bg-primary/5 font-semibold text-foreground ring-1 ring-primary/30' : 'border-border font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                }`}
-                data-testid={`language-${language}`}
-              >
-                <Flag language={language} />
-                <span className="whitespace-nowrap">{LANGUAGE_NAMES[language]}</span>
-                {selected && <Icon name="check" className="ml-auto size-3.5 text-primary" />}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          label={t('settings.language')}
+          value={settings.language}
+          options={LANGUAGES.map((language) => ({ value: language, icon: <Flag language={language} />, text: LANGUAGE_NAMES[language] }))}
+          onChange={(language) => void api.updateSettings({ language })}
+          testId="language"
+        />
       </Row>
       <Row title={t('settings.theme')} help={t('settings.themeHelp')}>
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1" role="radiogroup" aria-label={t('settings.theme')} data-testid="theme-select">
-          {THEMES.map((theme) => {
-            const selected = settings.theme === theme;
-            return (
-              <button
-                key={theme}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => void api.updateSettings({ theme })}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-all ${
-                  selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
-                }`}
-                data-testid={`theme-${theme}`}
-              >
-                <Icon name={THEME_ICONS[theme]} className="size-3.5" />
-                {t(`settings.themes.${theme}`)}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          label={t('settings.theme')}
+          value={settings.theme}
+          options={THEMES.map((theme) => ({ value: theme, icon: <Icon name={THEME_ICONS[theme]} className="size-3.5" />, text: t(`settings.themes.${theme}`) }))}
+          onChange={(theme) => void api.updateSettings({ theme })}
+          testId="theme"
+        />
       </Row>
       <Row title={t('settings.qaTimeout')} help={t('settings.qaTimeoutHelp')}>
         <QaTimeout seconds={settings.qaTimeoutSeconds} />
@@ -287,22 +303,22 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
   return (
     <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid="disk-usage">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{t('settings.disk')}</h3>
-        <span className="text-xs text-muted-foreground">{t('settings.diskHelp')}</span>
+        <h3 className="text-base font-semibold text-foreground">{t('settings.disk')}</h3>
+        <span className="text-sm text-muted-foreground">{t('settings.diskHelp')}</span>
       </div>
       {!running ? (
-        <p className="text-sm text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
+        <p className="text-base text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const).map((id) => {
             const item = items?.find((entry) => entry.id === id);
             return (
               <div key={id} className="min-w-0 rounded-lg border border-border/60 bg-card p-3" data-testid={`disk-${id}`}>
-                <span className="block truncate text-xs font-semibold text-muted-foreground">{t(`settings.diskItems.${id}.name`)}</span>
-                <span className="mt-0.5 block text-base font-bold text-foreground tabular-nums">
+                <span className="block truncate text-sm font-semibold text-muted-foreground">{t(`settings.diskItems.${id}.name`)}</span>
+                <span className="mt-0.5 block text-lg font-bold text-foreground tabular-nums">
                   {items === null ? t('settings.diskMeasuring') : typeof item?.bytes === 'number' ? formatBytes(item.bytes, i18n.language) : '—'}
                 </span>
-                <span className="block text-xs text-muted-foreground">{item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}</span>
+                <span className="block text-sm text-muted-foreground">{item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}</span>
               </div>
             );
           })}
@@ -387,10 +403,10 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
             <div key={id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between" data-testid={`tool-${id}`} data-status={status.label}>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground">{t(`checklist.${id}.title`)}</span>
-                  {check.version && <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">v{check.version}</span>}
+                  <span className="text-base font-semibold text-foreground">{t(`checklist.${id}.title`)}</span>
+                  {check.version && <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-sm text-muted-foreground">v{check.version}</span>}
                 </div>
-                {problem && <p className="mt-1 text-sm text-muted-foreground">{problem}</p>}
+                {problem && <p className="mt-1 text-base text-muted-foreground">{problem}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Badge tone={status.tone}>{t(`settings.toolStatus.${status.label}`)}</Badge>
@@ -448,7 +464,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       {locked && (
         <Notice data-testid="settings-locked">
           <p className="font-semibold">{t('settings.locked.title', { task: t(`settings.locked.tasks.${task}`) })}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{t('settings.locked.body')}</p>
+          <p className="mt-0.5 text-base text-muted-foreground">{t('settings.locked.body')}</p>
         </Notice>
       )}
       <div className={pane}>
@@ -457,20 +473,20 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
           help={t('settings.backupHelp')}
           aside={
             outdated && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs leading-none font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400" data-testid="backup-outdated">
+              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-sm leading-none font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400" data-testid="backup-outdated">
                 <Icon name="alertTriangle" className="size-3 text-amber-500" />
                 {t('settings.backupOutdated')}
               </span>
             )
           }
         />
-        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-sm" data-testid="last-export">
+        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-base" data-testid="last-export">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <dt className="text-muted-foreground">{t('settings.lastExport')}</dt>
             <dd className="min-w-0 text-right">
               {last && lastFile ? (
                 <>
-                  <span className="font-mono text-xs font-semibold text-foreground">{lastFile.name}</span>
+                  <span className="font-mono text-sm font-semibold text-foreground">{lastFile.name}</span>
                   <span className="text-muted-foreground">
                     {' · '}
                     {ago(last.at, now, i18n.language)} ({new Date(last.at).toLocaleDateString(locale(i18n.language), { dateStyle: 'medium' })})
@@ -484,7 +500,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
           {lastFile && (
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <dt className="text-muted-foreground">{t('settings.exportFolder')}</dt>
-              <dd className="min-w-0 font-mono text-xs break-all text-foreground">{lastFile.folder}</dd>
+              <dd className="min-w-0 font-mono text-sm break-all text-foreground">{lastFile.folder}</dd>
             </div>
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border/60 pt-2.5">
@@ -502,7 +518,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             </dd>
           </div>
         </dl>
-        {dockerDown && !locked && <p className="text-sm text-muted-foreground">{t('settings.needsDocker')}</p>}
+        {dockerDown && !locked && <p className="text-base text-muted-foreground">{t('settings.needsDocker')}</p>}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
@@ -531,8 +547,8 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
         <Icon name="alertTriangle" className="mt-0.5 size-4 text-destructive" />
         <div className="min-w-0 space-y-4">
           <div>
-            <h2 className="text-base leading-tight font-bold tracking-tight text-destructive">{t('settings.dangerZone')}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
+            <h2 className="text-lg leading-tight font-bold tracking-tight text-destructive">{t('settings.dangerZone')}</h2>
+            <p className="mt-1 text-base leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
           </div>
           <Button variant="dangerOutline" disabled={task !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
             <Icon name="rotateCcw" />
@@ -544,7 +560,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       {confirmNewGame && (
         <Modal title={t('settings.newGameTitle')} icon={<Icon name="rotateCcw" className="size-5 text-destructive" />} onClose={() => setConfirmNewGame(false)}>
           <Notice>
-            <p className="text-sm leading-relaxed">{t('settings.newGameWarning')}</p>
+            <p className="text-base leading-relaxed">{t('settings.newGameWarning')}</p>
           </Notice>
           <div className="mt-5 flex justify-end gap-2">
             <Button onClick={() => setConfirmNewGame(false)}>{t('common.cancel')}</Button>
@@ -566,18 +582,18 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       )}
       {pending && (
         <Modal title={t('settings.restoreTitle')} onClose={() => setPending(null)} data-testid="restore-dialog">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-base">
             <dt className="text-muted-foreground">{t('settings.restoreFile')}</dt>
-            <dd className="font-mono text-xs font-semibold break-all">{pending.summary.fileName}</dd>
+            <dd className="font-mono text-sm font-semibold break-all">{pending.summary.fileName}</dd>
             <dt className="text-muted-foreground">{t('settings.restoreCreated')}</dt>
             <dd>{new Date(pending.summary.createdAt).toLocaleString(locale(i18n.language), { dateStyle: 'medium', timeStyle: 'short' })}</dd>
             <dt className="text-muted-foreground">{t('settings.restoreVersion')}</dt>
-            <dd>Bug Detective <span className="font-mono text-xs">{pending.summary.appVersion}</span></dd>
+            <dd>Bug Detective <span className="font-mono text-sm">{pending.summary.appVersion}</span></dd>
             <dt className="text-muted-foreground">{t('settings.restoreProgress')}</dt>
             <dd className="font-semibold">{t('settings.ticketsDone', { count: pending.summary.ticketsDone })}</dd>
           </dl>
           {pending.summary.overwritesProgress && (
-            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200" data-testid="restore-warning">
+            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-base text-amber-900 dark:text-amber-200" data-testid="restore-warning">
               <p className="flex items-start gap-2 font-medium">
                 <Icon name="alertTriangle" className="mt-0.5 size-4 text-amber-500" />
                 {t('settings.restoreWarning')}
@@ -613,11 +629,11 @@ function Restoring({ log }: { log: string[] }) {
   const { t } = useTranslation();
   return (
     <Modal title={t('settings.restoringTitle')} icon={<Icon name="spinner" className="size-5 text-primary" />} data-testid="restoring">
-      <p className="text-sm text-muted-foreground">{t('settings.restoringHelp')}</p>
+      <p className="text-base text-muted-foreground">{t('settings.restoringHelp')}</p>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-busy>
         <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
       </div>
-      <pre className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-border/80 bg-black p-3.5 font-mono text-xs whitespace-pre-wrap text-emerald-400 shadow-inner">
+      <pre className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-border/80 bg-black p-3.5 font-mono text-sm whitespace-pre-wrap text-emerald-400 shadow-inner">
         {log.length > 0 ? log.join('\n') : '»'}
       </pre>
     </Modal>
@@ -640,25 +656,25 @@ function About({ snapshot }: { snapshot: Snapshot }) {
         <img src={logo} alt="" className="size-12 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-bold tracking-tight">{t('app.name')}</h2>
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary" data-testid="app-version">
+            <h2 className="text-xl font-bold tracking-tight">{t('app.name')}</h2>
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold text-primary" data-testid="app-version">
               v{snapshot.appVersion}
             </span>
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t('settings.aboutTagline')}</p>
+          <p className="mt-1 text-base leading-relaxed text-muted-foreground">{t('settings.aboutTagline')}</p>
         </div>
       </div>
       <div className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-foreground">{t('settings.runtime')}</span>
-          <span className="font-mono text-xs text-muted-foreground">{t('settings.runtimeHost')}</span>
+          <span className="text-base font-semibold text-foreground">{t('settings.runtime')}</span>
+          <span className="font-mono text-sm text-muted-foreground">{t('settings.runtimeHost')}</span>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {parts.map((part) => (
             <div key={part.id} className="rounded-lg border border-border/60 bg-card p-3">
-              <span className="block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">{part.name}</span>
-              <span className="mt-0.5 block font-mono text-sm font-bold text-foreground">v{part.version}</span>
-              <span className="text-xs text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
+              <span className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">{part.name}</span>
+              <span className="mt-0.5 block font-mono text-base font-bold text-foreground">v{part.version}</span>
+              <span className="text-sm text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
             </div>
           ))}
         </div>
@@ -678,10 +694,10 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
   const outdated = backupStatus(snapshot.state) === 'outdated';
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8" data-testid="settings">
+    <div className="mx-auto max-w-5xl px-6 py-8" data-testid="settings">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('settings.title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('settings.subtitle')}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('settings.title')}</h1>
+        <p className="mt-1 text-base text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
       <div className="mb-8 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
@@ -694,7 +710,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-base whitespace-nowrap transition-colors ${
                 active ? 'bg-primary font-semibold text-primary-foreground shadow-xs' : 'font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               }`}
               data-testid={`settings-tab-${id}`}
@@ -703,7 +719,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               {t(`settings.tabs.${id}`)}
               {id === 'backup' && outdated && (
                 <span
-                  className={`rounded-full border px-1.5 py-0.5 text-xs leading-none font-semibold ${active ? 'border-transparent bg-amber-400 text-amber-950' : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300'}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-sm leading-none font-semibold ${active ? 'border-transparent bg-amber-400 text-amber-950' : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300'}`}
                   data-testid="backup-age"
                 >
                   {last ? shortAge(last.at, now) : '!'}

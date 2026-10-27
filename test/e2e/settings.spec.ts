@@ -22,18 +22,27 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await page.getByTestId('theme-light').click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
 
-    // QA limit: typed as a duration, out of range explained, never saved.
+    // QA limit: minutes, out of range explained and never saved.
     const timeout = page.getByTestId('qa-timeout');
-    await expect(timeout).toHaveValue('3 min 00 s');
-    await timeout.fill('5');
+    await expect(timeout).toHaveValue('3');
+    // The field's arrows step whole minutes.
+    await timeout.press('ArrowUp');
+    await expect(timeout).toHaveValue('4');
+    await timeout.press('ArrowDown');
+    await timeout.press('ArrowDown');
+    await expect(timeout).toHaveValue('2');
+    await timeout.fill('0.2');
     await timeout.blur();
-    await expect(page.getByTestId('qa-timeout-error')).toHaveText('Value must be between 30s and 30m.');
-    await timeout.fill('2:30');
+    await expect(page.getByTestId('qa-timeout-error')).toHaveText('Enter between 0.5 and 30 minutes.');
+    await timeout.fill('2.5');
     await timeout.press('Enter');
-    await expect(timeout).toHaveValue('2 min 30 s');
+    await expect(timeout).toHaveValue('2.5');
     await expect(page.getByTestId('qa-timeout-error')).toHaveCount(0);
-    await page.getByRole('button', { name: '30 seconds more' }).click();
-    await expect(timeout).toHaveValue('3 min 00 s');
+    await page.getByRole('button', { name: '1 minute more' }).click();
+    await expect(timeout).toHaveValue('3.5');
+    await page.getByRole('button', { name: '1 minute less' }).click();
+    await expect(timeout).toHaveValue('2.5');
+    await page.getByRole('button', { name: '1 minute more' }).click();
 
     // Developer tools: versions and disk usage.
     await page.getByTestId('settings-tab-environment').click();

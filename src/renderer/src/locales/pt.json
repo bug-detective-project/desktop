@@ -249,9 +249,10 @@
     },
     "qaTimeout": "Limite de tempo do QA",
     "qaTimeoutHelp": "Quanto tempo uma execução automática do QA pode levar antes de parar.",
-    "qaTimeoutInvalid": "O valor deve ficar entre 30s e 30min.",
-    "qaTimeoutLess": "30 segundos a menos",
-    "qaTimeoutMore": "30 segundos a mais",
+    "qaTimeoutUnit": "minutos",
+    "qaTimeoutInvalid": "Informe entre 0,5 e 30 minutos.",
+    "qaTimeoutLess": "1 minuto a menos",
+    "qaTimeoutMore": "1 minuto a mais",
     "environment": "Status do ambiente de desenvolvimento",
     "environmentHelp": "As ferramentas que o Bug Detective precisa para rodar o SupportDesk em um dev container.",
     "toolStatus": {

@@ -44,12 +44,12 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
     <div className="mx-auto max-w-7xl space-y-6 px-6 py-6" data-testid="code-review">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold tracking-wider text-muted-foreground uppercase">{t('review.title')}</span>
             <span className="font-mono font-bold text-primary">{ticketTitle(snapshot, ticketNumber, language).key}</span>
             <StagePill status={ticket.status} />
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{ticketTitle(snapshot, ticketNumber, language).text}</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">{ticketTitle(snapshot, ticketNumber, language).text}</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onBack}>
