@@ -85,9 +85,11 @@ function Panel({
 function Tag({
   children,
   tone = 'muted',
+  size = 'sm',
 }: {
   children: ReactNode
   tone?: 'muted' | 'primary'
+  size?: 'xs' | 'sm'
 }) {
   const look =
     tone === 'primary'
@@ -95,7 +97,7 @@ function Tag({
       : 'bg-muted font-medium text-muted-foreground'
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-sm whitespace-nowrap ${look}`}
+      className={`rounded px-1.5 py-0.5 whitespace-nowrap ${size === 'xs' ? 'text-xs' : 'text-sm'} ${look}`}
     >
       {children}
     </span>
@@ -898,7 +900,7 @@ function ContactsCard({ language }: { language: Language }) {
         <li className="flex flex-col gap-1 pt-2">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-primary">{senior.name}</span>
-            <Tag tone="primary">{t('dashboard.mentorTag')}</Tag>
+            <Tag tone="primary" size="xs">{t('dashboard.mentorTag')}</Tag>
           </div>
           <span className="block text-xs text-muted-foreground">
             {senior.role} · {content.company.name}
@@ -961,7 +963,7 @@ function ProjectContextCard({ language }: { language: Language }) {
               <span className="text-lg font-bold tracking-tight text-foreground">
                 {content.company.name}
               </span>
-              <Tag>{t('dashboard.companyTag')}</Tag>
+              <Tag size="xs">{t('dashboard.companyTag')}</Tag>
             </div>
             <p className="text-base leading-relaxed text-muted-foreground">
               {content.company.summary}
@@ -976,7 +978,7 @@ function ProjectContextCard({ language }: { language: Language }) {
                 />
                 {content.client.name}
               </span>
-              <Tag>{t('dashboard.clientTag')}</Tag>
+              <Tag size="xs">{t('dashboard.clientTag')}</Tag>
             </div>
             <p className="text-base leading-relaxed text-muted-foreground">
               {content.client.about}
@@ -1010,11 +1012,11 @@ function EnvironmentCard({ snapshot }: { snapshot: Snapshot }) {
     )[look]
     return (
       <span
-        className={`flex items-center gap-1 font-semibold whitespace-nowrap ${style}`}
+        className={`flex items-center gap-1 text-xs font-semibold whitespace-nowrap ${style}`}
       >
         <Icon
           name={icon}
-          className="size-3.5"
+          className="size-3"
         />{' '}
         {label}
       </span>
