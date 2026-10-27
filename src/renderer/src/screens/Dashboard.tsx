@@ -172,7 +172,7 @@ function Dock({
       {children}
       {actions && (
         <div
-          className={`mt-3 flex flex-wrap items-center gap-2 border-t pt-3 ${look.rule}`}
+          className={`mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 ${look.rule}`}
         >
           {actions}
         </div>
@@ -205,14 +205,13 @@ interface Actions {
   busy: string | null
 }
 
+/** VS Code and browser buttons with short labels, so they fit next to the main action; the full label is the tooltip. */
 function WorkspaceButtons({
   snapshot,
   actions,
-  compact = false,
 }: {
   snapshot: Snapshot
   actions: Actions
-  compact?: boolean
 }) {
   const { t } = useTranslation()
   const dockerDown = snapshot.dockerState !== 'running'
@@ -222,6 +221,7 @@ function WorkspaceButtons({
         size="sm"
         disabled={dockerDown}
         busy={actions.busy === 'vscode'}
+        title={t('ticket.openVSCode')}
         onClick={() => actions.run('vscode', () => api.openVSCode())}
       >
         {actions.busy !== 'vscode' && (
@@ -230,12 +230,13 @@ function WorkspaceButtons({
             className="size-3.5"
           />
         )}{' '}
-        {compact ? t('dashboard.vscodeShort') : t('ticket.openVSCode')}
+        {t('dashboard.vscodeShort')}
       </Button>
       <Button
         size="sm"
         disabled={dockerDown}
         busy={actions.busy === 'browser'}
+        title={t('ticket.openBrowser')}
         onClick={() => actions.run('browser', () => api.openAppInBrowser())}
       >
         {actions.busy !== 'browser' && (
@@ -244,7 +245,7 @@ function WorkspaceButtons({
             className="size-3.5"
           />
         )}{' '}
-        {compact ? t('dashboard.browserShort') : t('ticket.openBrowser')}
+        {t('dashboard.browserShort')}
       </Button>
     </>
   )
@@ -814,11 +815,10 @@ function AssignmentCard({
             />
             {t('dashboard.goToBoard')}
           </Button>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
             <WorkspaceButtons
               snapshot={snapshot}
               actions={actions}
-              compact
             />
           </div>
         </div>
@@ -885,22 +885,22 @@ function ContactsCard({ language }: { language: Language }) {
         {content.client.reporters.map((person) => (
           <li
             key={person.name}
-            className="py-2 first:pt-0"
+            className="flex flex-col gap-1 py-2 first:pt-0"
           >
             <span className="block font-semibold text-foreground">
               {person.name}
             </span>
-            <span className="block text-base text-muted-foreground">
+            <span className="block text-xs text-muted-foreground">
               {person.role} · {content.client.name}
             </span>
           </li>
         ))}
-        <li className="pt-2">
+        <li className="flex flex-col gap-1 pt-2">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-primary">{senior.name}</span>
             <Tag tone="primary">{t('dashboard.mentorTag')}</Tag>
           </div>
-          <span className="block text-base text-muted-foreground">
+          <span className="block text-xs text-muted-foreground">
             {senior.role} · {content.company.name}
           </span>
         </li>
