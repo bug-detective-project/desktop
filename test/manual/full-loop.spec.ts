@@ -165,7 +165,7 @@ test('the full game loop with real Docker and VS Code', async () => {
 
   await page.getByTestId('nav-dashboard').click();
   await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'completion');
-  await expect(page.getByTestId('tickets-done')).toContainText('4 of 4');
+  await expect(page.getByTestId('assignment-card')).toContainText('You finished every ticket.');
   log('all four tickets done; completion message received');
 
   // Export, delete the volume, restore.

@@ -38,7 +38,7 @@ export function resourceNames(prefix = 'bugdetective'): ResourceNames {
 export const CONTAINER_PORTS = { client: 15173, api: 3001 } as const;
 const PREFERRED_HOST_PORTS = { client: 5173, api: 3001 } as const;
 
-export const playerBranch = (stage: number) => `player/ticket-${stage}`;
+export { playerBranch } from '../../shared/types.ts';
 
 const SCRIPTS = {
   importStage: `set -eu

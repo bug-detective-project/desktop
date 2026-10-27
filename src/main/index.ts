@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { app, BrowserWindow, session, shell } from 'electron';
 import { z } from 'zod';
+import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
 import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
@@ -109,6 +110,8 @@ function createWindow(): BrowserWindow {
     minHeight: 700,
     show: false,
     title: 'Bug Detective',
+    // Windows takes the icon from the executable; Linux (and WSLg) needs it on the window.
+    icon,
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
     webPreferences: {

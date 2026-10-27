@@ -3,7 +3,7 @@
 An offline-first desktop game where developers practice debugging. The player joins Lanternfish Labs, gets SupportDesk tickets on a Kanban board, fixes them in their own VS Code (attached to a Docker container), and goes through QA and a code review. Runs on Windows (installer) and on Linux, including directly inside WSL 2 (development mode; no Linux package yet).
 
 - Electron 45 (Node.js 24.22 inside Electron) + React 19 + TypeScript 7 + Vite 8 via electron-vite 6
-- Tailwind CSS 4 (`@tailwindcss/vite`, tokens in `src/renderer/src/styles.css` with `@theme`), Inter and JetBrains Mono bundled locally
+- Tailwind CSS 4 (`@tailwindcss/vite`, shadcn-style tokens in `src/renderer/src/styles.css`; rules in [docs/design-system.md](docs/design-system.md)), Inter and JetBrains Mono bundled locally
 - i18next (English and Brazilian Portuguese)
 - electron-builder 26 (NSIS installer)
 - Build tooling: Node.js 26.12.1 (`.nvmrc`), the same version as SupportDesk and the Docker images
@@ -20,7 +20,9 @@ src/main/              Electron main process
   services/            prerequisites, docker, workspace, content/, qa, vscode, state, backup, process
   platform/            OS-specific code: types.ts (interface), windows.ts, linux.ts (Linux and WSL 2)
 src/preload/           the typed window.bugDetective bridge
-src/renderer/          React UI (Tailwind)
+src/renderer/          React UI (Tailwind): app header + Dashboard, Board, Settings, ticket panel, code review
+docs/                  design-system.md (tokens, components and screen layout)
+resources/icon.png     app icon (executable, installer, window); the header logo is src/renderer/src/assets/logo.png
 src/shared/            types, the Kanban state machine, QA message selection
 docker/workspace/      the player's workspace image (+ the port forwarder)
 docker/qa/             the QA image (Node 26 + Playwright Chromium + the SupportDesk QA CLI)

@@ -6,22 +6,17 @@ import { PLAYER_MOVES, isPlayerMoveAllowed } from '@shared/kanban.ts';
 import { COLUMNS } from '@shared/types.ts';
 import type { Column, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
+import { ticketTitle } from '../components/ticketTitle.ts';
+import { STAGE } from '../components/stage.ts';
 import { Badge, Spinner } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
 
-const ACCENT: Record<Column, string> = {
-  todo: 'bg-col-todo',
-  inProgress: 'bg-col-progress',
-  inQa: 'bg-col-qa',
-  codeReview: 'bg-col-review',
-  done: 'bg-col-done',
-};
-
 function TicketCard({
   ticket,
   title,
+  ticketKey,
   draggable,
   onOpen,
   onDragStart,
@@ -29,13 +24,13 @@ function TicketCard({
 }: {
   ticket: TicketState;
   title: string;
+  ticketKey: string;
   draggable: boolean;
   onOpen: () => void;
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
 }) {
   const { t } = useTranslation();
-  const [key, ...rest] = title.split(': ');
   return (
     <div
       role="button"
@@ -52,13 +47,13 @@ function TicketCard({
       onClick={onOpen}
       data-testid={`card-${ticket.ticket}`}
       data-status={ticket.status}
-      className={`w-full rounded-lg border border-line bg-surface p-3 text-left shadow-sm transition hover:border-brand-400 hover:shadow ${
-        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+      className={`w-full rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
+        draggable ? 'cursor-grab border-primary/30 active:cursor-grabbing' : 'cursor-pointer border-border'
       }`}
     >
-      <p className="font-mono text-xs text-muted">{rest.length > 0 ? key : `#${ticket.ticket}`}</p>
-      <p className="mt-1 text-sm font-medium">{rest.length > 0 ? rest.join(': ') : title}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <p className="font-mono text-xs font-bold text-primary">{ticketKey}</p>
+      <p className="mt-1 text-sm leading-snug font-semibold text-foreground">{title}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2 empty:hidden">
         {ticket.status === 'inQa' && (
           <Badge tone="warn">
             <Spinner className="size-3" /> {t('board.qaRunning')}
@@ -107,10 +102,10 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
   };
 
   return (
-    <div className="flex h-full flex-col p-8" data-testid="board">
+    <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-6" data-testid="board">
       <header className="mb-5">
-        <h1 className="text-2xl font-semibold">{t('board.title')}</h1>
-        <p className="mt-1 text-sm text-muted">{state.tickets.length === 0 ? t('board.empty') : t('board.hint')}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t('board.title')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{state.tickets.length === 0 ? t('board.empty') : t('board.hint')}</p>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-5 gap-4">
         {COLUMNS.map((column) => {
@@ -134,21 +129,24 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                 event.preventDefault();
                 void drop(column, Number(event.dataTransfer.getData(DRAG_TYPE)));
               }}
-              className={`flex min-h-0 flex-col rounded-card border bg-raised/60 transition ${
-                dragging && allowed ? 'border-brand-400 ring-2 ring-brand-400/40' : 'border-line'
-              } ${dragging && !allowed ? 'opacity-60' : ''} ${over === column && allowed ? 'bg-brand-500/10' : ''}`}
+              className={`flex min-h-0 flex-col rounded-xl border transition ${
+                dragging && allowed ? 'border-primary ring-2 ring-primary/30' : 'border-border'
+              } ${dragging && !allowed ? 'opacity-60' : ''} ${over === column && allowed ? 'bg-primary/10' : 'bg-muted/40'}`}
             >
-              <div className={`h-1 rounded-t-card ${ACCENT[column]}`} />
-              <h2 className="flex items-center justify-between px-3 py-2.5 text-sm font-semibold">
-                {t(`board.columns.${column}`)}
-                <span className="text-xs font-normal text-muted">{tickets.length}</span>
+              <h2 className="flex items-center justify-between gap-2 px-3 py-3 text-[11px] font-bold tracking-wider text-foreground uppercase">
+                <span className="flex items-center gap-2">
+                  <span className={`size-2 rounded-full ${STAGE[column].dot}`} aria-hidden />
+                  {t(`board.columns.${column}`)}
+                </span>
+                <span className="rounded-full border border-border bg-card px-1.5 text-[10px] font-semibold text-muted-foreground">{tickets.length}</span>
               </h2>
               <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
                 {tickets.map((ticket) => (
                   <TicketCard
                     key={ticket.ticket}
                     ticket={ticket}
-                    title={snapshot.titles[ticket.ticket]?.[language] ?? `Ticket ${ticket.ticket}`}
+                    title={ticketTitle(snapshot, ticket.ticket, language).text}
+                    ticketKey={ticketTitle(snapshot, ticket.ticket, language).key}
                     draggable={canDrag(ticket)}
                     onOpen={() => onOpenTicket(ticket.ticket)}
                     onDragStart={(event) => {

@@ -7,6 +7,8 @@ directories:
 files:
   - out/**
   - package.json
+  # The window icon (Linux); Windows takes resources/icon.png as the executable and installer icon.
+  - resources/icon.png
   - '!**/*.map'
 # Docker build contexts (workspace and QA images, with the QA CLI) and their tags.
 extraResources:

@@ -6,61 +6,92 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * The game's design tokens, in one place. Semantic colors switch with the theme through CSS
- * variables; Tailwind utilities (bg-surface, text-muted, border-line, ...) read them.
+ * The game's design tokens, in one place (shadcn-style names, see docs/design-system.md).
+ * Semantic colors switch with the theme through CSS variables; Tailwind utilities
+ * (bg-background, bg-card, text-muted-foreground, border-border, bg-primary, ...) read them.
  */
 :root {
-  --bd-canvas: oklch(97.5% 0.006 250);
-  --bd-surface: oklch(100% 0 0);
-  --bd-raised: oklch(96% 0.008 250);
-  --bd-ink: oklch(22% 0.03 260);
-  --bd-muted: oklch(48% 0.025 260);
-  --bd-line: oklch(90% 0.012 255);
+  --background: oklch(0.985 0.003 240);
+  --foreground: oklch(0.145 0.015 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0.015 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0.015 240);
+
+  /* Brand: editorial indigo */
+  --primary: oklch(0.5 0.15 265);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.006 240);
+  --secondary-foreground: oklch(0.205 0.015 240);
+  --muted: oklch(0.96 0.006 240);
+  --muted-foreground: oklch(0.52 0.015 240);
+  --accent: oklch(0.95 0.01 200);
+  --accent-foreground: oklch(0.205 0.015 240);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.91 0.005 240);
+  --input: oklch(0.91 0.005 240);
+  --ring: oklch(0.5 0.15 265);
+  --radius: 0.5rem;
 }
 
 .dark {
-  --bd-canvas: oklch(17% 0.02 262);
-  --bd-surface: oklch(21% 0.022 262);
-  --bd-raised: oklch(25.5% 0.024 262);
-  --bd-ink: oklch(94% 0.01 255);
-  --bd-muted: oklch(70% 0.02 255);
-  --bd-line: oklch(32% 0.025 262);
+  --background: oklch(0.13 0.012 240);
+  --foreground: oklch(0.98 0.005 240);
+  --card: oklch(0.165 0.014 240);
+  --card-foreground: oklch(0.98 0.005 240);
+  --popover: oklch(0.165 0.014 240);
+  --popover-foreground: oklch(0.98 0.005 240);
+
+  --primary: oklch(0.68 0.15 265);
+  --primary-foreground: oklch(0.12 0.01 240);
+
+  --secondary: oklch(0.22 0.014 240);
+  --secondary-foreground: oklch(0.98 0.005 240);
+  --muted: oklch(0.21 0.012 240);
+  --muted-foreground: oklch(0.65 0.015 240);
+  --accent: oklch(0.24 0.02 200);
+  --accent-foreground: oklch(0.98 0.005 240);
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.98 0.005 240);
+  --border: oklch(0.25 0.014 240);
+  --input: oklch(0.25 0.014 240);
+  --ring: oklch(0.68 0.15 265);
 }
 
 @theme inline {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 
-  --color-canvas: var(--bd-canvas);
-  --color-surface: var(--bd-surface);
-  --color-raised: var(--bd-raised);
-  --color-ink: var(--bd-ink);
-  --color-muted: var(--bd-muted);
-  --color-line: var(--bd-line);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @theme {
-  --color-brand-50: oklch(97% 0.02 195);
-  --color-brand-100: oklch(93% 0.045 195);
-  --color-brand-400: oklch(74% 0.12 195);
-  --color-brand-500: oklch(65% 0.13 198);
-  --color-brand-600: oklch(56% 0.12 200);
-  --color-brand-700: oklch(48% 0.1 202);
-
-  /* Kanban columns */
-  --color-col-todo: oklch(65% 0.03 255);
-  --color-col-progress: oklch(68% 0.15 250);
-  --color-col-qa: oklch(76% 0.15 75);
-  --color-col-review: oklch(63% 0.18 300);
-  --color-col-done: oklch(68% 0.15 155);
-
-  --color-ok: oklch(66% 0.15 155);
-  --color-warn: oklch(77% 0.15 75);
-  --color-danger: oklch(62% 0.2 25);
-
-  --spacing-sidebar: 15rem;
   --spacing-panel: 44rem;
-  --radius-card: 0.75rem;
 }
 
 html,
@@ -70,5 +101,5 @@ body,
 }
 
 body {
-  @apply bg-canvas text-ink font-sans antialiased;
+  @apply bg-background font-sans text-foreground antialiased selection:bg-primary/20;
 }

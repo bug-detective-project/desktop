@@ -5,7 +5,9 @@ import { findTicket } from '@shared/kanban.ts';
 import { api } from '../api.ts';
 import { DiffView } from '../components/DiffView.tsx';
 import { Markdown } from '../components/Markdown.tsx';
-import { Button, Card, SectionTitle } from '../components/ui.tsx';
+import { Icon } from '../components/icons.tsx';
+import { ticketTitle } from '../components/ticketTitle.ts';
+import { Button, Card, SectionTitle, StagePill } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snapshot; ticketNumber: number; onBack: () => void }) {
@@ -39,18 +41,24 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
   };
 
   return (
-    <div className="space-y-6 p-8" data-testid="code-review">
+    <div className="mx-auto max-w-7xl space-y-6 px-6 py-6" data-testid="code-review">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-muted">{t('review.title')}</p>
-          <h1 className="text-2xl font-semibold">{snapshot.titles[ticketNumber]?.[language]}</h1>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold tracking-wider text-muted-foreground uppercase">{t('review.title')}</span>
+            <span className="font-mono font-bold text-primary">{ticketTitle(snapshot, ticketNumber, language).key}</span>
+            <StagePill status={ticket.status} />
+          </div>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">{ticketTitle(snapshot, ticketNumber, language).text}</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onBack}>
-            ← {t('review.back')}
+            <Icon name="arrowLeft" />
+            {t('review.back')}
           </Button>
           {ticket.status === 'codeReview' && (
             <Button variant="primary" busy={busy} onClick={accept} data-testid="accept-review">
+              {!busy && <Icon name="checkCircle" />}
               {t('review.accept')}
             </Button>
           )}

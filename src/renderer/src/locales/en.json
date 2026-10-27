@@ -7,6 +7,17 @@
     "board": "Board",
     "settings": "Settings"
   },
+  "header": {
+    "theme": "Theme",
+    "toggleTheme": "Switch between the light and dark theme",
+    "me": "ME",
+    "docker": {
+      "running": "Docker running",
+      "starting": "Docker starting…",
+      "notRunning": "Docker stopped",
+      "notInstalled": "Docker not installed"
+    }
+  },
   "common": {
     "checkAgain": "Check again",
     "close": "Close",
@@ -72,21 +83,65 @@
     "ready": "Environment ready"
   },
   "dashboard": {
-    "welcome": "Welcome to {{company}}",
-    "client": "Client",
-    "project": "Project",
-    "status": "Project status",
-    "ticketsDone_one": "{{count}} of {{total}} tickets done",
-    "ticketsDone_other": "{{count}} of {{total}} tickets done",
-    "current": "Current ticket",
-    "noTicket": "No ticket yet.",
-    "inbox": "Inbox",
-    "from": "From {{name}}, {{role}}",
+    "inbox": "Directives & Inbox",
+    "inboxCount": "{{count}} total",
+    "unread": "unread",
+    "clientTag": "Client",
+    "messageId": "ID",
+    "previousDirective": "You are viewing the directive for a previous ticket ({{key}}, done). Your active assignment is {{active}}.",
+    "previousDirectiveNoActive": "You are viewing the directive for a ticket you already finished ({{key}}).",
+    "activeChip": "{{key}} active",
+    "nextLabel": "Manager directive",
+    "nextTitle": "Next action: get your next assignment",
+    "nextBody": "The ticket is downloaded and your workspace is set up for it. One ticket at a time.",
     "nextAssignment": "Get next assignment",
     "unlocking": "Downloading and setting up the ticket…",
+    "unlockingBody": "Unpacking the stage and preparing your workspace container.",
     "finishFirst": "Finish the current ticket to get the next one.",
+    "activeLabel": "Active work",
+    "branch": "Branch",
+    "startOnBoard": "Start ticket on Board",
+    "viewQa": "View QA verification on Board",
+    "acceptReview": "Read & accept code review",
+    "goToBoard": "Go to Board",
+    "vscodeShort": "VS Code",
+    "browserShort": "Browser",
+    "blockedLabel": "Assignment blocked",
+    "blockedDockerTitle": "Docker is not running",
+    "blockedDockerBody": "Start Docker Desktop to download your next ticket. Your branches and previous fixes are safe.",
+    "dockerDownActive": "Docker is not running. VS Code and the app open again once it is back.",
+    "completedLabel": "Completed directive",
+    "doneMerged": "{{key}} done & merged",
+    "completedBody": "You already finished this ticket: it passed QA and the code review was accepted.",
+    "returnToActive": "Return to active task ({{key}})",
+    "viewOnBoard": "View {{key}} on Board",
+    "allDoneLabel": "Onboarding complete",
     "allDone": "You finished every ticket.",
-    "openBoard": "Open the board"
+    "allDoneBody": "Your board, your branches and the code are still here to explore.",
+    "current": "Current assignment",
+    "queued": "Queued",
+    "queuedBody": "Your next ticket is ready to download.",
+    "noTicket": "No active ticket.",
+    "completed": "Completed",
+    "client": "Client",
+    "contacts": "Client reporters & mentors",
+    "mentorTag": "Hints mentor",
+    "environment": "Local environment",
+    "env": {
+      "docker": "Docker Engine",
+      "workspaceImage": "Workspace image",
+      "qaImage": "QA image",
+      "projectDependencies": "Dependencies"
+    },
+    "envStatus": {
+      "ready": "Ready",
+      "missing": "Missing",
+      "installing": "Installing…",
+      "running": "Running",
+      "starting": "Starting",
+      "notRunning": "Stopped",
+      "notInstalled": "Not installed"
+    }
   },
   "board": {
     "title": "Board",
@@ -209,7 +264,10 @@
     "newGameTitle": "Start a new game?",
     "newGameWarning": "Your board, history and hints will be reset. Export your progress first if you want to keep it. Code in the workspace is archived, not deleted.",
     "newGameConfirm": "Start new game",
-    "newGameDone": "A new game has started."
+    "newGameDone": "A new game has started.",
+    "preferences": "Preferences",
+    "preferencesHelp": "Language, theme and how long QA may run.",
+    "dangerZone": "Start over"
   },
   "errors": {
     "dockerUnavailable": "Docker is not running. Start Docker Desktop and try again.",

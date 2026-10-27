@@ -2,19 +2,26 @@
   "company": {
     "name": "Lanternfish Labs",
     "tagline": "Uma pequena consultoria de software que cria e mantém aplicações para empresas em crescimento.",
+    "summary": "Uma consultoria remota de doze pessoas. Pareamento quando alguém trava, planejamento às segundas.",
     "about": "A Lanternfish Labs é uma consultoria de doze pessoas. Quase todo o time trabalha remoto, com uma reunião de planejamento às segundas e sessões de pareamento sempre que alguém trava. Pessoas desenvolvedoras novas começam direto em um projeto de cliente, com correções de bugs pequenas e reais como onboarding."
   },
   "client": {
     "name": "Harborline Outfitters",
     "about": "A Harborline vende equipamentos para atividades ao ar livre pela internet. O time de suporte, de oito pessoas, atende clientes por e-mail e chat e registra tudo no SupportDesk, a plataforma em fase inicial que a Lanternfish está construindo para eles.",
-    "contacts": "Hannah Brooks (líder do time de suporte), Marcus Bell (gerente de operações de suporte) e Elena Duarte (supervisora de atendimento) reportam os bugs."
+    "contacts": "Hannah Brooks (líder do time de suporte), Marcus Bell (gerente de operações de suporte) e Elena Duarte (supervisora de atendimento) reportam os bugs.",
+    "reporters": [
+      { "name": "Hannah Brooks", "role": "Líder do suporte" },
+      { "name": "Marcus Bell", "role": "Operações de suporte" },
+      { "name": "Elena Duarte", "role": "Supervisora de atendimento" }
+    ]
   },
   "project": {
     "name": "SupportDesk",
-    "about": "Uma aplicação de suporte com duas telas: uma lista de tickets com busca e uma tela de detalhes em que os atendentes mudam status, prioridade e responsável. React e Vite no front-end; Node.js, Express e SQLite no back-end."
+    "about": "Uma aplicação de suporte com duas telas: uma lista de tickets com busca e uma tela de detalhes em que os atendentes mudam status, prioridade e responsável. React e Vite no front-end; Node.js, Express e SQLite no back-end.",
+    "stack": "React e Vite, Node.js e Express, SQLite"
   },
   "people": {
-    "manager": { "name": "Rafaela Nunes", "role": "Gerente de engenharia" },
+    "manager": { "name": "Rafaela Nunes", "role": "Gerente de engenharia", "email": "rafaela@lanternfish.labs" },
     "senior": { "name": "Priya Raman", "role": "Desenvolvedora sênior" }
   },
   "messages": {

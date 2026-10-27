@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CheckResult, ExternalLink, Snapshot } from '@shared/api.ts';
+import logo from '../assets/logo.png';
 import { api } from '../api.ts';
+import { Icon } from '../components/icons.tsx';
 import { Button, Card, StatusIcon } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
@@ -32,11 +34,14 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
   return (
     <main className="mx-auto flex min-h-full max-w-2xl flex-col justify-center gap-6 p-8" data-testid="checklist">
       <div>
-        <p className="text-sm font-semibold text-brand-600">{t('app.name')}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t('checklist.title')}</h1>
-        <p className="mt-2 text-muted">{t('checklist.intro')}</p>
+        <p className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground">
+          <img src={logo} alt="" className="size-8 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
+          {t('app.name')}
+        </p>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight">{t('checklist.title')}</h1>
+        <p className="mt-2 text-muted-foreground">{t('checklist.intro')}</p>
       </div>
-      <Card className="divide-y divide-line p-0">
+      <Card className="divide-y divide-border p-0">
         {(report?.checks ?? []).map((check) => {
           const reason = check.status === 'ok' ? 'ok' : (check.reason ?? 'notFound');
           return (
@@ -44,10 +49,10 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
               <StatusIcon status={check.status} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="font-medium">{t(`checklist.${check.id}.title`)}</h2>
-                  <span className="text-xs text-muted">{t(`checklist.status.${check.status}`)}</span>
+                  <h2 className="text-sm font-semibold">{t(`checklist.${check.id}.title`)}</h2>
+                  <span className="text-xs text-muted-foreground">{t(`checklist.status.${check.status}`)}</span>
                 </div>
-                <p className="mt-1 text-sm text-muted">{t(`checklist.${check.id}.${reason}`)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t(`checklist.${check.id}.${reason}`)}</p>
                 {check.status !== 'ok' && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {check.id === 'docker' && check.reason !== 'notInstalled' && (
@@ -71,7 +76,8 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                       </Button>
                     )}
                     <Button variant="ghost" onClick={() => void api.openExternal(LINKS[check.id])}>
-                      {t('common.learnMore')} ↗
+                      {t('common.learnMore')}
+                      <Icon name="externalLink" className="size-3.5" />
                     </Button>
                   </div>
                 )}
@@ -85,9 +91,12 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
           {t('common.checkAgain')}
         </Button>
         <div className="flex items-center gap-3">
-          {report?.allOk && <span className="text-sm text-ok">{t('checklist.allOk')}</span>}
+          {report?.allOk && <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+              <Icon name="checkCircle" /> {t('checklist.allOk')}
+            </span>}
           <Button variant="primary" disabled={!report?.allOk} onClick={onContinue} data-testid="start-playing">
             {t('checklist.continue')}
+            <Icon name="arrowRight" />
           </Button>
         </div>
       </div>
@@ -103,11 +112,23 @@ export function DockerBanner({ snapshot }: { snapshot: Snapshot }) {
   }
   const starting = snapshot.dockerState === 'starting' || snapshot.busy === 'startingDocker';
   return (
-    <div className="flex items-center justify-between gap-4 bg-amber-100 px-6 py-2.5 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100" role="alert" data-testid="docker-banner">
-      <span>{starting ? t('banner.dockerStarting') : t('banner.dockerStopped')}</span>
-      {!starting && snapshot.dockerState !== 'notInstalled' && (
-        <Button onClick={() => api.startDocker().catch(toast.error)}>{t('banner.startDocker')}</Button>
-      )}
+    <div
+      className={`border-b ${starting ? 'border-amber-500/30 bg-amber-500/10' : 'border-destructive/30 bg-destructive/5'}`}
+      role="alert"
+      data-testid="docker-banner"
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-xs">
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <Icon name={starting ? 'spinner' : 'alertTriangle'} className={`size-4 ${starting ? 'text-amber-500' : 'text-destructive'}`} />
+          {starting ? t('banner.dockerStarting') : t('banner.dockerStopped')}
+        </span>
+        {!starting && snapshot.dockerState !== 'notInstalled' && (
+          <Button size="sm" variant="primary" onClick={() => api.startDocker().catch(toast.error)}>
+            <Icon name="play" className="size-3.5" />
+            {t('banner.startDocker')}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -6,6 +6,9 @@ export const DEFAULT_QA_TIMEOUT_SECONDS = 180;
 export const MIN_QA_TIMEOUT_SECONDS = 30;
 export const MAX_QA_TIMEOUT_SECONDS = 1800;
 
+/** The workspace branch where the player works on a ticket. */
+export const playerBranch = (stage: number) => `player/ticket-${stage}`;
+
 export const COLUMNS = ['todo', 'inProgress', 'inQa', 'codeReview', 'done'] as const;
 export type Column = (typeof COLUMNS)[number];
 

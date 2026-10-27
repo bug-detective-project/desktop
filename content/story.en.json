@@ -2,19 +2,26 @@
   "company": {
     "name": "Lanternfish Labs",
     "tagline": "A small software consultancy that builds and maintains apps for growing companies.",
+    "summary": "A twelve-person remote consultancy. Pairing when someone is stuck, weekly planning on Mondays.",
     "about": "Lanternfish Labs is a twelve-person consultancy. Most of the team works remotely, with a weekly planning call on Mondays and pairing sessions whenever someone is stuck. New developers start on a client project right away, with small, real bug fixes as onboarding."
   },
   "client": {
     "name": "Harborline Outfitters",
     "about": "Harborline sells outdoor gear online. Its support team of eight answers customers by email and chat, and tracks everything in SupportDesk, the early-stage platform Lanternfish is building for them.",
-    "contacts": "Hannah Brooks (support team lead), Marcus Bell (support operations manager) and Elena Duarte (customer support supervisor) report the bugs."
+    "contacts": "Hannah Brooks (support team lead), Marcus Bell (support operations manager) and Elena Duarte (customer support supervisor) report the bugs.",
+    "reporters": [
+      { "name": "Hannah Brooks", "role": "Support team lead" },
+      { "name": "Marcus Bell", "role": "Support operations" },
+      { "name": "Elena Duarte", "role": "Support supervisor" }
+    ]
   },
   "project": {
     "name": "SupportDesk",
-    "about": "A two-screen support app: a ticket list with search, and a details screen where agents change status, priority and assignee. React and Vite on the front end, Node.js, Express and SQLite on the back end."
+    "about": "A two-screen support app: a ticket list with search, and a details screen where agents change status, priority and assignee. React and Vite on the front end, Node.js, Express and SQLite on the back end.",
+    "stack": "React and Vite, Node.js and Express, SQLite"
   },
   "people": {
-    "manager": { "name": "Rafaela Nunes", "role": "Engineering manager" },
+    "manager": { "name": "Rafaela Nunes", "role": "Engineering manager", "email": "rafaela@lanternfish.labs" },
     "senior": { "name": "Priya Raman", "role": "Senior developer" }
   },
   "messages": {

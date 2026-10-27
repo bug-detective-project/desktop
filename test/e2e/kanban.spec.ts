@@ -91,3 +91,29 @@ test('a QA timeout returns the card with the timeout template', async () => {
     await close();
   }
 });
+
+test('the dashboard shows only the current assignment, never how many tickets exist', async () => {
+  const { page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    await expect(page.getByTestId('assignment-card')).toContainText('Queued');
+    await expect(page.getByTestId('action-dock')).toContainText('Next action');
+    await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
+
+    await page.getByTestId('next-assignment').click();
+    await page.getByTestId('card-1').waitFor();
+    await page.getByTestId('nav-dashboard').click();
+    await expect(page.getByTestId('assignment-card')).toContainText('SD-214');
+    await expect(page.getByTestId('assignment-card').locator('[data-stage]')).toHaveAttribute('data-stage', 'todo');
+    await expect(page.getByTestId('action-dock')).toContainText('player/ticket-1');
+    await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
+
+    // The header's theme toggle switches the theme everywhere.
+    const dark = () => page.evaluate(() => document.documentElement.classList.contains('dark'));
+    const before = await dark();
+    await page.getByTestId('theme-toggle').click();
+    await expect.poll(dark).toBe(!before);
+  } finally {
+    await close();
+  }
+});
