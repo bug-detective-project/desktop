@@ -48,10 +48,11 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 | --- | --- | --- | --- |
 | Page title | 30px | `text-3xl font-bold tracking-tight` | "Board", "Settings", "Before you start", the code review title |
 | Subject | 20px | `text-xl font-bold tracking-tight` | Directive subject, ticket panel title, dialog titles, About app name |
-| Card heading | 18px | `text-lg font-bold tracking-tight` (or `font-semibold`) | Settings pane titles and setting titles, Danger zone, Lanternfish Labs and client cards, current assignment title, app name in the header |
+| Card heading | 18px | `text-lg font-bold tracking-tight` (or `font-semibold`) | Settings pane titles and setting titles, Danger zone, the Lanternfish Labs and client names in Project context, current assignment title, app name in the header |
 | **Normal text** | **16px** | `text-base` | Card titles, directive and ticket body, list items, help texts, dialog text, inputs, tabs, navigation, buttons (`md`) |
 | Secondary | 14px | `text-sm text-muted-foreground` | Dates, ticket keys, secondary lines, badges, chips, header pills, small buttons (`sm`) |
-| Label | 12px | `text-xs font-bold uppercase tracking-wider` | Board column titles, Dashboard card labels ("Current assignment", "Local environment"), counters |
+| Label | 12px | `text-xs font-bold uppercase tracking-wider` | Board column titles, Dashboard card labels ("Current assignment", "Project context", "Contacts", "Local environment"), counters |
+| Small | 12px | `text-xs` | Dashboard tags ("Your team", "Client", "Hints mentor"), the "role · company" lines in Contacts, the Local environment statuses ("Running", "Ready (1.1 GB)") |
 
 Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap`). Markdown (`Markdown.tsx`): `h1` 24px, paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-base`.
 
