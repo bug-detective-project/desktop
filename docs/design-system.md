@@ -27,6 +27,8 @@ Fonts: **Inter** for the UI, **JetBrains Mono** for IDs, versions, paths, code a
 
 The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles `.dark` on `<html>`. The header's theme button switches between Light and Dark.
 
+`color-scheme` follows the theme (`light` on `:root`, `dark` on `.dark`), so native controls match it. Scrollbars (`styles.css`) are 10px, rounded, without arrow buttons, on a transparent track; the thumb is `--muted-foreground` at 45% (75% on hover), so it works in both themes. Do not set `scrollbar-width` or `scrollbar-color`: Chromium then ignores the `::-webkit-scrollbar` rules and the arrows come back.
+
 ## Logo and app icon
 
 - Source: the 960 × 960 app icon. Its dark rounded tile (800 × 800, about 21% corner radius) is cut out of the white margin, with transparent corners.

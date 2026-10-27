@@ -113,6 +113,10 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     const before = await dark();
     await page.getByTestId('theme-toggle').click();
     await expect.poll(dark).toBe(!before);
+    // Native controls and scrollbars follow the theme.
+    const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+    await expect.poll(scheme).toBe(before ? 'light' : 'dark');
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::-webkit-scrollbar-button').display)).toBe('none');
   } finally {
     await close();
   }
