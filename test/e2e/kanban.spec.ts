@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { dragCard, launch, startFirstTicket } from './fixtures.ts';
 
@@ -119,5 +122,36 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::-webkit-scrollbar-button').display)).toBe('none');
   } finally {
     await close();
+  }
+});
+
+test('the project context card collapses and remembers it after a restart', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+  try {
+    const first = await launch({}, { userData });
+    await first.page.getByTestId('start-playing').click();
+    const card = first.page.getByTestId('project-context');
+    const toggle = first.page.getByTestId('project-context-toggle');
+    await expect(toggle).toHaveText('Project context');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(card).toContainText('Lanternfish Labs');
+    await expect(card).toContainText('Harborline Outfitters');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(card).not.toContainText('Harborline Outfitters');
+    await first.close();
+
+    const second = await launch({}, { userData });
+    try {
+      await second.page.getByTestId('start-playing').click();
+      const again = second.page.getByTestId('project-context-toggle');
+      await expect(again).toHaveAttribute('aria-expanded', 'false');
+      await again.click();
+      await expect(second.page.getByTestId('project-context')).toContainText('Harborline Outfitters');
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await rm(userData, { recursive: true, force: true });
   }
 });

@@ -10,6 +10,7 @@ export type IconName =
   | 'checkCircle'
   | 'arrowRight'
   | 'arrowLeft'
+  | 'chevronDown'
   | 'externalLink'
   | 'download'
   | 'alertTriangle'
@@ -80,6 +81,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="m12 19-7-7 7-7" />
     </>
   ),
+  chevronDown: <path d="m6 9 6 6 6-6" />,
   externalLink: (
     <>
       <path d="M15 3h6v6" />

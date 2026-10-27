@@ -81,6 +81,8 @@
     "inboxCount": "{{count}} no total",
     "unread": "não lida",
     "clientTag": "Cliente",
+    "companyTag": "Sua equipe",
+    "projectContext": "Contexto do projeto",
     "messageId": "ID",
     "previousDirective": "Você está vendo a mensagem de um ticket anterior ({{key}}, concluído). Sua tarefa ativa é o {{active}}.",
     "previousDirectiveNoActive": "Você está vendo a mensagem de um ticket que já concluiu ({{key}}).",

@@ -909,6 +909,91 @@ function ContactsCard({ language }: { language: Language }) {
   )
 }
 
+const CONTEXT_OPEN_KEY = 'bd.dashboard.projectContextOpen'
+
+/** Lanternfish Labs and the client in one card that the player can collapse; the choice is remembered. */
+function ProjectContextCard({ language }: { language: Language }) {
+  const { t } = useTranslation()
+  const content = story(language)
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(CONTEXT_OPEN_KEY) !== 'false'
+    } catch {
+      return true
+    }
+  })
+  const toggle = () => {
+    setOpen(!open)
+    try {
+      localStorage.setItem(CONTEXT_OPEN_KEY, String(!open))
+    } catch {
+      // Only a convenience: without storage the card just opens expanded next time.
+    }
+  }
+  return (
+    <section
+      className="rounded-xl border border-border bg-card text-base shadow-sm"
+      data-testid="project-context"
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="project-context-body"
+        className="flex w-full items-center justify-between gap-2 rounded-xl p-4 text-left transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        data-testid="project-context-toggle"
+      >
+        <h3 className="text-xs font-bold tracking-wider text-foreground uppercase">
+          {t('dashboard.projectContext')}
+        </h3>
+        <Icon
+          name="chevronDown"
+          className={`size-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div
+          id="project-context-body"
+          className="space-y-3 px-4 pb-4"
+        >
+          <section className="space-y-2 border-t border-border/60 pt-3">
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-lg font-bold tracking-tight text-foreground">
+                {content.company.name}
+              </span>
+              <Tag>{t('dashboard.companyTag')}</Tag>
+            </div>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {content.company.summary}
+            </p>
+          </section>
+          <section className="space-y-2 border-t border-border/60 pt-3">
+            <div className="flex flex-col items-start gap-1">
+              <span className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-foreground">
+                <span
+                  className="size-2 shrink-0 rounded-full bg-emerald-500"
+                  aria-hidden
+                />
+                {content.client.name}
+              </span>
+              <Tag>{t('dashboard.clientTag')}</Tag>
+            </div>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {content.client.about}
+            </p>
+            <p className="text-base text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {content.project.name}:
+              </span>{' '}
+              {content.project.stack}
+            </p>
+          </section>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function EnvironmentCard({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation()
   const installing = snapshot.busy === 'installing'
@@ -1112,36 +1197,7 @@ export function Dashboard({
           </ul>
         </Panel>
 
-        <Panel className="p-3.5">
-          <span className="mb-1 block text-lg font-bold tracking-tight text-foreground">
-            {content.company.name}
-          </span>
-          <p className="text-base leading-relaxed text-muted-foreground">
-            {content.company.summary}
-          </p>
-        </Panel>
-
-        <Panel className="space-y-2 p-3.5">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="size-2 rounded-full bg-emerald-500"
-              aria-hidden
-            />
-            <span className="text-lg font-bold tracking-tight text-foreground">
-              {content.client.name}
-            </span>
-            <Tag>{t('dashboard.clientTag')}</Tag>
-          </div>
-          <p className="text-base leading-relaxed text-muted-foreground">
-            {content.client.about}
-          </p>
-          <p className="border-t border-border/50 pt-2 text-base text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              {content.project.name}:
-            </span>{' '}
-            {content.project.stack}
-          </p>
-        </Panel>
+        <ProjectContextCard language={language} />
       </div>
 
       <MessageView
