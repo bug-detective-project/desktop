@@ -3,7 +3,7 @@
 export const TICKET_COUNT = 4;
 export const HINTS_PER_TICKET = 3;
 export const DEFAULT_QA_TIMEOUT_SECONDS = 180;
-export const MIN_QA_TIMEOUT_SECONDS = 30;
+export const MIN_QA_TIMEOUT_SECONDS = 60;
 export const MAX_QA_TIMEOUT_SECONDS = 1800;
 
 /** The workspace branch where the player works on a ticket. */

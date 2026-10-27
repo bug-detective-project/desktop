@@ -147,7 +147,7 @@ describe('QA with real Docker', () => {
   });
 
   it('counts an infinite loop as a timeout and removes the QA container', async () => {
-    await game.updateSettings({ qaTimeoutSeconds: 45 });
+    await game.updateSettings({ qaTimeoutSeconds: 60 });
     const ws = await workspace();
     // A synchronous infinite loop when the ticket list module loads (the dev server is not running).
     await docker.execChecked(runtime.names.container, ['sh', '-c', 'printf "\\nwhile (true) {}\\n" >> client/src/pages/TicketList.tsx'], {
@@ -158,7 +158,7 @@ describe('QA with real Docker', () => {
     console.log(`timeout QA: ${seconds.toFixed(1)} s`);
     expect(ticket.status).toBe('inProgress');
     expect(ticket.attempts.at(-1)!.result.status).toBe('timeout');
-    expect(ticket.comments.at(-1)).toMatchObject({ kind: 'timeout', timeoutSeconds: 45 });
+    expect(ticket.comments.at(-1)).toMatchObject({ kind: 'timeout', timeoutSeconds: 60 });
     expect((await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`))).toEqual([]);
     await ws.git(['checkout', '--', 'client/src/pages/TicketList.tsx']);
     await game.updateSettings({ qaTimeoutSeconds: 180 });

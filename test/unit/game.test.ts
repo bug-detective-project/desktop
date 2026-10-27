@@ -277,7 +277,9 @@ describe('Game', () => {
     const { game } = createGame();
     await game.init();
     await game.updateSettings({ qaTimeoutSeconds: 5 });
-    expect(game.current.settings.qaTimeoutSeconds).toBe(30);
+    expect(game.current.settings.qaTimeoutSeconds).toBe(60);
+    await game.updateSettings({ qaTimeoutSeconds: 5000 });
+    expect(game.current.settings.qaTimeoutSeconds).toBe(1800);
     await game.updateSettings({ qaTimeoutSeconds: 240, language: 'pt' });
     expect(game.current.settings).toMatchObject({ qaTimeoutSeconds: 240, language: 'pt' });
   });

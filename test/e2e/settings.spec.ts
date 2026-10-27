@@ -31,9 +31,9 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await timeout.press('ArrowDown');
     await timeout.press('ArrowDown');
     await expect(timeout).toHaveValue('2');
-    await timeout.fill('0.2');
+    await timeout.fill('0.5');
     await timeout.blur();
-    await expect(page.getByTestId('qa-timeout-error')).toHaveText('Enter between 0.5 and 30 minutes.');
+    await expect(page.getByTestId('qa-timeout-error')).toHaveText('Enter between 1 and 30 minutes.');
     await timeout.fill('2.5');
     await timeout.press('Enter');
     await expect(timeout).toHaveValue('2.5');

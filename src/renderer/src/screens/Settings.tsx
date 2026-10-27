@@ -145,8 +145,8 @@ function QaTimeout({ seconds }: { seconds: number }) {
           <input
             type="number"
             inputMode="decimal"
-            // The arrows step whole minutes. No min attribute: HTML counts steps from it (0.5, 1.5, …);
-            // the 0.5 minimum is checked on commit, and half minutes can still be typed.
+            // The arrows step whole minutes from the 1-minute minimum; half minutes can still be typed.
+            min={MIN_QA_TIMEOUT_SECONDS / 60}
             max={MAX_QA_TIMEOUT_SECONDS / 60}
             step={1}
             aria-invalid={invalid}

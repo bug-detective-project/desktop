@@ -75,6 +75,13 @@ describe('migrations', () => {
     settings: { language: 'pt' },
   };
 
+  it('loads a QA limit under the 1-minute minimum (older versions allowed 30 s) as 1 minute', () => {
+    const base = rules.createInitialState(ctx);
+    expect(migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 45 } }, ctx).settings.qaTimeoutSeconds).toBe(60);
+    expect(migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 240 } }, ctx).settings.qaTimeoutSeconds).toBe(240);
+    expect(() => migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 5000 } }, ctx)).toThrow();
+  });
+
   it('migrates version 1 to the current schema', () => {
     const state = migrateState(v1, ctx);
     expect(state.schemaVersion).toBe(2);

@@ -106,7 +106,13 @@ export const gameStateSchema = z.object({
   ),
   settings: z.object({
     language: z.enum(LANGUAGES),
-    qaTimeoutSeconds: z.number().int().min(MIN_QA_TIMEOUT_SECONDS).max(MAX_QA_TIMEOUT_SECONDS),
+    // The minimum was 30 s before it became 1 minute: older states and saves load with 1 minute.
+    qaTimeoutSeconds: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_QA_TIMEOUT_SECONDS)
+      .transform((seconds) => Math.max(MIN_QA_TIMEOUT_SECONDS, seconds)),
     theme: z.enum(THEMES),
   }),
   lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
