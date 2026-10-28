@@ -83,7 +83,6 @@
     "clientTag": "Client",
     "companyTag": "Your team",
     "projectContext": "Project context",
-    "messageId": "ID",
     "previousDirective": "You are viewing the directive for a previous ticket ({{key}}, done). Your active assignment is {{active}}.",
     "previousDirectiveNoActive": "You are viewing the directive for a ticket you already finished ({{key}}).",
     "activeChip": "{{key}} active",

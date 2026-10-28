@@ -150,7 +150,7 @@ function Dock({
   }[tone]
   return (
     <div
-      className={`mt-6 rounded-xl border p-4 ${look.box}`}
+      className={`mt-6 shrink-0 rounded-xl border p-4 ${look.box}`}
       data-testid="action-dock"
       {...props}
     >
@@ -662,19 +662,14 @@ function MessageView({
   const activeKey = active
     ? ticketTitle(snapshot, active.ticket, language).key
     : ''
-  const messageId =
-    message?.kind === 'assignment'
-      ? `msg-${viewedKey.toLowerCase().replace(/[^a-z0-9]/g, '')}`
-      : `msg-${message?.kind ?? ''}`
-
   return (
     <article
-      className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-6"
+      className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-6 lg:max-h-full lg:min-h-0"
       data-testid="message"
     >
       {message && text && (
         <>
-          <header className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-4">
+          <header className="mb-4 flex shrink-0 items-start justify-between gap-3 border-b border-border pb-4">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-base font-bold text-primary">
                 {initials(manager.name)}
@@ -697,46 +692,49 @@ function MessageView({
                 </span>
               </div>
             </div>
-            <span className="shrink-0 font-mono text-sm text-muted-foreground">
-              {t('dashboard.messageId')}: {messageId}
-            </span>
           </header>
 
-          {previous && (
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-base">
-              <div className="flex items-center gap-2">
-                <span
-                  className="size-2 shrink-0 rounded-full bg-emerald-500"
-                  aria-hidden
-                />
-                <span className="text-foreground">
-                  {active
-                    ? t('dashboard.previousDirective', {
-                        key: viewedKey,
-                        active: activeKey,
-                      })
-                    : t('dashboard.previousDirectiveNoActive', {
-                        key: viewedKey,
-                      })}
-                </span>
-              </div>
-              {active && (
-                <span className="shrink-0 rounded border border-primary/30 bg-background px-2 py-0.5 font-mono text-sm font-bold text-primary">
-                  {t('dashboard.activeChip', { key: activeKey })}
-                </span>
-              )}
-            </div>
-          )}
-
-          <h1 className="mb-4 text-xl font-bold tracking-tight text-foreground">
-            {text.subject}
-          </h1>
-          <Markdown
-            testId="inbox-body"
-            className="text-base"
+          {/* Only the e-mail itself scrolls: the sender header stays on top, the action dock below. */}
+          <div
+            className="-mr-4 min-h-0 overflow-y-auto pr-4"
+            data-testid="message-scroll"
           >
-            {text.body}
-          </Markdown>
+            {previous && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-base">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="size-2 shrink-0 rounded-full bg-emerald-500"
+                    aria-hidden
+                  />
+                  <span className="text-foreground">
+                    {active
+                      ? t('dashboard.previousDirective', {
+                          key: viewedKey,
+                          active: activeKey,
+                        })
+                      : t('dashboard.previousDirectiveNoActive', {
+                          key: viewedKey,
+                        })}
+                  </span>
+                </div>
+                {active && (
+                  <span className="shrink-0 rounded border border-primary/30 bg-background px-2 py-0.5 font-mono text-sm font-bold text-primary">
+                    {t('dashboard.activeChip', { key: activeKey })}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <h1 className="mb-4 text-xl font-bold tracking-tight text-foreground">
+              {text.subject}
+            </h1>
+            <Markdown
+              testId="inbox-body"
+              className="text-base"
+            >
+              {text.body}
+            </Markdown>
+          </div>
         </>
       )}
       <ActionDock
@@ -933,8 +931,9 @@ function ProjectContextCard({ language }: { language: Language }) {
     }
   }
   return (
+    // Shrinks to what the column has left below the inbox; the body scrolls.
     <section
-      className="rounded-xl border border-border bg-card text-base shadow-sm"
+      className="flex min-h-0 flex-col rounded-xl border border-border bg-card text-base shadow-sm"
       data-testid="project-context"
     >
       <button
@@ -942,7 +941,7 @@ function ProjectContextCard({ language }: { language: Language }) {
         onClick={toggle}
         aria-expanded={open}
         aria-controls="project-context-body"
-        className="flex w-full items-center justify-between gap-2 rounded-xl p-4 text-left transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="flex w-full shrink-0 items-center justify-between gap-2 rounded-xl p-4 text-left transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
         data-testid="project-context-toggle"
       >
         <h3 className="text-xs font-bold tracking-wider text-foreground uppercase">
@@ -956,7 +955,8 @@ function ProjectContextCard({ language }: { language: Language }) {
       {open && (
         <div
           id="project-context-body"
-          className="space-y-3 px-4 pb-4"
+          className="min-h-0 space-y-3 overflow-y-auto px-4 pb-4"
+          data-testid="project-context-body"
         >
           <section className="space-y-2 border-t border-border/60 pt-3">
             <div className="flex flex-col items-start gap-1">
@@ -1132,11 +1132,12 @@ export function Dashboard({
 
   return (
     <div
-      className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 px-6 py-6 lg:grid-cols-12"
+      className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 px-6 py-6 lg:h-full lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)]"
       data-testid="dashboard"
     >
-      <div className="space-y-3 lg:col-span-3">
-        <Panel className="p-3">
+      {/* On large screens the dashboard is at most the window tall: each column fits and scrolls inside. */}
+      <div className="flex flex-col gap-3 lg:col-span-3 lg:max-h-full lg:min-h-0">
+        <Panel className="shrink-0 p-3">
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-border/70 pb-2">
             <h3 className="text-xs font-bold tracking-wider text-foreground uppercase">
               {t('dashboard.inbox')}
@@ -1145,8 +1146,10 @@ export function Dashboard({
               {t('dashboard.inboxCount', { count: threads.length })}
             </span>
           </div>
+          {/* At most three messages tall: each one is 3 lines of 1.5rem, 1.25rem padding, 0.5rem gaps and a
+              2px border (6.25rem + 2px), plus two 0.375rem gaps between them. More messages scroll. */}
           <ul
-            className="space-y-1.5"
+            className="max-h-[calc(19.5rem+6px)] space-y-1.5 overflow-y-auto"
             data-testid="inbox"
           >
             {threads.map((message) => {
@@ -1209,7 +1212,7 @@ export function Dashboard({
         actions={actions}
       />
 
-      <div className="space-y-4 lg:col-span-3">
+      <div className="space-y-4 lg:col-span-3 lg:max-h-full lg:overflow-y-auto">
         <AssignmentCard
           snapshot={snapshot}
           active={active}

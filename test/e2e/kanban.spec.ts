@@ -238,3 +238,41 @@ test('a card shows only its key and title, and "Test failed" only after a failed
     await close();
   }
 });
+
+test('the inbox shows at most three messages, and the dashboard fits the window with the project context and the e-mail scrolling', async () => {
+  const { page, close } = await launch();
+  try {
+    await page.setViewportSize({ width: 1440, height: 560 });
+    await page.getByTestId('start-playing').click();
+    const inbox = page.getByTestId('inbox');
+    await expect(page.getByTestId('inbox-message')).toHaveCount(1);
+    await expect.poll(() => inbox.evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(false);
+
+    // Five messages (copies of the first, outside React): exactly three fit, the rest scroll.
+    const fit = await inbox.evaluate((list) => {
+      const item = list.querySelector('li')!;
+      for (let index = 0; index < 4; index += 1) list.append(item.cloneNode(true));
+      const third = list.querySelectorAll('li')[2]!.getBoundingClientRect();
+      return { scrolls: list.scrollHeight > list.clientHeight, visible: list.clientHeight, threeTall: third.bottom - list.getBoundingClientRect().top };
+    });
+    expect(fit.scrolls).toBe(true);
+    expect(Math.abs(fit.visible - fit.threeTall)).toBeLessThanOrEqual(2);
+
+    // The dashboard is at most the window tall: the page does not scroll, the project context and the e-mail do.
+    const main = page.locator('main');
+    await expect.poll(() => main.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+    for (const id of ['project-context', 'message', 'action-dock']) {
+      const bottom = await page.getByTestId(id).evaluate((element) => element.getBoundingClientRect().bottom);
+      expect(bottom).toBeLessThanOrEqual(560);
+    }
+    const scrolls = (id: string) => page.getByTestId(id).evaluate((element) => element.scrollHeight > element.clientHeight);
+    await expect.poll(() => scrolls('project-context-body')).toBe(true);
+    await expect.poll(() => scrolls('message-scroll')).toBe(true);
+    // The sender header stays outside the scrolling e-mail, and the e-mail shows no message ID.
+    await expect(page.getByTestId('message').locator('> header')).toContainText('Rafaela Nunes');
+    await expect(page.getByTestId('message-scroll').locator('header')).toHaveCount(0);
+    await expect(page.getByTestId('message')).not.toContainText('msg-');
+  } finally {
+    await close();
+  }
+});
