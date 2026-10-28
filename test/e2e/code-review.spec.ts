@@ -164,6 +164,9 @@ test('the review texts are in Portuguese', async () => {
     await expect(file(page, 'client/src/pages/TicketDetails.tsx').locator('thead')).toContainText('Solução de referência');
     await expect(page.getByTestId('review-comparison').locator('summary')).toHaveText('Diff sua solução com a solução proposta');
     await expect(page.getByTestId('review-reference').locator('summary')).toHaveText('Diff solução proposta com o código original');
+    // The commits are always named in English, so the Portuguese steps quote the English names.
+    await expect(page.getByTestId('vscode-steps')).toContainText('clique no commit do topo, "Your approved solution"');
+    await expect(page.getByTestId('vscode-steps')).toContainText('"Reference"');
     await page.getByTestId('open-review-vscode').click();
     await expect(page.getByTestId('review-banner')).toContainText('Você está vendo o review do ticket SD-214 no VS Code. Seu código será restaurado automaticamente.');
   } finally {

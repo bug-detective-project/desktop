@@ -241,7 +241,7 @@
     "vscodeSteps": {
       "title": "How to see the diff in VS Code",
       "scm": "Open Source Control (Ctrl+Shift+G).",
-      "graph": "In the Graph section, click the top commit, \"Your approved solution\". If Graph is not shown: \"…\" at the top of Source Control → Views → Graph.",
+      "graph": "In the Graph section, click the top commit, \"Your approved solution\" (below it is \"Reference\", the proposed solution). If Graph is not shown: \"…\" at the top of Source Control → Views → Graph.",
       "diff": "The diff of every file opens: the proposed solution on the left, yours on the right. The files are read-only.",
       "back": "When you are done, come back here and click \"Back to my code\" (your code also comes back on its own before QA)."
     },

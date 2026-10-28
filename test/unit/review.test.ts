@@ -108,9 +108,13 @@ describe('comparison diff', () => {
 // Pure helpers
 
 describe('review helpers', () => {
-  it('names the review commits in the language chosen when QA passed', () => {
-    expect(reviewMessages('en', 2)).toMatchObject({ reference: 'Reference — ticket 2', snapshot: 'Your approved solution — ticket 2' });
-    expect(reviewMessages('pt', 2)).toMatchObject({ reference: 'Referência — ticket 2', snapshot: 'Sua solução aprovada — ticket 2' });
+  it('names the review commits in English, whatever the app language', () => {
+    expect(reviewMessages(2)).toEqual({
+      approved: 'Approved by QA — ticket 2',
+      reference: 'Reference — ticket 2',
+      snapshot: 'Your approved solution — ticket 2',
+      edits: 'Changes made while viewing the review — ticket 2',
+    });
   });
 
   it('makes every file read-only, keeping the project settings (JSONC)', () => {

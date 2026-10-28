@@ -511,7 +511,7 @@ export class Game {
     return this.options.runtime.buildReview({
       ticket: meta.ticket,
       date: meta.approvedAt,
-      messages: reviewMessages(meta.language, meta.ticket),
+      messages: reviewMessages(meta.ticket),
       snapshot,
       reference,
       settings: readOnlySettings(projectSettings ? fileText(projectSettings) : null),
@@ -648,7 +648,7 @@ export class Game {
       point: session.returnPoint,
       wipCommit,
       stamp: editsStamp(this.ctx().now),
-      editsMessage: reviewMessages(this.state.settings.language, session.ticket).edits,
+      editsMessage: reviewMessages(session.ticket).edits,
       excludes: this.excludes,
     });
     if (result.editsSaved || result.tipMoved) {

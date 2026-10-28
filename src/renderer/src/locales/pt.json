@@ -241,7 +241,7 @@
     "vscodeSteps": {
       "title": "Como ver o diff no VS Code",
       "scm": "Abra o Controle do Código-Fonte (Ctrl+Shift+G).",
-      "graph": "Na seção Graph, clique no commit do topo, \"Sua solução aprovada\". Se o Graph não aparecer: \"…\" no topo do Controle do Código-Fonte → Views → Graph.",
+      "graph": "Na seção Graph, clique no commit do topo, \"Your approved solution\" (sua solução aprovada; abaixo dele fica \"Reference\", a solução proposta). Os nomes dos commits ficam sempre em inglês. Se o Graph não aparecer: \"…\" no topo do Controle do Código-Fonte → Views → Graph.",
       "diff": "Abre o diff de todos os arquivos: a solução proposta à esquerda e a sua à direita. Os arquivos ficam somente leitura.",
       "back": "Quando terminar, volte aqui e clique em \"Voltar para o meu código\" (seu código também volta sozinho antes do QA)."
     },

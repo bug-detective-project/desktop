@@ -1,28 +1,19 @@
 /** Pure helpers of the review technique: commit messages, the read-only VS Code settings and names. */
-import type { Language } from '../../../shared/types.ts';
 
 /** Fixed (not translated): it is a technical commit the player normally never sees. */
 export const WIP_MESSAGE = 'Bug Detective: work in progress saved automatically';
 
-const MESSAGES: Record<Language, { approved: string; reference: string; snapshot: string; edits: string }> = {
-  en: {
-    approved: 'Approved by QA — ticket {n}',
-    reference: 'Reference — ticket {n}',
-    snapshot: 'Your approved solution — ticket {n}',
-    edits: 'Changes made while viewing the review — ticket {n}',
-  },
-  pt: {
-    approved: 'Aprovada no QA — ticket {n}',
-    reference: 'Referência — ticket {n}',
-    snapshot: 'Sua solução aprovada — ticket {n}',
-    edits: 'Alterações feitas durante o review — ticket {n}',
-  },
-};
-
-export function reviewMessages(language: Language, ticket: number) {
-  const fill = (template: string) => template.replace('{n}', String(ticket));
-  const messages = MESSAGES[language];
-  return { approved: fill(messages.approved), reference: fill(messages.reference), snapshot: fill(messages.snapshot), edits: fill(messages.edits) };
+/**
+ * Always in English, whatever the app language: the commits show in VS Code (Graph) and the in-app
+ * steps quote these names, so they must match in every language.
+ */
+export function reviewMessages(ticket: number) {
+  return {
+    approved: `Approved by QA — ticket ${ticket}`,
+    reference: `Reference — ticket ${ticket}`,
+    snapshot: `Your approved solution — ticket ${ticket}`,
+    edits: `Changes made while viewing the review — ticket ${ticket}`,
+  };
 }
 
 const READ_ONLY = { 'files.readonlyInclude': { '**': true } };
