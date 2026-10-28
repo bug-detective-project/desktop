@@ -54,13 +54,14 @@ export function isPlayerMoveAllowed(from: Column, to: Column): boolean {
 
 export function createInitialState(ctx: RuleContext, language: Language = 'en'): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     createdAt: ctx.now,
     currentTicket: null,
     tickets: [],
     activity: [],
     inbox: [{ id: ctx.id(), kind: 'welcome', at: ctx.now, read: false }],
     settings: { language, qaTimeoutSeconds: DEFAULT_QA_TIMEOUT_SECONDS, theme: 'system' },
+    reviewSession: null,
   };
 }
 

@@ -116,6 +116,23 @@ export const gameStateSchema = z.object({
     theme: z.enum(THEMES),
   }),
   lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
+  reviewSession: z
+    .object({
+      ticket: z.number().int().min(1),
+      phase: z.enum(['saving', 'switching', 'open', 'returning']),
+      startedAt: z.string(),
+      returnPoint: z.object({
+        branch: z.string().nullable(),
+        head: z.string().regex(/^[0-9a-f]{40,64}$/),
+        indexTree: z.string().regex(/^[0-9a-f]{40,64}$/),
+        excludesFile: z.string().nullable(),
+      }),
+      wipCommit: z
+        .string()
+        .regex(/^[0-9a-f]{40,64}$/)
+        .nullable(),
+    })
+    .nullable(),
 });
 
 // ---------------------------------------------------------------------------
@@ -175,8 +192,14 @@ function migrateV1toV2(v1: Raw, ctx: RuleContext): Raw {
   };
 }
 
+/** Version 3 added the review checked out in the workspace (none, in any older state). */
+function migrateV2toV3(v2: Raw): Raw {
+  return { ...v2, schemaVersion: 3, reviewSession: null };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: RuleContext) => Raw> = {
   1: migrateV1toV2,
+  2: migrateV2toV3,
 };
 
 export class StateVersionError extends Error {}

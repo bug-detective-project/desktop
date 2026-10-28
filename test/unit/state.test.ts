@@ -20,7 +20,7 @@ describe('StateStore', () => {
   it('starts a new game when there is no saved state', async () => {
     const { state, recovered } = await new StateStore(dir).load(ctx, 'pt');
     expect(recovered).toBe(false);
-    expect(state.schemaVersion).toBe(2);
+    expect(state.schemaVersion).toBe(3);
     expect(state.settings.language).toBe('pt');
   });
 
@@ -84,7 +84,7 @@ describe('migrations', () => {
 
   it('migrates version 1 to the current schema', () => {
     const state = migrateState(v1, ctx);
-    expect(state.schemaVersion).toBe(2);
+    expect(state.schemaVersion).toBe(3);
     expect(state.settings).toEqual({ language: 'pt', qaTimeoutSeconds: 180, theme: 'system' });
     expect(state.tickets[0]).toMatchObject({
       hintsRevealed: 3,
@@ -106,7 +106,7 @@ describe('migrations', () => {
     const recovered = rules.recoverInterruptedQa(state, ctx);
     expect(rules.findTicket(recovered, 2)!.status).toBe('inProgress');
     await store.save(recovered);
-    expect(JSON.parse(await readFile(store.file, 'utf8')).schemaVersion).toBe(2);
+    expect(JSON.parse(await readFile(store.file, 'utf8')).schemaVersion).toBe(3);
   });
 
   it('rejects state without a version and invalid current state', () => {

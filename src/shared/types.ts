@@ -134,7 +134,22 @@ export interface LastExport {
   path: string;
 }
 
-export const SCHEMA_VERSION = 2;
+/**
+ * A review checked out in the workspace. Written before every step of the checkout and the return,
+ * so an interrupted switch is finished or rolled back on the next start.
+ */
+export interface ReviewSession {
+  ticket: number;
+  /** saving: the temporary commit may exist; switching: the review may be checked out; open; returning. */
+  phase: 'saving' | 'switching' | 'open' | 'returning';
+  startedAt: string;
+  /** Where the player was: their branch (null for a detached HEAD), HEAD, index and excludes file. */
+  returnPoint: { branch: string | null; head: string; indexTree: string; excludesFile: string | null };
+  /** The temporary commit with the player's uncommitted work, or null when there was none. */
+  wipCommit: string | null;
+}
+
+export const SCHEMA_VERSION = 3;
 
 export interface GameState {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -148,6 +163,8 @@ export interface GameState {
   settings: Settings;
   /** Added after version 2 shipped; optional, so older state files stay valid. */
   lastExport?: LastExport | null;
+  /** The review checked out in the workspace, or null when the player's code is checked out. */
+  reviewSession: ReviewSession | null;
 }
 
 /**
