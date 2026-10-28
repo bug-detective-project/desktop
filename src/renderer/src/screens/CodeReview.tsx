@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ReviewComparison, Snapshot, TicketContent } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
 import { api } from '../api.ts';
+import { story } from '../content.ts';
 import { Markdown } from '../components/Markdown.tsx';
 import { SplitDiff } from '../components/SplitDiff.tsx';
 import { parseDiff, visibleFiles } from '../components/diff.ts';
 import { Icon } from '../components/icons.tsx';
 import { ticketTitle } from '../components/ticketTitle.ts';
-import { Button, Card, LogView, SectionTitle, StagePill } from '../components/ui.tsx';
+import { Button, Card, LogView, SectionTitle, StagePill, Tooltip } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 /** "Open Review in VS Code": starts Docker Desktop first when it is stopped. */
@@ -35,18 +37,51 @@ function OpenReviewButton({ snapshot, ticketNumber }: { snapshot: Snapshot; tick
   const working = busy || snapshot.busy === 'openingReview';
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button
-        variant="primary"
-        busy={working}
-        disabled={snapshot.dockerState === 'notInstalled' || (snapshot.busy !== null && !working)}
-        onClick={open}
-        data-testid="open-review-vscode"
+      {/* VS Code cannot be opened directly on the commit's diff without an extension: the steps show on hover of the button or the icon. */}
+      <Tooltip
+        className="items-center gap-2"
+        panelClassName="right-0 w-96"
+        hoverOnly
+        content={
+          <div data-testid="vscode-steps">
+            <p className="mb-1 font-semibold">{t('review.vscodeSteps.title')}</p>
+            <ol className="list-decimal space-y-1 pl-5">
+              {(['scm', 'graph', 'diff', 'back'] as const).map((step) => (
+                <li key={step}>{t(`review.vscodeSteps.${step}`)}</li>
+              ))}
+            </ol>
+          </div>
+        }
       >
-        {!working && <Icon name="code" />}
-        {t('review.openInVSCode')}
-      </Button>
+        <Button
+          variant="primary"
+          busy={working}
+          disabled={snapshot.dockerState === 'notInstalled' || (snapshot.busy !== null && !working)}
+          onClick={open}
+          data-testid="open-review-vscode"
+        >
+          {!working && <Icon name="code" />}
+          {t('review.openInVSCode')}
+        </Button>
+        <span className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-hidden data-testid="vscode-steps-info">
+          <Icon name="info" className="size-5" />
+        </span>
+      </Tooltip>
       {dockerDown && snapshot.dockerState !== 'notInstalled' && <span className="text-xs text-muted-foreground">{t('review.startsDocker')}</span>}
     </div>
+  );
+}
+
+/** A card whose body collapses under its title; open by default. */
+function DropdownCard({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
+  return (
+    <details open className="group min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-sm" data-testid={testId}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 p-5 select-none [&::-webkit-details-marker]:hidden">
+        <Icon name="chevronDown" className="size-5 -rotate-90 text-muted-foreground transition-transform group-open:rotate-0" />
+        <h2 className="text-base font-bold tracking-wider text-foreground uppercase">{title}</h2>
+      </summary>
+      <div className="px-5 pb-5">{children}</div>
+    </details>
   );
 }
 
@@ -126,7 +161,8 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-6 py-6" data-testid="code-review">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+      {/* The actions always sit below the title, whatever its length. */}
+      <header className="space-y-4">
         <div>
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold tracking-wider text-muted-foreground uppercase">{t('review.title')}</span>
@@ -135,7 +171,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
           </div>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">{ticketTitle(snapshot, ticketNumber, language).text}</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2" data-testid="review-actions">
           <Button variant="ghost" onClick={onBack}>
             <Icon name="arrowLeft" />
             {t('review.back')}
@@ -152,34 +188,45 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
         <SectionTitle>{t('review.explanation')}</SectionTitle>
         {content?.reviewMarkdown && <Markdown testId="review-markdown">{content.reviewMarkdown}</Markdown>}
       </Card>
-      <Card className="min-w-0" data-testid="review-comparison">
-        <SectionTitle
-          aside={
-            <div className="flex items-start gap-4">
-              <label className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={showWhitespace}
-                  onChange={(event) => setShowWhitespace(event.target.checked)}
-                  className="accent-primary"
-                  data-testid="whitespace-toggle"
-                />
-                {t('review.showWhitespace')}
-              </label>
-              <OpenReviewButton snapshot={snapshot} ticketNumber={ticketNumber} />
-            </div>
-          }
-        >
-          {t('review.comparison')}
-        </SectionTitle>
-        <p className="mb-4 text-base text-muted-foreground">{t('review.comparisonIntro')}</p>
+      <DropdownCard title={t('review.comparison')} testId="review-comparison">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <p className="max-w-3xl text-base text-muted-foreground">{t('review.comparisonIntro')}</p>
+          <div className="flex items-start gap-4">
+            <label className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={showWhitespace}
+                onChange={(event) => setShowWhitespace(event.target.checked)}
+                className="accent-primary"
+                data-testid="whitespace-toggle"
+              />
+              {t('review.showWhitespace')}
+            </label>
+            <OpenReviewButton snapshot={snapshot} ticketNumber={ticketNumber} />
+          </div>
+        </div>
         {snapshot.busy === 'openingReview' && snapshot.log.length > 0 && (
           <div className="mb-4">
             <LogView lines={snapshot.log} />
           </div>
         )}
         {comparison && <Comparison comparison={comparison} showWhitespace={showWhitespace} />}
-      </Card>
+      </DropdownCard>
+      <DropdownCard title={t('review.referenceSection')} testId="review-reference">
+        <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: story(language).people.senior.name })}</p>
+        {content?.referencePatch && (
+          <SplitDiff
+            diff={content.referencePatch}
+            testId="reference-diff"
+            labels={{
+              left: t('review.original'),
+              right: t('review.referenceSolution'),
+              onlyLeft: t('review.removedByReference'),
+              onlyRight: t('review.addedByReference'),
+            }}
+          />
+        )}
+      </DropdownCard>
     </div>
   );
 }

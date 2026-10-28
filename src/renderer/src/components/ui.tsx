@@ -5,7 +5,7 @@ import type { Column } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
 import { STAGE } from './stage.ts';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'review';
 type Size = 'sm' | 'md';
 
 // Icons inside buttons always inherit the button's text color (currentColor).
@@ -15,6 +15,8 @@ const VARIANTS: Record<Variant, string> = {
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60',
   danger: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-95 disabled:opacity-50',
   dangerOutline: 'border border-destructive/50 text-destructive shadow-2xs hover:bg-destructive/10 disabled:opacity-60',
+  // The Code Review stage hue (see stage.ts), for actions of a card in Code Review.
+  review: 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600',
 };
 
 const SIZES: Record<Size, string> = {
@@ -88,13 +90,29 @@ export function StagePill({ status, className = '' }: { status: Column; classNam
 }
 
 /** A hint shown below its child on hover or focus. The wrapper catches hover even when the child button is disabled. */
-export function Tooltip({ content, className = '', children }: { content: ReactNode; className?: string; children: ReactNode }) {
+export function Tooltip({
+  content,
+  className = '',
+  panelClassName = 'inset-x-0',
+  hoverOnly = false,
+  children,
+}: {
+  content: ReactNode;
+  className?: string;
+  /** Position and width of the hint; by default exactly as wide as the child. */
+  panelClassName?: string;
+  /** Shows only while the pointer is over the children, not when one of them has focus (e.g. after a click). */
+  hoverOnly?: boolean;
+  children: ReactNode;
+}) {
+  // A named group: a "group" ancestor (a dropdown card, for example) must not open the hint.
+  const focus = hoverOnly ? '' : 'group-focus-within/tooltip:visible group-focus-within/tooltip:opacity-100';
   return (
-    <span className={`group relative inline-flex ${className}`}>
+    <span className={`group/tooltip relative inline-flex ${className}`}>
       {children}
       <span
         role="tooltip"
-        className="pointer-events-none invisible absolute inset-x-0 top-full z-50 mt-2 rounded-md border border-border bg-popover px-3 py-2 text-sm leading-relaxed text-popover-foreground opacity-0 shadow-lg transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+        className={`pointer-events-none invisible absolute ${panelClassName} top-full z-50 mt-2 rounded-md border border-border bg-popover px-3 py-2 text-sm leading-relaxed text-popover-foreground opacity-0 shadow-lg transition-opacity ${focus} group-hover/tooltip:visible group-hover/tooltip:opacity-100`}
       >
         {content}
       </span>

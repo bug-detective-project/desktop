@@ -9,19 +9,44 @@ async function reachCodeReview(page: Page): Promise<void> {
   await dragCard(page, 1, 'inQa');
   await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
   await page.getByTestId('card-1').click();
-  await page.getByTestId('open-review').click();
+  // In Code Review the button takes the stage color and the whole row of the panel header.
+  const button = page.getByTestId('open-review');
+  await expect(button).toHaveClass(/bg-indigo-600/);
+  const [buttonBox, actionsBox] = await Promise.all([button.boundingBox(), page.getByTestId('open-vscode').locator('../..').boundingBox()]);
+  expect(Math.round(buttonBox!.width)).toBe(Math.round(actionsBox!.width));
+  await button.click();
   await expect(page.getByTestId('code-review')).toBeVisible();
 }
 
-const file = (page: Page, path: string) => page.locator(`[data-testid="comparison-file"][data-path="${path}"]`);
+const file = (page: Page, path: string) => page.locator(`[data-testid="comparison"] [data-testid="comparison-file"][data-path="${path}"]`);
 
 test('the review keeps the explanation on top and compares the two solutions file by file', async () => {
   const { page, close } = await launch({ qa: ['passed'] });
   try {
     await reachCodeReview(page);
+    // Back and Accept sit below the title; the diff dropdown titles are 16px.
+    const title = await page.getByTestId('code-review').locator('header h1').boundingBox();
+    const actions = await page.getByTestId('review-actions').boundingBox();
+    expect(actions!.y).toBeGreaterThanOrEqual(title!.y + title!.height);
+    expect(actions!.x).toBe(title!.x);
+    await expect(page.getByTestId('review-comparison').locator('summary h2')).toHaveCSS('font-size', '16px');
+    await expect(page.getByTestId('review-reference').locator('summary h2')).toHaveCSS('font-size', '16px');
     const explanation = await page.getByTestId('review-markdown').boundingBox();
     const comparison = await page.getByTestId('review-comparison').boundingBox();
+    const reference = await page.getByTestId('review-reference').boundingBox();
     expect(explanation!.y).toBeLessThan(comparison!.y);
+    expect(comparison!.y).toBeLessThan(reference!.y);
+
+    // Both dropdowns start open; only the comparison opens the review in VS Code.
+    await expect(page.getByTestId('review-comparison')).toHaveJSProperty('open', true);
+    await expect(page.getByTestId('review-reference')).toHaveJSProperty('open', true);
+    await expect(page.getByTestId('review-reference').getByTestId('open-review-vscode')).toHaveCount(0);
+    const referenceFile = page.locator('[data-testid="reference-diff"] [data-testid="comparison-file"][data-path="client/src/pages/TicketDetails.tsx"]');
+    await expect(referenceFile.locator('thead')).toContainText('Original code');
+    await expect(referenceFile.locator('thead')).toContainText('Reference solution');
+    await page.getByTestId('review-reference').locator('summary').click();
+    await expect(page.getByTestId('review-reference')).toHaveJSProperty('open', false);
+    await expect(page.getByTestId('reference-diff')).toBeHidden();
 
     // Only differing files, matched by path; one-sided files, renames and binaries are labeled.
     const list = page.getByTestId('comparison-files');
@@ -76,7 +101,24 @@ test('Open Review in VS Code shows the banner until the player goes back to thei
     await reachCodeReview(page);
     const button = page.getByTestId('open-review-vscode');
     await expect(button).toHaveText('Open Review in VS Code');
+    // The info icon beside it explains how to reach the diff in VS Code.
+    // Only hovering the button or the icon shows the steps; a click (focus) does not keep them open.
+    const steps = page.getByTestId('vscode-steps');
+    await expect(steps).toBeHidden();
+    await page.getByTestId('vscode-steps-info').hover();
+    await expect(steps).toBeVisible();
+    await page.getByTestId('whitespace-toggle').hover();
+    await expect(steps).toBeHidden();
+    await button.hover();
+    await expect(steps).toBeVisible();
+    await page.getByTestId('review-markdown').hover();
+    await expect(steps).toBeHidden();
+    await button.hover();
+    await expect(page.getByTestId('vscode-steps')).toContainText('In the Graph section, click the top commit, "Your approved solution"');
+    await expect(page.getByTestId('vscode-steps').locator('li')).toHaveCount(4);
     await button.click();
+    await page.getByTestId('review-markdown').hover();
+    await expect(steps).toBeHidden(); // the focused button does not keep the steps open
     const banner = page.getByTestId('review-banner');
     await expect(banner).toContainText('Viewing the review of ticket SD-214 in VS Code. Your code will be restored automatically.');
     await expect(page.locator('body')).not.toContainText(/review\/|player\/|review-edits\//);
@@ -120,6 +162,8 @@ test('the review texts are in Portuguese', async () => {
     await expect(page.getByTestId('open-review-vscode')).toHaveText('Abrir review no VS Code');
     await expect(file(page, 'client/src/api/errors.ts')).toContainText('Somente na sua solução');
     await expect(file(page, 'client/src/pages/TicketDetails.tsx').locator('thead')).toContainText('Solução de referência');
+    await expect(page.getByTestId('review-comparison').locator('summary')).toHaveText('Diff sua solução com a solução proposta');
+    await expect(page.getByTestId('review-reference').locator('summary')).toHaveText('Diff solução proposta com o código original');
     await page.getByTestId('open-review-vscode').click();
     await expect(page.getByTestId('review-banner')).toContainText('Você está vendo o review do ticket SD-214 no VS Code. Seu código será restaurado automaticamente.');
   } finally {

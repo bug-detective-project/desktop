@@ -149,6 +149,8 @@
     },
     "hint": "Drag your card from To Do to In Progress, then to In QA when it is fixed. The other moves happen on their own.",
     "notAllowed": "Only QA and the code review move a card there.",
+    "notAllowedInQa": "Your card is being tested. When QA finishes, it moves the card to the right column.",
+    "notAllowedInReview": "To move the card to Done, accept the code review.",
     "qaRunning": "QA is running…",
     "attempts_one": "{{count}} QA attempt",
     "attempts_other": "{{count}} QA attempts",
@@ -200,15 +202,20 @@
   },
   "qa": {
     "comment": {
-      "gate1Failed": "Gate 1 failed: existing functionality broke. Your change made project tests fail. Fix them before resubmitting.",
-      "gate2Failed": "Gate 2 failed: the reported bug is still unresolved. The app still shows the behavior described in the ticket.",
+      "gate1Failed": "Existing functionality broke. Your change made project tests fail. Fix them before resubmitting.",
+      "gate2Failed": "The reported bug is still unresolved. The app still shows the behavior described in the ticket.",
       "timeout": "Timeout: QA exceeded the time limit of {{seconds}} seconds, possibly because of a hang or infinite loop.",
       "passed": "Passed: ready for code review.",
       "interrupted": "QA was interrupted because the app closed. This does not count as an attempt. Move the card to In QA again.",
       "error": "QA could not run. This does not count as an attempt. Details: {{detail}}",
       "branchWarning": "Heads-up: your workspace is not on this ticket's code (it was switched in Git). QA evaluates the current files anyway."
     },
-    "gate": "Gate {{gate}}",
+    "badge": {
+      "failed": "Test failed",
+      "passed": "Tests passed"
+    },
+    "errors_one": "{{count}} error in this run",
+    "errors_other": "{{count}} errors in this run",
     "failingTests": "Failing tests:",
     "unfinishedTests": "Unfinished tests:",
     "running": "QA is running for this ticket. It cannot be cancelled."
@@ -218,7 +225,7 @@
     "explanation": "Review notes",
     "accept": "Accept review",
     "back": "Back to the board",
-    "comparison": "Comparing solutions",
+    "comparison": "Diff: your solution with the proposed solution",
     "comparisonIntro": "Your approved solution next to the reference solution. Both can be valid: use the differences to see other ways to solve the ticket.",
     "yourSolution": "Your solution",
     "referenceSolution": "Reference solution",
@@ -231,13 +238,24 @@
     "removedByYou": "Removed by you",
     "addedByYou": "Added by you",
     "openInVSCode": "Open Review in VS Code",
+    "vscodeSteps": {
+      "title": "How to see the diff in VS Code",
+      "scm": "Open Source Control (Ctrl+Shift+G).",
+      "graph": "In the Graph section, click the top commit, \"Your approved solution\". If Graph is not shown: \"…\" at the top of Source Control → Views → Graph.",
+      "diff": "The diff of every file opens: the proposed solution on the left, yours on the right. The files are read-only.",
+      "back": "When you are done, come back here and click \"Back to my code\" (your code also comes back on its own before QA)."
+    },
     "startsDocker": "Docker Desktop is not running: it starts first.",
     "banner": "Viewing the review of ticket {{ticket}} in VS Code. Your code will be restored automatically.",
     "backToMyCode": "Back to my code",
     "notice": {
       "editsSaved": "Changes made while viewing the review of ticket {{ticket}} were saved separately and your code was restored.",
       "workKept": "Your code was restored. Your work in progress was kept as a commit, because new commits were made while the review of ticket {{ticket}} was open."
-    }
+    },
+    "referenceSection": "Diff: proposed solution with the original code",
+    "referenceIntro": "What {{name}} changed in the code the ticket started from to fix the bug.",
+    "removedByReference": "Removed by the reference",
+    "addedByReference": "Added by the reference"
   },
   "comparison": {
     "files_one": "{{count}} file differs",

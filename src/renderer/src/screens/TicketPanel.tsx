@@ -187,7 +187,6 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
                   <span className="font-medium">{t('ticket.attempt', { number: attempt.number })}</span>
                   <Badge tone={attempt.result.status === 'passed' ? 'ok' : 'danger'}>
                     {t(`ticket.attemptResult.${attempt.result.status}`)}
-                    {attempt.result.status !== 'passed' && ` · ${t('qa.gate', { gate: attempt.result.gate })}`}
                   </Badge>
                   <span className="text-muted-foreground">{t('ticket.testsSummary', { passed, failed })}</span>
                   <time className="ml-auto text-sm text-muted-foreground">{new Date(attempt.finishedAt).toLocaleString(locale)}</time>
@@ -271,7 +270,12 @@ export function TicketPanel({
           </div>
           <WorkspaceActions snapshot={snapshot} ticket={ticket} />
           {(ticket.status === 'codeReview' || ticket.status === 'done') && (
-            <Button variant="primary" onClick={onOpenReview} data-testid="open-review">
+            <Button
+              variant={ticket.status === 'codeReview' ? 'review' : 'primary'}
+              className={ticket.status === 'codeReview' ? 'w-full' : ''}
+              onClick={onOpenReview}
+              data-testid="open-review"
+            >
               <Icon name="checkCircle" />
               {t('ticket.openReview')}
             </Button>
@@ -315,8 +319,8 @@ export function TicketPanel({
                 </div>
               )}
               {ticket.comments.length === 0 && !qaRunning && <p className="text-base text-muted-foreground">{t('ticket.noComments')}</p>}
-              {[...ticket.comments].reverse().map((comment) => (
-                <QaCommentView key={comment.id} comment={comment} />
+              {[...ticket.comments].reverse().map((comment, index) => (
+                <QaCommentView key={comment.id} comment={comment} defaultOpen={index === 0} />
               ))}
             </div>
           )}

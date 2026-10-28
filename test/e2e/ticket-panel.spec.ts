@@ -48,14 +48,17 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await panel.getByTestId('tab-qa').click();
     const comment = panel.getByTestId('qa-comment').first();
     await expect(comment).toHaveAttribute('data-kind', 'gate2Failed');
-    await expect(comment).toContainText('Gate 2');
-    await expect(comment).toContainText('Gate 2 failed: the reported bug is still unresolved');
+    await expect(comment.locator('header')).toContainText('Test failed');
+    await expect(comment).toContainText('The reported bug is still unresolved');
+    await expect(comment).not.toContainText('Gate');
     await expect(comment.getByTestId('qa-failing-test')).toContainText('Next shows the next ticket');
     await expect(comment.getByTestId('qa-failing-test')).toContainText('Expected "4", received "3"');
 
     // History: attempts and the append-only activity log.
     await panel.getByTestId('tab-history').click();
     await expect(panel.getByTestId('attempt')).toHaveCount(1);
+    await expect(panel.getByTestId('attempt')).toContainText('failed');
+    await expect(panel.getByTestId('attempt')).not.toContainText('Gate');
     await expect(panel.getByTestId('activity-entry')).toHaveCount(4);
     await expect(panel.getByTestId('activity')).toContainText('In QA → In Progress');
     await expect(panel).toContainText('Hints used: 3 of 3');
@@ -89,5 +92,46 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
     }
   } finally {
     await rm(userData, { recursive: true, force: true });
+  }
+});
+
+test('the QA tab groups the errors of each run in a dropdown, the latest run open', async () => {
+  const { page, close } = await launch({ qa: ['gate2', 'gate1', 'passed'], qaDelayMs: 300 });
+  try {
+    await startFirstTicket(page);
+    await dragCard(page, 1, 'inProgress');
+    await dragCard(page, 1, 'inQa');
+    await expect(page.getByTestId('card-1')).toContainText('1 QA attempt', { timeout: 15_000 });
+    await dragCard(page, 1, 'inQa');
+    await expect(page.getByTestId('card-1')).toContainText('2 QA attempts', { timeout: 15_000 });
+    await page.getByTestId('card-1').click();
+    const panel = page.getByTestId('ticket-panel');
+    await panel.getByTestId('tab-qa').click();
+
+    const [latest, earlier] = [panel.getByTestId('qa-comment').nth(0), panel.getByTestId('qa-comment').nth(1)];
+    await expect(latest).toHaveAttribute('data-kind', 'gate1Failed');
+    await expect(latest.getByTestId('qa-errors')).toHaveJSProperty('open', true);
+    await expect(latest.getByTestId('qa-errors').locator('summary')).toHaveText('1 error in this run');
+    await expect(latest.getByTestId('qa-failing-test')).toContainText('expected 15 rows, got 0');
+
+    await expect(latest.locator('header')).toContainText('Test failed');
+    await expect(earlier).toHaveAttribute('data-kind', 'gate2Failed');
+    await expect(earlier.getByTestId('qa-errors')).toHaveJSProperty('open', false);
+    await expect(earlier.getByTestId('qa-failing-test')).toBeHidden();
+    await earlier.getByTestId('qa-errors').locator('summary').click();
+    await expect(earlier.getByTestId('qa-failing-test')).toContainText('Expected "4", received "3"');
+
+    // A passing run: a green "Tests passed" badge and no error dropdown.
+    await panel.getByTestId('close-panel').click();
+    await dragCard(page, 1, 'inQa');
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await page.getByTestId('card-1').click();
+    await panel.getByTestId('tab-qa').click();
+    const passed = panel.getByTestId('qa-comment').first();
+    await expect(passed).toHaveAttribute('data-kind', 'passed');
+    await expect(passed.locator('header')).toContainText('Tests passed');
+    await expect(passed.getByTestId('qa-errors')).toHaveCount(0);
+  } finally {
+    await close();
   }
 });

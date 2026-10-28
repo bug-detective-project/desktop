@@ -149,6 +149,8 @@
     },
     "hint": "Arraste o seu card de A fazer para Em andamento e depois para Em QA quando estiver corrigido. Os outros movimentos acontecem sozinhos.",
     "notAllowed": "Só o QA e o code review movem um card para lá.",
+    "notAllowedInQa": "Seu card está em teste. Quando terminar, o QA vai mover o card para a coluna correta.",
+    "notAllowedInReview": "Para mover o card para Concluído, aceite o code review.",
     "qaRunning": "O QA está rodando…",
     "attempts_one": "{{count}} tentativa de QA",
     "attempts_other": "{{count}} tentativas de QA",
@@ -200,15 +202,20 @@
   },
   "qa": {
     "comment": {
-      "gate1Failed": "Gate 1 falhou: uma funcionalidade existente quebrou. Sua alteração fez testes do projeto falharem. Corrija-os antes de reenviar.",
-      "gate2Failed": "Gate 2 falhou: o bug reportado ainda não foi resolvido. A aplicação ainda apresenta o comportamento descrito no ticket.",
+      "gate1Failed": "Uma funcionalidade existente quebrou. Sua alteração fez testes do projeto falharem. Corrija-os antes de reenviar.",
+      "gate2Failed": "O bug reportado ainda não foi resolvido. A aplicação ainda apresenta o comportamento descrito no ticket.",
       "timeout": "Timeout: o QA excedeu o limite de {{seconds}} segundos, possivelmente por causa de um travamento ou loop infinito.",
       "passed": "Aprovado: pronto para code review.",
       "interrupted": "O QA foi interrompido porque o app fechou. Isso não conta como tentativa. Mova o card para Em QA de novo.",
       "error": "O QA não pôde rodar. Isso não conta como tentativa. Detalhes: {{detail}}",
       "branchWarning": "Atenção: o seu workspace não está no código deste ticket (foi trocado no Git). O QA avalia os arquivos atuais mesmo assim."
     },
-    "gate": "Gate {{gate}}",
+    "badge": {
+      "failed": "Teste falhou",
+      "passed": "Testes aprovados"
+    },
+    "errors_one": "{{count}} erro nesta execução",
+    "errors_other": "{{count}} erros nesta execução",
     "failingTests": "Testes com falha:",
     "unfinishedTests": "Testes não concluídos:",
     "running": "O QA está rodando para este ticket. Ele não pode ser cancelado."
@@ -218,7 +225,7 @@
     "explanation": "Notas da revisão",
     "accept": "Aceitar a revisão",
     "back": "Voltar ao quadro",
-    "comparison": "Comparando soluções",
+    "comparison": "Diff sua solução com a solução proposta",
     "comparisonIntro": "Sua solução aprovada ao lado da solução de referência. As duas podem ser válidas: use as diferenças para ver outras formas de resolver o ticket.",
     "yourSolution": "Sua solução",
     "referenceSolution": "Solução de referência",
@@ -231,13 +238,24 @@
     "removedByYou": "Removido por você",
     "addedByYou": "Adicionado por você",
     "openInVSCode": "Abrir review no VS Code",
+    "vscodeSteps": {
+      "title": "Como ver o diff no VS Code",
+      "scm": "Abra o Controle do Código-Fonte (Ctrl+Shift+G).",
+      "graph": "Na seção Graph, clique no commit do topo, \"Sua solução aprovada\". Se o Graph não aparecer: \"…\" no topo do Controle do Código-Fonte → Views → Graph.",
+      "diff": "Abre o diff de todos os arquivos: a solução proposta à esquerda e a sua à direita. Os arquivos ficam somente leitura.",
+      "back": "Quando terminar, volte aqui e clique em \"Voltar para o meu código\" (seu código também volta sozinho antes do QA)."
+    },
     "startsDocker": "O Docker Desktop não está rodando: ele será iniciado antes.",
     "banner": "Você está vendo o review do ticket {{ticket}} no VS Code. Seu código será restaurado automaticamente.",
     "backToMyCode": "Voltar para o meu código",
     "notice": {
       "editsSaved": "As alterações feitas durante o review do ticket {{ticket}} foram salvas separadamente e o seu código foi restaurado.",
       "workKept": "Seu código foi restaurado. O seu trabalho em andamento ficou guardado como um commit, porque houve novos commits enquanto o review do ticket {{ticket}} estava aberto."
-    }
+    },
+    "referenceSection": "Diff solução proposta com o código original",
+    "referenceIntro": "O que {{name}} mudou no código com que o ticket começou para corrigir o bug.",
+    "removedByReference": "Removido pela referência",
+    "addedByReference": "Adicionado pela referência"
   },
   "comparison": {
     "files_one": "{{count}} arquivo diferente",

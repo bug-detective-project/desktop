@@ -18,6 +18,7 @@ function TicketCard({
   title,
   ticketKey,
   draggable,
+  movable,
   onOpen,
   onDragStart,
   onDragEnd,
@@ -26,6 +27,8 @@ function TicketCard({
   title: string;
   ticketKey: string;
   draggable: boolean;
+  /** Draggable only so a drop can explain why the card stays (In QA, Code Review): styled as not movable. */
+  movable: boolean;
   onOpen: () => void;
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
@@ -48,7 +51,7 @@ function TicketCard({
       data-testid={`card-${ticket.ticket}`}
       data-status={ticket.status}
       className={`w-full rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
-        draggable ? 'cursor-grab border-primary/30 active:cursor-grabbing' : 'cursor-pointer border-border'
+        movable ? 'cursor-grab border-primary/30 active:cursor-grabbing' : 'cursor-pointer border-border'
       }`}
     >
       <p className="font-mono text-sm font-bold text-primary">{ticketKey}</p>
@@ -75,8 +78,11 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
   const [dragging, setDragging] = useState<TicketState | null>(null);
   const [over, setOver] = useState<Column | null>(null);
 
-  const canDrag = (ticket: TicketState) =>
+  const canMove = (ticket: TicketState) =>
     ticket.ticket === state.currentTicket && (PLAYER_MOVES[ticket.status]?.length ?? 0) > 0 && snapshot.busy !== 'qa';
+  // Cards that QA or the code review will move can still be picked up: dropping them explains what moves them.
+  const canDrag = (ticket: TicketState) =>
+    canMove(ticket) || (ticket.ticket === state.currentTicket && (ticket.status === 'inQa' || ticket.status === 'codeReview'));
 
   const endDrag = () => {
     draggingRef.current = null;
@@ -90,8 +96,9 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
     if (!ticket || ticket.status === column) {
       return;
     }
-    if (!isPlayerMoveAllowed(ticket.status, column)) {
-      toast.info(t('board.notAllowed'));
+    if (!isPlayerMoveAllowed(ticket.status, column) || !canMove(ticket)) {
+      const reason = ticket.status === 'inQa' ? 'notAllowedInQa' : ticket.status === 'codeReview' ? 'notAllowedInReview' : 'notAllowed';
+      toast.info(t(`board.${reason}`));
       return;
     }
     try {
@@ -148,6 +155,7 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                     title={ticketTitle(snapshot, ticket.ticket, language).text}
                     ticketKey={ticketTitle(snapshot, ticket.ticket, language).key}
                     draggable={canDrag(ticket)}
+                    movable={canMove(ticket)}
                     onOpen={() => onOpenTicket(ticket.ticket)}
                     onDragStart={(event) => {
                       event.dataTransfer.setData(DRAG_TYPE, String(ticket.ticket));

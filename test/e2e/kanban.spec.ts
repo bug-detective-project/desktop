@@ -2,10 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { dragCard, launch, startFirstTicket } from './fixtures.ts';
 
+/** Drops a card on a column it cannot go to and expects the explanation (drags occasionally get lost, so retry). */
+async function dropExplains(page: Page, card: Locator, column: string, message: string) {
+  await expect(async () => {
+    await card.dragTo(page.getByTestId(`column-${column}`));
+    await expect(page.getByTestId('toast-info').filter({ hasText: message })).not.toHaveCount(0, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+}
+
 test('the player can only drag To Do → In Progress → In QA; QA and review move the rest', async () => {
-  const { page, close } = await launch({ qa: ['gate2', 'passed'], qaDelayMs: 800 });
+  const { page, close } = await launch({ qa: ['gate2', 'passed'], qaDelayMs: 4000 });
   try {
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
@@ -26,10 +35,11 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     await card.dragTo(page.getByTestId('column-todo'));
     await expect(card).toHaveAttribute('data-status', 'inProgress');
 
-    // In QA: the card cannot be dragged anywhere while QA runs, then comes back with a comment.
+    // In QA: the card cannot move while QA runs (a drop says QA will move it), then comes back with a comment.
     await dragCard(page, 1, 'inQa');
     await expect(card).toHaveAttribute('data-status', 'inQa');
-    await expect(card).toHaveAttribute('draggable', 'false');
+    await dropExplains(page, card, 'done', 'Your card is being tested. When QA finishes, it moves the card to the right column.');
+    await expect(card).toHaveAttribute('data-status', 'inQa');
     const cancel = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
     expect(cancel).toMatch(/moveNotAllowed|busy/);
     await expect(card).toHaveAttribute('data-status', 'inProgress', { timeout: 15_000 });
@@ -38,7 +48,10 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     // Second attempt passes: Code Review, then Done after accepting the review.
     await dragCard(page, 1, 'inQa');
     await expect(card).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
-    await expect(card).toHaveAttribute('draggable', 'false');
+    for (const column of ['done', 'inProgress']) {
+      await dropExplains(page, card, column, 'To move the card to Done, accept the code review.');
+      await expect(card).toHaveAttribute('data-status', 'codeReview');
+    }
     await card.click();
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('code-review')).toBeVisible();
@@ -87,6 +100,7 @@ test('a QA timeout returns the card with the timeout template', async () => {
     await card.click();
     await page.getByTestId('tab-qa').click();
     await expect(page.getByTestId('qa-comment').first()).toHaveAttribute('data-kind', 'timeout');
+    await expect(page.getByTestId('qa-comment').first().locator('header')).toContainText('Test failed');
     await expect(page.getByTestId('qa-comment').first()).toContainText('180 seconds');
     await expect(page.getByTestId('qa-comment').first()).toContainText('Unfinished tests');
   } finally {
