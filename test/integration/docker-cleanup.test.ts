@@ -89,6 +89,7 @@ describe('Docker cleanup', () => {
   it('everything: removes the workspace container and volume and the current images', async () => {
     const result = await runtime.cleanDocker('everything');
     expect(result.failed).toEqual([]);
+    expect(result.workspaceKept).toBe(false);
     expect(await exists.container(`${PREFIX}-workspace`)).toBe(false);
     expect(await exists.volume(`${PREFIX}-workspace`)).toBe(false);
     expect(await exists.image(IMAGES.workspace)).toBe(false);

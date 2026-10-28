@@ -176,8 +176,32 @@ test('Docker cleanup lists what Docker could not remove, and why', async () => {
     const result = page.getByTestId('cleanup-result');
     await expect(result).toContainText('Alguns itens não foram removidos');
     await expect(result).toContainText('2 removidos. O Docker não conseguiu remover 1 item:');
-    await expect(result.getByTestId('cleanup-failed')).toHaveText('bugdetective-qa-inputError response from daemon: bugdetective-qa-input is in use');
+    await expect(result.getByTestId('cleanup-failed')).toHaveText('Volume: bugdetective-qa-inputError response from daemon: bugdetective-qa-input is in use');
+    // Leftovers never touch the game: no line about it.
+    await expect(result.getByTestId('cleanup-game')).toHaveCount(0);
     await expect(result).toContainText('Se o Docker Desktop parecer travado, reinicie-o');
+  } finally {
+    await close();
+  }
+});
+
+test('removing everything keeps the game when Docker could not remove the code', async () => {
+  const { page, close } = await launch({ cleanupFails: ['bugdetective-workspace'] });
+  try {
+    await startFirstTicket(page);
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-backup').click();
+    await page.getByTestId('remove-docker').click();
+    await page.getByTestId('confirm-remove-docker').click();
+    const result = page.getByTestId('cleanup-result');
+    // The container and the volume share a name: the kind tells them apart.
+    await expect(result.getByTestId('cleanup-failed')).toHaveCount(2);
+    await expect(result.getByTestId('cleanup-failed').first()).toContainText('Container: bugdetective-workspace');
+    await expect(result.getByTestId('cleanup-failed').last()).toContainText('Volume: bugdetective-workspace');
+    await expect(result.getByTestId('cleanup-game')).toHaveText('Your progress was kept: the volume with your code could not be removed.');
+    await result.getByRole('button', { name: 'Close' }).last().click();
+    await page.getByTestId('nav-board').click();
+    await expect(page.getByTestId('card-1')).toBeVisible();
   } finally {
     await close();
   }

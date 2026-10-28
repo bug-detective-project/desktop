@@ -203,17 +203,35 @@ export class FakeRuntime implements GameRuntime {
 
   async cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup> {
     // Leftovers: a QA container, the QA input volume and an image of an older version.
-    const names =
+    const targets: { kind: 'container' | 'volume' | 'image'; name: string }[] =
       scope === 'leftovers'
-        ? ['bugdetective-qa-1a2b3c4d', 'bugdetective-qa-input', 'bugdetective-qa:0ld0ld0ld0ld']
-        : ['bugdetective-workspace', 'bugdetective-workspace', 'bugdetective-vscode-server', 'bugdetective-qa-cache', 'bugdetective-qa-input', 'bugdetective-workspace:281e4701af14', 'bugdetective-qa:9c8db3bee0fc'];
-    const failed = names.filter((name) => this.scenario.cleanupFails.includes(name)).map((name) => ({ name, reason: `Error response from daemon: ${name} is in use` }));
+        ? [
+            { kind: 'container', name: 'bugdetective-qa-1a2b3c4d' },
+            { kind: 'volume', name: 'bugdetective-qa-input' },
+            { kind: 'image', name: 'bugdetective-qa:0ld0ld0ld0ld' },
+          ]
+        : [
+            { kind: 'container', name: 'bugdetective-workspace' },
+            { kind: 'volume', name: 'bugdetective-workspace' },
+            { kind: 'volume', name: 'bugdetective-vscode-server' },
+            { kind: 'volume', name: 'bugdetective-qa-cache' },
+            { kind: 'volume', name: 'bugdetective-qa-input' },
+            { kind: 'image', name: 'bugdetective-workspace:281e4701af14' },
+            { kind: 'image', name: 'bugdetective-qa:9c8db3bee0fc' },
+          ];
+    const failed = targets
+      .filter((target) => this.scenario.cleanupFails.includes(target.name))
+      .map((target) => ({ ...target, reason: `Error response from daemon: ${target.name} is in use` }));
+    const result: DockerCleanup = { removed: targets.length - failed.length, failed };
     if (scope === 'everything') {
+      result.workspaceKept = failed.some((target) => target.kind === 'volume' && target.name === 'bugdetective-workspace');
       this.scenario.environmentReady = false;
-      this.stages.clear();
-      this.claimed = null;
+      if (!result.workspaceKept) {
+        this.stages.clear();
+        this.claimed = null;
+      }
     }
-    return { removed: names.length - failed.length, failed };
+    return result;
   }
 
   async diskUsage(): Promise<DiskUsageItem[]> {

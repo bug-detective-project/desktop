@@ -62,6 +62,19 @@ describe('Docker cleanup plan', () => {
     expect(plan.filter((target) => target.kind !== 'image').map((target) => target.name)).toEqual(['bugdetective-test-workspace', 'bugdetective-test-workspace']);
   });
 
+  it('removes "repository:<none>" images by id, and only from the app repositories', () => {
+    const withUntagged: LabelledResources = {
+      containers: [],
+      volumes: [],
+      images: [
+        { ref: 'bugdetective-qa:<none>', id: 'ggg' },
+        { ref: 'someone-else:<none>', id: 'hhh' },
+      ],
+    };
+    const plan = planCleanup(withUntagged, { ...options, scope: 'leftovers' });
+    expect(plan).toEqual([{ kind: 'image', name: 'ggg' }]);
+  });
+
   it('a cleanup of leftovers never touches another project (new projects arrive as resources of their own)', () => {
     const withAnotherProject: LabelledResources = {
       containers: [...found.containers, 'bugdetective-tasklist-workspace', 'bugdetective-tasklist-qa-1a2b3c4d'],

@@ -66,12 +66,20 @@ function useCleanupResult() {
       <p className="text-base leading-relaxed">{t('settings.cleanup.partial', { removed: result.removed, count: result.failed.length })}</p>
       <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-lg border border-border/80 bg-secondary/40 p-3">
         {result.failed.map((item) => (
-          <li key={item.name} className="min-w-0" data-testid="cleanup-failed">
-            <p className="font-mono text-sm font-semibold break-all">{item.name}</p>
+          <li key={`${item.kind}:${item.name}`} className="min-w-0" data-testid="cleanup-failed">
+            <p className="text-sm break-all">
+              <span className="font-semibold text-muted-foreground">{t(`settings.cleanup.kinds.${item.kind}`)}: </span>
+              <span className="font-mono font-semibold">{item.name}</span>
+            </p>
             <p className="text-sm break-words text-muted-foreground">{item.reason}</p>
           </li>
         ))}
       </ul>
+      {result.workspaceKept !== undefined && (
+        <p className="mt-3 text-base leading-relaxed font-medium" data-testid="cleanup-game">
+          {t(result.workspaceKept ? 'settings.cleanup.gameKept' : 'settings.cleanup.gameReset')}
+        </p>
+      )}
       <p className="mt-3 text-base leading-relaxed text-muted-foreground">{t('settings.cleanup.restartHint')}</p>
       <div className="mt-5 flex justify-end">
         <Button onClick={() => setResult(null)}>{t('common.close')}</Button>
@@ -616,12 +624,12 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             <Button
               variant="dangerOutline"
               className="mt-3"
-              busy={task === 'removingDocker'}
-              disabled={task !== null || dockerDown}
+              busy={task === 'removingDocker' || busy === 'removeDocker'}
+              disabled={task !== null || busy !== null || dockerDown}
               onClick={() => setConfirmRemoveDocker(true)}
               data-testid="remove-docker"
             >
-              {task !== 'removingDocker' && <Icon name="trash" />}
+              {task !== 'removingDocker' && busy !== 'removeDocker' && <Icon name="trash" />}
               {t('settings.cleanup.everything')}
             </Button>
           </div>

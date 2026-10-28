@@ -317,14 +317,47 @@ describe('Game', () => {
     const result = await game.removeDockerData();
     expect(clean).toHaveBeenCalledWith('everything');
     // A failure is reported, and the rest still goes.
-    expect(result.failed).toEqual([{ name: 'bugdetective-qa-cache', reason: 'Error response from daemon: bugdetective-qa-cache is in use' }]);
+    expect(result.failed).toEqual([{ kind: 'volume', name: 'bugdetective-qa-cache', reason: 'Error response from daemon: bugdetective-qa-cache is in use' }]);
     expect(result.removed).toBe(6);
+    expect(result.workspaceKept).toBe(false);
     expect(game.current.createdAt).not.toBe(firstGame);
     expect(game.current.tickets).toEqual([]);
     expect(game.current.reviewSession).toBeNull();
     expect(game.current.settings.language).toBe('pt');
     // The images are gone too: the next assignment needs the downloads again.
     expect(game.snapshot().environment?.ready).toBe(false);
+  });
+
+  it('keeps the game when the volume with the code could not be removed', async () => {
+    const { game } = createGame({ scenario: { cleanupFails: ['bugdetective-workspace'] } });
+    await game.init();
+    await game.nextAssignment();
+    const createdAt = game.current.createdAt;
+    const result = await game.removeDockerData();
+    expect(result.workspaceKept).toBe(true);
+    expect(result.failed.map((item) => `${item.kind} ${item.name}`)).toEqual(['container bugdetective-workspace', 'volume bugdetective-workspace']);
+    expect(game.current.createdAt).toBe(createdAt);
+    expect(game.current.currentTicket).toBe(1);
+  });
+
+  it('runs the whole removal as one task: no other action starts in between', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    let release!: () => void;
+    const clean = runtime.cleanDocker.bind(runtime);
+    vi.spyOn(runtime, 'cleanDocker').mockImplementation(async (scope) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return clean(scope);
+    });
+    const removal = game.removeDockerData();
+    await vi.waitFor(() => expect(game.snapshot().busy).toBe('removingDocker'));
+    await expect(game.removeDockerData()).rejects.toMatchObject({ code: 'busy' });
+    await expect(game.cleanDockerLeftovers()).rejects.toMatchObject({ code: 'busy' });
+    release();
+    await removal;
+    expect(game.snapshot().busy).toBeNull();
   });
 
   it('refuses to remove everything while QA runs or Docker is stopped', async () => {

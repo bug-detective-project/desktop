@@ -11,6 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Language, QaResult } from '../../shared/types.ts';
+import { isQaContainer } from './cleanup.ts';
 import { readTar } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
 import { LABEL, mountArg } from './docker.ts';
@@ -257,7 +258,7 @@ export class QaRunner {
   /** Removes QA containers left behind by a crash. */
   async cleanupLeftovers(): Promise<void> {
     for (const name of await this.docker.containersWithRole('qa')) {
-      if (name.startsWith(`${this.names.prefix}-qa-`)) {
+      if (isQaContainer(name, this.names.prefix)) {
         await this.docker.removeContainer(name);
       }
     }

@@ -418,7 +418,14 @@
       "partialTitle": "Some items were not removed",
       "partial_one": "{{removed}} removed. Docker could not remove 1 item:",
       "partial_other": "{{removed}} removed. Docker could not remove {{count}} items:",
-      "restartHint": "If Docker Desktop seems stuck, restart it (or your computer) and run the cleanup again."
+      "restartHint": "If Docker Desktop seems stuck, restart it (or your computer) and run the cleanup again.",
+      "kinds": {
+        "container": "Container",
+        "volume": "Volume",
+        "image": "Image"
+      },
+      "gameKept": "Your progress was kept: the volume with your code could not be removed.",
+      "gameReset": "A new game has started."
     }
   },
   "errors": {

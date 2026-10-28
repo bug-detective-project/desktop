@@ -222,12 +222,13 @@ export class DockerRuntime implements GameRuntime {
         await docker.build(this.platform.dockerHostPath(join(this.contextRoot, name)), tag, `${name}-image`, (line) => onLine(line));
       }
     }
-    // Images of older app versions are not needed any more (an image a container still uses stays).
+    // The workspace container moves to the new image first: the image of an older version is then
+    // free and goes away with the other leftovers (an image a container still uses stays).
+    const workspace = await this.runningWorkspace();
     const old = await this.cleanDocker('leftovers').catch(() => null);
     if (old && old.removed > 0) {
       onLine(`» Removed ${old.removed} item(s) left by older versions`);
     }
-    const workspace = await this.runningWorkspace();
     if (!(await workspace.hasRepository())) {
       return;
     }
@@ -290,8 +291,11 @@ export class DockerRuntime implements GameRuntime {
         }
         result.removed += 1;
       } catch (error) {
-        result.failed.push({ name: target.name, reason: cleanupReason(error) });
+        result.failed.push({ kind: target.kind, name: target.name, reason: cleanupReason(error) });
       }
+    }
+    if (scope === 'everything') {
+      result.workspaceKept = await docker.volumeExists(this.names.volume);
     }
     return result;
   }

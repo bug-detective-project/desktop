@@ -418,7 +418,14 @@
       "partialTitle": "Alguns itens não foram removidos",
       "partial_one": "{{removed}} removidos. O Docker não conseguiu remover 1 item:",
       "partial_other": "{{removed}} removidos. O Docker não conseguiu remover {{count}} itens:",
-      "restartHint": "Se o Docker Desktop parecer travado, reinicie-o (ou o computador) e rode a limpeza de novo."
+      "restartHint": "Se o Docker Desktop parecer travado, reinicie-o (ou o computador) e rode a limpeza de novo.",
+      "kinds": {
+        "container": "Container",
+        "volume": "Volume",
+        "image": "Imagem"
+      },
+      "gameKept": "Seu progresso foi mantido: o volume com o seu código não pôde ser removido.",
+      "gameReset": "Um novo jogo começou."
     }
   },
   "errors": {

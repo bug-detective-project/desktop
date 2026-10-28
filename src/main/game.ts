@@ -418,31 +418,41 @@ export class Game {
     await this.options.reviews.clear();
     this.titles = {};
     this.hintsTotal = {};
+    // Nothing of the old game is recovered or reported in the new one.
+    this.recoverReview = false;
+    this.reviewNotice = null;
     await this.commit({ ...fresh, settings: { ...fresh.settings, theme, qaTimeoutSeconds } });
   }
 
   /** "Clean up leftovers": QA leftovers and images of older versions. The player's work stays. */
   async cleanDockerLeftovers(): Promise<DockerCleanup> {
-    await this.requireDocker();
-    const result = await this.exclusive('cleaningDocker', () => this.options.runtime.cleanDocker('leftovers'));
-    await this.refreshEnvironment().catch(() => {});
-    return result;
+    return this.exclusive('cleaningDocker', async () => {
+      await this.requireDocker();
+      const result = await this.options.runtime.cleanDocker('leftovers');
+      await this.refreshEnvironment().catch(() => {});
+      return result;
+    });
   }
 
   /**
    * "Remove everything from Docker": every container, volume and image of the app, the player's
    * code included, then a new game (a game without its code cannot go on; a backup can be restored).
-   * A checked-out review is not returned first: its branch goes away with the rest.
+   * The game is kept when the volume with the code could not be removed. A checked-out review is not
+   * returned first: its branch goes away with the rest. Everything runs inside one exclusive task,
+   * so no other action (nor the start-up review recovery) runs in between.
    */
   async removeDockerData(): Promise<DockerCleanup> {
-    if (this.busy || this.qaRun) {
-      throw new GameError('busy');
-    }
-    await this.requireDocker();
-    const result = await this.exclusive('removingDocker', () => this.options.runtime.cleanDocker('everything'));
-    await this.startOver();
-    await this.refreshEnvironment().catch(() => {});
-    return result;
+    return this.exclusive('removingDocker', async () => {
+      await this.requireDocker();
+      // A recovery started just before (Docker came back) finishes first: it works in the container about to go.
+      await this.returning?.catch(() => {});
+      const result = await this.options.runtime.cleanDocker('everything');
+      if (!result.workspaceKept) {
+        await this.startOver();
+      }
+      await this.refreshEnvironment().catch(() => {});
+      return result;
+    });
   }
 
   async markInboxRead(id: string): Promise<void> {

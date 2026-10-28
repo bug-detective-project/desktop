@@ -1,7 +1,10 @@
 /**
  * Which Docker resources a cleanup removes. Everything the app creates carries the
- * `bugdetective.role` label; names add the resource prefix (containers, volumes) or the image
- * repository, so a cleanup never touches another program's resources, nor a test run's.
+ * `bugdetective.role` label, and a cleanup only takes labelled resources whose name starts with
+ * the resource prefix (containers, volumes) or whose image repository is one of the app's, so
+ * another program's resources are never touched. A longer prefix that starts with this one (a
+ * test run's "bugdetective-test-…") counts as the app's for "everything", and labelled images
+ * without a tag are always removed, whichever app version built them.
  */
 import type { DockerCleanupScope } from '../../shared/api.ts';
 
@@ -29,6 +32,12 @@ export interface CleanupPlanOptions {
 }
 
 const repository = (ref: string) => ref.slice(0, ref.lastIndexOf(':'));
+const untagged = (ref: string) => ref.endsWith(':<none>');
+
+/** A container a QA run leaves behind: the run itself, the copy helper or the dependency installer. */
+export function isQaContainer(name: string, prefix: string): boolean {
+  return name.startsWith(`${prefix}-qa-`);
+}
 
 /**
  * The resources to remove, containers first (they hold volumes and images), then volumes, then images.
@@ -41,12 +50,12 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
   const repositories = new Set(options.currentImages.map(repository));
   const current = new Set(options.currentImages);
 
-  const containers = found.containers.filter((name) => ours(name) && (everything || name.startsWith(`${options.prefix}-qa-`)));
+  const containers = found.containers.filter((name) => ours(name) && (everything || isQaContainer(name, options.prefix)));
   const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume));
   const images = found.images.filter(({ ref }) => {
-    // Untagged images with the app's label are what a rebuild leaves behind.
-    if (ref === '<none>:<none>') {
-      return true;
+    // Untagged images with the app's label ("<none>:<none>", or "repository:<none>") are what a rebuild leaves behind.
+    if (untagged(ref)) {
+      return repository(ref) === '<none>' || repositories.has(repository(ref));
     }
     return repositories.has(repository(ref)) && (everything || !current.has(ref));
   });
@@ -54,7 +63,8 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
   return [
     ...containers.map((name) => ({ kind: 'container' as const, name })),
     ...volumes.map((name) => ({ kind: 'volume' as const, name })),
-    // An untagged image is removed by id; a tagged one by its tag, so a shared id keeps its other tags.
-    ...images.map(({ ref, id }) => ({ kind: 'image' as const, name: ref === '<none>:<none>' ? id : ref })),
+    // An untagged image is removed by id ("repository:<none>" is no valid reference); a tagged one by
+    // its tag, so an id shared with another tag keeps that tag.
+    ...images.map(({ ref, id }) => ({ kind: 'image' as const, name: untagged(ref) ? id : ref })),
   ];
 }

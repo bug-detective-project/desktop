@@ -3,6 +3,7 @@
  * app carry the `bugdetective.role` label so cleanup never touches anything else.
  */
 import type { Readable } from 'node:stream';
+import type { LabelledResources } from './cleanup.ts';
 import { CommandError, runChecked } from './process.ts';
 import type { CommandRunner, RunOptions, RunResult } from './process.ts';
 
@@ -155,7 +156,7 @@ export class Docker {
   }
 
   /** Every container, volume and image carrying the app's label, whatever its role. */
-  async labelled(): Promise<{ containers: string[]; volumes: string[]; images: { ref: string; id: string }[] }> {
+  async labelled(): Promise<LabelledResources> {
     const filter = ['--filter', `label=${LABEL}`];
     const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
     const [containers, volumes, images] = await Promise.all([

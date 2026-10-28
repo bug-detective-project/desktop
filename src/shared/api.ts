@@ -59,7 +59,9 @@ export type DockerCleanupScope = 'leftovers' | 'everything';
 /** What a Docker cleanup removed, and what it could not remove (with Docker's reason). */
 export interface DockerCleanup {
   removed: number;
-  failed: { name: string; reason: string }[];
+  failed: { kind: 'container' | 'volume' | 'image'; name: string; reason: string }[];
+  /** "everything" only: the volume with the player's code is still there, so the game was kept. */
+  workspaceKept?: boolean;
 }
 
 /**
