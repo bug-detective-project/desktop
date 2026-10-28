@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
-import type { DiskUsageItem, EnvironmentItem, EnvironmentReport } from '../shared/api.ts';
+import type { DiskUsageItem, EnvironmentItem, EnvironmentReport, ReviewComparison } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
 import { DockerUnavailableError } from './services/docker.ts';
@@ -15,7 +15,7 @@ import type { Environment } from './services/prerequisites.ts';
 import type { PrerequisiteReport } from '../shared/api.ts';
 import { QaRunner } from './services/qa.ts';
 import { Workspace, resourceNames } from './services/workspace.ts';
-import type { ResourceNames, WorkspacePorts } from './services/workspace.ts';
+import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 export type LineHandler = (line: string) => void;
 
@@ -59,6 +59,23 @@ export interface GameRuntime {
 
   runQa(request: QaRequest): Promise<QaResult>;
   cleanupQaLeftovers(): Promise<void>;
+  /** The files the last QA run tested (its own copy of the workspace). */
+  testedFiles(): Promise<ArchiveFile[]>;
+
+  /** The stage commit with the reference patch applied. */
+  referenceFiles(stage: number, patch: string): Promise<ArchiveFile[]>;
+  /** Creates or recreates the approved-snapshot tag and the review branch. */
+  buildReview(build: ReviewBuild): Promise<ReviewCommits>;
+  reviewRefs(ticket: number): Promise<{ branch: string | null; tag: string | null }>;
+  /** The comparison diffs, computed by git from the review commits. */
+  reviewComparison(stage: number, commits: ReviewCommits, excludes: readonly string[]): Promise<ReviewComparison>;
+  reviewReturnPoint(): Promise<ReturnPoint>;
+  reviewSaveWork(message: string, excludes: readonly string[]): Promise<string | null>;
+  headCommit(): Promise<{ commit: string; parent: string | null; subject: string }>;
+  reviewSwitch(ticket: number, excludesFile: string): Promise<void>;
+  reviewReturn(request: ReturnRequest): Promise<ReturnResult>;
+  /** Opens VS Code attached to the workspace, reusing a window already open on it. */
+  openVSCodeReview(): Promise<void>;
 
   bundle(): Promise<Uint8Array | null>;
   /** Replaces the workspace volume with the repository in `bundle`, checked out at `branch`. */
@@ -282,6 +299,62 @@ export class DockerRuntime implements GameRuntime {
       throw new Error('VS Code was not found');
     }
     await vscode.openAttached(workspace.containerName);
+  }
+
+  async testedFiles() {
+    return (await this.qa()).testedFiles();
+  }
+
+  async referenceFiles(stage: number, patch: string) {
+    return (await this.runningWorkspace()).referenceFiles(stage, patch);
+  }
+
+  async buildReview(build: ReviewBuild) {
+    return (await this.runningWorkspace()).buildReview(build);
+  }
+
+  async reviewRefs(ticket: number) {
+    return (await this.runningWorkspace()).reviewRefs(ticket);
+  }
+
+  async reviewComparison(stage: number, commits: ReviewCommits, excludes: readonly string[]): Promise<ReviewComparison> {
+    const workspace = await this.runningWorkspace();
+    const baseline = `refs/tags/stage-${stage}`;
+    return {
+      solutions: await workspace.diff(commits.snapshot, commits.reference),
+      solutionsIgnoringWhitespace: await workspace.diff(commits.snapshot, commits.reference, { ignoreWhitespace: true }),
+      baseline: await workspace.diff(baseline, commits.approved, { pathspecs: excludes }),
+      baselineIgnoringWhitespace: await workspace.diff(baseline, commits.approved, { ignoreWhitespace: true, pathspecs: excludes }),
+    };
+  }
+
+  async reviewReturnPoint() {
+    return (await this.runningWorkspace()).reviewReturnPoint();
+  }
+
+  async reviewSaveWork(message: string, excludes: readonly string[]) {
+    return (await this.runningWorkspace()).reviewSaveWork(message, excludes);
+  }
+
+  async headCommit() {
+    return (await this.runningWorkspace()).headCommit();
+  }
+
+  async reviewSwitch(ticket: number, excludesFile: string) {
+    await (await this.runningWorkspace()).reviewSwitch(ticket, excludesFile);
+  }
+
+  async reviewReturn(request: ReturnRequest) {
+    return (await this.runningWorkspace()).reviewReturn(request);
+  }
+
+  async openVSCodeReview() {
+    const workspace = await this.runningWorkspace();
+    const { vscode } = await this.env();
+    if (!vscode) {
+      throw new Error('VS Code was not found');
+    }
+    await vscode.openAttached(workspace.containerName, { reuseWindow: true });
   }
 
   async runQa(request: QaRequest) {

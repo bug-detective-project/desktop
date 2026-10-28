@@ -5,7 +5,7 @@
  * passed as positional arguments ("$1", "$2"), never interpolated into the script.
  */
 import { createHash } from 'node:crypto';
-import { writeTar } from './content/archive.ts';
+import { readTar, writeTar } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
 import { LABEL, mountArg } from './docker.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
@@ -19,6 +19,8 @@ export interface ResourceNames {
   volume: string;
   vscodeVolume: string;
   cacheVolume: string;
+  /** The copy of the workspace that QA tests; after a pass, the approved snapshot is read from it. */
+  qaInputVolume: string;
 }
 
 /** Docker resource names. Tests use another prefix so they never touch a player's volume. */
@@ -32,6 +34,7 @@ export function resourceNames(prefix = 'bugdetective'): ResourceNames {
     volume: `${prefix}-workspace`,
     vscodeVolume: `${prefix}-vscode-server`,
     cacheVolume: `${prefix}-qa-cache`,
+    qaInputVolume: `${prefix}-qa-input`,
   };
 }
 /** Container ports: the forwarder in front of Vite, and the Express API. */
@@ -77,7 +80,8 @@ git rev-parse "refs/tags/stage-$stage^{commit}"`,
   /**
    * Makes the repository belong to this game. Player branches and uncommitted work left by another
    * game (an earlier playthrough on this computer, or a build without game ids) are archived, never
-   * deleted: work goes to a stash, branches are renamed to archive/<time>/player/ticket-N.
+   * deleted: work goes to a stash, branches are renamed to archive/<time>/player/ticket-N (review
+   * branches and approved-snapshot tags too, under archive/<time>/).
    * Prints the number of archived branches.
    */
   claimForGame: `set -eu
@@ -92,6 +96,13 @@ count=0
 for ref in $(git for-each-ref --format='%(refname:short)' refs/heads/player/); do
   git branch -m "$ref" "archive/$stamp/$ref"
   count=$((count + 1))
+done
+# Reviews belong to the game they came from: archived with the player branches, never shown in a new game.
+for ref in $(git for-each-ref --format='%(refname:short)' refs/heads/review/ refs/heads/review-edits/); do
+  git branch -m "$ref" "archive/$stamp/$ref"
+done
+for ref in $(git for-each-ref --format='%(refname:short)' refs/tags/qa-approved/); do
+  git tag "archive/$stamp/$ref" "$ref" && git tag -d "$ref" >/dev/null
 done
 # Leave HEAD on the stage history, so the next checkout starts from a clean tree.
 if git rev-parse -q --verify refs/heads/bugdetective/stages >/dev/null; then
@@ -144,6 +155,127 @@ GIT_INDEX_FILE="$idx" git add -A
 GIT_INDEX_FILE="$idx" git diff --cached --no-color --no-ext-diff --no-renames "stage-$stage" -- . ':(exclude)package-lock.json'
 rm -f "$idx"`,
 
+  /** The reference of a ticket: the stage commit plus its reference patch (stdin), as a tar of the whole tree. */
+  referenceTree: `set -eu
+stage="$1"; idx="/tmp/bugdetective-reference-$stage.index"; patch="/tmp/bugdetective-reference-$stage.patch"
+cat > "$patch"
+cd ${WORKSPACE_DIR}
+rm -f "$idx"
+GIT_INDEX_FILE="$idx" git read-tree "refs/tags/stage-$stage^{commit}"
+GIT_INDEX_FILE="$idx" git apply --cached --whitespace=nowarn "$patch"
+tree=$(GIT_INDEX_FILE="$idx" git write-tree)
+rm -f "$idx" "$patch"
+git archive --format=tar "$tree"`,
+
+  /**
+   * Builds the approved-snapshot tag and the two-commit review branch from a tar on stdin with
+   * snapshot/ (the files QA tested, already filtered), reference/ and settings.json (the read-only
+   * VS Code settings). Excluded paths (the remaining arguments, as pathspecs) and the settings file
+   * keep the reference's version in the snapshot commit. Commits use a fixed date, so rebuilding
+   * from the same data gives the same commits. Prints the approved, reference and snapshot commits.
+   */
+  buildReview: `set -eu
+n="$1"; date="$2"; approvedMessage="$3"; referenceMessage="$4"; snapshotMessage="$5"; shift 5
+tmp="/tmp/bugdetective-review-$n"
+rm -rf "$tmp"; mkdir -p "$tmp/snapshot" "$tmp/reference"
+tar -x -C "$tmp"
+cd ${WORKSPACE_DIR}
+if [ "$(git symbolic-ref -q HEAD || true)" = "refs/heads/review/ticket-$n" ]; then
+  echo "The review is checked out" >&2; exit 3
+fi
+base=$(git rev-parse "refs/tags/stage-$n^{commit}")
+export GIT_DIR=${WORKSPACE_DIR}/.git GIT_INDEX_FILE="$tmp/index"
+export GIT_AUTHOR_NAME="Bug Detective" GIT_AUTHOR_EMAIL="review@bugdetective.invalid" GIT_AUTHOR_DATE="$date"
+export GIT_COMMITTER_NAME="Bug Detective" GIT_COMMITTER_EMAIL="review@bugdetective.invalid" GIT_COMMITTER_DATE="$date"
+cd "$tmp/snapshot"
+GIT_WORK_TREE="$tmp/snapshot" git add -A -f -- .
+approved=$(git commit-tree "$(git write-tree)" -p "$base" -m "$approvedMessage")
+rm -f "$GIT_INDEX_FILE"
+cd "$tmp/reference"
+GIT_WORK_TREE="$tmp/reference" git add -A -f -- .
+settings=$(git hash-object -w "$tmp/settings.json")
+git update-index --add --cacheinfo "100644,$settings,.vscode/settings.json"
+reference=$(git commit-tree "$(git write-tree)" -p "$base" -m "$referenceMessage")
+cd "$tmp/snapshot"
+GIT_WORK_TREE="$tmp/snapshot" git add -A -f -- . ':(exclude,literal).vscode/settings.json' "$@"
+snapshot=$(git commit-tree "$(git write-tree)" -p "$reference" -m "$snapshotMessage")
+git tag -f "qa-approved/ticket-$n" "$approved" >/dev/null
+git update-ref "refs/heads/review/ticket-$n" "$snapshot"
+cd /; rm -rf "$tmp"
+echo "$approved $reference $snapshot"`,
+
+  /** Where the player is before a review: "<branch or ->\n<HEAD>\n<index tree>\n<core.excludesFile or ->". */
+  reviewReturnPoint: `set -eu
+cd ${WORKSPACE_DIR}
+branch=$(git symbolic-ref -q --short HEAD || echo -)
+head=$(git rev-parse HEAD)
+index=$(git write-tree)
+excludes=$(git config --get core.excludesFile || echo -)
+printf '%s\n%s\n%s\n%s\n' "$branch" "$head" "$index" "$excludes"`,
+
+  /**
+   * Saves uncommitted and untracked work as a temporary commit on the current branch (never a
+   * stash). Excluded paths (arguments) are never added. Prints the commit, or "-" when nothing changed.
+   */
+  reviewSaveWork: `set -eu
+message="$1"; shift
+cd ${WORKSPACE_DIR}
+git add -A -- . "$@"
+if git diff --cached --quiet; then echo -; exit 0; fi
+git -c core.hooksPath=/dev/null commit -q --no-verify -m "$message"
+git rev-parse HEAD`,
+
+  /** Checks out the review; excluded files are hidden from Source Control meanwhile (stdin: the excludes file). */
+  reviewSwitch: `set -eu
+n="$1"
+cd ${WORKSPACE_DIR}
+cat > .git/bugdetective-review-exclude
+git config core.excludesFile "${WORKSPACE_DIR}/.git/bugdetective-review-exclude"
+git checkout -q "review/ticket-$n"`,
+
+  /**
+   * Returns to the player's code. Safe to run again after an interruption at any point:
+   * 1. changes made on the review branch are committed to review-edits/ticket-N-<stamp>;
+   * 2. the previous core.excludesFile comes back; 3. the player's branch (or detached HEAD) is checked out;
+   * 4. the temporary commit is undone with a mixed reset and the index is restored, only while it is the tip.
+   * Prints "edits" and "restored" or "tipMoved" lines.
+   */
+  reviewReturn: `set -eu
+n="$1"; branch="$2"; head="$3"; wip="$4"; index="$5"; excludes="$6"; stamp="$7"; editsMessage="$8"; shift 8
+cd ${WORKSPACE_DIR}
+current=$(git symbolic-ref -q --short HEAD || true)
+case "$current" in
+  "review/ticket-$n"|"review-edits/ticket-$n-"*)
+    if [ -n "$(git status --porcelain -- . "$@")" ]; then
+      if [ "$current" = "review/ticket-$n" ]; then git checkout -q -b "review-edits/ticket-$n-$stamp"; fi
+      git add -A -- . "$@"
+      git -c core.hooksPath=/dev/null commit -q --no-verify -m "$editsMessage"
+      echo edits
+    fi;;
+esac
+if [ "$excludes" = - ]; then git config --unset core.excludesFile || true; else git config core.excludesFile "$excludes"; fi
+rm -f .git/bugdetective-review-exclude
+tip="$head"; if [ "$wip" != - ]; then tip="$wip"; fi
+if [ "$branch" = - ]; then
+  # A detached HEAD: go back to it unless HEAD is already detached there (an interrupted return).
+  if [ -n "$current" ]; then git checkout -q --detach "$tip"; fi
+elif [ "$current" != "$branch" ]; then
+  git checkout -q "$branch"
+fi
+if [ "$wip" != - ]; then
+  now=$(git rev-parse HEAD)
+  if [ "$now" = "$wip" ]; then
+    git reset -q --mixed "$head"
+    now="$head"
+  fi
+  if [ "$now" = "$head" ]; then
+    git read-tree "$index"
+    echo restored
+  else
+    echo tipMoved
+  fi
+fi`,
+
   installDepsFromCache: `set -eu
 key="$1"
 cd ${WORKSPACE_DIR}
@@ -178,6 +310,63 @@ git config user.email "developer@supportdesk.invalid"
 git fetch -q /tmp/bugdetective-restore.bundle "refs/*:refs/*"
 git checkout -q -f "$branch"
 rm -f /tmp/bugdetective-restore.bundle`,
+};
+
+export interface ReviewCommits {
+  /** The approved snapshot (tag qa-approved/ticket-N), its parent is the stage commit. */
+  approved: string;
+  /** First commit of review/ticket-N: the reference. */
+  reference: string;
+  /** Tip of review/ticket-N: the approved snapshot on top of the reference. */
+  snapshot: string;
+}
+
+export interface ReviewBuild {
+  ticket: number;
+  /** ISO date used for every commit, so a rebuild gives the same commits. */
+  date: string;
+  messages: { approved: string; reference: string; snapshot: string };
+  snapshot: readonly ArchiveFile[];
+  reference: readonly ArchiveFile[];
+  /** The read-only .vscode/settings.json of both review commits. */
+  settings: string;
+  /** Exclude pathspecs (review configuration). */
+  excludes: readonly string[];
+}
+
+/** Where the player was before a review. */
+export interface ReturnPoint {
+  /** The checked-out branch, or null for a detached HEAD. */
+  branch: string | null;
+  head: string;
+  /** The player's index, restored after the temporary commit is undone. */
+  indexTree: string;
+  /** core.excludesFile before the review, or null when it was not set. */
+  excludesFile: string | null;
+}
+
+export interface ReturnRequest {
+  ticket: number;
+  point: ReturnPoint;
+  wipCommit: string | null;
+  /** Suffix of the branch that keeps changes made while the review was checked out. */
+  stamp: string;
+  editsMessage: string;
+  excludes: readonly string[];
+}
+
+export interface ReturnResult {
+  /** Changes made on the review branch were saved to a review-edits branch. */
+  editsSaved: boolean;
+  /** The temporary commit was no longer the branch tip, so it was left in place. */
+  tipMoved: boolean;
+}
+
+const ticketArg = (ticket: number) => {
+  if (!Number.isInteger(ticket) || ticket < 1 || ticket > 99) {
+    throw new Error(`Invalid ticket: ${ticket}`);
+  }
+  return String(ticket);
 };
 
 export interface WorkspacePorts {
@@ -377,6 +566,97 @@ export class Workspace {
 
   async applyPatch(patch: string): Promise<void> {
     await this.exec(['git', 'apply', '--whitespace=nowarn', '-'], { input: patch, timeoutMs: 60_000 });
+  }
+
+  /** Files of the stage commit with the reference patch applied. */
+  async referenceFiles(stage: number, patch: string): Promise<ArchiveFile[]> {
+    const { stdout } = await this.script('referenceTree', [ticketArg(stage)], { input: patch, timeoutMs: 60_000 });
+    return readTar(stdout);
+  }
+
+  /** Creates (or recreates) the qa-approved/ticket-N tag and the review/ticket-N branch. */
+  async buildReview(build: ReviewBuild): Promise<ReviewCommits> {
+    const tar = await writeTar([
+      ...build.snapshot.map((file) => ({ ...file, path: `snapshot/${file.path}` })),
+      ...build.reference.map((file) => ({ ...file, path: `reference/${file.path}` })),
+      { path: 'settings.json', data: Buffer.from(build.settings), executable: false },
+    ]);
+    const { messages } = build;
+    const { stdout } = await this.script(
+      'buildReview',
+      [ticketArg(build.ticket), build.date, messages.approved, messages.reference, messages.snapshot, ...build.excludes],
+      { input: tar, timeoutMs: 120_000 },
+    );
+    const [approved, reference, snapshot] = stdout.toString('utf8').trim().split('\n').at(-1)!.split(' ');
+    return { approved, reference, snapshot };
+  }
+
+  /** The commits review/ticket-N and qa-approved/ticket-N point at, or null when missing. */
+  async reviewRefs(ticket: number): Promise<{ branch: string | null; tag: string | null }> {
+    const resolve = async (ref: string) => {
+      const result = await this.docker.exec(this.names.container, ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`], {
+        user: 'node',
+        workdir: WORKSPACE_DIR,
+      });
+      return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
+    };
+    const number = ticketArg(ticket);
+    return { branch: await resolve(`refs/heads/review/ticket-${number}`), tag: await resolve(`refs/tags/qa-approved/ticket-${number}`) };
+  }
+
+  /** git diff between two commits, with rename detection. */
+  async diff(from: string, to: string, options: { ignoreWhitespace?: boolean; pathspecs?: readonly string[] } = {}): Promise<string> {
+    const whitespace = options.ignoreWhitespace ? ['--ignore-all-space', '--ignore-cr-at-eol', '--ignore-blank-lines'] : [];
+    return this.git(['diff', '--no-color', '--no-ext-diff', '-M', ...whitespace, from, to, '--', '.', ...(options.pathspecs ?? [])], {
+      timeoutMs: 60_000,
+    });
+  }
+
+  async reviewReturnPoint(): Promise<ReturnPoint> {
+    const { stdout } = await this.script('reviewReturnPoint', [], { timeoutMs: 60_000 });
+    const [branch, head, indexTree, excludesFile] = stdout.toString('utf8').trim().split('\n');
+    return { branch: branch === '-' ? null : branch, head, indexTree, excludesFile: excludesFile === '-' ? null : excludesFile };
+  }
+
+  /** Commits uncommitted and untracked work, except excluded paths. Returns the commit, or null when nothing changed. */
+  async reviewSaveWork(message: string, excludes: readonly string[]): Promise<string | null> {
+    const { stdout } = await this.script('reviewSaveWork', [message, ...excludes], { timeoutMs: 60_000 });
+    const commit = stdout.toString('utf8').trim().split('\n').at(-1)!;
+    return commit === '-' ? null : commit;
+  }
+
+  /** HEAD's commit, parent and subject: recognizes a temporary commit left by an interrupted review. */
+  async headCommit(): Promise<{ commit: string; parent: string | null; subject: string }> {
+    const [commit, parents, subject = ''] = (await this.git(['log', '-1', '--format=%H%n%P%n%s', 'HEAD'])).split('\n');
+    return { commit, parent: parents.split(' ')[0] || null, subject };
+  }
+
+  async reviewSwitch(ticket: number, excludesFile: string): Promise<void> {
+    await this.script('reviewSwitch', [ticketArg(ticket)], { input: excludesFile, timeoutMs: 60_000 });
+  }
+
+  async reviewReturn(request: ReturnRequest): Promise<ReturnResult> {
+    const { point } = request;
+    if (!/^[0-9TZ]{8,20}$/.test(request.stamp)) {
+      throw new Error(`Invalid stamp: ${request.stamp}`);
+    }
+    const { stdout } = await this.script(
+      'reviewReturn',
+      [
+        ticketArg(request.ticket),
+        point.branch ?? '-',
+        point.head,
+        request.wipCommit ?? '-',
+        point.indexTree,
+        point.excludesFile ?? '-',
+        request.stamp,
+        request.editsMessage,
+        ...request.excludes,
+      ],
+      { timeoutMs: 60_000 },
+    );
+    const lines = stdout.toString('utf8').split('\n');
+    return { editsSaved: lines.includes('edits'), tipMoved: lines.includes('tipMoved') };
   }
 
   /** "<node version>\0<platform>\0<arch>" of the images, part of the dependency cache key. */

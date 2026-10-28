@@ -8,6 +8,8 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
+import { loadReviewConfig } from '../../src/main/services/review/config.ts';
+import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
@@ -35,6 +37,8 @@ function createGame(options: { scenario?: object; content?: ContentSource } = {}
   const game = new Game({
     store: new StateStore(dir),
     packages: new PackageStore(join(dir, 'packages')),
+    reviews: new ReviewStore(join(dir, 'reviews')),
+    review: loadReviewConfig('supportdesk'),
     content: options.content ?? localSource(),
     runtime,
     appVersion: '0.1.0',
@@ -109,7 +113,7 @@ describe('Game', () => {
     expect(status(game)).toBe('codeReview');
     const review = await game.ticketContent(1, 'en');
     expect(review.reviewMarkdown).toContain('Code review');
-    expect(review.playerDiff).toContain('fixed by the player');
+    expect(review.playerDiff).toContain('activeEmployees'); // the approved snapshot against the stage
 
     await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'ticketNotDone' });
     await game.acceptReview(1);

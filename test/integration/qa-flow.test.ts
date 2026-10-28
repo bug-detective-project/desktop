@@ -17,6 +17,8 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
+import { loadReviewConfig } from '../../src/main/services/review/config.ts';
+import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import { Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
@@ -34,6 +36,8 @@ function createGame(stateDir = dir) {
   return new Game({
     store: new StateStore(stateDir),
     packages: new PackageStore(join(stateDir, 'packages')),
+    reviews: new ReviewStore(join(stateDir, 'reviews')),
+    review: loadReviewConfig('supportdesk'),
     content: new LocalContentSource({
       repoPath: supportdesk,
       manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),

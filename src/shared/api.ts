@@ -39,7 +39,39 @@ export interface DiskUsageItem {
   bytes: number | null;
 }
 
-export type BusyTask = 'unlocking' | 'starting' | 'installing' | 'qa' | 'exporting' | 'restoring' | 'startingDocker' | null;
+export type BusyTask =
+  | 'unlocking'
+  | 'starting'
+  | 'installing'
+  | 'qa'
+  | 'exporting'
+  | 'restoring'
+  | 'startingDocker'
+  | 'openingReview'
+  | 'closingReview'
+  | null;
+
+/**
+ * What happened when the app brought the player's code back after a review, told in ticket terms:
+ * editsSaved: changes made while the review was checked out were saved separately;
+ * workKept: the temporary commit of their work was no longer the branch tip, so it stays as a commit.
+ */
+export interface ReviewNotice {
+  ticket: number;
+  kind: 'editsSaved' | 'workKept';
+}
+
+/**
+ * The stored comparison of a ticket that passed QA, as unified diffs (git diff -M). "solutions" goes
+ * from the approved snapshot (old side, the left pane) to the reference (new side, the right pane);
+ * "baseline" from the stage the ticket started from to the approved snapshot.
+ */
+export interface ReviewComparison {
+  solutions: string;
+  solutionsIgnoringWhitespace: string;
+  baseline: string;
+  baselineIgnoringWhitespace: string;
+}
 
 export interface Snapshot {
   state: GameState;
@@ -53,6 +85,7 @@ export interface Snapshot {
   environment: EnvironmentReport | null;
   /** Output of the running install or QA, most recent last. */
   log: string[];
+  reviewNotice: ReviewNotice | null;
   contentSource: string;
   appVersion: string;
   versions: { electron: string; node: string; chrome: string };
@@ -102,6 +135,14 @@ export interface BugDetectiveApi {
   revealSolution(ticket: number): Promise<void>;
   acceptReview(ticket: number): Promise<void>;
   markInboxRead(id: string): Promise<void>;
+
+  /** The stored comparison of a ticket in Code Review or Done; works without Docker. */
+  reviewComparison(ticket: number): Promise<ReviewComparison>;
+  /** Saves the player's work, checks out the ticket's review and opens VS Code on it. */
+  openReview(ticket: number): Promise<void>;
+  /** Brings the player's code back ("Back to my code"). */
+  closeReview(): Promise<void>;
+  dismissReviewNotice(): Promise<void>;
 
   ticketContent(ticket: number, language: Language): Promise<TicketContent>;
   workspaceStatus(): Promise<WorkspaceStatus>;

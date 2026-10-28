@@ -4,18 +4,35 @@
  */
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import type { BusyTask, DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport, SaveSummary, Snapshot, TicketContent } from '../shared/api.ts';
+import type {
+  BusyTask,
+  DiskUsageItem,
+  EngineState,
+  EnvironmentReport,
+  PrerequisiteReport,
+  ReviewComparison,
+  ReviewNotice,
+  SaveSummary,
+  Snapshot,
+  TicketContent,
+} from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
 import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS } from '../shared/types.ts';
-import type { Column, GameState, Language, Settings } from '../shared/types.ts';
+import type { Column, GameState, Language, ReviewSession, Settings } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { createSave, readSave } from './services/backup.ts';
+import { fileText } from './services/content/archive.ts';
+import type { ArchiveFile } from './services/content/archive.ts';
 import type { ValidatedSave } from './services/backup.ts';
 import type { ContentSource } from './services/content/source.ts';
 import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
+import { excludeMatcher, excludePathspecs, excludesFileContent } from './services/review/config.ts';
+import type { ReviewConfig } from './services/review/config.ts';
+import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from './services/review/review.ts';
+import type { ReviewMeta, ReviewStore } from './services/review/store.ts';
 import type { StateStore } from './services/state.ts';
 import { playerBranch } from './services/workspace.ts';
 
@@ -31,6 +48,9 @@ export class GameError extends Error {
 export interface GameOptions {
   store: StateStore;
   packages: PackageStore;
+  reviews: ReviewStore;
+  /** The review configuration of the project being played. */
+  review: ReviewConfig;
   content: ContentSource;
   runtime: GameRuntime;
   appVersion: string;
@@ -54,6 +74,10 @@ export class Game {
   private hintsTotal: Record<number, number> = {};
   private qaRun: Promise<void> | null = null;
   private pendingSaves = new Map<string, ValidatedSave & { fileName: string }>();
+  private reviewNotice: ReviewNotice | null = null;
+  /** A review was still checked out when the app started: bring the player's code back once Docker answers. */
+  private recoverReview = false;
+  private returning: Promise<void> | null = null;
 
   constructor(options: GameOptions) {
     this.options = options;
@@ -71,6 +95,7 @@ export class Game {
     if (recovered !== state) {
       await this.options.store.save(recovered);
     }
+    this.recoverReview = recovered.reviewSession !== null;
     await this.loadTicketMeta();
   }
 
@@ -89,6 +114,7 @@ export class Game {
       prerequisites: this.prerequisites,
       environment: this.environment,
       log: this.log,
+      reviewNotice: this.reviewNotice,
       contentSource: `${this.options.content.kind}: ${this.options.content.describe()}`,
       appVersion: this.options.appVersion,
       versions: this.options.versions,
@@ -163,6 +189,10 @@ export class Game {
   async refreshDockerState(): Promise<EngineState> {
     const state = await this.options.runtime.dockerState().catch((): EngineState => 'notRunning');
     this.setDockerState(state);
+    if (state === 'running' && this.recoverReview && !this.busy) {
+      this.recoverReview = false;
+      void this.returnToPlayerCode().catch((error: unknown) => this.appendLog(`» Could not restore your code: ${(error as Error).message}`));
+    }
     return state;
   }
 
@@ -235,6 +265,7 @@ export class Game {
       throw new GameError('noMoreTickets');
     }
     await this.requireDocker();
+    await this.beforePlayerCode();
     await this.exclusive('unlocking', async () => {
       this.appendLog(`» Fetching stage ${ticket} from ${this.options.content.describe()}`);
       const fetched = await this.options.content.fetchStage(ticket);
@@ -277,6 +308,7 @@ export class Game {
     // Validate the move before touching anything.
     this.apply((state, ctx) => rules.playerMove(state, ticket, 'inProgress', ctx));
     await this.requireDocker();
+    await this.beforePlayerCode();
     await this.exclusive('starting', async () => {
       const discarded = await this.options.runtime.resetToStage(ticket);
       if (discarded.changes > 0 || discarded.commits > 0) {
@@ -295,6 +327,7 @@ export class Game {
       throw new GameError('busy', `Busy: ${this.busy}`);
     }
     await this.requireDocker();
+    await this.beforePlayerCode();
     const environment = await this.refreshEnvironment();
     if (!environment.ready) {
       throw new GameError('environmentNotReady');
@@ -332,7 +365,8 @@ export class Game {
         packageDir: packages.dir(ticket),
         onLine: (line) => this.appendLog(line),
       });
-      const playerDiff = result.status === 'passed' ? await runtime.playerDiff(ticket).catch(() => null) : null;
+      // A pass is recorded only with its approved snapshot; if that cannot be saved, QA did not complete.
+      const playerDiff = result.status === 'passed' ? await this.captureApproval(ticket) : null;
       await this.commit(
         this.apply((state, ctx) => rules.recordQaResult(state, ticket, { startedAt, branch, branchWarning, timeoutSeconds, result, playerDiff }, ctx)),
       );
@@ -351,7 +385,12 @@ export class Game {
     await this.commit(this.apply((state, ctx) => rules.revealSolution(state, ticket, this.hintsTotal[ticket] ?? HINTS_PER_TICKET, ctx)));
   }
 
+  /** Accepting uses only the approved snapshot; with Docker stopped, the player's code comes back later. */
   async acceptReview(ticket: number): Promise<void> {
+    this.apply((state, ctx) => rules.acceptReview(state, ticket, ctx));
+    if (this.state.reviewSession && (await this.refreshDockerState()) === 'running') {
+      await this.returnToPlayerCode();
+    }
     await this.commit(this.apply((state, ctx) => rules.acceptReview(state, ticket, ctx)));
   }
 
@@ -363,9 +402,14 @@ export class Game {
     if (this.busy || this.qaRun) {
       throw new GameError('busy');
     }
+    if (this.state.reviewSession) {
+      await this.requireDocker();
+      await this.returnToPlayerCode();
+    }
     const { language, theme, qaTimeoutSeconds } = this.state.settings;
     const fresh = rules.createInitialState(this.ctx(), language);
     await this.options.packages.clear();
+    await this.options.reviews.clear();
     this.titles = {};
     this.hintsTotal = {};
     await this.commit({ ...fresh, settings: { ...fresh.settings, theme, qaTimeoutSeconds } });
@@ -417,6 +461,7 @@ export class Game {
 
   async openVSCode(): Promise<void> {
     await this.requireDocker();
+    await this.beforePlayerCode();
     await this.options.runtime.openVSCode();
   }
 
@@ -436,20 +481,199 @@ export class Game {
   }
 
   // -------------------------------------------------------------------------
+  // Code review: approved snapshot, review branch, automatic checkout and return
+
+  private get excludes(): string[] {
+    return excludePathspecs(this.options.review);
+  }
+
+  /**
+   * After a QA pass: stores the approved snapshot (the files QA tested, after the excludes) and the
+   * reference, creates the tag and the review branch, and computes the comparison. Returns the
+   * player's diff against the stage.
+   */
+  private async captureApproval(ticket: number): Promise<string> {
+    const { runtime, packages, reviews, review } = this.options;
+    this.appendLog('» Saving the approved solution for the code review');
+    const excluded = excludeMatcher(review);
+    const snapshot = (await runtime.testedFiles()).filter((file) => !excluded(file.path));
+    const reference = await runtime.referenceFiles(ticket, (await packages.readText(ticket, 'reference.patch')) ?? '');
+    const meta = { ticket, approvedAt: this.ctx().now, language: this.state.settings.language };
+    const commits = await this.buildReviewBranch(meta, snapshot, reference);
+    const comparison = await runtime.reviewComparison(ticket, commits, this.excludes);
+    // The ticket is still In QA: an earlier pass that failed to record may be replaced.
+    await reviews.save({ meta: { ...meta, commits, comparison }, snapshot, reference }, { replace: true });
+    return comparison.baseline;
+  }
+
+  private buildReviewBranch(meta: Pick<ReviewMeta, 'ticket' | 'approvedAt' | 'language'>, snapshot: ArchiveFile[], reference: ArchiveFile[]) {
+    const projectSettings = reference.find((file) => file.path === '.vscode/settings.json');
+    return this.options.runtime.buildReview({
+      ticket: meta.ticket,
+      date: meta.approvedAt,
+      messages: reviewMessages(meta.language, meta.ticket),
+      snapshot,
+      reference,
+      settings: readOnlySettings(projectSettings ? fileText(projectSettings) : null),
+      excludes: this.excludes,
+    });
+  }
+
+  /** Recreates the tag and the review branch from the stored data when they are missing or moved. */
+  private async ensureReviewBranch(ticket: number): Promise<void> {
+    const stored = await this.options.reviews.load(ticket);
+    if (!stored) {
+      throw new GameError('noReview');
+    }
+    const refs = await this.options.runtime.reviewRefs(ticket);
+    if (refs.branch === stored.meta.commits.snapshot && refs.tag === stored.meta.commits.approved) {
+      return;
+    }
+    this.appendLog('» Rebuilding the review from the saved solution');
+    const commits = await this.buildReviewBranch(stored.meta, stored.snapshot, stored.reference);
+    if (JSON.stringify(commits) !== JSON.stringify(stored.meta.commits)) {
+      await this.options.reviews.save({ ...stored, meta: { ...stored.meta, commits } });
+    }
+  }
+
+  private requireReviewable(ticket: number): void {
+    const current = rules.findTicket(this.state, ticket);
+    if (!current || (current.status !== 'codeReview' && current.status !== 'done') || !this.options.reviews.has(ticket)) {
+      throw new GameError('noReview');
+    }
+  }
+
+  /** The stored comparison; needs no Docker. */
+  async reviewComparison(ticket: number): Promise<ReviewComparison> {
+    this.requireReviewable(ticket);
+    return (await this.options.reviews.comparison(ticket))!;
+  }
+
+  private async saveSession(session: ReviewSession | null): Promise<void> {
+    await this.commit({ ...this.state, reviewSession: session });
+  }
+
+  /**
+   * "Open Review in VS Code": saves the player's work as a temporary commit, checks out the review
+   * and opens VS Code. Any failure brings the player's code back before the error is shown.
+   */
+  async openReview(ticket: number): Promise<void> {
+    this.requireReviewable(ticket);
+    await this.requireDocker();
+    await this.exclusive('openingReview', async () => {
+      const open = this.state.reviewSession;
+      if (open && (open.ticket !== ticket || open.phase !== 'open')) {
+        await this.returnToPlayerCode();
+      }
+      if (!this.state.reviewSession) {
+        this.appendLog('» Preparing the review');
+        await this.ensureReviewBranch(ticket);
+        await this.checkOutReview(ticket);
+      }
+      this.appendLog('» Opening VS Code');
+      try {
+        await this.options.runtime.openVSCodeReview();
+      } catch (error) {
+        await this.returnToPlayerCode();
+        throw new GameError('vscodeFailed', (error as Error).message);
+      }
+    });
+  }
+
+  /** Each step is recorded before it runs, so an interruption is finished or undone on the next start. */
+  private async checkOutReview(ticket: number): Promise<void> {
+    const { runtime } = this.options;
+    try {
+      const returnPoint = await runtime.reviewReturnPoint();
+      let session: ReviewSession = { ticket, phase: 'saving', startedAt: this.ctx().now, returnPoint, wipCommit: null };
+      await this.saveSession(session);
+      session = { ...session, wipCommit: await runtime.reviewSaveWork(WIP_MESSAGE, this.excludes), phase: 'switching' };
+      await this.saveSession(session);
+      await runtime.reviewSwitch(ticket, excludesFileContent(this.options.review));
+      await this.saveSession({ ...session, phase: 'open' });
+    } catch (error) {
+      await this.returnToPlayerCode().catch(() => {});
+      throw new GameError('reviewFailed', (error as Error).message);
+    }
+  }
+
+  /** "Back to my code". */
+  async closeReview(): Promise<void> {
+    if (!this.state.reviewSession) {
+      return;
+    }
+    await this.requireDocker();
+    await this.exclusive('closingReview', () => this.returnToPlayerCode());
+  }
+
+  async dismissReviewNotice(): Promise<void> {
+    this.reviewNotice = null;
+    this.emit();
+  }
+
+  /** Before every action that depends on the player's code: bring it back if a review is checked out. */
+  private async beforePlayerCode(): Promise<void> {
+    if (this.state.reviewSession) {
+      await this.returnToPlayerCode();
+    }
+  }
+
+  /** One return at a time, even when the start-up recovery and an action ask together. */
+  private returnToPlayerCode(): Promise<void> {
+    this.returning ??= this.bringBackPlayerCode().finally(() => {
+      this.returning = null;
+    });
+    return this.returning;
+  }
+
+  /**
+   * Checks the player's branch out again and undoes the temporary commit. Resumes an interrupted
+   * checkout or return: in the saving phase the temporary commit exists only if it is HEAD.
+   */
+  private async bringBackPlayerCode(): Promise<void> {
+    const session = this.state.reviewSession;
+    if (!session) {
+      return;
+    }
+    const { runtime } = this.options;
+    let { wipCommit } = session;
+    if (session.phase === 'saving') {
+      const head = await runtime.headCommit();
+      const point = session.returnPoint.head;
+      wipCommit = head.commit !== point && head.parent === point && head.subject === WIP_MESSAGE ? head.commit : null;
+    }
+    await this.saveSession({ ...session, phase: 'returning', wipCommit });
+    const result = await runtime.reviewReturn({
+      ticket: session.ticket,
+      point: session.returnPoint,
+      wipCommit,
+      stamp: editsStamp(this.ctx().now),
+      editsMessage: reviewMessages(this.state.settings.language, session.ticket).edits,
+      excludes: this.excludes,
+    });
+    if (result.editsSaved || result.tipMoved) {
+      this.reviewNotice = { ticket: session.ticket, kind: result.editsSaved ? 'editsSaved' : 'workKept' };
+    }
+    await this.saveSession(null);
+  }
+
+  // -------------------------------------------------------------------------
   // Export and restore
 
   async exportProgress(file: string): Promise<void> {
     await this.requireDocker();
+    await this.beforePlayerCode();
     await this.exclusive('exporting', async () => {
       const packages = new Map<number, Uint8Array>();
       for (const ticket of this.state.tickets) {
         packages.set(ticket.ticket, await this.options.packages.readZip(ticket.ticket));
       }
+      const reviews = await this.options.reviews.exportFiles();
       const bundle = await this.options.runtime.bundle();
       const at = this.ctx().now;
       // The save carries its own export record, so a restored game starts as backed up.
       const state = { ...this.state, lastExport: { at, path: file } };
-      await writeFileAtomic(file, createSave({ state, bundle, packages }, this.options.appVersion, at));
+      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews }, this.options.appVersion, at));
       await this.commit(state);
     });
   }
@@ -487,6 +711,7 @@ export class Game {
       throw new GameError('busy');
     }
     await this.requireDocker();
+    await this.beforePlayerCode();
     await this.exclusive('restoring', async () => {
       this.pendingSaves.delete(token);
       const current = save.state.currentTicket;
@@ -496,8 +721,10 @@ export class Game {
       for (const [stage, zip] of save.packages) {
         await this.options.packages.save(stage, zip);
       }
-      // A save taken during QA restores as interrupted, like after a crash.
-      await this.commit(rules.recoverInterruptedQa(save.state, this.ctx()));
+      await this.options.reviews.importSave(save.reviews);
+      // A save taken during QA restores as interrupted, like after a crash. Exports always return
+      // from a review first, so a restored workspace never has one checked out.
+      await this.commit({ ...rules.recoverInterruptedQa(save.state, this.ctx()), reviewSession: null });
       this.titles = {};
       await this.loadTicketMeta();
     });

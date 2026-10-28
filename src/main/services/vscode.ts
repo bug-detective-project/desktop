@@ -66,9 +66,13 @@ export class VSCode {
     }
   }
 
-  /** Opens a new VS Code window attached to the container, at the workspace folder. */
-  async openAttached(containerName: string): Promise<void> {
-    const result = await this.run(['--new-window', '--folder-uri', attachedContainerUri(containerName)], 60_000);
+  /**
+   * Opens VS Code attached to the container, at the workspace folder: in a new window, or with
+   * reuseWindow, in the window already open on that folder when there is one.
+   */
+  async openAttached(containerName: string, options: { reuseWindow?: boolean } = {}): Promise<void> {
+    const window = options.reuseWindow ? [] : ['--new-window'];
+    const result = await this.run([...window, '--folder-uri', attachedContainerUri(containerName)], 60_000);
     if (result.code !== 0) {
       throw new Error(`VS Code could not be opened: ${(result.stderr || result.stdout.toString('utf8')).trim()}`);
     }

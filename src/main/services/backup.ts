@@ -4,6 +4,7 @@
  *   state.json           the game state
  *   workspace.bundle     `git bundle` of the workspace repository (player/* branches, stage tags)
  *   packages/stage-N.zip the downloaded stage packages
+ *   reviews/ticket-N/…   the review data of each ticket that passed QA (approved snapshot, reference, comparison)
  */
 import { z } from 'zod';
 import type { RuleContext } from '../../shared/kanban.ts';
@@ -22,7 +23,10 @@ export const saveManifestSchema = z.object({
   appVersion: z.string().max(50),
   schemaVersion: z.number().int().min(1),
   createdAt: z.string(),
-  files: z.record(z.string().regex(/^(state\.json|workspace\.bundle|packages\/stage-\d{1,2}\.zip)$/), z.string().regex(/^[0-9a-f]{64}$/)),
+  files: z.record(
+    z.string().regex(/^(state\.json|workspace\.bundle|packages\/stage-\d{1,2}\.zip|reviews\/ticket-\d{1,2}\/(snapshot\.zip|reference\.zip|review\.json))$/),
+    z.string().regex(/^[0-9a-f]{64}$/),
+  ),
 });
 
 export type SaveManifest = z.infer<typeof saveManifestSchema>;
@@ -33,6 +37,8 @@ export interface SaveContents {
   state: GameState;
   bundle: Uint8Array | null;
   packages: Map<number, Uint8Array>;
+  /** Review data keyed reviews/ticket-N/<file> (older saves have none). */
+  reviews?: Map<string, Uint8Array>;
 }
 
 export function createSave(contents: SaveContents, appVersion: string, now: string): Uint8Array {
@@ -44,6 +50,9 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
   }
   for (const [stage, zip] of [...contents.packages].sort(([a], [b]) => a - b)) {
     files.push({ path: `packages/stage-${stage}.zip`, data: zip, executable: false });
+  }
+  for (const [path, data] of [...(contents.reviews ?? [])].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    files.push({ path, data, executable: false });
   }
   const manifest: SaveManifest = {
     format: 'bug-detective-save',
@@ -58,6 +67,7 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
 
 export interface ValidatedSave extends SaveContents {
   manifest: SaveManifest;
+  reviews: Map<string, Uint8Array>;
 }
 
 /** Validates a .bdsave completely (manifest, checksums, state schema) before anything is restored. */
@@ -127,5 +137,9 @@ export function readSave(bytes: Uint8Array, ctx: RuleContext): ValidatedSave {
       throw new InvalidSaveError(`The save is missing the package for ticket ${ticket.ticket}`);
     }
   }
-  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages };
+  const reviews = new Map<string, Uint8Array>();
+  for (const path of Object.keys(manifest.files).filter((name) => name.startsWith('reviews/'))) {
+    reviews.set(path, byPath.get(path)!.data);
+  }
+  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews };
 }

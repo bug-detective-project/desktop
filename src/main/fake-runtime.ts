@@ -4,10 +4,12 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport } from '../shared/api.ts';
+import type { DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
+import { textFile } from './services/content/archive.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
+import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
 
@@ -22,6 +24,9 @@ interface Scenario {
   branch: string | null;
   /** Simulates Docker stopping in the middle of a session, right after the first unlock. */
   stopDockerAfterUnlock: boolean;
+  /** "identical": the approved solution is exactly the reference (the revealed solution applied). */
+  review: 'different' | 'identical';
+  vscodeFails: boolean;
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -34,7 +39,106 @@ const DEFAULT_SCENARIO: Scenario = {
   qaDelayMs: 300,
   branch: null,
   stopDockerAfterUnlock: false,
+  review: 'different',
+  vscodeFails: false,
 };
+
+const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
+
+/** Approved solution (old side) against the reference (new side), covering every kind of file entry. */
+function solutionsDiff(whitespace: boolean): string {
+  const large = Array.from({ length: 2100 }, (_, index) => `+export const row${index} = ${index};`).join('\n');
+  return [
+    'diff --git a/client/src/pages/TicketDetails.tsx b/client/src/pages/TicketDetails.tsx',
+    'index 1111111..2222222 100644',
+    '--- a/client/src/pages/TicketDetails.tsx',
+    '+++ b/client/src/pages/TicketDetails.tsx',
+    '@@ -74,4 +74,5 @@ export function TicketDetails() {',
+    '   }, [search]);',
+    ' ',
+    '+  const activeEmployees = employees.filter((employee) => employee.active);',
+    '   const position = resultIds.indexOf(Number(id));',
+    '@@ -242,3 +243,3 @@ export function TicketDetails() {',
+    '                 <option value="">Unassigned</option>',
+    '-                {employees.map((employee) => (',
+    '+                {activeEmployees.map((employee) => (',
+    '                   <option key={employee.id} value={employee.id}>',
+    'diff --git a/client/src/api/tickets.ts b/client/src/api/tickets.ts',
+    'index 3333333..4444444 100644',
+    '--- a/client/src/api/tickets.ts',
+    '+++ b/client/src/api/tickets.ts',
+    '@@ -60,3 +60,7 @@ export function updateTicket(id: number, values: TicketFormValues): Promise<Response> {',
+    '-export function readErrorMessage(response: Response): Promise<string | undefined> {',
+    '-  return errorFromBody(response);',
+    '+export async function readErrorMessage(response: Response): Promise<string | undefined> {',
+    '+  try {',
+    '+    const body = await response.json();',
+    '+    return typeof body?.error === \'string\' ? body.error : undefined;',
+    '+  } catch {',
+    ' }',
+    'diff --git a/client/src/api/errors.ts b/client/src/api/errors.ts',
+    'deleted file mode 100644',
+    'index 5555555..0000000',
+    '--- a/client/src/api/errors.ts',
+    '+++ /dev/null',
+    '@@ -1,2 +0,0 @@',
+    '-/** Reads the "error" field of a failed API response. */',
+    '-export async function errorFromBody(response: Response) {}',
+    'diff --git a/client/src/pages/TicketDetails.assignment.test.tsx b/client/src/pages/TicketDetails.assignment.test.tsx',
+    'new file mode 100644',
+    'index 0000000..6666666',
+    '--- /dev/null',
+    '+++ b/client/src/pages/TicketDetails.assignment.test.tsx',
+    '@@ -0,0 +1,2 @@',
+    "+import { describe, it } from 'vitest';",
+    "+describe('assignment', () => it('keeps the previous assignee when the update fails'));",
+    'diff --git a/client/src/helpers.ts b/client/src/utils/helpers.ts',
+    'similarity index 90%',
+    'rename from client/src/helpers.ts',
+    'rename to client/src/utils/helpers.ts',
+    'index 7777777..8888888 100644',
+    '--- a/client/src/helpers.ts',
+    '+++ b/client/src/utils/helpers.ts',
+    '@@ -1 +1 @@',
+    '-export const helper = 1;',
+    '+export const helper = 2;',
+    'diff --git a/client/public/logo.png b/client/public/logo.png',
+    'index 9999999..aaaaaaa 100644',
+    'Binary files a/client/public/logo.png and b/client/public/logo.png differ',
+    'diff --git a/client/src/generated/rows.ts b/client/src/generated/rows.ts',
+    'index bbbbbbb..ccccccc 100644',
+    '--- a/client/src/generated/rows.ts',
+    '+++ b/client/src/generated/rows.ts',
+    '@@ -0,0 +1,2100 @@',
+    large,
+    ...(whitespace
+      ? [
+          'diff --git a/client/src/searchParams.ts b/client/src/searchParams.ts',
+          'index ddddddd..eeeeeee 100644',
+          '--- a/client/src/searchParams.ts',
+          '+++ b/client/src/searchParams.ts',
+          '@@ -1 +1 @@',
+          '-export const SEARCH = "search";   ',
+          '+export const SEARCH = "search";',
+        ]
+      : ['diff --git a/client/src/searchParams.ts b/client/src/searchParams.ts', 'index ddddddd..eeeeeee 100644']),
+    '',
+  ].join('\n');
+}
+
+function baselineDiff(): string {
+  return [
+    'diff --git a/client/src/pages/TicketDetails.tsx b/client/src/pages/TicketDetails.tsx',
+    'index 1111111..2222222 100644',
+    '--- a/client/src/pages/TicketDetails.tsx',
+    '+++ b/client/src/pages/TicketDetails.tsx',
+    '@@ -242,3 +242,3 @@ export function TicketDetails() {',
+    '                 <option value="">Unassigned</option>',
+    '-                {employees.map((employee) => (',
+    '+                {activeEmployees.map((employee) => (',
+    '',
+  ].join('\n');
+}
 
 export class FakeRuntime implements GameRuntime {
   private readonly scenario: Scenario;
@@ -166,6 +270,72 @@ export class FakeRuntime implements GameRuntime {
   async startDevServer() {}
 
   async openVSCode() {}
+
+  async testedFiles() {
+    return [textFile('client/src/App.tsx', 'export {}\n'), textFile('package-lock.json', '{}\n')];
+  }
+
+  async referenceFiles(stage: number) {
+    return [textFile('client/src/App.tsx', `export {} // reference ${stage}\n`)];
+  }
+
+  /** Review branches built, by ticket, for tests. */
+  reviews = new Map<number, ReviewCommits>();
+
+  async buildReview(build: ReviewBuild) {
+    const seed = `${build.ticket}:${build.date}`;
+    const commits = { approved: fakeCommit(`approved ${seed}`), reference: fakeCommit(`reference ${seed}`), snapshot: fakeCommit(`snapshot ${seed}`) };
+    this.reviews.set(build.ticket, commits);
+    return commits;
+  }
+
+  async reviewRefs(ticket: number) {
+    const commits = this.reviews.get(ticket);
+    return { branch: commits?.snapshot ?? null, tag: commits?.approved ?? null };
+  }
+
+  async reviewComparison(): Promise<ReviewComparison> {
+    const identical = this.scenario.review === 'identical';
+    return {
+      solutions: identical ? '' : solutionsDiff(true),
+      solutionsIgnoringWhitespace: identical ? '' : solutionsDiff(false),
+      baseline: baselineDiff(),
+      baselineIgnoringWhitespace: baselineDiff(),
+    };
+  }
+
+  private head = fakeCommit('head');
+
+  async reviewReturnPoint() {
+    return { branch: this.branch, head: this.head, indexTree: fakeCommit('index'), excludesFile: null };
+  }
+
+  async reviewSaveWork() {
+    return null;
+  }
+
+  async headCommit() {
+    return { commit: this.head, parent: null, subject: 'Stage' };
+  }
+
+  /** The branch the player was on while a review is checked out, for tests. */
+  private playerBranchDuringReview: string | null = null;
+
+  async reviewSwitch(ticket: number) {
+    this.playerBranchDuringReview = this.branch;
+    this.branch = `review/ticket-${ticket}`;
+  }
+
+  async reviewReturn(request: ReturnRequest) {
+    this.branch = request.point.branch ?? this.playerBranchDuringReview;
+    return { editsSaved: false, tipMoved: false };
+  }
+
+  async openVSCodeReview() {
+    if (this.scenario.vscodeFails) {
+      throw new Error('VS Code was not found');
+    }
+  }
 
   async runQa(request: QaRequest): Promise<QaResult> {
     const outcome = this.scenario.qa[Math.min(this.qaIndex, this.scenario.qa.length - 1)];

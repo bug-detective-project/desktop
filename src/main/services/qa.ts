@@ -1,6 +1,8 @@
 /**
  * QA orchestration. Each run uses a fresh container from the QA image:
- *   - the workspace volume is mounted read-only; the CLI copies it without node_modules, .git and databases;
+ *   - the app first copies the workspace (without .git and node_modules) into the QA input volume,
+ *     mounted read-only; the CLI copies it again without node_modules, .git and databases. After a
+ *     pass, the approved snapshot is read from that same copy, so it holds exactly the files QA tested;
  *   - the stage package (app data folder) is bind-mounted read-only at /package;
  *   - dependencies come from the cache volume, keyed by the lockfile;
  * then the SupportDesk QA CLI runs with --json. The container is always removed afterward.
@@ -10,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Language, QaResult } from '../../shared/types.ts';
 import { readTar } from './content/archive.ts';
+import type { ArchiveFile } from './content/archive.ts';
 import { LABEL, mountArg } from './docker.ts';
 import type { Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
@@ -17,6 +20,11 @@ import { resourceNames } from './workspace.ts';
 import type { ResourceNames } from './workspace.ts';
 
 const RESULT_PATH = '/tmp/qa-result.json';
+
+/** Replaces the QA input volume's content with the workspace files, as root (the fresh volume is root-owned). */
+const COPY_SCRIPT = `set -eu
+find /input -mindepth 1 -delete
+tar -C /source --exclude=.git --exclude=node_modules -cf - . | tar -C /input -xpf -`;
 /** Extra time on top of the CLI's own timeout for container start-up and cleanup. */
 const OUTER_GRACE_SECONDS = 90;
 
@@ -101,7 +109,7 @@ export class QaRunner {
    * the container), so they run with --network none: offline by design, and the player's code
    * cannot reach anything outside. Installing dependencies does use the network.
    */
-  private baseArgs(name: string, options: { packageDir?: string; network: boolean }): string[] {
+  private baseArgs(name: string, options: { packageDir?: string; network: boolean; source?: string }): string[] {
     const args = [
       'run',
       '--name',
@@ -112,7 +120,7 @@ export class QaRunner {
       '--network',
       options.network ? 'bridge' : 'none',
       '--mount',
-      mountArg({ type: 'volume', src: this.names.volume, dst: '/workspace', readonly: true }),
+      mountArg({ type: 'volume', src: options.source ?? this.names.volume, dst: '/workspace', readonly: true }),
       '--mount',
       mountArg({ type: 'volume', src: this.names.cacheVolume, dst: '/cache' }),
     ];
@@ -123,12 +131,57 @@ export class QaRunner {
     return args;
   }
 
+  /** A short-lived root container from the QA image, with the given volumes, running `command`. */
+  private async helper(mounts: string[], command: string[], timeoutMs: number) {
+    const name = `${this.names.prefix}-qa-copy-${randomUUID().slice(0, 8)}`;
+    try {
+      return await this.docker.run(
+        ['run', '--name', name, '--label', `${LABEL}=qa`, '--network', 'none', '--user', 'root', '--entrypoint', command[0], ...mounts, this.image, ...command.slice(1)],
+        { timeoutMs },
+      );
+    } finally {
+      await this.docker.removeContainer(name);
+    }
+  }
+
+  /** Copies the workspace into the QA input volume: the files this QA run tests. */
+  private async copyWorkspace(): Promise<void> {
+    await this.docker.createVolume(this.names.qaInputVolume, 'qa-input');
+    const copied = await this.helper(
+      [
+        '--mount',
+        mountArg({ type: 'volume', src: this.names.volume, dst: '/source', readonly: true }),
+        '--mount',
+        mountArg({ type: 'volume', src: this.names.qaInputVolume, dst: '/input' }),
+      ],
+      ['sh', '-c', COPY_SCRIPT],
+      5 * 60_000,
+    );
+    if (copied.code !== 0) {
+      throw new QaInfrastructureError(`Copying the workspace for QA failed: ${copied.stderr.trim()}`);
+    }
+  }
+
+  /** The files the last QA run tested (the QA input volume), for the approved snapshot. */
+  async testedFiles(): Promise<ArchiveFile[]> {
+    const read = await this.helper(
+      ['--mount', mountArg({ type: 'volume', src: this.names.qaInputVolume, dst: '/input', readonly: true })],
+      ['tar', '-C', '/input', '-cf', '-', '.'],
+      5 * 60_000,
+    );
+    if (read.code !== 0) {
+      throw new QaInfrastructureError(`Reading the files QA tested failed: ${read.stderr.trim()}`);
+    }
+    return readTar(read.stdout);
+  }
+
   /** Runs QA for one ticket. Returns the CLI's result; throws QaInfrastructureError if QA could not run. */
   async run(request: QaRunRequest): Promise<QaResult> {
+    await this.copyWorkspace();
     const name = `${this.names.prefix}-qa-${randomUUID().slice(0, 8)}`;
     const startedAt = Date.now();
     const args = [
-      ...this.baseArgs(name, { packageDir: request.packageDir, network: false }),
+      ...this.baseArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume }),
       this.image,
       '--ticket',
       String(request.ticket),

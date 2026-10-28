@@ -19,6 +19,8 @@ import { LocalContentSource } from './services/content/local.ts';
 import type { ContentSource } from './services/content/source.ts';
 import { PackageStore } from './services/content/store.ts';
 import { runCommand } from './services/process.ts';
+import { loadReviewConfig } from './services/review/config.ts';
+import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
 
 // Tests and the "clean profile" checks can point the app at another data folder.
@@ -64,6 +66,12 @@ function contentSource(): ContentSource {
   return config.kind === 'local'
     ? new LocalContentSource({ repoPath: config.repoPath, manifestPath: config.manifestPath, runner: runCommand })
     : new GitHubContentSource({ repository: config.repository, release: config.release, baseUrl: config.baseUrl });
+}
+
+/** The learning project the app plays (package.json bugDetective.project), for its review configuration. */
+function projectId(): string {
+  const packageJson = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')) as { bugDetective: { project: string } };
+  return packageJson.bugDetective.project;
 }
 
 const platform: Platform | null = isE2E ? null : currentPlatform();
@@ -152,6 +160,8 @@ async function main(): Promise<void> {
   const game = new Game({
     store: new StateStore(userData),
     packages: new PackageStore(join(userData, 'packages')),
+    reviews: new ReviewStore(join(userData, 'reviews')),
+    review: loadReviewConfig(projectId()),
     content: contentSource(),
     runtime: runtime(),
     appVersion: app.getVersion(),

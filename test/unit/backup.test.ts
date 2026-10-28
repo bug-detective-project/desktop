@@ -26,7 +26,7 @@ describe('export and restore manifest', () => {
     expect(restored.state).toEqual(state);
     expect(Buffer.from(restored.bundle!).toString()).toBe('# v2 git bundle\n');
     expect(sha256Hex(restored.packages.get(1)!)).toBe(sha256Hex(packageZip));
-    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 1, appVersion: '0.1.0', schemaVersion: 2 });
+    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 1, appVersion: '0.1.0', schemaVersion: 3 });
     expect(Object.keys(restored.manifest.files).sort()).toEqual(['packages/stage-1.zip', 'state.json', 'workspace.bundle']);
   });
 
