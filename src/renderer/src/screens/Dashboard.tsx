@@ -879,7 +879,7 @@ function ContactsCard({ language }: { language: Language }) {
   const content = story(language)
   const senior = content.people.senior
   return (
-    <Panel>
+    <Panel data-testid="contacts-card">
       <h3 className="mb-2.5 text-xs font-bold tracking-wider text-foreground uppercase">
         {t('dashboard.contacts')}
       </h3>
@@ -1215,8 +1215,8 @@ export function Dashboard({
           active={active}
           actions={actions}
         />
-        <ContactsCard language={language} />
         <EnvironmentCard snapshot={snapshot} />
+        <ContactsCard language={language} />
       </div>
     </div>
   )

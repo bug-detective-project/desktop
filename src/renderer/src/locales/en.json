@@ -113,7 +113,7 @@
     "allDoneLabel": "Onboarding complete",
     "allDone": "You finished every ticket.",
     "allDoneBody": "Your board and your code are still here to explore.",
-    "current": "Current assignment",
+    "current": "Current task",
     "queued": "Queued",
     "queuedBody": "Your next ticket is ready to download.",
     "noTicket": "No active ticket.",

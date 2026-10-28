@@ -113,6 +113,12 @@ test('the dashboard shows only the current assignment, never how many tickets ex
   try {
     await page.getByTestId('start-playing').click();
     await expect(page.getByTestId('assignment-card')).toContainText('Queued');
+    await expect(page.getByTestId('assignment-card').locator('h3').first()).toHaveText('Current task');
+    // Right column: the current task, then the local environment, then the contacts.
+    const order = await page.locator('[data-testid="assignment-card"], [data-testid="environment-card"], [data-testid="contacts-card"]').evaluateAll((cards) =>
+      cards.map((card) => card.getAttribute('data-testid')),
+    );
+    expect(order).toEqual(['assignment-card', 'environment-card', 'contacts-card']);
     await expect(page.getByTestId('action-dock')).toContainText('Next action');
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
