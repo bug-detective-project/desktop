@@ -18,7 +18,8 @@ src/main/              Electron main process
   runtime.ts           GameRuntime interface and DockerRuntime
   fake-runtime.ts      in-memory runtime for the e2e tests (development builds only)
   devtools.ts          Chrome DevTools shortcuts and React Developer Tools (development builds only)
-  services/            prerequisites, docker, workspace, content/, qa, vscode, state, backup, process
+  services/            prerequisites, docker, workspace, content/, qa, vscode, state, backup, process,
+                       review/ (review configuration, review data store, commit messages and settings)
   platform/            OS-specific code: types.ts (interface), windows.ts, linux.ts (Linux and WSL 2)
 src/preload/           the typed window.bugDetective bridge
 src/renderer/          React UI (Tailwind): app header + Dashboard, Board, Settings, ticket panel, code review
@@ -27,7 +28,8 @@ resources/icon.png     app icon (executable, installer, window); the header logo
 src/shared/            types, the Kanban state machine, QA message selection
 docker/workspace/      the player's workspace image (+ the port forwarder)
 docker/qa/             the QA image (Node 26 + Playwright Chromium + the SupportDesk QA CLI)
-content/               company story and manager messages (story.en.json, story.pt.json)
+content/               company story and manager messages (story.en.json, story.pt.json), and
+                       projects/<projectId>/review.json (each learning project's review configuration)
 tools/                 build-stage-packages.ts, prepare-resources.ts, sync-windows.sh, win.sh
 tools/lint/            the isolated ESLint toolchain (config.js, its own package.json)
 .husky/                git hooks (pre-commit, pre-push)
@@ -120,9 +122,9 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Command | Where | What |
 | --- | --- | --- |
-| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs `../supportdesk-private` with its `stage-N` branches), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller |
-| `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA. Uses the `bugdetective-test-*` resources only. Run `pnpm run build` first. |
-| `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, language, restart, Settings tabs (versions, disk usage, QA limit, last export, locked actions) |
+| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs `../supportdesk-private` with its `stage-N` branches), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller, the code review (review configuration and path matching, comparison parsing, review data, the checkout and return state machine with crash recovery) |
+| `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA (`qa-flow`, `bugdetective-test-*` resources); the code review: approved snapshot from an uncommitted fix, review branch and its recreation, checkout and return with uncommitted/untracked/excluded files, edits on the review branch, crash recovery, a Done review, the return before QA, export/restore and a new game (`review-flow`, `bugdetective-review-test-*` resources). Never touches the player's resources. Run `pnpm run build` first. |
+| `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, code review (layout, file list, split diff, whitespace toggle, identical solutions, review banner, button states), language, restart, Settings tabs (versions, disk usage, QA limit, last export, locked actions) |
 | `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
 
 ## Lint and git hooks
@@ -157,9 +159,11 @@ The installer is per-user (no admin rights), lets the player choose the folder, 
 | --- | --- |
 | State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, migrations in `services/state.ts`) |
 | Stage packages | `%APPDATA%\Bug Detective\packages\stage-N.zip` and `stage-N\` (outside the Docker volume) |
+| Review data | `%APPDATA%\Bug Detective\reviews\ticket-N\` (`snapshot.zip`, `reference.zip`, `review.json`) for every ticket that passed QA; included in exports |
+| Review configuration | `bugDetective.project` in `package.json` picks `content/projects/<projectId>/review.json`: `{ "exclude": ["<glob>", …], "includeTests": true }`. Built-in excludes always apply on top (dependencies, lockfiles, `*.db`, `*.sqlite*`, `dist/`, `build/`, `coverage/`, `.env*`, logs). |
 | Content source | Development: the local SupportDesk checkout (`BUGDETECTIVE_SUPPORTDESK`, `BUGDETECTIVE_MANIFEST` override the paths). Installed app: GitHub, `bugDetective.contentRepository` / `contentRelease` in `package.json`. `%APPDATA%\Bug Detective\content-source.json` overrides both: `{ "kind": "local", "repoPath": "...", "manifestPath": "..." }` or `{ "kind": "github", "repository": "owner/name", "release": "latest" }` |
 | Data folder | `BUGDETECTIVE_USER_DATA` replaces `%APPDATA%\Bug Detective` (tests, clean-profile checks) |
-| Docker resources | Volumes `bugdetective-workspace` (the player's repository), `bugdetective-vscode-server`, `bugdetective-qa-cache` (dependency cache); container `bugdetective-workspace`; images `bugdetective-workspace:<hash>`, `bugdetective-qa:<hash>`; QA containers `bugdetective-qa-*`. All labeled `bugdetective.role`. |
+| Docker resources | Volumes `bugdetective-workspace` (the player's repository), `bugdetective-vscode-server`, `bugdetective-qa-cache` (dependency cache), `bugdetective-qa-input` (the copy of the workspace the last QA run tested); container `bugdetective-workspace`; images `bugdetective-workspace:<hash>`, `bugdetective-qa:<hash>`; QA containers `bugdetective-qa-*`. All labeled `bugdetective.role`. |
 
 ## Publishing stages (GitHub)
 
@@ -179,7 +183,9 @@ Nothing is published automatically. To publish a content release:
 - The repository records its game (`git config bugdetective.game`, the state's `createdAt`). When another game unlocks a stage (a new playthrough on the same computer, or **Settings → New game**), the old `player/*` branches are renamed to `archive/<time>/player/ticket-N` and uncommitted work is stashed. A restore marks the repository with the restored game.
 - Starting a ticket (To Do → In Progress, once per ticket) forces `player/ticket-N` back to `stage-N`: uncommitted changes, untracked files and extra commits are discarded (ignored files such as `node_modules` stay) and `npm run db:reset` reseeds the database. Returning from QA keeps the player's work. This step needs Docker.
 - **Open in VS Code** runs `Code.exe <commit>\resources\app\out\cli.js --new-window --folder-uri vscode-remote://attached-container+<hex of {"containerName":"/bugdetective-workspace"}>/workspaces/supportdesk` with `ELECTRON_RUN_AS_NODE=1`, which is exactly what `bin\code.cmd` does, without going through `cmd.exe`.
-- QA runs in a new container per attempt, with `--network none`, the workspace volume mounted read-only, the stage package bind-mounted read-only, and dependencies from the cache volume. The container is always removed.
+- QA runs in a new container per attempt, with `--network none`, the stage package bind-mounted read-only, and dependencies from the cache volume. The workspace (without `.git` and `node_modules`) is first copied into the `bugdetective-qa-input` volume, which QA mounts read-only; edits made while QA runs do not change what it tests. The containers are always removed.
+- **Code review.** When QA passes, the files QA tested (from `bugdetective-qa-input`, minus the review excludes) become the approved snapshot: stored in the app data folder and as a commit tagged `qa-approved/ticket-N` that is on no player branch. The app also builds `review/ticket-N` with two commits on the stage commit, the reference (stage + `reference.patch`) then the approved snapshot, so the snapshot commit's diff is exactly "reference → your solution". Excluded paths keep the reference's version in both commits, and both carry a `.vscode/settings.json` with `"files.readonlyInclude": { "**": true }` (merged into the project's own settings). Commits use the approval date, so rebuilding from the stored data gives the same commits. The in-app comparison uses diffs computed by git at that moment (with and without whitespace), so it works with Docker stopped.
+- **Open Review in VS Code** commits the player's uncommitted and untracked work on their branch as `Bug Detective: work in progress saved automatically` (excluded paths never included; no stash), records where to return in `state.json`, checks out `review/ticket-N` with a temporary `core.excludesFile` that hides excluded files from Source Control, and opens VS Code without `--new-window` (an open window on the workspace is reused). The Source Control Graph's top commit is the approved solution; opening it shows the multi-file diff. The return (the banner's "Back to my code", and automatically before QA, Open in VS Code, accepting the review, the next assignment, starting a ticket, a new game, export, restore, and on start after a crash) saves edits made on the review branch to `review-edits/ticket-N-<time>`, restores `core.excludesFile`, checks out the player's branch, undoes the temporary commit with a mixed reset and restores the index. Every step is written to the state first, so an interrupted switch is finished on the next start.
 
 ## Security
 
