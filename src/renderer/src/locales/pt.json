@@ -153,16 +153,21 @@
       "done": "Concluído"
     },
     "hint": "Mova seu ticket para Em QA quando a correção estiver pronta. O QA roda primeiro os testes do projeto e depois as verificações do ticket.",
+    "hintTodo": "Mova seu ticket para a coluna Em andamento e comece sua tarefa.",
+    "hintCodeReview": "Revise e aceite o code review para mover a tarefa para Concluído.",
+    "hintDone": "Volte para o Painel e aguarde a nova tarefa.",
     "notAllowed": "Só o QA e o code review movem um card para lá.",
     "notAllowedInQa": "Seu card está em teste. Quando terminar, o QA vai mover o card para a coluna correta.",
     "notAllowedInReview": "Para mover o card para Concluído, aceite o code review.",
+    "notAllowedBackToTodo": "Tarefas em andamento não podem voltar para a coluna A fazer.",
     "emptyColumn": {
       "todo": "Nada esperando. Novas tarefas chegam na sua caixa de entrada.",
       "inProgress": "Arraste seu ticket para cá quando começar a trabalhar nele.",
       "inQa": "Solte seu ticket aqui para rodar o QA.",
       "codeReview": "Tickets aprovados no QA aguardam revisão aqui.",
       "done": "Os tickets chegam aqui quando você aceita a revisão."
-    }
+    },
+    "testing": "Em teste"
   },
   "ticket": {
     "tabs": {

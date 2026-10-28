@@ -8,7 +8,7 @@ import type { Column, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { STAGE } from '../components/stage.ts';
-import { Badge } from '../components/ui.tsx';
+import { Badge, Spinner } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
@@ -24,6 +24,7 @@ function TicketCard({
   title,
   ticketKey,
   active,
+  testing,
   draggable,
   movable,
   onOpen,
@@ -35,6 +36,8 @@ function TicketCard({
   ticketKey: string;
   /** The ticket the player is working on (In Progress). */
   active: boolean;
+  /** QA is running on this ticket right now. */
+  testing: boolean;
   draggable: boolean;
   /** Draggable only so a drop can explain why the card stays (In QA, Code Review): styled as not movable. */
   movable: boolean;
@@ -64,7 +67,17 @@ function TicketCard({
         active ? 'border-primary/40' : 'border-border'
       } ${movable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
-      <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+        {testing && (
+          <span data-testid="card-qa-running">
+            <Badge tone="warn">
+              <Spinner className="size-3" />
+              {t('board.testing')}
+            </Badge>
+          </span>
+        )}
+      </div>
       <p className="mt-1 line-clamp-2 font-medium text-foreground">{title}</p>
       {lastQaFailed(ticket) && (
         <div className="mt-2.5" data-testid="card-qa-failed">
@@ -73,6 +86,25 @@ function TicketCard({
       )}
     </div>
   );
+}
+
+/**
+ * The subtitle follows the ticket the player is working on (the one not Done yet). With only Done
+ * tickets, it points back to the Dashboard for the next assignment, or says every ticket is done.
+ */
+function boardHint(snapshot: Snapshot): string {
+  const { tickets } = snapshot.state;
+  const active = tickets.find((ticket) => ticket.status !== 'done');
+  if (active?.status === 'todo') {
+    return 'board.hintTodo';
+  }
+  if (active?.status === 'codeReview') {
+    return 'board.hintCodeReview';
+  }
+  if (!active && tickets.length > 0) {
+    return snapshot.nextTicket === null ? 'dashboard.allDone' : 'board.hintDone';
+  }
+  return 'board.hint';
 }
 
 export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTicket: (ticket: number) => void }) {
@@ -107,7 +139,14 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
       return;
     }
     if (!isPlayerMoveAllowed(ticket.status, column) || !canMove(ticket)) {
-      const reason = ticket.status === 'inQa' ? 'notAllowedInQa' : ticket.status === 'codeReview' ? 'notAllowedInReview' : 'notAllowed';
+      const reason =
+        ticket.status === 'inQa'
+          ? 'notAllowedInQa'
+          : ticket.status === 'codeReview'
+            ? 'notAllowedInReview'
+            : ticket.status === 'inProgress' && column === 'todo'
+              ? 'notAllowedBackToTodo'
+              : 'notAllowed';
       toast.info(t(`board.${reason}`));
       return;
     }
@@ -122,7 +161,9 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-6" data-testid="board">
       <header className="mb-5">
         <h1 className="text-3xl font-bold tracking-tight">{t('board.title')}</h1>
-        <p className="mt-1 text-base text-muted-foreground">{t('board.hint')}</p>
+        <p className="mt-1 text-base text-muted-foreground" data-testid="board-hint">
+          {t(boardHint(snapshot))}
+        </p>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-5 items-stretch gap-4">
         {COLUMNS.map((column) => {
@@ -176,6 +217,7 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                     title={ticketTitle(snapshot, ticket.ticket, language).text}
                     ticketKey={ticketTitle(snapshot, ticket.ticket, language).key}
                     active={ticket.ticket === state.currentTicket && ticket.status === 'inProgress'}
+                    testing={ticket.status === 'inQa' && snapshot.busy === 'qa'}
                     draggable={canDrag(ticket)}
                     movable={canMove(ticket)}
                     onOpen={() => onOpenTicket(ticket.ticket)}

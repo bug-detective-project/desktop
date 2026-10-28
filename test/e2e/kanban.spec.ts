@@ -19,6 +19,9 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
     await expect(card).toHaveAttribute('data-status', 'todo');
+    // The subtitle follows the column of the ticket being worked on.
+    const hint = page.getByTestId('board-hint');
+    await expect(hint).toHaveText('Move your ticket to In Progress and start your task.');
 
     // Forbidden drops are refused by the UI...
     for (const column of ['inQa', 'codeReview', 'done']) {
@@ -32,7 +35,8 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
 
     await dragCard(page, 1, 'inProgress');
     await expect(card).toHaveAttribute('data-status', 'inProgress');
-    await card.dragTo(page.getByTestId('column-todo'));
+    await expect(hint).toHaveText("Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.");
+    await dropExplains(page, card, 'todo', 'Tickets in progress cannot go back to To Do.');
     await expect(card).toHaveAttribute('data-status', 'inProgress');
 
     // In QA: the card cannot move while QA runs (a drop says QA will move it), then comes back with a comment.
@@ -48,6 +52,7 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     // Second attempt passes: Code Review, then Done after accepting the review.
     await dragCard(page, 1, 'inQa');
     await expect(card).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await expect(hint).toHaveText('Review and accept the code review to move the ticket to Done.');
     for (const column of ['done', 'inProgress']) {
       await dropExplains(page, card, column, 'To move the card to Done, accept the code review.');
       await expect(card).toHaveAttribute('data-status', 'codeReview');
@@ -60,12 +65,15 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     await page.getByTestId('accept-review').click();
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(card).toHaveAttribute('data-status', 'done');
+    await expect(hint).toHaveText('Go back to the Dashboard and wait for your next assignment.');
 
     // One active ticket at a time: the next one is unlocked only now.
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('inbox-message')).toHaveCount(1 + 1);
     await page.getByTestId('next-assignment').click();
     await expect(page.getByTestId('card-2')).toHaveAttribute('data-status', 'todo');
+    // A Done ticket next to an active one: the active one decides the subtitle.
+    await expect(hint).toHaveText('Move your ticket to In Progress and start your task.');
     await expect(page.getByTestId('card-1')).toHaveAttribute('draggable', 'false');
     const reopen = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
     expect(reopen).toContain('notActiveTicket');
@@ -202,7 +210,7 @@ test('the columns are framed cards with a placeholder when empty, in English and
   const { page, close } = await launch();
   try {
     await startFirstTicket(page);
-    await expect(page.getByTestId('board')).toContainText("Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.");
+    await expect(page.getByTestId('board-hint')).toHaveText('Move your ticket to In Progress and start your task.');
     const column = page.getByTestId('column-inQa');
     await expect(column).toHaveAttribute('aria-label', 'In QA');
     await expect(column).toHaveClass(/rounded-xl/);
@@ -226,11 +234,14 @@ test('the columns are framed cards with a placeholder when empty, in English and
     await expect(page.getByTestId('empty-inProgress')).toHaveCount(0);
 
     await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));
-    await expect(page.getByTestId('board')).toContainText('Mova seu ticket para Em QA quando a correção estiver pronta.');
+    await expect(page.getByTestId('board-hint')).toHaveText(
+      'Mova seu ticket para Em QA quando a correção estiver pronta. O QA roda primeiro os testes do projeto e depois as verificações do ticket.',
+    );
     await expect(page.getByTestId('empty-todo')).toHaveText('Nada esperando. Novas tarefas chegam na sua caixa de entrada.');
     await expect(page.getByTestId('empty-inQa')).toHaveText('Solte seu ticket aqui para rodar o QA.');
     await expect(page.getByTestId('empty-codeReview')).toHaveText('Tickets aprovados no QA aguardam revisão aqui.');
     await expect(page.getByTestId('empty-done')).toHaveText('Os tickets chegam aqui quando você aceita a revisão.');
+    await dropExplains(page, page.getByTestId('card-1'), 'todo', 'Tarefas em andamento não podem voltar para a coluna A fazer.');
   } finally {
     await close();
   }
@@ -248,8 +259,12 @@ test('a card shows only its key and title, and "Test failed" only after a failed
     await expect(page.getByTestId('board').getByRole('button', { name: /VS Code|Browser/ })).toHaveCount(0);
 
     await dragCard(page, 1, 'inQa');
+    // While QA runs, a "Testing" tag with a spinner sits next to the key; it goes away with the result.
+    await expect(card.getByTestId('card-qa-running')).toHaveText('Testing');
+    await expect(card.getByTestId('card-qa-running').locator('svg')).toBeVisible();
     await expect(card).toHaveAttribute('data-attempts', '1', { timeout: 15_000 });
     await expect(card).toHaveAttribute('data-status', 'inProgress');
+    await expect(card.getByTestId('card-qa-running')).toHaveCount(0);
     await expect(card.getByTestId('card-qa-failed')).toHaveText('Test failed');
 
     // A new run replaces the failure; once it passes the badge is gone, and no "Tests passed" badge appears.
