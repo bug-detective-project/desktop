@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
 import { sha256Hex, treeDigest, writeZip } from './archive.ts';
-import { gitArchive, readPackageDir } from './local.ts';
+import { gitArchive, readPackageDir, resolveStageRef } from './local.ts';
 import { parseManifest } from './manifest.ts';
 import type { StageEntry, StageManifest } from './manifest.ts';
 
@@ -41,12 +41,13 @@ export async function buildStagePackages(options: BuildOptions): Promise<StageMa
     const file = `${branch}-v${version}.zip`;
     await writeFile(join(out, file), zip);
 
-    const codeFiles = await gitArchive(runner, git, repo, branch);
+    const ref = await resolveStageRef(runner, git, repo, branch);
+    const codeFiles = await gitArchive(runner, git, repo, ref);
     stages.push({
       stage,
       branch,
-      commit: await gitText('rev-parse', `refs/heads/${branch}`),
-      commitMessage: await gitText('log', '-1', '--format=%s', `refs/heads/${branch}`),
+      commit: await gitText('rev-parse', ref),
+      commitMessage: await gitText('log', '-1', '--format=%s', ref),
       codeDigest: treeDigest(codeFiles),
       codeFiles: codeFiles.length,
       package: { file, sha256: sha256Hex(zip), size: zip.length, digest: treeDigest(packageFiles) },

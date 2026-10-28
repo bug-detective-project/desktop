@@ -41,7 +41,24 @@ test/unit|integration|e2e|manual
 - Windows 10/11 with WSL 2 and Docker Desktop (WSL 2 backend)
 - VS Code (the app installs the Dev Containers extension)
 - For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
-- `../supportdesk-private` next to this folder (the SupportDesk repository with the `stage-N` branches)
+- `../supportdesk-private` next to this folder: a clone of the SupportDesk repository (see below)
+
+### Getting the SupportDesk repository
+
+Clone it next to `desktop/`, so the two folders are siblings:
+
+```sh
+cd ..    # the folder that holds desktop/
+git clone git@github.com:bug-detective-project/supportdesk-private.git
+```
+
+The default branch (`main`) is all that needs to be checked out. The tools read the `stage-1` … `stage-4` branches from the clone as they are: the local branch when there is one, otherwise `origin/stage-N`, which `git clone` already fetched. **Never create, rename or rebuild the `stage-N` branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `qa/scripts/build-stages.sh` in that repository). If a tool says a stage branch is missing, run `git -C ../supportdesk-private fetch origin`. If `stage-N` branches were created by hand, reset them to the published ones:
+
+```sh
+cd ../supportdesk-private
+git fetch origin
+for n in 1 2 3 4; do git branch -f --track stage-$n origin/stage-$n; done
+```
 
 ## Development on Windows
 
@@ -122,7 +139,7 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Command | Where | What |
 | --- | --- | --- |
-| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs `../supportdesk-private` with its `stage-N` branches), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller, the code review (review configuration and path matching, comparison parsing, review data, the checkout and return state machine with crash recovery) |
+| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs the `../supportdesk-private` clone), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller, the code review (review configuration and path matching, comparison parsing, review data, the checkout and return state machine with crash recovery) |
 | `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA (`qa-flow`, `bugdetective-test-*` resources); the code review: approved snapshot from an uncommitted fix, review branch and its recreation, checkout and return with uncommitted/untracked/excluded files, edits on the review branch, crash recovery, a Done review, the return before QA, export/restore and a new game (`review-flow`, `bugdetective-review-test-*` resources); the Docker cleanup, leftovers and everything (`docker-cleanup`, `bugdetective-cleanup-test-*` resources and image tags of its own). Never touches the player's resources. Run `pnpm run build` first. |
 | `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime: first-run checklist, Docker banner, Kanban drag rules, ticket panel, code review (layout, file list, split diff, whitespace toggle, identical solutions, review banner, button states), language, restart, Settings tabs (versions, disk usage, QA limit, last export, locked actions) |
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |

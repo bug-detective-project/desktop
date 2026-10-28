@@ -35,6 +35,25 @@ export async function gitArchive(runner: CommandRunner, git: string, repoPath: s
 }
 
 /**
+ * The ref of a stage branch: the local `stage-N`, or `origin/stage-N` in a fresh clone (where git
+ * creates only the default branch locally). The stage branches are published content: they are
+ * fetched from the repository, never created by hand.
+ */
+export async function resolveStageRef(runner: CommandRunner, git: string, repoPath: string, branch: string): Promise<string> {
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
+    const result = await runner(git, ['-c', 'safe.directory=*', '-C', repoPath, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+      timeoutMs: 30_000,
+    });
+    if (result.code === 0) {
+      return ref;
+    }
+  }
+  throw new Error(
+    `${repoPath} has no ${branch} branch (neither local nor origin/${branch}). Run "git -C ${repoPath} fetch origin"; never create the stage branches by hand.`,
+  );
+}
+
+/**
  * Text files are normalized to LF: a Windows checkout with core.autocrlf=true has CRLF in its
  * working tree, and the package must be byte-identical on every platform (and git apply needs LF).
  */
@@ -79,7 +98,7 @@ export class LocalContentSource implements ContentSource {
     const entry = stageEntry(await this.manifest(), stage);
     const packageFiles = await readPackageDir(join(repoPath, 'qa', 'stages', `stage-${stage}`));
     const packageZip = writeZip(packageFiles);
-    const codeFiles = await gitArchive(runner, git, repoPath, entry.branch);
+    const codeFiles = await gitArchive(runner, git, repoPath, await resolveStageRef(runner, git, repoPath, entry.branch));
     return verifyStage({ entry, packageZip, packageFiles: readZip(packageZip), codeFiles });
   }
 }

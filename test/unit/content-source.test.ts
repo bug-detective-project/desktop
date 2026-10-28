@@ -102,6 +102,30 @@ describe('LocalContentSource', () => {
   });
 });
 
+describe('a fresh clone of the SupportDesk repository', () => {
+  it('reads the stage branches from origin when git created only the default branch locally', async () => {
+    const clone = join(root, 'clone');
+    await runChecked(runCommand, 'git', ['clone', '-q', repo, clone]);
+    const local = await runCommand('git', ['-C', clone, 'rev-parse', '--verify', '--quiet', 'refs/heads/stage-1']);
+    expect(local.code).not.toBe(0);
+
+    const cloned = await buildStagePackages({ repo: clone, out: join(root, 'clone-packages'), version: '1.0.0', runner: runCommand });
+    expect(cloned.stages[0]).toMatchObject({ commit: manifest.stages[0].commit, codeDigest: manifest.stages[0].codeDigest });
+    const source = new LocalContentSource({ repoPath: clone, manifestPath: join(root, 'clone-packages', 'manifest.json'), runner: runCommand });
+    expect((await source.fetchStage(1)).codeFiles.map((file) => file.path)).toContain('client/App.tsx');
+  });
+
+  it('says how to get a stage branch that is missing, instead of creating it', async () => {
+    const empty = join(root, 'no-stages');
+    await mkdir(join(empty, 'qa', 'stages', 'stage-1'), { recursive: true });
+    await writeFile(join(empty, 'qa', 'stages', 'stage-1', 'ticket.en.md'), '# SD-214\n');
+    await runChecked(runCommand, 'git', ['init', '-q', '-b', 'main', empty]);
+    await expect(buildStagePackages({ repo: empty, out: join(root, 'no-stages-out'), version: '1.0.0', runner: runCommand })).rejects.toThrow(
+      /has no stage-1 branch \(neither local nor origin\/stage-1\)\. Run "git -C .+ fetch origin"; never create the stage branches by hand\./,
+    );
+  });
+});
+
 describe('GitHubContentSource (mock server)', () => {
   let server: Server;
   let baseUrl: string;
