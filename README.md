@@ -213,7 +213,7 @@ Each game project has two repositories in the `bug-detective-project` organizati
 Nothing is published automatically. To publish a content release:
 
 1. Push every branch to the private repository (`git push origin --all`) and the `stage-1` … `stage-4` branches to the public one (`git push public stage-1 stage-2 stage-3 stage-4`). Keep `qa/` off the stage branches.
-2. `pnpm run build:stages -- --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk-private --version 1.0.0`).
+2. `pnpm run build:stages --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk-private --version 1.0.0`).
 3. Create a GitHub Release on the public repository and upload every file of `build/stage-packages/`: `gh release create v1.0.0 -R bug-detective-project/supportdesk --target stage-1 build/stage-packages/*`.
 4. The app downloads `releases/latest/download/manifest.json`, then the package of the unlocked stage and `archive/refs/heads/stage-N.zip`. It checks the package's SHA-256 and the stage files' digest against the manifest before using anything. If a branch moves after the release, its digest no longer matches: publish a new release.
 
