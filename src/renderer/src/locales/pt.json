@@ -10,7 +10,10 @@
   "header": {
     "theme": "Tema",
     "toggleTheme": "Alternar entre o tema claro e o escuro",
-    "me": "EU"
+    "me": "EU",
+    "unread_one": "{{count}} mensagem não lida",
+    "unread_other": "{{count}} mensagens não lidas",
+    "language": "Idioma: {{language}}"
   },
   "common": {
     "checkAgain": "Verificar de novo",
@@ -134,7 +137,10 @@
       "running": "Em execução",
       "starting": "Iniciando",
       "notRunning": "Parado",
-      "notInstalled": "Não instalado"
+      "notInstalled": "Não instalado",
+      "checking": "Verificando…",
+      "needsDocker": "Precisa do Docker",
+      "notYet": "Ainda não instalado"
     }
   },
   "board": {

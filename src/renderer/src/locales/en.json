@@ -10,7 +10,10 @@
   "header": {
     "theme": "Theme",
     "toggleTheme": "Switch between the light and dark theme",
-    "me": "ME"
+    "me": "ME",
+    "unread_one": "{{count}} unread message",
+    "unread_other": "{{count}} unread messages",
+    "language": "Language: {{language}}"
   },
   "common": {
     "checkAgain": "Check again",
@@ -134,7 +137,10 @@
       "running": "Running",
       "starting": "Starting",
       "notRunning": "Stopped",
-      "notInstalled": "Not installed"
+      "notInstalled": "Not installed",
+      "checking": "Checking…",
+      "needsDocker": "Needs Docker",
+      "notYet": "Not installed yet"
     }
   },
   "board": {

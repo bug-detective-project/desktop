@@ -2,7 +2,7 @@ import type { EnvironmentItemId, Snapshot } from '@shared/api.ts'
 import { findTicket } from '@shared/kanban.ts'
 import type { InboxMessage, Language, TicketState } from '@shared/types.ts'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../api.ts'
 import { Icon } from '../components/icons.tsx'
@@ -19,6 +19,13 @@ const ENVIRONMENT_SIZES: Record<EnvironmentItemId, string> = {
   qaImage: '3 GB',
   projectDependencies: '160 MB',
 }
+
+/** The rows of the Local environment card, always shown in this order. */
+const ENVIRONMENT_ITEMS: EnvironmentItemId[] = [
+  'workspaceImage',
+  'qaImage',
+  'projectDependencies',
+]
 
 const locale = (language: Language) => (language === 'pt' ? 'pt-BR' : 'en-US')
 
@@ -1001,14 +1008,22 @@ function EnvironmentCard({ snapshot }: { snapshot: Snapshot }) {
   const installing = snapshot.busy === 'installing'
   const docker =
     snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState
-  const status = (look: 'ok' | 'pending' | 'bad', label: string) => {
+  // The report is only made after an unlock or a restore: ask for it as soon as Docker runs.
+  const unchecked = docker === 'running' && snapshot.environment === null
+  useEffect(() => {
+    if (unchecked) {
+      void api.refreshEnvironment().catch(() => {})
+    }
+  }, [unchecked])
+  const status = (look: 'ok' | 'pending' | 'bad' | 'unknown', label: string) => {
     const style = {
       ok: 'text-emerald-600 dark:text-emerald-400',
       pending: 'text-amber-500',
       bad: 'text-destructive',
+      unknown: 'text-muted-foreground',
     }[look]
     const icon = (
-      { ok: 'check', pending: 'spinner', bad: 'alertCircle' } as const
+      { ok: 'check', pending: 'spinner', bad: 'alertCircle', unknown: 'info' } as const
     )[look]
     return (
       <span
@@ -1022,47 +1037,69 @@ function EnvironmentCard({ snapshot }: { snapshot: Snapshot }) {
       </span>
     )
   }
+  // Every row is always listed, with its state: nothing is hidden while Docker is down or still being checked.
+  const itemStatus = (id: EnvironmentItemId) => {
+    const item = snapshot.environment?.items.find((entry) => entry.id === id)
+    if (item?.ready) {
+      return status(
+        'ok',
+        `${t('dashboard.envStatus.ready')} (${ENVIRONMENT_SIZES[id]})`,
+      )
+    }
+    if (installing) {
+      return status('pending', t('dashboard.envStatus.installing'))
+    }
+    if (!snapshot.environment) {
+      // Images and dependencies can only be checked with Docker running.
+      return docker === 'running'
+        ? status('pending', t('dashboard.envStatus.checking'))
+        : status('unknown', t('dashboard.envStatus.needsDocker'))
+    }
+    // Dependencies are listed only once the workspace exists; with the workspace image in place
+    // they are installed with the first ticket, so they are not an error yet.
+    const workspaceReady = snapshot.environment.items.some(
+      (entry) => entry.id === 'workspaceImage' && entry.ready,
+    )
+    return !item && workspaceReady
+      ? status('unknown', t('dashboard.envStatus.notYet'))
+      : status('bad', t('dashboard.envStatus.missing'))
+  }
   return (
     <Panel data-testid="environment-card">
       <h3 className="mb-2.5 text-xs font-bold tracking-wider text-foreground uppercase">
         {t('dashboard.environment')}
       </h3>
       <dl className="space-y-2">
-        {docker && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-muted-foreground">
-              {t('dashboard.env.docker')}
-            </dt>
-            <dd>
-              {status(
-                docker === 'running'
-                  ? 'ok'
-                  : docker === 'starting'
-                    ? 'pending'
-                    : 'bad',
-                t(`dashboard.envStatus.${docker}`),
-              )}
-            </dd>
-          </div>
-        )}
-        {snapshot.environment?.items.map((item) => (
+        <div
+          className="flex items-center justify-between gap-2"
+          data-testid="env-docker"
+        >
+          <dt className="text-muted-foreground">
+            {t('dashboard.env.docker')}
+          </dt>
+          <dd>
+            {docker
+              ? status(
+                  docker === 'running'
+                    ? 'ok'
+                    : docker === 'starting'
+                      ? 'pending'
+                      : 'bad',
+                  t(`dashboard.envStatus.${docker}`),
+                )
+              : status('pending', t('dashboard.envStatus.checking'))}
+          </dd>
+        </div>
+        {ENVIRONMENT_ITEMS.map((id) => (
           <div
-            key={item.id}
+            key={id}
             className="flex items-center justify-between gap-2"
+            data-testid={`env-${id}`}
           >
             <dt className="text-muted-foreground">
-              {t(`dashboard.env.${item.id}`)}
+              {t(`dashboard.env.${id}`)}
             </dt>
-            <dd>
-              {item.ready
-                ? status(
-                    'ok',
-                    `${t('dashboard.envStatus.ready')} (${ENVIRONMENT_SIZES[item.id]})`,
-                  )
-                : installing
-                  ? status('pending', t('dashboard.envStatus.installing'))
-                  : status('bad', t('dashboard.envStatus.missing'))}
-            </dd>
+            <dd>{itemStatus(id)}</dd>
           </div>
         ))}
       </dl>
@@ -1106,12 +1143,17 @@ export function Dashboard({
       : undefined
   const active = current && current.status !== 'done' ? current : undefined
 
-  const select = (message: InboxMessage) => {
-    setSelectedId(message.id)
-    if (!message.read) {
-      void api.markInboxRead(message.id)
+  // The open message counts as read, also when it opened on its own (on arrival, or the newest
+  // one shown when the Dashboard or the inbox button is opened), not only after a click.
+  const openId = selected?.id
+  const openUnread = selected !== undefined && !selected.read
+  useEffect(() => {
+    if (openId && openUnread) {
+      void api.markInboxRead(openId)
     }
-  }
+  }, [openId, openUnread])
+
+  const select = (message: InboxMessage) => setSelectedId(message.id)
 
   const run = (id: string, action: () => Promise<unknown>) => {
     setBusy(id)

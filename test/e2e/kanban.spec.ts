@@ -130,6 +130,29 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(page.getByTestId('action-dock')).not.toContainText('player/');
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
+    // The header has no inbox button: the Dashboard item carries the unread counter.
+    await expect(page.getByTestId('header-inbox')).toHaveCount(0);
+
+    // The header's language menu: the current flag opens one flag per language, no labels.
+    const languageMenu = page.getByTestId('language-menu');
+    await expect(languageMenu).toHaveText('');
+    await expect(languageMenu).toHaveAttribute('aria-label', 'Language: English');
+    await languageMenu.click();
+    const options = page.getByTestId('language-options');
+    await expect(options.getByRole('menuitemradio')).toHaveCount(2);
+    await expect(options).toHaveText('');
+    await expect(page.getByTestId('language-en')).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('language-pt').click();
+    await expect(options).toHaveCount(0);
+    await expect(page.getByTestId('nav-board')).toHaveText('Quadro');
+    await expect(languageMenu).toHaveAttribute('aria-label', 'Idioma: Português (Brasil)');
+    await languageMenu.click();
+    await page.keyboard.press('Escape');
+    await expect(options).toHaveCount(0);
+    await languageMenu.click();
+    await page.getByTestId('language-en').click();
+    await expect(page.getByTestId('nav-board')).toHaveText('Board');
+
     // The header's theme toggle switches the theme everywhere.
     const dark = () => page.evaluate(() => document.documentElement.classList.contains('dark'));
     const before = await dark();
@@ -242,7 +265,8 @@ test('a card shows only its key and title, and "Test failed" only after a failed
 test('the inbox shows at most three messages, and the dashboard fits the window with the project context and the e-mail scrolling', async () => {
   const { page, close } = await launch();
   try {
-    await page.setViewportSize({ width: 1440, height: 560 });
+    // The window's minimum size (minHeight in src/main/index.ts).
+    await page.setViewportSize({ width: 1440, height: 700 });
     await page.getByTestId('start-playing').click();
     const inbox = page.getByTestId('inbox');
     await expect(page.getByTestId('inbox-message')).toHaveCount(1);
@@ -263,7 +287,7 @@ test('the inbox shows at most three messages, and the dashboard fits the window 
     await expect.poll(() => main.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
     for (const id of ['project-context', 'message', 'action-dock']) {
       const bottom = await page.getByTestId(id).evaluate((element) => element.getBoundingClientRect().bottom);
-      expect(bottom).toBeLessThanOrEqual(560);
+      expect(bottom).toBeLessThanOrEqual(700);
     }
     const scrolls = (id: string) => page.getByTestId(id).evaluate((element) => element.scrollHeight > element.clientHeight);
     await expect.poll(() => scrolls('project-context-body')).toBe(true);
@@ -272,6 +296,58 @@ test('the inbox shows at most three messages, and the dashboard fits the window 
     await expect(page.getByTestId('message').locator('> header')).toContainText('Rafaela Nunes');
     await expect(page.getByTestId('message-scroll').locator('header')).toHaveCount(0);
     await expect(page.getByTestId('message')).not.toContainText('msg-');
+  } finally {
+    await close();
+  }
+});
+
+test('Local environment always lists Docker, both images and the dependencies, with their state', async () => {
+  const rows = ['env-docker', 'env-workspaceImage', 'env-qaImage', 'env-projectDependencies'];
+  const { page, close } = await launch({ stopDockerAfterUnlock: true });
+  try {
+    // Before the first ticket the card asks for the report itself: nothing waits for an unlock.
+    await page.getByTestId('start-playing').click();
+    const card = page.getByTestId('environment-card');
+    for (const row of rows) await expect(card.getByTestId(row)).toBeVisible();
+    await expect(card.getByTestId('env-docker')).toContainText('Running');
+    await expect(card.getByTestId('env-workspaceImage')).toContainText('Ready (1.1 GB)');
+    await expect(card.getByTestId('env-qaImage')).toContainText('Ready (3 GB)');
+    await expect(card.getByTestId('env-projectDependencies')).toContainText('Not installed yet');
+
+    // Docker stops: every row stays, Docker with its stopped state.
+    await page.getByTestId('next-assignment').click();
+    await expect(page.getByTestId('docker-banner')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('nav-dashboard').click();
+    for (const row of rows) await expect(card.getByTestId(row)).toBeVisible();
+    await expect(card.getByTestId('env-docker')).toContainText('Stopped');
+  } finally {
+    await close();
+  }
+});
+
+test('an unread message that is shown open counts as read, without clicking it', async () => {
+  const { page, close } = await launch({ qa: ['passed'] });
+  try {
+    // The welcome message opens on its own: the header counter clears.
+    await page.getByTestId('start-playing').click();
+    await expect(page.getByTestId('inbox-message')).toHaveCount(1);
+    await expect(page.getByTestId('unread-count')).toHaveCount(0);
+
+    // A new directive arrives while the player is on the Board (after accepting the review)...
+    await page.getByTestId('next-assignment').click();
+    await page.getByTestId('card-1').waitFor();
+    await dragCard(page, 1, 'inProgress');
+    await dragCard(page, 1, 'inQa');
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await page.getByTestId('card-1').click();
+    await page.getByTestId('open-review').click();
+    await page.getByTestId('accept-review').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('nav-dashboard').getByTestId('unread-count')).toHaveText('1');
+    // ...and opening the Dashboard shows it open, which marks it read.
+    await page.getByTestId('nav-dashboard').click();
+    await expect(page.getByTestId('dashboard')).toBeVisible();
+    await expect(page.getByTestId('unread-count')).toHaveCount(0);
   } finally {
     await close();
   }
