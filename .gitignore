@@ -5,3 +5,6 @@ build/
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# Personal helper: builds the installer from WSL and installs it on Windows.
+install-windows.sh
