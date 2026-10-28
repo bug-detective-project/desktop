@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
-import type { Components } from 'react-markdown';
+import type { Components, ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 // Links and images never load anything: the app shows no remote content.
@@ -26,11 +27,44 @@ const components: Components = {
   input: ({ checked }) => <input type="checkbox" checked={checked} readOnly disabled className="mr-1.5 align-middle accent-primary" />,
 };
 
+type HastNode = NonNullable<ExtraProps['node']>['children'][number];
+
+function textOf(node: HastNode): string {
+  if (node.type === 'text') return node.value;
+  return node.type === 'element' ? node.children.map(textOf).join('') : '';
+}
+
+/** Replaces the value cell of two-column "field | value" rows when fieldValue returns something for that field. */
+function fieldRow(fieldValue: (field: string, value: string) => ReactNode | undefined): Components['tr'] {
+  return function FieldRow({ node, children }) {
+    const cells = node?.children.filter((child) => child.type === 'element') ?? [];
+    const [field, value] = cells.map((cell) => textOf(cell).trim());
+    const custom = cells.length === 2 && cells[0].tagName === 'td' ? fieldValue(field, value) : undefined;
+    if (custom === undefined) return <tr>{children}</tr>;
+    return (
+      <tr>
+        <td className="border border-border px-2 py-1">{field}</td>
+        <td className="border border-border px-2 py-1">{custom}</td>
+      </tr>
+    );
+  };
+}
+
 /** GitHub-flavored markdown. Body text is muted; emphasis and code stand out in the foreground color. */
-export function Markdown({ children, testId, className = 'text-base' }: { children: string; testId?: string; className?: string }) {
+export function Markdown({
+  children,
+  testId,
+  className = 'text-base',
+  fieldValue,
+}: {
+  children: string;
+  testId?: string;
+  className?: string;
+  fieldValue?: (field: string, value: string) => ReactNode | undefined;
+}) {
   return (
     <div className={`text-muted-foreground [&>*:last-child]:mb-0 ${className}`} data-testid={testId}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={fieldValue ? { ...components, tr: fieldRow(fieldValue) } : components}>
         {children}
       </ReactMarkdown>
     </div>

@@ -87,6 +87,21 @@ export function StagePill({ status, className = '' }: { status: Column; classNam
   );
 }
 
+/** A hint shown below its child on hover or focus. The wrapper catches hover even when the child button is disabled. */
+export function Tooltip({ content, className = '', children }: { content: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <span className={`group relative inline-flex ${className}`}>
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute inset-x-0 top-full z-50 mt-2 rounded-md border border-border bg-popover px-3 py-2 text-sm leading-relaxed text-popover-foreground opacity-0 shadow-lg transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+      >
+        {content}
+      </span>
+    </span>
+  );
+}
+
 export function StatusIcon({ status }: { status: 'ok' | 'missing' | 'pending' | 'warning' }) {
   const styles = {
     ok: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',

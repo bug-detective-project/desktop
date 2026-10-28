@@ -11,10 +11,14 @@ import { Markdown } from '../components/Markdown.tsx';
 import { QaCommentView } from '../components/QaComment.tsx';
 import { Icon } from '../components/icons.tsx';
 import { ticketTitle } from '../components/ticketTitle.ts';
-import { Badge, Button, LogView, StagePill, Tabs } from '../components/ui.tsx';
+import { Badge, Button, LogView, StagePill, Tabs, Tooltip } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 type Tab = 'ticket' | 'qa' | 'history' | 'senior';
+
+// Rows of the ticket's field table that show live data or a colored badge, in both languages.
+const STATUS_FIELDS = new Set(['Status']);
+const TYPE_FIELDS = new Set(['Issue type', 'Tipo de item']);
 
 /** Loads the ticket's texts again whenever the ticket, its progress or the language changes. */
 function useTicketContent(ticket: TicketState, language: 'en' | 'pt') {
@@ -64,29 +68,27 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   }
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="primary" disabled={!dockerUp} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
-          {busy !== 'vscode' && <Icon name="code" />}
-          {t('ticket.openVSCode')}
-        </Button>
-        <Button disabled={!dockerUp} busy={busy === 'browser'} onClick={() => run('browser', () => api.openAppInBrowser())} data-testid="open-browser">
+      {status && !status.devServerUp && (
+        <Tooltip content={t('ticket.devServerDown')} className="w-full">
+          <Button className="w-full" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
+            {busy !== 'dev' && <Icon name="play" />}
+            {t('ticket.startDevServer')}
+          </Button>
+        </Tooltip>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Tooltip content={t('ticket.vscodeHint')}>
+          <Button variant="primary" className="w-full" disabled={!dockerUp} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
+            {busy !== 'vscode' && <Icon name="code" />}
+            {t('ticket.openVSCode')}
+          </Button>
+        </Tooltip>
+        <Button className="w-full" disabled={!dockerUp} busy={busy === 'browser'} onClick={() => run('browser', () => api.openAppInBrowser())} data-testid="open-browser">
           {busy !== 'browser' && <Icon name="externalLink" />}
           {t('ticket.openBrowser')}
           {status?.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
         </Button>
-        {status && !status.devServerUp && (
-          <Button variant="ghost" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
-            {busy !== 'dev' && <Icon name="play" />}
-            {t('ticket.startDevServer')}
-          </Button>
-        )}
       </div>
-      <p className="text-sm text-muted-foreground">{t('ticket.vscodeHint')}</p>
-      {status && (
-        <p className="text-sm text-muted-foreground">
-          {!status.devServerUp && <span>{t('ticket.devServerDown')}</span>}
-        </p>
-      )}
     </div>
   );
 }
@@ -288,7 +290,19 @@ export function TicketPanel({
           />
         </div>
         <div className="flex-1 overflow-y-auto p-5">
-          {tab === 'ticket' && content && <Markdown testId="ticket-markdown">{content.ticketMarkdown}</Markdown>}
+          {tab === 'ticket' && content && (
+            <Markdown
+              testId="ticket-markdown"
+              fieldValue={(field, value) => {
+                // The file is written when the ticket is created, so the status comes from the board instead.
+                if (STATUS_FIELDS.has(field)) return <StagePill status={ticket.status} />;
+                if (TYPE_FIELDS.has(field)) return <Badge tone={value.toLowerCase() === 'bug' ? 'danger' : 'neutral'}>{value}</Badge>;
+                return undefined;
+              }}
+            >
+              {content.ticketMarkdown}
+            </Markdown>
+          )}
           {tab === 'qa' && (
             <div className="space-y-3" data-testid="qa-comments">
               {qaRunning && (
