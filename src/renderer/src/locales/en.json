@@ -8,7 +8,6 @@
     "settings": "Settings"
   },
   "header": {
-    "theme": "Theme",
     "toggleTheme": "Switch between the light and dark theme",
     "me": "ME",
     "unread_one": "{{count}} unread message",
@@ -366,7 +365,9 @@
         "startingDocker": "Docker Desktop is starting",
         "starting": "the ticket is starting",
         "exporting": "exporting",
-        "restoring": "restoring"
+        "restoring": "restoring",
+        "cleaningDocker": "Docker is being cleaned up",
+        "removingDocker": "everything is being removed from Docker"
       }
     },
     "dangerZone": "Danger zone",
@@ -395,6 +396,29 @@
       "electron": "Desktop host",
       "node": "Main process",
       "chrome": "Renderer"
+    },
+    "cleanup": {
+      "leftoversTitle": "Docker cleanup",
+      "leftoversHelp": "Removes what the game leaves behind in Docker: QA containers, the copy of your code that QA tested and images of older versions. Your code and progress stay.",
+      "leftovers": "Clean up leftovers",
+      "leftoversDone_one": "Docker cleanup done: 1 item removed.",
+      "leftoversDone_other": "Docker cleanup done: {{count}} items removed.",
+      "needsDocker": "Docker is not running: start it to clean up. If Docker Desktop is stuck, restart it.",
+      "everythingTitle": "Remove everything from Docker",
+      "everythingHelp": "Deletes every container, volume and image Bug Detective created in Docker, including the code in your workspace, and starts a new game. Use it when Docker is left in a bad state.",
+      "everything": "Remove everything from Docker…",
+      "confirmTitle": "Remove everything from Docker?",
+      "confirmWarning": "This deletes the code in your workspace and starts a new game. It cannot be undone.",
+      "confirmContainers": "Containers: your workspace and any QA run left behind",
+      "confirmVolumes": "Volumes: your code, the VS Code server, the dependency cache and the QA copy",
+      "confirmImages": "Images: the workspace and QA images (about 4 GB, built again on the next download)",
+      "confirmBackup": "To keep your progress, cancel and export it first; you can restore it afterwards.",
+      "confirm": "Remove everything",
+      "everythingDone": "Everything Bug Detective created in Docker was removed. A new game has started.",
+      "partialTitle": "Some items were not removed",
+      "partial_one": "{{removed}} removed. Docker could not remove 1 item:",
+      "partial_other": "{{removed}} removed. Docker could not remove {{count}} items:",
+      "restartHint": "If Docker Desktop seems stuck, restart it (or your computer) and run the cleanup again."
     }
   },
   "errors": {

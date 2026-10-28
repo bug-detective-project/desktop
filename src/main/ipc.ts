@@ -55,6 +55,8 @@ const schemas = {
   inspectSave: none,
   restoreProgress: z.tuple([z.string().uuid()]),
   newGame: none,
+  cleanDockerLeftovers: none,
+  removeDockerData: none,
 } as const;
 
 export type Channel = keyof typeof schemas;
@@ -147,6 +149,8 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     },
     restoreProgress: (token) => game.restoreProgress(token),
     newGame: () => game.newGame(),
+    cleanDockerLeftovers: () => game.cleanDockerLeftovers(),
+    removeDockerData: () => game.removeDockerData(),
   };
 
   for (const channel of CHANNELS) {

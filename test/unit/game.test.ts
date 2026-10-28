@@ -287,4 +287,58 @@ describe('Game', () => {
     await game.updateSettings({ qaTimeoutSeconds: 240, language: 'pt' });
     expect(game.current.settings).toMatchObject({ qaTimeoutSeconds: 240, language: 'pt' });
   });
+
+  it('cleans up Docker leftovers without touching the game', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    const clean = vi.spyOn(runtime, 'cleanDocker');
+    const result = await game.cleanDockerLeftovers();
+    expect(clean).toHaveBeenCalledWith('leftovers');
+    expect(result).toEqual({ removed: 3, failed: [] });
+    expect(game.current.currentTicket).toBe(1);
+    expect(game.snapshot().busy).toBeNull();
+  });
+
+  it('removes everything from Docker and starts a new game, even with a review checked out', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'], cleanupFails: ['bugdetective-qa-cache'] } });
+    await game.init();
+    await game.updateSettings({ language: 'pt' });
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.openReview(1);
+    expect(game.current.reviewSession).not.toBeNull();
+    const firstGame = game.current.createdAt;
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const clean = vi.spyOn(runtime, 'cleanDocker');
+    const result = await game.removeDockerData();
+    expect(clean).toHaveBeenCalledWith('everything');
+    // A failure is reported, and the rest still goes.
+    expect(result.failed).toEqual([{ name: 'bugdetective-qa-cache', reason: 'Error response from daemon: bugdetective-qa-cache is in use' }]);
+    expect(result.removed).toBe(6);
+    expect(game.current.createdAt).not.toBe(firstGame);
+    expect(game.current.tickets).toEqual([]);
+    expect(game.current.reviewSession).toBeNull();
+    expect(game.current.settings.language).toBe('pt');
+    // The images are gone too: the next assignment needs the downloads again.
+    expect(game.snapshot().environment?.ready).toBe(false);
+  });
+
+  it('refuses to remove everything while QA runs or Docker is stopped', async () => {
+    const running = createGame({ scenario: { qaDelayMs: 200 } });
+    await running.game.init();
+    await running.game.nextAssignment();
+    await running.game.move(1, 'inProgress');
+    await running.game.move(1, 'inQa');
+    await expect(running.game.removeDockerData()).rejects.toMatchObject({ code: 'busy' });
+    await running.game.waitForQa();
+
+    const stopped = createGame({ scenario: { docker: 'notRunning' } });
+    await stopped.game.init();
+    await expect(stopped.game.removeDockerData()).rejects.toThrow();
+    await expect(stopped.game.cleanDockerLeftovers()).rejects.toThrow();
+  });
 });

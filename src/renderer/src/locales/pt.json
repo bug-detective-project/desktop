@@ -8,7 +8,6 @@
     "settings": "Configurações"
   },
   "header": {
-    "theme": "Tema",
     "toggleTheme": "Alternar entre o tema claro e o escuro",
     "me": "EU",
     "unread_one": "{{count}} mensagem não lida",
@@ -366,7 +365,9 @@
         "startingDocker": "o Docker Desktop está iniciando",
         "starting": "o ticket está sendo iniciado",
         "exporting": "exportando",
-        "restoring": "restaurando"
+        "restoring": "restaurando",
+        "cleaningDocker": "o Docker está sendo limpo",
+        "removingDocker": "tudo está sendo removido do Docker"
       }
     },
     "dangerZone": "Zona de perigo",
@@ -395,6 +396,29 @@
       "electron": "Host desktop",
       "node": "Processo principal",
       "chrome": "Renderizador"
+    },
+    "cleanup": {
+      "leftoversTitle": "Limpeza do Docker",
+      "leftoversHelp": "Remove o que o jogo deixa para trás no Docker: containers de QA, a cópia do seu código que o QA testou e imagens de versões antigas. Seu código e seu progresso continuam.",
+      "leftovers": "Limpar sobras",
+      "leftoversDone_one": "Limpeza do Docker concluída: 1 item removido.",
+      "leftoversDone_other": "Limpeza do Docker concluída: {{count}} itens removidos.",
+      "needsDocker": "O Docker não está rodando: inicie-o para limpar. Se o Docker Desktop travou, reinicie-o.",
+      "everythingTitle": "Remover tudo do Docker",
+      "everythingHelp": "Apaga todos os containers, volumes e imagens que o Bug Detective criou no Docker, inclusive o código do seu workspace, e começa um novo jogo. Use quando o Docker ficar num estado ruim.",
+      "everything": "Remover tudo do Docker…",
+      "confirmTitle": "Remover tudo do Docker?",
+      "confirmWarning": "Isso apaga o código do seu workspace e começa um novo jogo. Não dá para desfazer.",
+      "confirmContainers": "Containers: seu workspace e qualquer rodada de QA que tenha ficado para trás",
+      "confirmVolumes": "Volumes: seu código, o servidor do VS Code, o cache de dependências e a cópia do QA",
+      "confirmImages": "Imagens: as imagens do workspace e do QA (cerca de 4 GB, construídas de novo no próximo download)",
+      "confirmBackup": "Para manter seu progresso, cancele e exporte-o antes; depois você pode restaurá-lo.",
+      "confirm": "Remover tudo",
+      "everythingDone": "Tudo o que o Bug Detective criou no Docker foi removido. Um novo jogo começou.",
+      "partialTitle": "Alguns itens não foram removidos",
+      "partial_one": "{{removed}} removidos. O Docker não conseguiu remover 1 item:",
+      "partial_other": "{{removed}} removidos. O Docker não conseguiu remover {{count}} itens:",
+      "restartHint": "Se o Docker Desktop parecer travado, reinicie-o (ou o computador) e rode a limpeza de novo."
     }
   },
   "errors": {

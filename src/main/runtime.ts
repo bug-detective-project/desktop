@@ -5,10 +5,12 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
-import type { DiskUsageItem, EnvironmentItem, EnvironmentReport, ReviewComparison } from '../shared/api.ts';
+import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
+import { planCleanup } from './services/cleanup.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
 import { DockerUnavailableError } from './services/docker.ts';
+import { CommandError } from './services/process.ts';
 import type { EngineState , Docker} from './services/docker.ts';
 import { Prerequisites } from './services/prerequisites.ts';
 import type { Environment } from './services/prerequisites.ts';
@@ -37,6 +39,8 @@ export interface GameRuntime {
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
   diskUsage(): Promise<DiskUsageItem[]>;
+  /** Removes the app's Docker leftovers, or everything it created; one failure never stops the rest. */
+  cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup>;
 
   /**
    * Makes the workspace repository belong to the game `gameId`, archiving player branches left by
@@ -92,6 +96,18 @@ export interface ImageConfig {
 interface ImageTags {
   workspace: string;
   qa: string;
+}
+
+/** Docker's own words for a failed removal ("Error response from daemon: …"), or that it did not answer. */
+function cleanupReason(error: unknown): string {
+  if (error instanceof CommandError) {
+    if (error.result.timedOut) {
+      return 'Docker did not answer in time';
+    }
+    const lines = error.result.stderr.split(/\r?\n/).filter((line) => line.trim());
+    return (lines.at(-1) ?? error.message).slice(0, 300);
+  }
+  return (error as Error).message.slice(0, 300);
 }
 
 export class DockerRuntime implements GameRuntime {
@@ -206,6 +222,11 @@ export class DockerRuntime implements GameRuntime {
         await docker.build(this.platform.dockerHostPath(join(this.contextRoot, name)), tag, `${name}-image`, (line) => onLine(line));
       }
     }
+    // Images of older app versions are not needed any more (an image a container still uses stays).
+    const old = await this.cleanDocker('leftovers').catch(() => null);
+    if (old && old.removed > 0) {
+      onLine(`» Removed ${old.removed} item(s) left by older versions`);
+    }
     const workspace = await this.runningWorkspace();
     if (!(await workspace.hasRepository())) {
       return;
@@ -242,6 +263,37 @@ export class DockerRuntime implements GameRuntime {
       { id: 'qaImage', bytes: qaImage },
       { id: 'qaCache', bytes: volumes[this.names.cacheVolume] ?? null },
     ];
+  }
+
+  async cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup> {
+    const docker = await this.docker();
+    const tags = await this.imageTags();
+    const targets = planCleanup(await docker.labelled(), {
+      scope,
+      prefix: this.names.prefix,
+      qaInputVolume: this.names.qaInputVolume,
+      currentImages: [tags.workspace, tags.qa],
+    });
+    const result: DockerCleanup = { removed: 0, failed: [] };
+    for (const target of targets) {
+      try {
+        if (target.kind === 'container') {
+          await docker.removeContainer(target.name);
+          if (await docker.inspectContainer(target.name)) {
+            throw new Error('The container is still there');
+          }
+        } else if (target.kind === 'volume') {
+          await docker.removeVolume(target.name);
+        } else {
+          // Leftovers keep an image that a container still uses; everything removes it by force.
+          await docker.removeImage(target.name, { force: scope === 'everything' });
+        }
+        result.removed += 1;
+      } catch (error) {
+        result.failed.push({ name: target.name, reason: cleanupReason(error) });
+      }
+    }
+    return result;
   }
 
   async claimWorkspace(gameId: string) {

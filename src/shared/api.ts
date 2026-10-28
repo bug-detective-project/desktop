@@ -49,7 +49,18 @@ export type BusyTask =
   | 'startingDocker'
   | 'openingReview'
   | 'closingReview'
+  | 'cleaningDocker'
+  | 'removingDocker'
   | null;
+
+/** leftovers: QA leftovers and images of older app versions; everything: all the app created, the player's code too. */
+export type DockerCleanupScope = 'leftovers' | 'everything';
+
+/** What a Docker cleanup removed, and what it could not remove (with Docker's reason). */
+export interface DockerCleanup {
+  removed: number;
+  failed: { name: string; reason: string }[];
+}
 
 /**
  * What happened when the app brought the player's code back after a review, told in ticket terms:
@@ -158,6 +169,10 @@ export interface BugDetectiveApi {
   restoreProgress(token: string): Promise<void>;
   /** Starts over; the workspace's branches from this game are archived on the next unlock. */
   newGame(): Promise<void>;
+  /** Removes QA leftovers and images of older versions; the player's work stays. */
+  cleanDockerLeftovers(): Promise<DockerCleanup>;
+  /** Removes everything the app created in Docker, the player's code included, and starts a new game. */
+  removeDockerData(): Promise<DockerCleanup>;
 }
 
 export interface SaveSummary {

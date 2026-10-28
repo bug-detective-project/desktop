@@ -16,6 +16,9 @@ files:
 extraResources:
   - from: build/docker
     to: docker
+  # Run by the uninstaller (resources/installer.nsh) to remove the app's Docker data.
+  - from: resources/remove-docker-data.ps1
+    to: remove-docker-data.ps1
 asar: true
 npmRebuild: false
 win:
@@ -30,3 +33,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Bug Detective
+  # Uninstalling removes the game state too: the Docker data (the player's code) goes with it
+  # (installer.nsh), and a state without its code cannot go on. Updates keep both.
+  deleteAppDataOnUninstall: true
+  include: resources/installer.nsh

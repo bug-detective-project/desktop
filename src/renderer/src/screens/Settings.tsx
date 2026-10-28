@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CheckResult, DiskUsageItem, ExternalLink, SaveSummary, Snapshot } from '@shared/api.ts';
+import type { CheckResult, DiskUsageItem, DockerCleanup, ExternalLink, SaveSummary, Snapshot } from '@shared/api.ts';
 import { parseMinutes, toMinutes } from '@shared/duration.ts';
 import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, backupStatus } from '@shared/types.ts';
 import type { Language, Theme } from '@shared/types.ts';
@@ -44,6 +44,41 @@ function useAction() {
     }
   };
   return { busy, run };
+}
+
+/**
+ * After a Docker cleanup: a toast when everything went, otherwise a dialog with what Docker could
+ * not remove and why (usually a stuck Docker Desktop, which a restart fixes).
+ */
+function useCleanupResult() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [result, setResult] = useState<DockerCleanup | null>(null);
+  const show = (cleanup: DockerCleanup, done: (removed: number) => string) => {
+    if (cleanup.failed.length === 0) {
+      toast.info(done(cleanup.removed));
+    } else {
+      setResult(cleanup);
+    }
+  };
+  const dialog = result && (
+    <Modal title={t('settings.cleanup.partialTitle')} icon={<Icon name="alertTriangle" className="size-5 text-amber-500" />} onClose={() => setResult(null)} data-testid="cleanup-result">
+      <p className="text-base leading-relaxed">{t('settings.cleanup.partial', { removed: result.removed, count: result.failed.length })}</p>
+      <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-lg border border-border/80 bg-secondary/40 p-3">
+        {result.failed.map((item) => (
+          <li key={item.name} className="min-w-0" data-testid="cleanup-failed">
+            <p className="font-mono text-sm font-semibold break-all">{item.name}</p>
+            <p className="text-sm break-words text-muted-foreground">{item.reason}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-base leading-relaxed text-muted-foreground">{t('settings.cleanup.restartHint')}</p>
+      <div className="mt-5 flex justify-end">
+        <Button onClick={() => setResult(null)}>{t('common.close')}</Button>
+      </div>
+    </Modal>
+  );
+  return { show, dialog };
 }
 
 function PaneHeader({ title, help, aside }: { title: string; help: string; aside?: ReactNode }) {
@@ -400,6 +435,40 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
         })}
       </div>
       <DiskUsage snapshot={snapshot} refresh={refresh} />
+      <DockerLeftovers snapshot={snapshot} onCleaned={() => setRefresh((value) => value + 1)} />
+    </div>
+  );
+}
+
+/** "Clean up leftovers": what QA leaves behind and images of older versions. Code and progress stay. */
+function DockerLeftovers({ snapshot, onCleaned }: { snapshot: Snapshot; onCleaned: () => void }) {
+  const { t } = useTranslation();
+  const { busy, run } = useAction();
+  const cleanup = useCleanupResult();
+  const dockerDown = snapshot.dockerState !== 'running';
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="docker-leftovers">
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-foreground">{t('settings.cleanup.leftoversTitle')}</h3>
+        <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">{dockerDown ? t('settings.cleanup.needsDocker') : t('settings.cleanup.leftoversHelp')}</p>
+      </div>
+      <Button
+        size="sm"
+        className="shrink-0 self-start sm:self-center"
+        busy={busy === 'leftovers' || snapshot.busy === 'cleaningDocker'}
+        disabled={dockerDown || snapshot.busy !== null}
+        onClick={() =>
+          run('leftovers', async () => {
+            cleanup.show(await api.cleanDockerLeftovers(), (count) => t('settings.cleanup.leftoversDone', { count }));
+            onCleaned();
+          })
+        }
+        data-testid="clean-leftovers"
+      >
+        {busy !== 'leftovers' && snapshot.busy !== 'cleaningDocker' && <Icon name="trash" className="size-3.5" />}
+        {t('settings.cleanup.leftovers')}
+      </Button>
+      {cleanup.dialog}
     </div>
   );
 }
@@ -433,6 +502,8 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
   const { busy, run } = useAction();
   const [pending, setPending] = useState<{ token: string; summary: SaveSummary } | null>(null);
   const [confirmNewGame, setConfirmNewGame] = useState(false);
+  const [confirmRemoveDocker, setConfirmRemoveDocker] = useState(false);
+  const cleanup = useCleanupResult();
   const progress = useProgressText(snapshot);
   const progressText = progress.current ? `${progress.done} · ${progress.current.key} (${progress.current.stage})` : progress.done;
   const last = snapshot.state.lastExport;
@@ -537,8 +608,60 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             <Icon name="rotateCcw" />
             {t('settings.newGame')}
           </Button>
+          <div className="border-t border-destructive/20 pt-4">
+            <h3 className="text-base font-semibold text-foreground">{t('settings.cleanup.everythingTitle')}</h3>
+            <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">
+              {dockerDown ? t('settings.cleanup.needsDocker') : t('settings.cleanup.everythingHelp')}
+            </p>
+            <Button
+              variant="dangerOutline"
+              className="mt-3"
+              busy={task === 'removingDocker'}
+              disabled={task !== null || dockerDown}
+              onClick={() => setConfirmRemoveDocker(true)}
+              data-testid="remove-docker"
+            >
+              {task !== 'removingDocker' && <Icon name="trash" />}
+              {t('settings.cleanup.everything')}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {confirmRemoveDocker && (
+        <Modal
+          title={t('settings.cleanup.confirmTitle')}
+          icon={<Icon name="trash" className="size-5 text-destructive" />}
+          onClose={() => setConfirmRemoveDocker(false)}
+          data-testid="remove-docker-dialog"
+        >
+          <Notice tone="danger">
+            <p className="text-base leading-relaxed">{t('settings.cleanup.confirmWarning')}</p>
+          </Notice>
+          <ul className="mt-4 list-disc space-y-1 pl-5 text-base text-muted-foreground">
+            <li>{t('settings.cleanup.confirmContainers')}</li>
+            <li>{t('settings.cleanup.confirmVolumes')}</li>
+            <li>{t('settings.cleanup.confirmImages')}</li>
+          </ul>
+          <p className="mt-4 text-base leading-relaxed">{t('settings.cleanup.confirmBackup')}</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button onClick={() => setConfirmRemoveDocker(false)}>{t('common.cancel')}</Button>
+            <Button
+              variant="danger"
+              data-testid="confirm-remove-docker"
+              onClick={() => {
+                setConfirmRemoveDocker(false);
+                void run('removeDocker', async () => {
+                  cleanup.show(await api.removeDockerData(), () => t('settings.cleanup.everythingDone'));
+                });
+              }}
+            >
+              {t('settings.cleanup.confirm')}
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {cleanup.dialog}
 
       {confirmNewGame && (
         <Modal title={t('settings.newGameTitle')} icon={<Icon name="rotateCcw" className="size-5 text-destructive" />} onClose={() => setConfirmNewGame(false)}>

@@ -59,6 +59,8 @@ const api: BugDetectiveApi = {
   inspectSave: () => call('inspectSave'),
   restoreProgress: (token) => call('restoreProgress', token),
   newGame: () => call('newGame'),
+  cleanDockerLeftovers: () => call('cleanDockerLeftovers'),
+  removeDockerData: () => call('removeDockerData'),
 };
 
 contextBridge.exposeInMainWorld('bugDetective', api);

@@ -164,8 +164,14 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     // The header's theme toggle switches the theme everywhere.
     const dark = () => page.evaluate(() => document.documentElement.classList.contains('dark'));
     const before = await dark();
-    await page.getByTestId('theme-toggle').click();
+    // An icon-only toggle: the sun in the light theme, the moon in the dark one.
+    const toggle = page.getByTestId('theme-toggle');
+    await expect(toggle).toHaveText('');
+    await expect(toggle).toHaveAttribute('aria-label', 'Switch between the light and dark theme');
+    await expect(toggle).toHaveAttribute('data-theme', before ? 'dark' : 'light');
+    await toggle.click();
     await expect.poll(dark).toBe(!before);
+    await expect(toggle).toHaveAttribute('data-theme', before ? 'light' : 'dark');
     // Native controls and scrollbars follow the theme.
     const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
     await expect.poll(scheme).toBe(before ? 'light' : 'dark');

@@ -118,14 +118,66 @@ test('settings show Docker stopped with a way to start it', async () => {
     await page.getByTestId('settings-tab-environment').click();
     await expect(page.getByTestId('tool-docker')).toHaveAttribute('data-status', 'stopped');
     await expect(page.getByTestId('disk-usage')).toContainText('Start Docker to measure disk usage.');
+    await expect(page.getByTestId('clean-leftovers')).toBeDisabled();
+    await expect(page.getByTestId('docker-leftovers')).toContainText('Docker is not running: start it to clean up. If Docker Desktop is stuck, restart it.');
     await page.getByTestId('settings-tab-backup').click();
     await expect(page.getByTestId('export-progress')).toBeDisabled();
+    await expect(page.getByTestId('remove-docker')).toBeDisabled();
     await expect(page.getByTestId('settings-pane-backup')).toContainText('Start Docker to export or restore your progress.');
 
     await page.getByTestId('settings-tab-environment').click();
     await page.getByTestId('start-docker').click();
     await expect(page.getByTestId('tool-docker')).toHaveAttribute('data-status', 'running', { timeout: 15_000 });
     await expect(page.getByTestId('disk-qaImage')).toContainText('3 GB');
+  } finally {
+    await close();
+  }
+});
+
+test('Docker cleanup: leftovers keep the game, removing everything starts a new game', async () => {
+  const { page, close } = await launch();
+  try {
+    await startFirstTicket(page);
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-environment').click();
+    await page.getByTestId('clean-leftovers').click();
+    await expect(page.getByTestId('toast-info').filter({ hasText: 'Docker cleanup done: 3 items removed.' })).toBeVisible();
+
+    // Removing everything asks first and lists what goes.
+    await page.getByTestId('settings-tab-backup').click();
+    await page.getByTestId('remove-docker').click();
+    const dialog = page.getByTestId('remove-docker-dialog');
+    await expect(dialog).toContainText('This deletes the code in your workspace and starts a new game.');
+    await expect(dialog).toContainText('Volumes: your code, the VS Code server, the dependency cache and the QA copy');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByTestId('remove-docker').click();
+    await page.getByTestId('confirm-remove-docker').click();
+    await expect(page.getByTestId('toast-info').filter({ hasText: 'Everything Bug Detective created in Docker was removed. A new game has started.' })).toBeVisible();
+    // A new game: no ticket on the board, and the downloads are needed again.
+    await page.getByTestId('nav-board').click();
+    await expect(page.getByTestId('card-1')).toHaveCount(0);
+    await page.getByTestId('nav-dashboard').click();
+    await expect(page.getByTestId('environment-panel')).toBeVisible();
+  } finally {
+    await close();
+  }
+});
+
+test('Docker cleanup lists what Docker could not remove, and why', async () => {
+  const { page, close } = await launch({ cleanupFails: ['bugdetective-qa-input'] });
+  try {
+    await startFirstTicket(page);
+    await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-environment').click();
+    await page.getByTestId('clean-leftovers').click();
+    const result = page.getByTestId('cleanup-result');
+    await expect(result).toContainText('Alguns itens não foram removidos');
+    await expect(result).toContainText('2 removidos. O Docker não conseguiu remover 1 item:');
+    await expect(result.getByTestId('cleanup-failed')).toHaveText('bugdetective-qa-inputError response from daemon: bugdetective-qa-input is in use');
+    await expect(result).toContainText('Se o Docker Desktop parecer travado, reinicie-o');
   } finally {
     await close();
   }

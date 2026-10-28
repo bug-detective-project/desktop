@@ -4,7 +4,7 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { DiskUsageItem, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
+import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from './services/content/archive.ts';
@@ -27,6 +27,8 @@ interface Scenario {
   /** "identical": the approved solution is exactly the reference (the revealed solution applied). */
   review: 'different' | 'identical';
   vscodeFails: boolean;
+  /** Docker resources a cleanup cannot remove (by name), with Docker's reason. */
+  cleanupFails: string[];
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -41,6 +43,7 @@ const DEFAULT_SCENARIO: Scenario = {
   stopDockerAfterUnlock: false,
   review: 'different',
   vscodeFails: false,
+  cleanupFails: [],
 };
 
 const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
@@ -196,6 +199,21 @@ export class FakeRuntime implements GameRuntime {
     onLine('» docker build bugdetective-workspace (fake)');
     onLine('» docker build bugdetective-qa (fake)');
     this.scenario.environmentReady = true;
+  }
+
+  async cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup> {
+    // Leftovers: a QA container, the QA input volume and an image of an older version.
+    const names =
+      scope === 'leftovers'
+        ? ['bugdetective-qa-1a2b3c4d', 'bugdetective-qa-input', 'bugdetective-qa:0ld0ld0ld0ld']
+        : ['bugdetective-workspace', 'bugdetective-workspace', 'bugdetective-vscode-server', 'bugdetective-qa-cache', 'bugdetective-qa-input', 'bugdetective-workspace:281e4701af14', 'bugdetective-qa:9c8db3bee0fc'];
+    const failed = names.filter((name) => this.scenario.cleanupFails.includes(name)).map((name) => ({ name, reason: `Error response from daemon: ${name} is in use` }));
+    if (scope === 'everything') {
+      this.scenario.environmentReady = false;
+      this.stages.clear();
+      this.claimed = null;
+    }
+    return { removed: names.length - failed.length, failed };
   }
 
   async diskUsage(): Promise<DiskUsageItem[]> {

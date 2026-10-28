@@ -88,14 +88,14 @@ export function AppHeader({
           <button
             type="button"
             onClick={() => api.updateSettings({ theme: dark ? 'light' : 'dark' }).catch(toast.error)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-xs transition-all hover:bg-muted"
+            className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-xs transition-all hover:bg-muted"
             title={t('header.toggleTheme')}
+            aria-label={t('header.toggleTheme')}
+            data-theme={dark ? 'dark' : 'light'}
             data-testid="theme-toggle"
           >
-            <Icon name="sunMoon" className="size-4 text-muted-foreground" />
-            <span className="hidden 2xl:inline">
-              {t('header.theme')}: <span className="font-semibold text-primary">{t(dark ? 'settings.themes.dark' : 'settings.themes.light')}</span>
-            </span>
+            {/* Icon only: the sun in the light theme, the moon in the dark one. */}
+            <Icon name={dark ? 'moon' : 'sun'} className="size-4 text-muted-foreground" />
           </button>
           <LanguageMenu language={language} />
           <div className="flex size-8 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-sm font-semibold text-primary" aria-hidden>

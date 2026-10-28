@@ -112,7 +112,7 @@ export class Docker {
   }
 
   async removeVolume(name: string): Promise<void> {
-    const result = await this.run(['volume', 'rm', '--force', name]);
+    const result = await this.run(['volume', 'rm', '--force', name], { timeoutMs: 60_000 });
     if (result.code !== 0 && (await this.volumeExists(name))) {
       throw new CommandError(this.cli, ['volume', 'rm', name], result);
     }
@@ -147,6 +147,30 @@ export class Docker {
 
   async removeContainer(name: string): Promise<void> {
     await this.run(['container', 'rm', '--force', '--volumes=false', name], { timeoutMs: 60_000 });
+  }
+
+  /** Removes an image by tag or id. Without force, an image a container still uses is kept (and this throws). */
+  async removeImage(ref: string, options: { force?: boolean } = {}): Promise<void> {
+    await this.checked(['image', 'rm', ...(options.force ? ['--force'] : []), ref], { timeoutMs: 120_000 });
+  }
+
+  /** Every container, volume and image carrying the app's label, whatever its role. */
+  async labelled(): Promise<{ containers: string[]; volumes: string[]; images: { ref: string; id: string }[] }> {
+    const filter = ['--filter', `label=${LABEL}`];
+    const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
+    const [containers, volumes, images] = await Promise.all([
+      this.checked(['container', 'ls', '--all', ...filter, '--format', '{{.Names}}'], { timeoutMs: 30_000 }),
+      this.checked(['volume', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
+      this.checked(['image', 'ls', ...filter, '--format', '{{.Repository}}:{{.Tag}}|{{.ID}}'], { timeoutMs: 30_000 }),
+    ]);
+    return {
+      containers: lines(containers),
+      volumes: lines(volumes),
+      images: lines(images).map((line) => {
+        const [ref = '', id = ''] = line.split('|');
+        return { ref, id };
+      }),
+    };
   }
 
   /** Names of containers carrying the given role label (running or not). */

@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import type {
   BusyTask,
   DiskUsageItem,
+  DockerCleanup,
   EngineState,
   EnvironmentReport,
   PrerequisiteReport,
@@ -406,6 +407,11 @@ export class Game {
       await this.requireDocker();
       await this.returnToPlayerCode();
     }
+    await this.startOver();
+  }
+
+  /** A fresh game that keeps the preferences; downloaded packages and reviews are removed. */
+  private async startOver(): Promise<void> {
     const { language, theme, qaTimeoutSeconds } = this.state.settings;
     const fresh = rules.createInitialState(this.ctx(), language);
     await this.options.packages.clear();
@@ -413,6 +419,30 @@ export class Game {
     this.titles = {};
     this.hintsTotal = {};
     await this.commit({ ...fresh, settings: { ...fresh.settings, theme, qaTimeoutSeconds } });
+  }
+
+  /** "Clean up leftovers": QA leftovers and images of older versions. The player's work stays. */
+  async cleanDockerLeftovers(): Promise<DockerCleanup> {
+    await this.requireDocker();
+    const result = await this.exclusive('cleaningDocker', () => this.options.runtime.cleanDocker('leftovers'));
+    await this.refreshEnvironment().catch(() => {});
+    return result;
+  }
+
+  /**
+   * "Remove everything from Docker": every container, volume and image of the app, the player's
+   * code included, then a new game (a game without its code cannot go on; a backup can be restored).
+   * A checked-out review is not returned first: its branch goes away with the rest.
+   */
+  async removeDockerData(): Promise<DockerCleanup> {
+    if (this.busy || this.qaRun) {
+      throw new GameError('busy');
+    }
+    await this.requireDocker();
+    const result = await this.exclusive('removingDocker', () => this.options.runtime.cleanDocker('everything'));
+    await this.startOver();
+    await this.refreshEnvironment().catch(() => {});
+    return result;
   }
 
   async markInboxRead(id: string): Promise<void> {
