@@ -279,10 +279,12 @@ export class FakeRuntime implements GameRuntime {
     return [textFile('client/src/App.tsx', `export {} // reference ${stage}\n`)];
   }
 
-  /** Review branches built, by ticket, for tests. */
+  /** Review branches built, by ticket, and every build request, for tests. */
   reviews = new Map<number, ReviewCommits>();
+  builds: ReviewBuild[] = [];
 
   async buildReview(build: ReviewBuild) {
+    this.builds.push(build);
     const seed = `${build.ticket}:${build.date}`;
     const commits = { approved: fakeCommit(`approved ${seed}`), reference: fakeCommit(`reference ${seed}`), snapshot: fakeCommit(`snapshot ${seed}`) };
     this.reviews.set(build.ticket, commits);
@@ -305,28 +307,39 @@ export class FakeRuntime implements GameRuntime {
   }
 
   private head = fakeCommit('head');
+  /** What HEAD looks like, for tests of an interrupted checkout. */
+  headInfo: { commit: string; parent: string | null; subject: string } | null = null;
+  /** Temporary commit returned by reviewSaveWork, for tests. */
+  wipCommit: string | null = null;
+  returns: ReturnRequest[] = [];
+  /** Makes the next review checkout fail (a locked index), for tests. */
+  failSwitch = false;
 
   async reviewReturnPoint() {
     return { branch: this.branch, head: this.head, indexTree: fakeCommit('index'), excludesFile: null };
   }
 
   async reviewSaveWork() {
-    return null;
+    return this.wipCommit;
   }
 
   async headCommit() {
-    return { commit: this.head, parent: null, subject: 'Stage' };
+    return this.headInfo ?? { commit: this.head, parent: null, subject: 'Stage' };
   }
 
   /** The branch the player was on while a review is checked out, for tests. */
   private playerBranchDuringReview: string | null = null;
 
   async reviewSwitch(ticket: number) {
+    if (this.failSwitch) {
+      throw new Error("Unable to create '.git/index.lock': File exists.");
+    }
     this.playerBranchDuringReview = this.branch;
     this.branch = `review/ticket-${ticket}`;
   }
 
   async reviewReturn(request: ReturnRequest) {
+    this.returns.push(request);
     this.branch = request.point.branch ?? this.playerBranchDuringReview;
     return { editsSaved: false, tipMoved: false };
   }
