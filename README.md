@@ -154,6 +154,46 @@ pnpm run dist:win    # dist\Bug-Detective-Setup-<version>.exe (not signed)
 
 The installer is per-user (no admin rights), lets the player choose the folder, and adds Start menu and desktop shortcuts. Uninstalling removes everything the app created in Docker (`resources/remove-docker-data.ps1`, run from `resources/installer.nsh`; nothing is done while Docker is not running) and the app data folder (`deleteAppDataOnUninstall`). An update keeps both: electron-builder runs the old uninstaller with `isUpdated`, and the cleanup step is skipped then. The script can also be run by hand: `powershell -ExecutionPolicy Bypass -File "<install folder>\resources\remove-docker-data.ps1"`. The packaged app carries `resources/docker/` (Dockerfiles, the QA CLI, `images.json`); images are built on the player's machine the first time, with the player's consent.
 
+### Building and installing on Windows from WSL 2
+
+When the code lives in WSL 2, the Windows installer is built with Windows Node.js on a Windows copy of the code (see [Windows development from WSL 2](#windows-development-from-wsl-2)), then installed on Windows like any other app. Every command below runs in a WSL terminal, from `desktop/`.
+
+**Once per computer:**
+
+1. Download the official Node.js 26.12.1 Windows zip (`node-v26.12.1-win-x64.zip`) and extract it to `%USERPROFILE%\bugdetective-dev\tools\node-v26.12.1-win-x64` (from WSL: `/mnt/c/Users/<you>/bugdetective-dev/tools/`). `tools/win.sh` uses it; another folder can be set with `BUGDETECTIVE_WIN_NODE`.
+2. Install pnpm next to that `node.exe`:
+
+   ```sh
+   tools/win.sh npm install -g pnpm@12.15.0
+   tools/win.sh pnpm --version    # 12.15.0
+   ```
+
+   npm warns that pnpm's install scripts did not run; pnpm works without them. If a build later says `'pnpm' is not recognized`, this step is missing.
+
+**Every build:**
+
+```sh
+tools/sync-windows.sh                              # copies desktop/ and ../supportdesk-private/ to C:\Users\<you>\bugdetective-dev
+tools/win.sh pnpm install --frozen-lockfile        # Windows node_modules (never shared with WSL)
+tools/win.sh pnpm run electron:install             # the Windows Electron binary
+tools/win.sh pnpm run dist:win                     # build + installer
+```
+
+The installer is `C:\Users\<you>\bugdetective-dev\desktop\dist\Bug-Detective-Setup-<version>.exe` (from WSL: `/mnt/c/Users/<you>/bugdetective-dev/desktop/dist/`). Sync again after every change: the Windows copy does not follow WSL by itself.
+
+**Install or update:**
+
+1. Close Bug Detective if it is open.
+2. Run the installer. Double-click it in Explorer, or install silently from WSL into the folder of the previous install:
+
+   ```sh
+   powershell.exe -NoProfile -Command "Start-Process -FilePath 'C:\Users\<you>\bugdetective-dev\desktop\dist\Bug-Detective-Setup-<version>.exe' -ArgumentList '/S' -Wait"
+   ```
+
+3. The app lands in `%LOCALAPPDATA%\Programs\Bug Detective` (unless another folder was chosen). Installing over an existing install is an update: the game state, saves and Docker data stay. The installer is not signed, so Windows SmartScreen may warn on the first start.
+
+The version number comes from `package.json`. A rebuild with the same version still replaces the installed files; the date of `Bug Detective.exe` in the install folder shows which build is installed. Uninstalling (Windows Settings → Apps) removes the app's Docker data and its app data folder, as described above.
+
 ## Configuration
 
 | | |
