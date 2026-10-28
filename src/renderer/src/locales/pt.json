@@ -215,12 +215,38 @@
   },
   "review": {
     "title": "Code review",
-    "reference": "Solução de referência",
-    "yours": "Suas alterações",
     "explanation": "Notas da revisão",
     "accept": "Aceitar a revisão",
-    "noDiff": "Nenhuma alteração foi encontrada em relação ao stage.",
-    "back": "Voltar ao quadro"
+    "back": "Voltar ao quadro",
+    "comparison": "Comparando soluções",
+    "comparisonIntro": "Sua solução aprovada ao lado da solução de referência. As duas podem ser válidas: use as diferenças para ver outras formas de resolver o ticket.",
+    "yourSolution": "Sua solução",
+    "referenceSolution": "Solução de referência",
+    "onlyYours": "Somente na sua solução",
+    "onlyReference": "Somente na referência",
+    "showWhitespace": "Mostrar espaços em branco",
+    "identical": "Sua solução é idêntica à referência",
+    "baselineIntro": "Suas alterações em relação ao código com que o ticket começou:",
+    "original": "Código original",
+    "removedByYou": "Removido por você",
+    "addedByYou": "Adicionado por você",
+    "openInVSCode": "Abrir review no VS Code",
+    "startsDocker": "O Docker Desktop não está rodando: ele será iniciado antes.",
+    "banner": "Você está vendo o review do ticket {{ticket}} no VS Code. Seu código será restaurado automaticamente.",
+    "backToMyCode": "Voltar para o meu código",
+    "notice": {
+      "editsSaved": "As alterações feitas durante o review do ticket {{ticket}} foram salvas separadamente e o seu código foi restaurado.",
+      "workKept": "Seu código foi restaurado. O seu trabalho em andamento ficou guardado como um commit, porque houve novos commits enquanto o review do ticket {{ticket}} estava aberto."
+    }
+  },
+  "comparison": {
+    "files_one": "{{count}} arquivo diferente",
+    "files_other": "{{count}} arquivos diferentes",
+    "renamed": "Renomeado",
+    "binary": "Arquivo binário diferente",
+    "large": "Diff grande: {{count}} linhas alteradas.",
+    "loadDiff": "Carregar diff",
+    "noLineChanges": "Só o nome ou o modo do arquivo mudou."
   },
   "diff": {
     "empty": "Sem diferenças."
@@ -350,6 +376,9 @@
     "noMoreHints": "Não há mais dicas.",
     "hintsRemaining": "Peça primeiro as dicas que faltam.",
     "workspaceNotRunning": "O workspace não está rodando.",
-    "failed": "Algo deu errado: {{message}}"
+    "failed": "Algo deu errado: {{message}}",
+    "noReview": "O review deste ticket não está disponível.",
+    "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
+    "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}"
   }
 }

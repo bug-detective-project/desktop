@@ -43,8 +43,7 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('code-review')).toBeVisible();
     await expect(page.getByTestId('review-markdown')).toContainText('Why the bug happened');
-    await expect(page.getByTestId('reference-diff')).toContainText('client/src/pages/TicketDetails.tsx');
-    await expect(page.getByTestId('player-diff')).toContainText('fixed by the player');
+    await expect(page.getByTestId('comparison')).toContainText('client/src/pages/TicketDetails.tsx');
     await page.getByTestId('accept-review').click();
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(card).toHaveAttribute('data-status', 'done');

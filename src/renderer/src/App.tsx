@@ -4,6 +4,7 @@ import type { Snapshot } from '@shared/api.ts';
 import { useSnapshot } from './api.ts';
 import { AppHeader } from './components/AppHeader.tsx';
 import type { View } from './components/AppHeader.tsx';
+import { ReviewBanner } from './components/ReviewBanner.tsx';
 import { Spinner } from './components/ui.tsx';
 import { Board } from './screens/Board.tsx';
 import { Checklist, DockerBanner } from './screens/Checklist.tsx';
@@ -75,6 +76,7 @@ export function App() {
     <div className="flex h-full flex-col">
       <AppHeader snapshot={snapshot} view={view} dark={dark} onNavigate={setView} />
       <DockerBanner snapshot={snapshot} />
+      <ReviewBanner snapshot={snapshot} />
       <main className="min-h-0 flex-1 overflow-y-auto">
         {view === 'dashboard' && (
           <Dashboard
