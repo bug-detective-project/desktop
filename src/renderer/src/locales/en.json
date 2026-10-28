@@ -147,14 +147,17 @@
       "codeReview": "Code Review",
       "done": "Done"
     },
-    "hint": "Drag your card from To Do to In Progress, then to In QA when it is fixed. The other moves happen on their own.",
+    "hint": "Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.",
     "notAllowed": "Only QA and the code review move a card there.",
     "notAllowedInQa": "Your card is being tested. When QA finishes, it moves the card to the right column.",
     "notAllowedInReview": "To move the card to Done, accept the code review.",
-    "qaRunning": "QA is running…",
-    "attempts_one": "{{count}} QA attempt",
-    "attempts_other": "{{count}} QA attempts",
-    "empty": "No tickets yet. Get your first assignment on the Dashboard."
+    "emptyColumn": {
+      "todo": "Nothing waiting. New assignments arrive in your inbox.",
+      "inProgress": "Drag your ticket here when you start working on it.",
+      "inQa": "Drop your ticket here to run QA.",
+      "codeReview": "Tickets that pass QA wait here for review.",
+      "done": "Tickets land here once you accept their review."
+    }
   },
   "ticket": {
     "tabs": {

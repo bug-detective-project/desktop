@@ -43,7 +43,7 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     const cancel = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
     expect(cancel).toMatch(/moveNotAllowed|busy/);
     await expect(card).toHaveAttribute('data-status', 'inProgress', { timeout: 15_000 });
-    await expect(card).toContainText('1 QA attempt');
+    await expect(card).toHaveAttribute('data-attempts', '1');
 
     // Second attempt passes: Code Review, then Done after accepting the review.
     await dragCard(page, 1, 'inQa');
@@ -95,7 +95,7 @@ test('a QA timeout returns the card with the timeout template', async () => {
     const card = page.getByTestId('card-1');
     await dragCard(page, 1, 'inProgress');
     await dragCard(page, 1, 'inQa');
-    await expect(card).toContainText('1 QA attempt', { timeout: 15_000 });
+    await expect(card).toHaveAttribute('data-attempts', '1', { timeout: 15_000 });
     await expect(card).toHaveAttribute('data-status', 'inProgress');
     await card.click();
     await page.getByTestId('tab-qa').click();
@@ -166,5 +166,69 @@ test('the project context card collapses and remembers it after a restart', asyn
     }
   } finally {
     await rm(userData, { recursive: true, force: true });
+  }
+});
+
+test('the columns are framed cards with a placeholder when empty, in English and Portuguese', async () => {
+  const { page, close } = await launch();
+  try {
+    await startFirstTicket(page);
+    await expect(page.getByTestId('board')).toContainText("Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.");
+    const column = page.getByTestId('column-inQa');
+    await expect(column).toHaveAttribute('aria-label', 'In QA');
+    await expect(column).toHaveClass(/rounded-xl/);
+    await expect(column.locator('header')).toHaveClass(/bg-amber-500\/10/);
+    await expect(page.getByTestId('count-todo')).toHaveText('1');
+    await expect(page.getByTestId('empty-todo')).toHaveCount(0);
+    const empty = {
+      inProgress: 'Drag your ticket here when you start working on it.',
+      inQa: 'Drop your ticket here to run QA.',
+      codeReview: 'Tickets that pass QA wait here for review.',
+      done: 'Tickets land here once you accept their review.',
+    };
+    for (const [id, text] of Object.entries(empty)) {
+      await expect(page.getByTestId(`empty-${id}`)).toHaveText(text);
+    }
+    await expect(page.getByTestId('empty-inQa')).toHaveClass(/border-amber-500\/40/);
+
+    // A placeholder is still a drop target.
+    await dragCard(page, 1, 'inProgress');
+    await expect(page.getByTestId('empty-todo')).toHaveText('Nothing waiting. New assignments arrive in your inbox.');
+    await expect(page.getByTestId('empty-inProgress')).toHaveCount(0);
+
+    await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));
+    await expect(page.getByTestId('board')).toContainText('Mova seu ticket para Em QA quando a correção estiver pronta.');
+    await expect(page.getByTestId('empty-todo')).toHaveText('Nada esperando. Novas tarefas chegam na sua caixa de entrada.');
+    await expect(page.getByTestId('empty-inQa')).toHaveText('Solte seu ticket aqui para rodar o QA.');
+    await expect(page.getByTestId('empty-codeReview')).toHaveText('Tickets aprovados no QA aguardam revisão aqui.');
+    await expect(page.getByTestId('empty-done')).toHaveText('Os tickets chegam aqui quando você aceita a revisão.');
+  } finally {
+    await close();
+  }
+});
+
+test('a card shows only its key and title, and "Test failed" only after a failed QA run', async () => {
+  const { page, close } = await launch({ qa: ['gate2', 'passed'], qaDelayMs: 1500 });
+  try {
+    await startFirstTicket(page);
+    const card = page.getByTestId('card-1');
+    await expect(card).toHaveText(/^SD-214/);
+    await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
+    await dragCard(page, 1, 'inProgress');
+    await expect(card).toHaveClass(/border-primary\/40/);
+    await expect(page.getByTestId('board').getByRole('button', { name: /VS Code|Browser/ })).toHaveCount(0);
+
+    await dragCard(page, 1, 'inQa');
+    await expect(card).toHaveAttribute('data-attempts', '1', { timeout: 15_000 });
+    await expect(card).toHaveAttribute('data-status', 'inProgress');
+    await expect(card.getByTestId('card-qa-failed')).toHaveText('Test failed');
+
+    // A new run replaces the failure; once it passes the badge is gone, and no "Tests passed" badge appears.
+    await dragCard(page, 1, 'inQa');
+    await expect(card).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
+    await expect(card).not.toContainText('Tests passed');
+  } finally {
+    await close();
   }
 });

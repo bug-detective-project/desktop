@@ -42,7 +42,7 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await panel.getByTestId('close-panel').click();
     await dragCard(page, 1, 'inQa');
     // Wait for the attempt itself: the card can still be in In Progress before the move lands.
-    await expect(page.getByTestId('card-1')).toContainText('1 QA attempt', { timeout: 15_000 });
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-attempts', '1', { timeout: 15_000 });
     await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'inProgress');
     await page.getByTestId('card-1').click();
     await panel.getByTestId('tab-qa').click();
@@ -101,9 +101,9 @@ test('the QA tab groups the errors of each run in a dropdown, the latest run ope
     await startFirstTicket(page);
     await dragCard(page, 1, 'inProgress');
     await dragCard(page, 1, 'inQa');
-    await expect(page.getByTestId('card-1')).toContainText('1 QA attempt', { timeout: 15_000 });
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-attempts', '1', { timeout: 15_000 });
     await dragCard(page, 1, 'inQa');
-    await expect(page.getByTestId('card-1')).toContainText('2 QA attempts', { timeout: 15_000 });
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-attempts', '2', { timeout: 15_000 });
     await page.getByTestId('card-1').click();
     const panel = page.getByTestId('ticket-panel');
     await panel.getByTestId('tab-qa').click();

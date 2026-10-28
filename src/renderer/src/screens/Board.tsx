@@ -8,15 +8,22 @@ import type { Column, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { STAGE } from '../components/stage.ts';
-import { Badge, Spinner } from '../components/ui.tsx';
+import { Badge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
+
+/** Whether the latest finished QA run of the ticket failed (a timeout counts as a failure). */
+function lastQaFailed(ticket: TicketState): boolean {
+  const last = ticket.attempts.at(-1);
+  return ticket.status !== 'inQa' && last !== undefined && last.result.status !== 'passed';
+}
 
 function TicketCard({
   ticket,
   title,
   ticketKey,
+  active,
   draggable,
   movable,
   onOpen,
@@ -26,6 +33,8 @@ function TicketCard({
   ticket: TicketState;
   title: string;
   ticketKey: string;
+  /** The ticket the player is working on (In Progress). */
+  active: boolean;
   draggable: boolean;
   /** Draggable only so a drop can explain why the card stays (In QA, Code Review): styled as not movable. */
   movable: boolean;
@@ -50,20 +59,18 @@ function TicketCard({
       onClick={onOpen}
       data-testid={`card-${ticket.ticket}`}
       data-status={ticket.status}
-      className={`w-full rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
-        movable ? 'cursor-grab border-primary/30 active:cursor-grabbing' : 'cursor-pointer border-border'
-      }`}
+      data-attempts={ticket.attempts.length}
+      className={`block rounded-lg border bg-background p-3.5 text-left transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
+        active ? 'border-primary/40' : 'border-border'
+      } ${movable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
-      <p className="font-mono text-sm font-bold text-primary">{ticketKey}</p>
-      <p className="mt-1 text-base leading-snug font-semibold text-foreground">{title}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-2 empty:hidden">
-        {ticket.status === 'inQa' && (
-          <Badge tone="warn">
-            <Spinner className="size-3" /> {t('board.qaRunning')}
-          </Badge>
-        )}
-        {ticket.attempts.length > 0 && <Badge>{t('board.attempts', { count: ticket.attempts.length })}</Badge>}
-      </div>
+      <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+      <p className="mt-1 line-clamp-2 font-medium text-foreground">{title}</p>
+      {lastQaFailed(ticket) && (
+        <div className="mt-2.5" data-testid="card-qa-failed">
+          <Badge tone="danger">{t('qa.badge.failed')}</Badge>
+        </div>
+      )}
     </div>
   );
 }
@@ -83,6 +90,9 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
   // Cards that QA or the code review will move can still be picked up: dropping them explains what moves them.
   const canDrag = (ticket: TicketState) =>
     canMove(ticket) || (ticket.ticket === state.currentTicket && (ticket.status === 'inQa' || ticket.status === 'codeReview'));
+
+  // In QA pulses only while a QA run is in progress; In Progress always does.
+  const pulses = (column: Column) => (column === 'inQa' ? snapshot.busy === 'qa' : STAGE[column].pulse);
 
   const endDrag = () => {
     draggingRef.current = null;
@@ -112,9 +122,9 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
     <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-6" data-testid="board">
       <header className="mb-5">
         <h1 className="text-3xl font-bold tracking-tight">{t('board.title')}</h1>
-        <p className="mt-1 text-base text-muted-foreground">{state.tickets.length === 0 ? t('board.empty') : t('board.hint')}</p>
+        <p className="mt-1 text-base text-muted-foreground">{t('board.hint')}</p>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-5 gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-5 items-stretch gap-4">
         {COLUMNS.map((column) => {
           const tickets = state.tickets.filter((ticket) => ticket.status === column);
           const allowed = dragging ? isPlayerMoveAllowed(dragging.status, column) : false;
@@ -136,24 +146,36 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                 event.preventDefault();
                 void drop(column, Number(event.dataTransfer.getData(DRAG_TYPE)));
               }}
-              className={`flex min-h-0 flex-col rounded-xl border transition ${
+              aria-label={t(`board.columns.${column}`)}
+              className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition ${
                 dragging && allowed ? 'border-primary ring-2 ring-primary/30' : 'border-border'
-              } ${dragging && !allowed ? 'opacity-60' : ''} ${over === column && allowed ? 'bg-primary/10' : 'bg-muted/40'}`}
+              } ${dragging && !allowed ? 'opacity-60' : ''}`}
             >
-              <h2 className="flex items-center justify-between gap-2 px-3 py-3 text-xs font-bold tracking-wider text-foreground uppercase">
-                <span className="flex items-center gap-2">
-                  <span className={`size-2 rounded-full ${STAGE[column].dot}`} aria-hidden />
-                  {t(`board.columns.${column}`)}
+              <header className={`flex items-center gap-2 border-b px-4 py-3 ${STAGE[column].pill}`}>
+                <span className={`size-1.5 shrink-0 rounded-full ${STAGE[column].dot} ${pulses(column) ? 'animate-pulse' : ''}`} aria-hidden />
+                <h2 className="truncate text-xs font-bold tracking-wider uppercase">{t(`board.columns.${column}`)}</h2>
+                <span className="ml-auto text-xs font-medium text-muted-foreground tabular-nums" data-testid={`count-${column}`}>
+                  {tickets.length}
                 </span>
-                <span className="rounded-full border border-border bg-card px-1.5 text-xs font-semibold text-muted-foreground">{tickets.length}</span>
-              </h2>
-              <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+              </header>
+              <div className={`flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 transition-colors ${over === column && allowed ? 'bg-primary/5' : ''}`}>
+                {tickets.length === 0 && (
+                  <p
+                    className={`rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground ${
+                      column === 'inQa' ? 'border-amber-500/40' : 'border-border'
+                    }`}
+                    data-testid={`empty-${column}`}
+                  >
+                    {t(`board.emptyColumn.${column}`)}
+                  </p>
+                )}
                 {tickets.map((ticket) => (
                   <TicketCard
                     key={ticket.ticket}
                     ticket={ticket}
                     title={ticketTitle(snapshot, ticket.ticket, language).text}
                     ticketKey={ticketTitle(snapshot, ticket.ticket, language).key}
+                    active={ticket.ticket === state.currentTicket && ticket.status === 'inProgress'}
                     draggable={canDrag(ticket)}
                     movable={canMove(ticket)}
                     onOpen={() => onOpenTicket(ticket.ticket)}
