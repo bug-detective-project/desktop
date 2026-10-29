@@ -221,6 +221,7 @@ function CurrentTask({
       className="flex shrink-0 flex-col gap-3 border-b border-primary/25 bg-[color-mix(in_oklab,var(--primary)_22%,var(--card))] px-5 pt-6 pb-7"
       data-testid={testId}
       data-state={state}
+      data-tour="current-task"
     >
       <SectionLabel
         icon="clipboardList"
@@ -877,11 +878,14 @@ export function Dashboard({
   onOpenBoard,
   onOpenTicket,
   onOpenReview,
+  onboarding = false,
 }: {
   snapshot: Snapshot
   onOpenBoard: () => void
   onOpenTicket: (ticket: number) => void
   onOpenReview: (ticket: number) => void
+  /** Rafaela's onboarding is showing: the drawer stays closed so it does not cover the steps. */
+  onboarding?: boolean
 }) {
   const { t } = useTranslation()
   const toast = useToast()
@@ -991,6 +995,7 @@ export function Dashboard({
         <section
           className="flex min-h-0 min-w-0 flex-col border-r border-border"
           aria-label={t('dashboard.inbox')}
+          data-tour="inbox"
         >
           <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-[18px] pb-3">
             <div className="flex min-w-0 items-center gap-2.5">
@@ -1063,7 +1068,7 @@ export function Dashboard({
           actions={actions}
         />
 
-        {drawerOpen && (
+        {drawerOpen && !onboarding && (
           <ProjectDrawer
             language={language}
             onClose={closeDrawer}

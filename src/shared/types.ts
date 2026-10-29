@@ -165,6 +165,8 @@ export interface GameState {
   lastExport?: LastExport | null;
   /** The review checked out in the workspace, or null when the player's code is checked out. */
   reviewSession: ReviewSession | null;
+  /** Rafaela's onboarding was finished (or skipped in development); optional, so older state files stay valid. */
+  onboardingSeen?: boolean;
 }
 
 /**

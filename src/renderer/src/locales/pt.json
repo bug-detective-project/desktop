@@ -13,7 +13,8 @@
     "unread_one": "{{count}} mensagem não lida",
     "unread_other": "{{count}} mensagens não lidas",
     "language": "Idioma: {{language}}",
-    "pending": "Uma nova tarefa espera no Painel"
+    "pending": "Uma nova tarefa espera no Painel",
+    "onboarding": "Rever o onboarding: a Rafaela mostra para que serve cada parte do Painel e do Quadro"
   },
   "common": {
     "checkAgain": "Verificar de novo",
@@ -129,6 +130,110 @@
     "nextBody": "O ticket é baixado e o seu workspace é preparado para ele. Um ticket de cada vez.",
     "startServer": "Iniciar servidor",
     "stopServer": "Parar servidor"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Boas-vindas ao time!",
+      "body": "Oi! Sou a Rafaela, gerente de engenharia aqui na {{company}}. Antes do seu primeiro ticket, vou fazer seu onboarding: um tour rápido pelo Painel e pelo Quadro, onde você vai trabalhar. Leva uns 2 minutos.",
+      "start": "Começar onboarding"
+    },
+    "closing": {
+      "title": "É isso!",
+      "body": "Seu primeiro ticket está pronto: no Painel, clique em Pegar próxima tarefa para começar. Qualquer dúvida, a Priya é sua mentora: fale com ela pelo ticket.",
+      "bodyReplay": "Qualquer dúvida, a Priya é sua mentora: fale com ela pelo ticket.",
+      "finish": "Concluir"
+    },
+    "progress": "Passo {{step}} de {{total}}",
+    "next": "Próximo",
+    "back": "Voltar",
+    "skip": "Pular onboarding",
+    "example": "Ticket de exemplo",
+    "steps": {
+      "currentTask": {
+        "title": "Tarefa atual",
+        "body": "Aqui fica o ticket que você está fazendo. Quando eu te passar um ticket, ele aparece aqui, com o botão que leva até ele e atalhos para o VS Code e o navegador."
+      },
+      "environment": {
+        "title": "Ambiente local",
+        "body": "O Docker, as imagens e o servidor de desenvolvimento onde o SupportDesk roda. Quando algo precisa da sua atenção, o título fica vermelho e o item diz o que fazer."
+      },
+      "client": {
+        "title": "Cliente, projeto e contatos",
+        "body": "Para quem estamos construindo o SupportDesk. Em Projeto e contatos você encontra o projeto e o time: a Priya, desenvolvedora sênior, é sua mentora."
+      },
+      "inbox": {
+        "title": "Caixa de entrada",
+        "body": "É por aqui que eu te passo as tarefas. Cada ticket novo chega como um e-mail meu."
+      },
+      "message": {
+        "title": "O e-mail aberto",
+        "body": "Leia o pedido aqui. Quando houver uma tarefa nova esperando, o e-mail mostra o botão Pegar próxima tarefa."
+      },
+      "board": {
+        "title": "O Quadro",
+        "body": "O trabalho de cada ticket acontece no Quadro. Vamos até lá agora."
+      },
+      "columns": {
+        "title": "Colunas e fluxo",
+        "body": "Todo ticket passa por A fazer, Em andamento, Em QA, Code review e Concluído. Você avança o ticket conforme o trabalho anda."
+      },
+      "card": {
+        "title": "O card do ticket",
+        "body": "Clique no card para ver os detalhes do ticket. O botão Mover (ou arrastar) leva ele para a próxima coluna."
+      },
+      "qa": {
+        "title": "Em QA",
+        "body": "Solte o ticket aqui quando achar que está corrigido: os testes automáticos rodam. Se algo falhar, o ticket volta com os erros."
+      },
+      "ticketOpen": {
+        "title": "O ticket aberto",
+        "body": "Clicando no card, o ticket abre aqui ao lado do quadro, com tudo o que você precisa para trabalhar nele. Este é só um exemplo."
+      },
+      "ticketHeader": {
+        "title": "Código, etapa e título",
+        "body": "No topo ficam o código do ticket, a etapa em que ele está e o título."
+      },
+      "ticketActions": {
+        "title": "Código, app e servidor",
+        "body": "Abrir no VS Code conecta seu editor ao código. Abrir app no navegador mostra o SupportDesk rodando. O botão de baixo inicia ou para o servidor de desenvolvimento."
+      },
+      "ticketTab": {
+        "title": "A aba Ticket",
+        "body": "Aqui está o pedido: o que acontece, como reproduzir e o que deveria acontecer. Comece sempre reproduzindo o bug."
+      },
+      "qaTab": {
+        "title": "A aba QA",
+        "body": "Cada vez que o ticket passa pelo QA, o resultado aparece aqui. Se falhar, você vê quais testes quebraram e por quê."
+      },
+      "historyTab": {
+        "title": "A aba Histórico",
+        "body": "O histórico guarda suas tentativas de QA e cada movimento do ticket."
+      },
+      "seniorTab": {
+        "title": "Falar com a Priya",
+        "body": "Travou? Pergunte para a Priya. Ela responde com uma dica de cada vez e, depois de todas, pode mostrar a solução."
+      },
+      "review": {
+        "title": "Code review e Concluído",
+        "body": "Depois do QA, compare sua solução com a de referência no Code review e aceite para concluir o ticket."
+      },
+      "settings": {
+        "title": "Configurações",
+        "body": "Aqui ficam o idioma, o tema, o status das suas ferramentas e o backup do seu progresso. Não precisa mexer agora."
+      },
+      "replay": {
+        "title": "Rever quando quiser",
+        "body": "E se quiser rever este onboarding, é só clicar aqui, a qualquer momento."
+      }
+    },
+    "demo": {
+      "title": "Exemplo: a busca ignora letras maiúsculas",
+      "ticketMarkdown": "## O que acontece\n\nBuscar por `login` encontra o ticket, mas buscar por `Login` não encontra nada.\n\n## Como reproduzir\n\n1. Abra a lista de tickets.\n2. Busque por `Login`.\n\n## Esperado\n\nA busca encontra os mesmos tickets, com ou sem letras maiúsculas.",
+      "qaTest": "a busca encontra \"Login\" ao digitar \"login\"",
+      "qaError": "Esperado 1 resultado, recebido 0",
+      "question": "Consigo reproduzir, mas não sei por onde começar.",
+      "hint": "Compare as duas buscas na aba Network: o que o servidor recebe em cada uma?"
+    }
   },
   "board": {
     "title": "Quadro",

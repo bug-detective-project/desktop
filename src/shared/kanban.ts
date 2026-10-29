@@ -303,6 +303,18 @@ export function acceptReview(state: GameState, ticket: number, ctx: RuleContext)
   return next;
 }
 
+/**
+ * Rafaela's onboarding opens on its own until it is finished. A game that already has an unlocked
+ * ticket (a save from before the onboarding existed) counts as seen: the player is not interrupted.
+ */
+export function onboardingDue(state: GameState): boolean {
+  return !state.onboardingSeen && state.tickets.length === 0;
+}
+
+export function finishOnboarding(state: GameState): GameState {
+  return { ...state, onboardingSeen: true };
+}
+
 export function markInboxRead(state: GameState, id: string): GameState {
   return { ...state, inbox: state.inbox.map((message) => (message.id === id ? { ...message, read: true } : message)) };
 }

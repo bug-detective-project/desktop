@@ -32,7 +32,9 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function createGame(options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean } = {}) {
+function createGame(
+  options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean; devSkipOnboarding?: boolean; autoOnboarding?: boolean } = {},
+) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
   const game = new Game({
     store: new StateStore(dir),
@@ -44,6 +46,8 @@ function createGame(options: { scenario?: object; content?: ContentSource; devSo
     appVersion: '0.1.0',
     versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
     devSolveBug: options.devSolveBug,
+    devSkipOnboarding: options.devSkipOnboarding,
+    autoOnboarding: options.autoOnboarding,
   });
   return { game, runtime };
 }
@@ -167,6 +171,27 @@ describe('Game', () => {
     expect(runtime.solved).toHaveLength(1);
     expect(runtime.solved[0].stage).toBe(1);
     expect(runtime.solved[0].patch).toContain('diff --git');
+  });
+
+  it('opens the onboarding until it is finished, and keeps that in the saved game', async () => {
+    const { game } = createGame();
+    await game.init();
+    expect(game.snapshot()).toMatchObject({ onboardingDue: true, devSkipOnboarding: false });
+    await game.finishOnboarding();
+    expect(game.snapshot().onboardingDue).toBe(false);
+
+    // The same saved game after a restart; a new game shows it again.
+    const restarted = createGame({ devSkipOnboarding: true });
+    await restarted.game.init();
+    expect(restarted.game.snapshot()).toMatchObject({ onboardingDue: false, devSkipOnboarding: true });
+    await restarted.game.newGame();
+    expect(restarted.game.snapshot().onboardingDue).toBe(true);
+  });
+
+  it('does not open the onboarding on its own when told not to (the e2e tests)', async () => {
+    const { game } = createGame({ autoOnboarding: false });
+    await game.init();
+    expect(game.snapshot().onboardingDue).toBe(false);
   });
 
   it('enforces the drag rules in the main process', async () => {

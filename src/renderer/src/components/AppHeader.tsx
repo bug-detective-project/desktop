@@ -10,6 +10,7 @@ import { useToast } from '../toast-context.ts';
 import { Flag } from './Flag.tsx';
 import { LANGUAGE_NAMES } from './languages.ts';
 import { Icon } from './icons.tsx';
+import { Tooltip } from './ui.tsx';
 import type { IconName } from './icons.tsx';
 
 export type View = 'dashboard' | 'board' | 'settings' | 'review';
@@ -21,19 +22,22 @@ const NAV: { id: Exclude<View, 'review' | 'settings'>; icon: IconName }[] = [
 
 /**
  * The persistent app header: brand, navigation (the Dashboard item counts the unread messages), theme, language, the
- * settings (a gear button) and the player. Docker problems show in the banner below it.
+ * onboarding (a "?" button that replays it), the settings (a gear button) and the player. Docker problems show in the banner below it.
  */
 export function AppHeader({
   snapshot,
   view,
   dark,
   onNavigate,
+  onOnboarding,
 }: {
   snapshot: Snapshot;
   view: View;
   /** The resolved theme (a "system" setting follows the OS). */
   dark: boolean;
   onNavigate: (view: View) => void;
+  /** Replays Rafaela's onboarding from the start. */
+  onOnboarding: () => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -108,6 +112,17 @@ export function AppHeader({
             <Icon name={dark ? 'moon' : 'sun'} className="size-4 text-muted-foreground" />
           </button>
           <LanguageMenu language={language} />
+          <Tooltip content={t('header.onboarding')} hoverOnly panelClassName="right-0 w-72">
+            <button
+              type="button"
+              onClick={onOnboarding}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-xs transition-all hover:bg-muted"
+              aria-label={t('header.onboarding')}
+              data-testid="onboarding-replay"
+            >
+              <Icon name="helpCircle" className="size-4" />
+            </button>
+          </Tooltip>
           <button
             type="button"
             onClick={() => onNavigate('settings')}

@@ -94,6 +94,31 @@
   --spacing-panel: 44rem;
   /* The app's layout width (max-w-10xl): Tailwind stops at 7xl (80rem); 8rem steps up from there. */
   --container-10xl: 104rem;
+  /* The onboarding's example card walking through the five board columns. */
+  --animate-onboarding-flow: onboarding-flow 6s ease-in-out infinite;
+
+  @keyframes onboarding-flow {
+    0%,
+    12% {
+      transform: translateX(0);
+    }
+    20%,
+    32% {
+      transform: translateX(100%);
+    }
+    40%,
+    52% {
+      transform: translateX(200%);
+    }
+    60%,
+    72% {
+      transform: translateX(300%);
+    }
+    80%,
+    100% {
+      transform: translateX(400%);
+    }
+  }
 }
 
 html,

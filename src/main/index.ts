@@ -41,6 +41,10 @@ if (!app.isPackaged && !isE2E && existsSync(envFile)) {
 }
 // "Solve bug" on the board card: BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true, never in the installed app.
 const devSolveBug = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
+// "Skip onboarding" in Rafaela's onboarding: BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON=true, never in the installed app.
+const devSkipOnboarding = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
+// The e2e tests keep the onboarding from opening on its own unless BUGDETECTIVE_E2E_SHOW_ONBOARDING=true.
+const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E_SHOW_ONBOARDING ?? '');
 
 const contentConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('local'), repoPath: z.string(), manifestPath: z.string() }),
@@ -180,6 +184,8 @@ async function main(): Promise<void> {
     appVersion: app.getVersion(),
     versions: { electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome },
     devSolveBug,
+    devSkipOnboarding,
+    autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';

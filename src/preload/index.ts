@@ -44,6 +44,7 @@ const api: BugDetectiveApi = {
   revealSolution: (ticket) => call('revealSolution', ticket),
   acceptReview: (ticket) => call('acceptReview', ticket),
   markInboxRead: (id) => call('markInboxRead', id),
+  finishOnboarding: () => call('finishOnboarding'),
   reviewComparison: (ticket) => call('reviewComparison', ticket),
   openReview: (ticket) => call('openReview', ticket),
   closeReview: () => call('closeReview'),

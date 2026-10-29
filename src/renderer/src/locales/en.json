@@ -13,7 +13,8 @@
     "unread_one": "{{count}} unread message",
     "unread_other": "{{count}} unread messages",
     "language": "Language: {{language}}",
-    "pending": "A new task is waiting on the Dashboard"
+    "pending": "A new task is waiting on the Dashboard",
+    "onboarding": "Replay the onboarding: Rafaela shows what each part of the Dashboard and the Board is for"
   },
   "common": {
     "checkAgain": "Check again",
@@ -129,6 +130,110 @@
     "nextBody": "The ticket is downloaded and your workspace is set up for it. One ticket at a time.",
     "startServer": "Start server",
     "stopServer": "Stop server"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to the team!",
+      "body": "Hi! I'm Rafaela, engineering manager here at {{company}}. Before your first ticket, I'll do your onboarding: a quick tour of the Dashboard and the Board, where you'll work. It takes about 2 minutes.",
+      "start": "Start onboarding"
+    },
+    "closing": {
+      "title": "That's it!",
+      "body": "Your first ticket is ready: on the Dashboard, click Get next assignment to start. Any questions, Priya is your mentor: ask her from the ticket.",
+      "bodyReplay": "Any questions, Priya is your mentor: ask her from the ticket.",
+      "finish": "Finish"
+    },
+    "progress": "Step {{step}} of {{total}}",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip onboarding",
+    "example": "Example ticket",
+    "steps": {
+      "currentTask": {
+        "title": "Current task",
+        "body": "This is the ticket you're working on. When I hand you a ticket, it shows up here, with the button that takes you to it and shortcuts to VS Code and the browser."
+      },
+      "environment": {
+        "title": "Local environment",
+        "body": "Docker, the images and the dev server SupportDesk runs on. When something needs your attention, the title turns red and the item tells you what to do."
+      },
+      "client": {
+        "title": "Client, project and contacts",
+        "body": "Who we're building SupportDesk for. Under Project & contacts you'll find the project and the team: Priya, the senior developer, is your mentor."
+      },
+      "inbox": {
+        "title": "Inbox",
+        "body": "This is how I send you your tasks. Each new ticket arrives here as an e-mail from me."
+      },
+      "message": {
+        "title": "The open e-mail",
+        "body": "Read the request here. When a new task is waiting, the e-mail shows the Pick up next task button."
+      },
+      "board": {
+        "title": "The Board",
+        "body": "The work on each ticket happens on the Board. Let's go there now."
+      },
+      "columns": {
+        "title": "Columns and flow",
+        "body": "Every ticket goes through To Do, In Progress, In QA, Code Review and Done. You move it forward as the work progresses."
+      },
+      "card": {
+        "title": "The ticket card",
+        "body": "Click a card to see the ticket's details. The Move button (or a drag) takes it to the next column."
+      },
+      "qa": {
+        "title": "In QA",
+        "body": "Drop the ticket here when you think it's fixed: the automated tests run. If something fails, the ticket comes back with the errors."
+      },
+      "ticketOpen": {
+        "title": "The open ticket",
+        "body": "Click a card and the ticket opens here, beside the board, with everything you need to work on it. This one is just an example."
+      },
+      "ticketHeader": {
+        "title": "Key, stage and title",
+        "body": "At the top are the ticket's key, the stage it is in and its title."
+      },
+      "ticketActions": {
+        "title": "Code, app and dev server",
+        "body": "Open in VS Code connects your editor to the code. Open app in browser shows SupportDesk running. The button below starts or stops the dev server."
+      },
+      "ticketTab": {
+        "title": "The Ticket tab",
+        "body": "Here is the request: what happens, how to reproduce it and what should happen. Always start by reproducing the bug."
+      },
+      "qaTab": {
+        "title": "The QA tab",
+        "body": "Every time the ticket goes through QA, the result shows up here. If it fails, you see which tests broke and why."
+      },
+      "historyTab": {
+        "title": "The History tab",
+        "body": "The history keeps your QA attempts and every move of the ticket."
+      },
+      "seniorTab": {
+        "title": "Talking to Priya",
+        "body": "Stuck? Ask Priya. She answers with one hint at a time and, after all of them, can show you the solution."
+      },
+      "review": {
+        "title": "Code Review and Done",
+        "body": "Once QA passes, compare your solution with the reference one in Code Review, then accept it to finish the ticket."
+      },
+      "settings": {
+        "title": "Settings",
+        "body": "Language, theme, the status of your tools and the backup of your progress live here. No need to change anything now."
+      },
+      "replay": {
+        "title": "See this again",
+        "body": "If you want to go through this onboarding again, just click here, at any time."
+      }
+    },
+    "demo": {
+      "title": "Example: the search ignores capital letters",
+      "ticketMarkdown": "## What happens\n\nSearching for `login` finds the ticket, but searching for `Login` finds nothing.\n\n## How to reproduce\n\n1. Open the ticket list.\n2. Search for `Login`.\n\n## Expected\n\nThe search finds the same tickets, whatever the capital letters.",
+      "qaTest": "search finds \"Login\" when typing \"login\"",
+      "qaError": "Expected 1 result, received 0",
+      "question": "I can reproduce it, but I don't know where to start.",
+      "hint": "Compare the two searches in the Network tab: what does the server receive in each one?"
+    }
   },
   "board": {
     "title": "Board",

@@ -238,7 +238,7 @@ export function Board({
           {t(boardHint(snapshot))}
         </p>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-5 items-stretch gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-5 items-stretch gap-4" data-tour="columns">
         {COLUMNS.map((column) => {
           const tickets = state.tickets.filter((ticket) => ticket.status === column);
           const allowed = dragging ? isPlayerMoveAllowed(dragging.status, column) : false;

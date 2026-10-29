@@ -116,6 +116,7 @@ export const gameStateSchema = z.object({
     theme: z.enum(THEMES),
   }),
   lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
+  onboardingSeen: z.boolean().optional(),
   reviewSession: z
     .object({
       ticket: z.number().int().min(1),

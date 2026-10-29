@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { Snapshot } from '@shared/api.ts';
 import { useSnapshot } from './api.ts';
 import { AppHeader } from './components/AppHeader.tsx';
+import { Onboarding } from './components/Onboarding.tsx';
+import type { OnboardingMode } from './components/Onboarding.tsx';
 import type { View } from './components/AppHeader.tsx';
 import { ReviewBanner } from './components/ReviewBanner.tsx';
 import { Spinner } from './components/ui.tsx';
@@ -46,6 +48,9 @@ export function App() {
   const [openTicket, setOpenTicket] = useState<number | null>(null);
   const [reviewTicket, setReviewTicket] = useState<number | null>(null);
   const [checklistDone, setChecklistDone] = useState(false);
+  const [onboarding, setOnboarding] = useState<OnboardingMode | null>(null);
+  // Finished in this session: it does not open again while the snapshot catches up.
+  const [onboardingFinished, setOnboardingFinished] = useState(false);
   const dark = useThemeAndLanguage(snapshot);
 
   // The checklist is skipped when everything already passes and a game is in progress. Once
@@ -53,6 +58,12 @@ export function App() {
   const allOk = snapshot?.prerequisites?.allOk ?? false;
   if (allOk && !checklistDone && snapshot?.state.tickets.length) {
     setChecklistDone(true);
+  }
+  // Rafaela's onboarding opens on its own on the Dashboard after the checklist, until it is finished.
+  if (checklistDone && snapshot?.onboardingDue && onboarding === null && !onboardingFinished) {
+    setOnboarding('first');
+    setView('dashboard');
+    setOpenTicket(null);
   }
 
   if (!snapshot || !snapshot.prerequisites) {
@@ -79,7 +90,17 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <AppHeader snapshot={snapshot} view={view} dark={dark} onNavigate={setView} />
+      <AppHeader
+        snapshot={snapshot}
+        view={view}
+        dark={dark}
+        onNavigate={setView}
+        onOnboarding={() => {
+          setOnboarding((current) => current ?? 'replay');
+          setView('dashboard');
+          setOpenTicket(null);
+        }}
+      />
       <DockerBanner snapshot={snapshot} />
       <ReviewBanner snapshot={snapshot} />
       <main className="min-h-0 flex-1 overflow-y-auto">
@@ -92,6 +113,7 @@ export function App() {
               setOpenTicket(ticket);
             }}
             onOpenReview={openReview}
+            onboarding={onboarding !== null}
           />
         )}
         {view === 'board' && <Board snapshot={snapshot} onOpenTicket={setOpenTicket} onOpenReview={openReview} />}
@@ -100,8 +122,19 @@ export function App() {
           <CodeReview snapshot={snapshot} ticketNumber={reviewTicket} onBack={() => setView('board')} />
         )}
       </main>
-      {openTicket !== null && view !== 'review' && (
+      {openTicket !== null && view !== 'review' && onboarding === null && (
         <TicketPanel snapshot={snapshot} ticketNumber={openTicket} onClose={() => setOpenTicket(null)} onOpenReview={() => openReview(openTicket)} />
+      )}
+      {onboarding !== null && (
+        <Onboarding
+          snapshot={snapshot}
+          mode={onboarding}
+          onNavigate={setView}
+          onClose={() => {
+            setOnboarding(null);
+            setOnboardingFinished(true);
+          }}
+        />
       )}
     </div>
   );

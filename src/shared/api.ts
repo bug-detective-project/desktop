@@ -105,6 +105,10 @@ export interface Snapshot {
   versions: { electron: string; node: string; chrome: string };
   /** Development only: the board shows "Solve bug" (BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON). */
   devSolveBug: boolean;
+  /** Rafaela's onboarding opens on its own on the Dashboard (the first time, it cannot be skipped). */
+  onboardingDue: boolean;
+  /** Development only: the onboarding shows "Skip onboarding" (BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON). */
+  devSkipOnboarding: boolean;
 }
 
 export interface TicketContent {
@@ -151,6 +155,8 @@ export interface BugDetectiveApi {
   revealSolution(ticket: number): Promise<void>;
   acceptReview(ticket: number): Promise<void>;
   markInboxRead(id: string): Promise<void>;
+  /** Rafaela's onboarding was finished: it no longer opens on its own. */
+  finishOnboarding(): Promise<void>;
 
   /** The stored comparison of a ticket in Code Review or Done; works without Docker. */
   reviewComparison(ticket: number): Promise<ReviewComparison>;

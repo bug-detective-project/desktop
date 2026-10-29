@@ -58,6 +58,10 @@ export interface GameOptions {
   versions: Snapshot['versions'];
   /** Development only: allows "Solve bug" (never set by the packaged app). */
   devSolveBug?: boolean;
+  /** Development only: the onboarding can be skipped (never set by the packaged app). */
+  devSkipOnboarding?: boolean;
+  /** False keeps the onboarding from opening on its own (the e2e tests, unless they test it). */
+  autoOnboarding?: boolean;
   /** Called after every change, with the new snapshot. */
   onChange?: (snapshot: Snapshot) => void;
   clock?: () => Date;
@@ -122,6 +126,8 @@ export class Game {
       appVersion: this.options.appVersion,
       versions: this.options.versions,
       devSolveBug: this.options.devSolveBug ?? false,
+      onboardingDue: (this.options.autoOnboarding ?? true) && rules.onboardingDue(this.state),
+      devSkipOnboarding: this.options.devSkipOnboarding ?? false,
     };
   }
 
@@ -460,6 +466,10 @@ export class Game {
 
   async markInboxRead(id: string): Promise<void> {
     await this.commit(rules.markInboxRead(this.state, id));
+  }
+
+  async finishOnboarding(): Promise<void> {
+    await this.commit(rules.finishOnboarding(this.state));
   }
 
   async updateSettings(settings: Partial<Settings>): Promise<void> {
