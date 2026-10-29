@@ -231,7 +231,7 @@ export function Board({
   };
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col px-6 py-6" data-testid="board">
+    <div className="mx-auto flex h-full max-w-10xl flex-col px-6 py-6" data-testid="board">
       <header className="mb-5">
         <h1 className="text-3xl font-bold tracking-tight">{t('board.title')}</h1>
         <p className="mt-1 text-base text-muted-foreground" data-testid="board-hint">

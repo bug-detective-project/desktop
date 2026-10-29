@@ -1,6 +1,3 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { dragCard, launch, startFirstTicket } from './fixtures.ts';
@@ -88,7 +85,7 @@ test('Get Next Assignment is unavailable until the current ticket is Done', asyn
     await startFirstTicket(page);
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('next-assignment')).toHaveCount(0);
-    await expect(page.getByTestId('dashboard')).toContainText('Finish the current ticket');
+    await expect(page.getByTestId('dashboard')).not.toContainText('Finish the current ticket');
     const result = await page.evaluate(() => window.bugDetective.nextAssignment().then(() => 'unlocked', (error: Error) => error.message));
     expect(result).toContain('ticketNotDone');
   } finally {
@@ -120,22 +117,63 @@ test('the dashboard shows only the current assignment, never how many tickets ex
   const { page, close } = await launch();
   try {
     await page.getByTestId('start-playing').click();
-    await expect(page.getByTestId('assignment-card')).toContainText('Queued');
-    await expect(page.getByTestId('assignment-card').locator('h3').first()).toHaveText('Current task');
-    // Right column: the current task, then the local environment, then the contacts.
-    const order = await page.locator('[data-testid="assignment-card"], [data-testid="environment-card"], [data-testid="contacts-card"]').evaluateAll((cards) =>
-      cards.map((card) => card.getAttribute('data-testid')),
+    const task = page.getByTestId('assignment-card');
+    await expect(task).toHaveAttribute('data-state', 'queued');
+    await expect(task).toContainText('Backlog');
+    await expect(task).toContainText('Your next ticket is ready to download.');
+    await expect(task.locator('h3').first()).toHaveText('Current task');
+    // The work desk: the current task, then the local environment, then the drawer button; the action lives only here.
+    const desk = page.getByTestId('work-desk');
+    await expect(desk).toHaveAttribute('aria-label', 'Your desk');
+    const order = await desk.locator('[data-testid="assignment-card"], [data-testid="environment-card"], [data-testid="project-drawer-toggle"]').evaluateAll((items) =>
+      items.map((item) => item.getAttribute('data-testid')),
     );
-    expect(order).toEqual(['assignment-card', 'environment-card', 'contacts-card']);
-    await expect(page.getByTestId('action-dock')).toContainText('Next action');
+    expect(order).toEqual(['assignment-card', 'environment-card', 'project-drawer-toggle']);
+    // Below Local environment: the client.
+    await expect(page.getByTestId('desk-client')).toHaveText(/Client\s*Harborline Outfitters/);
+    const below = await page.evaluate(() => {
+      const top = (id: string) => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
+      return top('desk-client') > top('environment-card');
+    });
+    expect(below).toBe(true);
+    await expect(page.getByTestId('next-assignment')).toHaveCount(1);
+    // The e-mail ends with the same next step, which unlocks the ticket too.
+    await expect(page.getByTestId('email-next')).toContainText('Next action: get your next assignment');
+    await expect(page.getByTestId('email-next-assignment')).toBeEnabled();
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
-    await page.getByTestId('next-assignment').click();
+    await page.getByTestId('email-next-assignment').click();
     await page.getByTestId('card-1').waitFor();
     await page.getByTestId('nav-dashboard').click();
-    await expect(page.getByTestId('assignment-card')).toContainText('SD-214');
-    await expect(page.getByTestId('assignment-card').locator('[data-stage]')).toHaveAttribute('data-stage', 'todo');
-    await expect(page.getByTestId('action-dock')).not.toContainText('player/');
+    await expect(task).toHaveAttribute('data-state', 'active');
+    // Only while the next assignment waits: an active ticket has its action on the desk alone.
+    await expect(page.getByTestId('email-next')).toHaveCount(0);
+    await expect(task).toContainText('SD-214');
+    // The client is its own desk section, not a line of the task.
+    await expect(task).not.toContainText('Harborline');
+    // The stage pill sits on the "Current task" line, on the right.
+    const labelLine = task.locator('[data-stage]').locator('xpath=ancestor::div[1]');
+    await expect(labelLine).toContainText('Current task');
+    await expect(task.locator('[data-stage]')).toHaveAttribute('data-stage', 'todo');
+    // To Do gets a still gray dot in the current task's pill.
+    await expect(task.locator('[data-stage] > span.bg-slate-400')).toHaveCount(1);
+    await expect(task.locator('[data-stage] > span.bg-slate-400')).not.toHaveClass(/animate-pulse/);
+    // The primary action and, while a ticket is active, VS Code and Browser with their full labels as tooltips.
+    await expect(page.getByTestId('desk-primary')).toHaveText('Start ticket on Board');
+    await expect(page.getByTestId('desk-vscode')).toHaveAttribute('title', 'Open in VS Code');
+    // The current task is a full-bleed tinted block, the desk's first child, with its label in primary;
+    // VS Code and Browser keep a card surface on the tint.
+    expect(await desk.evaluate((element) => element.firstElementChild?.getAttribute('data-testid'))).toBe('assignment-card');
+    await expect(task).toHaveClass(/border-primary\/25/);
+    await expect(task.locator('h3')).toHaveClass(/text-primary/);
+    await expect(page.getByTestId('desk-vscode')).toHaveClass(/bg-card/);
+    await expect(page.getByTestId('desk-browser')).toHaveClass(/bg-card/);
+    await expect(page.getByTestId('desk-browser')).toHaveAttribute('title', 'Open app in browser');
+    await expect(desk).not.toContainText('player/');
+    await page.getByTestId('desk-primary').click();
+    await expect(page.getByTestId('ticket-panel')).toBeVisible();
+    await page.getByTestId('close-panel').click();
+    await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
     // The header has no inbox button: the Dashboard item carries the unread counter.
@@ -181,34 +219,64 @@ test('the dashboard shows only the current assignment, never how many tickets ex
   }
 });
 
-test('the project context card collapses and remembers it after a restart', async () => {
-  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+test('Project & contacts opens in a drawer: closed by default, closes with the button, Escape or the backdrop, and keeps focus right', async () => {
+  const { page, close } = await launch();
   try {
-    const first = await launch({}, { userData });
-    await first.page.getByTestId('start-playing').click();
-    const card = first.page.getByTestId('project-context');
-    const toggle = first.page.getByTestId('project-context-toggle');
-    await expect(toggle).toHaveText('Project context');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(card).toContainText('Lanternfish Labs');
-    await expect(card).toContainText('Harborline Outfitters');
-    await toggle.click();
+    await page.getByTestId('start-playing').click();
+    const toggle = page.getByTestId('project-drawer-toggle');
+    const drawer = page.getByTestId('project-drawer');
+    await expect(drawer).toHaveCount(0);
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(card).not.toContainText('Harborline Outfitters');
-    await first.close();
+    await expect(toggle).toHaveAttribute('aria-controls', 'project-drawer');
 
-    const second = await launch({}, { userData });
-    try {
-      await second.page.getByTestId('start-playing').click();
-      const again = second.page.getByTestId('project-context-toggle');
-      await expect(again).toHaveAttribute('aria-expanded', 'false');
-      await again.click();
-      await expect(second.page.getByTestId('project-context')).toContainText('Harborline Outfitters');
-    } finally {
-      await second.close();
-    }
+    await toggle.click();
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveAttribute('role', 'dialog');
+    await expect(drawer).toHaveAccessibleName('Project & contacts');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('project-drawer-close')).toBeFocused();
+    await expect(page.getByTestId('project-context')).toContainText('Lanternfish Labs');
+    await expect(page.getByTestId('project-context')).toContainText('Your team');
+    await expect(page.getByTestId('project-context')).toContainText('Harborline Outfitters');
+    await expect(page.getByTestId('project-context')).toContainText('Client');
+    // The hint mentor comes first in Contacts, with the mentor badge.
+    await expect(page.getByTestId('contacts-card').locator('li').first()).toContainText('Priya Raman');
+    await expect(page.getByTestId('contacts-card').locator('li').first()).toContainText('Hints mentor');
+    // Then the manager, on the player's own team.
+    await expect(page.getByTestId('contacts-card').locator('li').nth(1)).toContainText('Rafaela Nunes');
+    await expect(page.getByTestId('contacts-card').locator('li').nth(1)).toContainText('Engineering manager · Lanternfish Labs');
+
+    // Escape closes and gives the focus back to the desk button.
+    await page.keyboard.press('Escape');
+    await expect(drawer).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // The close button and a click on the backdrop close it too.
+    await toggle.click();
+    await page.getByTestId('project-drawer-close').click();
+    await expect(drawer).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    // The drawer opens on the side of the window, like the ticket panel, over a backdrop that covers it all.
+    await toggle.click();
+    const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    // Measured once the 150ms slide-in is over.
+    await expect
+      .poll(async () => {
+        const box = (await drawer.boundingBox())!;
+        return [Math.round(box.x + box.width), Math.round(box.y), Math.round(box.height)];
+      })
+      .toEqual([viewport.width, 0, viewport.height]);
+    await page.getByTestId('project-drawer-backdrop').click({ position: { x: 20, y: 20 } });
+    await expect(drawer).toHaveCount(0);
+
+    // Kept open for the session: a reload keeps it open.
+    await toggle.click();
+    await page.reload();
+    await page.getByTestId('start-playing').click();
+    await expect(drawer).toBeVisible();
   } finally {
-    await rm(userData, { recursive: true, force: true });
+    await close();
   }
 });
 
@@ -283,40 +351,51 @@ test('a card shows only its key and title, and "Test failed" only after a failed
   }
 });
 
-test('the inbox shows at most three messages, and the dashboard fits the window with the project context and the e-mail scrolling', async () => {
+test('the dashboard is one card with three panes that fit the window and scroll on their own, in English and Portuguese', async () => {
   const { page, close } = await launch();
   try {
-    // The window's minimum size (minHeight in src/main/index.ts).
+    // The window's minimum height (minHeight in src/main/index.ts).
     await page.setViewportSize({ width: 1440, height: 700 });
     await page.getByTestId('start-playing').click();
-    const inbox = page.getByTestId('inbox');
-    await expect(page.getByTestId('inbox-message')).toHaveCount(1);
-    await expect.poll(() => inbox.evaluate((list) => list.scrollHeight > list.clientHeight)).toBe(false);
-
-    // Five messages (copies of the first, outside React): exactly three fit, the rest scroll.
-    const fit = await inbox.evaluate((list) => {
-      const item = list.querySelector('li')!;
-      for (let index = 0; index < 4; index += 1) list.append(item.cloneNode(true));
-      const third = list.querySelectorAll('li')[2]!.getBoundingClientRect();
-      return { scrolls: list.scrollHeight > list.clientHeight, visible: list.clientHeight, threeTall: third.bottom - list.getBoundingClientRect().top };
+    const panes = await page.evaluate(() => {
+      const desk = document.querySelector('[data-testid="work-desk"]')!.getBoundingClientRect();
+      const inbox = document.querySelector('[data-testid="inbox"]')!.parentElement!.getBoundingClientRect();
+      const message = document.querySelector('[data-testid="message"]')!.getBoundingClientRect();
+      return { desk: desk.width, inbox: inbox.width, message: message.width, sameTop: desk.top === inbox.top && inbox.top === message.top };
     });
-    expect(fit.scrolls).toBe(true);
-    expect(Math.abs(fit.visible - fit.threeTall)).toBeLessThanOrEqual(2);
+    expect(panes).toMatchObject({ desk: 320, inbox: 400, sameTop: true });
+    expect(panes.message).toBeGreaterThan(400);
 
-    // The dashboard is at most the window tall: the page does not scroll, the project context and the e-mail do.
+    // The page never scrolls: the inbox list and the e-mail do, each on its own.
     const main = page.locator('main');
     await expect.poll(() => main.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
-    for (const id of ['project-context', 'message', 'action-dock']) {
-      const bottom = await page.getByTestId(id).evaluate((element) => element.getBoundingClientRect().bottom);
-      expect(bottom).toBeLessThanOrEqual(700);
-    }
     const scrolls = (id: string) => page.getByTestId(id).evaluate((element) => element.scrollHeight > element.clientHeight);
-    await expect.poll(() => scrolls('project-context-body')).toBe(true);
-    await expect.poll(() => scrolls('message-scroll')).toBe(true);
-    // The sender header stays outside the scrolling e-mail, and the e-mail shows no message ID.
-    await expect(page.getByTestId('message').locator('> header')).toContainText('Rafaela Nunes');
-    await expect(page.getByTestId('message-scroll').locator('header')).toHaveCount(0);
-    await expect(page.getByTestId('message')).not.toContainText('msg-');
+    await expect.poll(() => scrolls('message')).toBe(true);
+    await page.getByTestId('inbox').evaluate((list) => {
+      const item = list.querySelector('li')!;
+      for (let index = 0; index < 8; index += 1) list.append(item.cloneNode(true));
+    });
+    await expect.poll(() => scrolls('inbox')).toBe(true);
+    await expect.poll(() => main.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+
+    // The e-mail: subject, sender with address, "to you · role", the date; no message ID and no action.
+    const message = page.getByTestId('message');
+    await expect(message.locator('h1')).toHaveText('Welcome to Lanternfish Labs!');
+    await expect(message.locator('header')).toContainText('rafaela@lanternfish.labs');
+    await expect(message.locator('header')).toContainText('Engineering manager');
+    await expect(message.locator('header')).not.toContainText('to you');
+    await expect(message).not.toContainText('msg-');
+
+    // No button in the dashboard wraps, in either language.
+    for (const language of ['en', 'pt'] as const) {
+      await page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
+      await expect(page.getByTestId('nav-board')).toHaveText(language === 'en' ? 'Board' : 'Quadro');
+      const wrapped = await page.getByTestId('dashboard').locator('button').evaluateAll((buttons) =>
+        buttons.filter((button) => getComputedStyle(button).whiteSpace !== 'nowrap' && button.closest('[data-testid="inbox"]') === null).map((button) => button.textContent),
+      );
+      expect(wrapped).toEqual([]);
+    }
+    await expect(page.getByTestId('work-desk')).toHaveAttribute('aria-label', 'Sua mesa');
   } finally {
     await close();
   }
@@ -331,9 +410,13 @@ test('Local environment always lists Docker, both images and the dependencies, w
     const card = page.getByTestId('environment-card');
     for (const row of rows) await expect(card.getByTestId(row)).toBeVisible();
     await expect(card.getByTestId('env-docker')).toContainText('Running');
-    await expect(card.getByTestId('env-workspaceImage')).toContainText('Ready (1.1 GB)');
-    await expect(card.getByTestId('env-qaImage')).toContainText('Ready (3 GB)');
+    await expect(card.getByTestId('env-workspaceImage')).toContainText('Ready · 1.1 GB');
+    await expect(card.getByTestId('env-qaImage')).toContainText('Ready · 3 GB');
     await expect(card.getByTestId('env-projectDependencies')).toContainText('Not installed yet');
+    // No summary badge: the title is green while everything works, red on a problem.
+    await expect(card).toHaveAttribute('data-tone', 'ok');
+    await expect(card.getByRole('heading')).toHaveClass(/text-emerald-600/);
+    await expect(card).not.toContainText('All set');
 
     // Docker stops: every row stays, Docker with its stopped state.
     await page.getByTestId('next-assignment').click();
@@ -341,6 +424,9 @@ test('Local environment always lists Docker, both images and the dependencies, w
     await page.getByTestId('nav-dashboard').click();
     for (const row of rows) await expect(card.getByTestId(row)).toBeVisible();
     await expect(card.getByTestId('env-docker')).toContainText('Stopped');
+    await expect(card.getByTestId('env-docker')).toHaveAttribute('data-tone', 'danger');
+    await expect(card).toHaveAttribute('data-tone', 'danger');
+    await expect(card.getByRole('heading')).toHaveClass(/text-destructive/);
   } finally {
     await close();
   }
@@ -419,6 +505,103 @@ test('cards have a Move button in To Do and In Progress, and a Review button in 
     await card.getByTestId('review-card').click();
     await expect(page.getByTestId('code-review')).toBeVisible();
     await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});
+
+test('the work desk shows the downloads first, with the install log, then the queued assignment', async () => {
+  const { page, close } = await launch({ environmentReady: false });
+  try {
+    await page.getByTestId('start-playing').click();
+    const task = page.getByTestId('environment-panel');
+    await expect(task).toHaveAttribute('data-state', 'download');
+    await expect(task).toContainText('Download the game environment to continue.');
+    await expect(page.getByTestId('next-assignment')).toHaveCount(0);
+    const card = page.getByTestId('environment-card');
+    await expect(card.getByTestId('env-workspaceImage')).toHaveAttribute('data-tone', 'danger');
+    await expect(card.getByTestId('env-workspaceImage')).toContainText('Missing');
+    await expect(card).toHaveAttribute('data-tone', 'danger');
+    await expect(card.getByRole('heading')).toHaveClass(/text-destructive/);
+
+    await page.getByTestId('install-environment').click();
+    await expect(page.getByTestId('environment-panel')).toHaveCount(0);
+    await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+    await expect(card.getByTestId('env-workspaceImage')).toContainText('Ready · 1.1 GB');
+    await expect(card).toHaveAttribute('data-tone', 'ok');
+  } finally {
+    await close();
+  }
+});
+
+test('an older e-mail of a done ticket says so and links to it on the Board', async () => {
+  const { page, close } = await launch({ qa: ['passed'] });
+  try {
+    await startFirstTicket(page);
+    await dragCard(page, 1, 'inProgress');
+    await dragCard(page, 1, 'inQa');
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await page.getByTestId('nav-dashboard').click();
+    await expect(page.getByTestId('desk-primary')).toHaveText('Check code review');
+    await page.getByTestId('desk-primary').click();
+    await page.getByTestId('accept-review').click();
+    await page.getByTestId('nav-dashboard').click();
+    await page.getByTestId('inbox-message').filter({ hasText: 'Your first ticket: SD-214' }).getByRole('button').click();
+    await expect(page.getByTestId('previous-directive')).toContainText('SD-214');
+    await page.getByTestId('view-done-ticket').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('ticket-panel')).toContainText('SD-214');
+  } finally {
+    await close();
+  }
+});
+
+test('Local environment shows the dev server once a ticket exists, with a play or pause button and its tooltip', async () => {
+  const { page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    // Before the first ticket the workspace has no code to run: no dev server row.
+    await expect(page.getByTestId('env-docker')).toBeVisible();
+    await expect(page.getByTestId('env-devServer')).toHaveCount(0);
+
+    await page.getByTestId('next-assignment').click();
+    await page.getByTestId('card-1').waitFor();
+    await page.getByTestId('nav-dashboard').click();
+    const row = page.getByTestId('env-devServer');
+    await expect(row).toHaveAttribute('data-up', 'false');
+    await expect(row).toContainText('Dev server');
+    await expect(row).toContainText('Stopped');
+    // Stopped: the row's icon and status in amber; running: in green.
+    await expect(row).toHaveAttribute('data-tone', 'warn');
+    const start = page.getByTestId('desk-start-server');
+    await expect(start).toHaveAccessibleName('Start server');
+    // The button is as tall as the row's two lines, and square.
+    const size = await start.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const lines = button.closest('li')!.querySelector('span.min-w-0')!.getBoundingClientRect();
+      return { width: Math.round(box.width), height: Math.round(box.height), lines: Math.round(lines.height) };
+    });
+    expect(size.height).toBe(size.lines);
+    expect(size.width).toBe(size.height);
+    // Play in green, pause in amber.
+    await expect(start).toHaveClass(/text-emerald-600/);
+    await start.hover();
+    await expect(row.getByRole('tooltip')).toBeVisible();
+    await expect(row.getByRole('tooltip')).toHaveText('Start server');
+
+    await start.click();
+    await expect(row).toHaveAttribute('data-up', 'true');
+    await expect(row).toContainText('Running');
+    await expect(row).toHaveAttribute('data-tone', 'ok');
+    const stop = page.getByTestId('desk-stop-server');
+    await expect(stop).toHaveAccessibleName('Stop server');
+    await expect(stop).toHaveClass(/text-amber-600/);
+    await stop.click();
+    await expect(row).toHaveAttribute('data-up', 'false');
+    await expect(page.getByTestId('desk-start-server')).toBeVisible();
+    await expect(row).toHaveAttribute('data-tone', 'warn');
+    // Stopped is only a warning on its row: the section title stays green.
+    await expect(page.getByTestId('environment-card')).toHaveAttribute('data-tone', 'ok');
   } finally {
     await close();
   }

@@ -68,19 +68,10 @@
     "startDocker": "Iniciar o Docker Desktop"
   },
   "environment": {
-    "title": "Downloads necessários",
-    "intro": "Algumas partes do ambiente do jogo ainda não estão neste computador. Conecte-se à internet e instale. Depois disso, o jogo funciona offline.",
-    "items": {
-      "workspaceImage": "Imagem do workspace (Node.js 26, Git), cerca de 1,1 GB",
-      "qaImage": "Imagem de QA (Node.js 26, Playwright Chromium), cerca de 3 GB",
-      "projectDependencies": "Dependências do projeto (node_modules), cerca de 160 MB"
-    },
-    "install": "Baixar e instalar",
-    "installing": "Instalando… Isso pode levar alguns minutos.",
-    "ready": "Ambiente pronto"
+    "install": "Baixar e instalar"
   },
   "dashboard": {
-    "inbox": "Caixa de Entrada",
+    "inbox": "Caixa de entrada",
     "inboxCount": "{{count}} no total",
     "unread": "não lida",
     "clientTag": "Cliente",
@@ -88,35 +79,21 @@
     "projectContext": "Contexto do projeto",
     "previousDirective": "Você está vendo a mensagem de um ticket anterior ({{key}}, concluído). Sua tarefa ativa é o {{active}}.",
     "previousDirectiveNoActive": "Você está vendo a mensagem de um ticket que já concluiu ({{key}}).",
-    "activeChip": "{{key}} ativo",
-    "nextLabel": "Orientação da gerente",
-    "nextTitle": "Próximo passo: pegar a próxima tarefa",
-    "nextBody": "O ticket é baixado e o seu workspace é preparado para ele. Um ticket de cada vez.",
     "nextAssignment": "Pegar próxima tarefa",
     "unlocking": "Baixando e preparando o ticket…",
-    "unlockingBody": "Descompactando a etapa e preparando o container do workspace.",
-    "finishFirst": "Conclua o ticket atual para pegar o próximo.",
-    "activeLabel": "Trabalho ativo",
     "startOnBoard": "Começar o ticket no Quadro",
     "viewQa": "Ver a verificação de QA no Quadro",
-    "acceptReview": "Ler e aceitar a revisão de código",
+    "acceptReview": "Conferir code review",
     "goToBoard": "Ir para o Quadro",
     "vscodeShort": "VS Code",
     "browserShort": "Navegador",
-    "blockedLabel": "Tarefa bloqueada",
-    "blockedDockerTitle": "O Docker não está em execução",
     "blockedDockerBody": "Inicie o Docker Desktop para baixar o próximo ticket. Suas correções anteriores estão seguras.",
     "dockerDownActive": "O Docker não está em execução. O VS Code e a aplicação voltam a abrir quando ele voltar.",
-    "completedLabel": "Mensagem concluída",
-    "doneMerged": "{{key}} concluído e integrado",
-    "completedBody": "Você já concluiu este ticket: ele passou no QA e a revisão de código foi aceita.",
-    "returnToActive": "Voltar para a tarefa ativa ({{key}})",
     "viewOnBoard": "Ver {{key}} no Quadro",
-    "allDoneLabel": "Onboarding concluído",
     "allDone": "Você concluiu todos os tickets.",
     "allDoneBody": "Seu quadro e o seu código continuam aqui para explorar.",
     "current": "Tarefa atual",
-    "queued": "Na fila",
+    "queued": "Backlog",
     "queuedBody": "Seu próximo ticket está pronto para baixar.",
     "noTicket": "Nenhuma tarefa ativa.",
     "completed": "Concluído",
@@ -128,7 +105,8 @@
       "docker": "Docker Engine",
       "workspaceImage": "Imagem do workspace",
       "qaImage": "Imagem de QA",
-      "projectDependencies": "Dependências"
+      "projectDependencies": "Dependências",
+      "devServer": "Servidor de desenvolvimento"
     },
     "envStatus": {
       "ready": "Pronto",
@@ -141,7 +119,16 @@
       "checking": "Verificando…",
       "needsDocker": "Precisa do Docker",
       "notYet": "Ainda não instalado"
-    }
+    },
+    "desk": "Sua mesa",
+    "projectAndContacts": "Projeto e contatos",
+    "close": "Fechar",
+    "downloadFirst": "Baixe o ambiente do jogo para continuar. Depois disso, o jogo funciona offline.",
+    "nextLabel": "Orientação da gerente",
+    "nextTitle": "Próximo passo: pegar a próxima tarefa",
+    "nextBody": "O ticket é baixado e o seu workspace é preparado para ele. Um ticket de cada vez.",
+    "startServer": "Iniciar servidor",
+    "stopServer": "Parar servidor"
   },
   "board": {
     "title": "Quadro",

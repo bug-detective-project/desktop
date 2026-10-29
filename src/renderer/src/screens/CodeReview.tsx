@@ -168,7 +168,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-6 py-6" data-testid="code-review">
+    <div className="mx-auto max-w-10xl space-y-6 px-6 py-6" data-testid="code-review">
       {/* The actions always sit below the title, whatever its length. */}
       <header className="space-y-4">
         <div>

@@ -1,17 +1,19 @@
 /** Small building blocks shared by the screens. See docs/design-system.md for the rules they follow. */
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Column } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
 import { STAGE } from './stage.ts';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'review';
+type Variant = 'primary' | 'secondary' | 'card' | 'ghost' | 'danger' | 'dangerOutline' | 'review';
 type Size = 'xs' | 'sm' | 'md';
 
 // Icons inside buttons always inherit the button's text color (currentColor).
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-primary text-primary-foreground shadow-sm hover:opacity-95 disabled:opacity-50',
   secondary: 'border border-border bg-secondary text-secondary-foreground hover:bg-muted disabled:opacity-60',
+  // The secondary look on a card surface, for buttons on a tinted block (the Dashboard's current task).
+  card: 'border border-border bg-card text-secondary-foreground hover:bg-muted disabled:opacity-60',
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60',
   danger: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-95 disabled:opacity-50',
   dangerOutline: 'border border-destructive/50 text-destructive shadow-2xs hover:bg-destructive/10 disabled:opacity-60',
@@ -32,7 +34,7 @@ export function Button({
   className = '',
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; busy?: boolean }) {
+}: ComponentProps<'button'> & { variant?: Variant; size?: Size; busy?: boolean }) {
   return (
     <button
       type="button"
@@ -79,12 +81,13 @@ export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONE
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}>{children}</span>;
 }
 
-export function StagePill({ status, className = '' }: { status: Column; className?: string }) {
+/** The stage name in its hue. The dot shows for the pulsing stages, or always with `dot` (it pulses only where the stage does). */
+export function StagePill({ status, className = '', dot = false }: { status: Column; className?: string; dot?: boolean }) {
   const { t } = useTranslation();
   const stage = STAGE[status];
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${stage.pill} ${className}`} data-stage={status}>
-      {stage.pulse && <span className={`size-1.5 animate-pulse rounded-full ${stage.dot}`} aria-hidden />}
+      {(stage.pulse || dot) && <span className={`size-1.5 rounded-full ${stage.pulse ? 'animate-pulse' : ''} ${stage.dot}`} aria-hidden />}
       {t(`board.columns.${status}`)}
     </span>
   );

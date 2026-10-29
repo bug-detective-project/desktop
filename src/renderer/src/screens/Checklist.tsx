@@ -117,7 +117,7 @@ export function DockerBanner({ snapshot }: { snapshot: Snapshot }) {
       role="alert"
       data-testid="docker-banner"
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-sm">
+      <div className="mx-auto flex max-w-10xl items-center justify-between gap-4 px-6 py-2 text-sm">
         <span className="flex items-center gap-2 font-medium text-foreground">
           <Icon name={starting ? 'spinner' : 'alertTriangle'} className={`size-4 ${starting ? 'text-amber-500' : 'text-destructive'}`} />
           {starting ? t('banner.dockerStarting') : t('banner.dockerStopped')}

@@ -68,19 +68,10 @@
     "startDocker": "Start Docker Desktop"
   },
   "environment": {
-    "title": "Downloads needed",
-    "intro": "Some parts of the game environment are not on this computer yet. Connect to the internet, then install them. After that, the game works offline.",
-    "items": {
-      "workspaceImage": "Workspace image (Node.js 26, Git), about 1.1 GB",
-      "qaImage": "QA image (Node.js 26, Playwright Chromium), about 3 GB",
-      "projectDependencies": "Project dependencies (node_modules), about 160 MB"
-    },
-    "install": "Download and install",
-    "installing": "Installing… This can take several minutes.",
-    "ready": "Environment ready"
+    "install": "Download and install"
   },
   "dashboard": {
-    "inbox": "Directives & Inbox",
+    "inbox": "Inbox",
     "inboxCount": "{{count}} total",
     "unread": "unread",
     "clientTag": "Client",
@@ -88,35 +79,21 @@
     "projectContext": "Project context",
     "previousDirective": "You are viewing the directive for a previous ticket ({{key}}, done). Your active assignment is {{active}}.",
     "previousDirectiveNoActive": "You are viewing the directive for a ticket you already finished ({{key}}).",
-    "activeChip": "{{key}} active",
-    "nextLabel": "Manager directive",
-    "nextTitle": "Next action: get your next assignment",
-    "nextBody": "The ticket is downloaded and your workspace is set up for it. One ticket at a time.",
     "nextAssignment": "Get next assignment",
     "unlocking": "Downloading and setting up the ticket…",
-    "unlockingBody": "Unpacking the stage and preparing your workspace container.",
-    "finishFirst": "Finish the current ticket to get the next one.",
-    "activeLabel": "Active work",
     "startOnBoard": "Start ticket on Board",
     "viewQa": "View QA verification on Board",
-    "acceptReview": "Read & accept code review",
+    "acceptReview": "Check code review",
     "goToBoard": "Go to Board",
     "vscodeShort": "VS Code",
     "browserShort": "Browser",
-    "blockedLabel": "Assignment blocked",
-    "blockedDockerTitle": "Docker is not running",
     "blockedDockerBody": "Start Docker Desktop to download your next ticket. Your previous fixes are safe.",
     "dockerDownActive": "Docker is not running. VS Code and the app open again once it is back.",
-    "completedLabel": "Completed directive",
-    "doneMerged": "{{key}} done & merged",
-    "completedBody": "You already finished this ticket: it passed QA and the code review was accepted.",
-    "returnToActive": "Return to active task ({{key}})",
     "viewOnBoard": "View {{key}} on Board",
-    "allDoneLabel": "Onboarding complete",
     "allDone": "You finished every ticket.",
     "allDoneBody": "Your board and your code are still here to explore.",
     "current": "Current task",
-    "queued": "Queued",
+    "queued": "Backlog",
     "queuedBody": "Your next ticket is ready to download.",
     "noTicket": "No active ticket.",
     "completed": "Completed",
@@ -128,7 +105,8 @@
       "docker": "Docker Engine",
       "workspaceImage": "Workspace image",
       "qaImage": "QA image",
-      "projectDependencies": "Dependencies"
+      "projectDependencies": "Dependencies",
+      "devServer": "Dev server"
     },
     "envStatus": {
       "ready": "Ready",
@@ -141,7 +119,16 @@
       "checking": "Checking…",
       "needsDocker": "Needs Docker",
       "notYet": "Not installed yet"
-    }
+    },
+    "desk": "Your desk",
+    "projectAndContacts": "Project & contacts",
+    "close": "Close",
+    "downloadFirst": "Download the game environment to continue. After that, the game works offline.",
+    "nextLabel": "Manager directive",
+    "nextTitle": "Next action: get your next assignment",
+    "nextBody": "The ticket is downloaded and your workspace is set up for it. One ticket at a time.",
+    "startServer": "Start server",
+    "stopServer": "Stop server"
   },
   "board": {
     "title": "Board",

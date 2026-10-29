@@ -45,7 +45,7 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-6">
+      <div className="mx-auto flex h-16 max-w-10xl items-center justify-between gap-4 px-6">
         <div className="flex min-w-0 items-center gap-8">
           <div className="flex items-center gap-2.5">
             <img src={logo} alt="" className="size-9 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
