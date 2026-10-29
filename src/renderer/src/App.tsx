@@ -89,7 +89,7 @@ export function App() {
             onOpenReview={openReview}
           />
         )}
-        {view === 'board' && <Board snapshot={snapshot} onOpenTicket={setOpenTicket} />}
+        {view === 'board' && <Board snapshot={snapshot} onOpenTicket={setOpenTicket} onOpenReview={openReview} />}
         {view === 'settings' && <Settings snapshot={snapshot} />}
         {view === 'review' && reviewTicket !== null && (
           <CodeReview snapshot={snapshot} ticketNumber={reviewTicket} onBack={() => setView('board')} />

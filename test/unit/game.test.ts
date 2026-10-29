@@ -32,7 +32,7 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function createGame(options: { scenario?: object; content?: ContentSource } = {}) {
+function createGame(options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean } = {}) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
   const game = new Game({
     store: new StateStore(dir),
@@ -43,6 +43,7 @@ function createGame(options: { scenario?: object; content?: ContentSource } = {}
     runtime,
     appVersion: '0.1.0',
     versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
+    devSolveBug: options.devSolveBug,
   });
   return { game, runtime };
 }
@@ -145,6 +146,27 @@ describe('Game', () => {
     await expect(game.move(1, 'inProgress')).rejects.toMatchObject({ code: 'dockerUnavailable' });
     expect(rules.findTicket(game.current, 1)!.status).toBe('todo');
     expect(runtime.resets).toEqual([]);
+  });
+
+  it('solves the bug with the reference patch only when enabled, and only for the ticket in progress', async () => {
+    const off = createGame();
+    await off.game.init();
+    await off.game.nextAssignment();
+    expect(off.game.snapshot().devSolveBug).toBe(false);
+    await expect(off.game.solveBug(1)).rejects.toMatchObject({ code: 'solveBugNotAllowed' });
+    await off.game.move(1, 'inProgress');
+    await expect(off.game.solveBug(1)).rejects.toMatchObject({ code: 'solveBugNotAllowed' });
+    expect(off.runtime.solved).toEqual([]);
+
+    // The same saved game, with the development flag on.
+    const { game, runtime } = createGame({ devSolveBug: true });
+    await game.init();
+    expect(game.snapshot().devSolveBug).toBe(true);
+    await expect(game.solveBug(2)).rejects.toMatchObject({ code: 'solveBugNotAllowed' });
+    await game.solveBug(1);
+    expect(runtime.solved).toHaveLength(1);
+    expect(runtime.solved[0].stage).toBe(1);
+    expect(runtime.solved[0].patch).toContain('diff --git');
   });
 
   it('enforces the drag rules in the main process', async () => {

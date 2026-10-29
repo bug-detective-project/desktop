@@ -148,6 +148,7 @@ export class FakeRuntime implements GameRuntime {
   private qaIndex = 0;
   private branch: string | null = null;
   private stages = new Map<number, string>();
+  private devServerUp = false;
 
   constructor(json?: string) {
     this.scenario = { ...DEFAULT_SCENARIO, ...(json ? (JSON.parse(json) as Partial<Scenario>) : {}) };
@@ -274,6 +275,8 @@ export class FakeRuntime implements GameRuntime {
 
   /** Tickets whose workspace was reset to the stage, for tests. */
   resets: number[] = [];
+  /** Reference patches applied by "Solve bug", for tests. */
+  solved: { stage: number; patch: string }[] = [];
 
   async resetToStage(stage: number) {
     this.resets.push(stage);
@@ -300,15 +303,25 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async isDevServerUp() {
-    return false;
+    return this.devServerUp;
   }
 
-  async startDevServer() {}
+  async startDevServer() {
+    this.devServerUp = true;
+  }
+
+  async stopDevServer() {
+    this.devServerUp = false;
+  }
 
   async openVSCode() {}
 
   async testedFiles() {
     return [textFile('client/src/App.tsx', 'export {}\n'), textFile('package-lock.json', '{}\n')];
+  }
+
+  async solveBug(stage: number, patch: string) {
+    this.solved.push({ stage, patch });
   }
 
   async referenceFiles(stage: number) {

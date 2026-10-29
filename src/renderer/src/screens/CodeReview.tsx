@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ReviewComparison, Snapshot, TicketContent } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
+import { TICKET_COUNT } from '@shared/types.ts';
 import { api } from '../api.ts';
 import { story } from '../content.ts';
 import { Markdown } from '../components/Markdown.tsx';
@@ -85,10 +86,15 @@ function DropdownCard({ title, testId, children }: { title: string; testId: stri
   );
 }
 
+/** Whether the approved solution has no visible difference from the reference (with the current whitespace choice). */
+function isIdentical(comparison: ReviewComparison, showWhitespace: boolean): boolean {
+  return visibleFiles(parseDiff(showWhitespace ? comparison.solutions : comparison.solutionsIgnoringWhitespace)).length === 0;
+}
+
 function Comparison({ comparison, showWhitespace }: { comparison: ReviewComparison; showWhitespace: boolean }) {
   const { t } = useTranslation();
   const solutions = showWhitespace ? comparison.solutions : comparison.solutionsIgnoringWhitespace;
-  if (visibleFiles(parseDiff(solutions)).length > 0) {
+  if (!isIdentical(comparison, showWhitespace)) {
     return (
       <SplitDiff
         diff={solutions}
@@ -151,6 +157,8 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
     setBusy(true);
     try {
       await api.acceptReview(ticketNumber);
+      // The ticket is Done: the next one (if any) waits on the Dashboard.
+      toast.info(t(snapshot.state.tickets.length < TICKET_COUNT ? 'review.doneNext' : 'review.doneLast'));
       onBack();
     } catch (error) {
       toast.error(error);
@@ -212,21 +220,24 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
         )}
         {comparison && <Comparison comparison={comparison} showWhitespace={showWhitespace} />}
       </DropdownCard>
-      <DropdownCard title={t('review.referenceSection')} testId="review-reference">
-        <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: story(language).people.senior.name })}</p>
-        {content?.referencePatch && (
-          <SplitDiff
-            diff={content.referencePatch}
-            testId="reference-diff"
-            labels={{
-              left: t('review.original'),
-              right: t('review.referenceSolution'),
-              onlyLeft: t('review.removedByReference'),
-              onlyRight: t('review.addedByReference'),
-            }}
-          />
-        )}
-      </DropdownCard>
+      {/* An identical solution already shows the same diff (original → your solution) above. */}
+      {!(comparison && isIdentical(comparison, showWhitespace)) && (
+        <DropdownCard title={t('review.referenceSection')} testId="review-reference">
+          <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: story(language).people.senior.name })}</p>
+          {content?.referencePatch && (
+            <SplitDiff
+              diff={content.referencePatch}
+              testId="reference-diff"
+              labels={{
+                left: t('review.original'),
+                right: t('review.referenceSolution'),
+                onlyLeft: t('review.removedByReference'),
+                onlyRight: t('review.addedByReference'),
+              }}
+            />
+          )}
+        </DropdownCard>
+      )}
     </div>
   );
 }

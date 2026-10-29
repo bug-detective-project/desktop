@@ -6,7 +6,7 @@ import { Icon } from './icons.tsx';
 import { STAGE } from './stage.ts';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'review';
-type Size = 'sm' | 'md';
+type Size = 'xs' | 'sm' | 'md';
 
 // Icons inside buttons always inherit the button's text color (currentColor).
 const VARIANTS: Record<Variant, string> = {
@@ -20,6 +20,7 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
+  xs: 'gap-1 rounded-md px-2 py-0.5 text-xs',
   sm: 'gap-1.5 rounded-md px-2.5 py-1.5 text-sm',
   md: 'gap-2 rounded-lg px-3.5 py-2 text-base',
 };
@@ -39,7 +40,7 @@ export function Button({
       disabled={busy || props.disabled}
       {...props}
     >
-      {busy && <Spinner className={size === 'sm' ? 'size-3.5' : 'size-4'} />}
+      {busy && <Spinner className={size === 'xs' ? 'size-3' : size === 'sm' ? 'size-3.5' : 'size-4'} />}
       {children}
     </button>
   );

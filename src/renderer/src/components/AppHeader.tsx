@@ -40,6 +40,8 @@ export function AppHeader({
   const toast = useToast();
   const company = story(snapshot.state.settings.language).company.name;
   const unread = snapshot.state.inbox.filter((message) => !message.read).length;
+  // A next assignment waiting on the Dashboard: a red "1" that stays until the player picks it up (it wins over the unread count).
+  const pending = snapshot.nextTicket !== null;
   const language = snapshot.state.settings.language;
 
   return (
@@ -69,7 +71,16 @@ export function AppHeader({
                 >
                   <Icon name={item.icon} />
                   {t(`nav.${item.id}`)}
-                  {item.id === 'dashboard' && unread > 0 && (
+                  {item.id === 'dashboard' && pending && (
+                    <span
+                      className="inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground"
+                      title={t('header.pending')}
+                      data-testid="pending-count"
+                    >
+                      1
+                    </span>
+                  )}
+                  {item.id === 'dashboard' && !pending && unread > 0 && (
                     <span
                       className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground"
                       title={t('header.unread', { count: unread })}

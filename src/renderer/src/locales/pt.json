@@ -12,7 +12,8 @@
     "me": "EU",
     "unread_one": "{{count}} mensagem não lida",
     "unread_other": "{{count}} mensagens não lidas",
-    "language": "Idioma: {{language}}"
+    "language": "Idioma: {{language}}",
+    "pending": "Uma nova tarefa espera no Painel"
   },
   "common": {
     "checkAgain": "Verificar de novo",
@@ -166,7 +167,11 @@
       "codeReview": "Tickets aprovados no QA aguardam revisão aqui.",
       "done": "Os tickets chegam aqui quando você aceita a revisão."
     },
-    "testing": "Em teste"
+    "testing": "Em teste",
+    "solveBug": "Resolver bug",
+    "solvedBug": "A correção de referência está no seu código. Mova o card para Em QA para testá-la.",
+    "move": "Mover",
+    "review": "Revisão"
   },
   "ticket": {
     "tabs": {
@@ -178,6 +183,8 @@
     "openVSCode": "Abrir no VS Code",
     "openBrowser": "Abrir app no navegador",
     "startDevServer": "Iniciar servidor de desenvolvimento",
+    "stopDevServer": "Pausar servidor de desenvolvimento",
+    "devServerUp": "A aplicação está rodando. Pause por aqui para liberar as portas ou para reiniciá-la depois de mudar configurações.",
     "devServerDown": "A aplicação não está rodando. Rode npm run dev no terminal do VS Code, ou inicie por aqui.",
     "readOnly": "Este ticket está concluído. Ele é somente leitura.",
     "openReview": "Abrir code review",
@@ -267,7 +274,9 @@
     "referenceSection": "Diff solução proposta com o código original",
     "referenceIntro": "O que {{name}} mudou no código com que o ticket começou para corrigir o bug.",
     "removedByReference": "Removido pela referência",
-    "addedByReference": "Adicionado pela referência"
+    "addedByReference": "Adicionado pela referência",
+    "doneNext": "Ticket concluído! Vá para o Painel para pegar a próxima tarefa.",
+    "doneLast": "Ticket concluído! Esse era o último."
   },
   "comparison": {
     "files_one": "{{count}} arquivo diferente",
@@ -367,7 +376,8 @@
         "exporting": "exportando",
         "restoring": "restaurando",
         "cleaningDocker": "o Docker está sendo limpo",
-        "removingDocker": "tudo está sendo removido do Docker"
+        "removingDocker": "tudo está sendo removido do Docker",
+        "solvingBug": "o bug está sendo resolvido (desenvolvimento)"
       }
     },
     "dangerZone": "Zona de perigo",
@@ -441,6 +451,7 @@
     "failed": "Algo deu errado: {{message}}",
     "noReview": "O review deste ticket não está disponível.",
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
-    "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}"
+    "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
+    "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido."
   }
 }

@@ -51,6 +51,7 @@ export type BusyTask =
   | 'closingReview'
   | 'cleaningDocker'
   | 'removingDocker'
+  | 'solvingBug'
   | null;
 
 /** leftovers: QA leftovers and images of older app versions; everything: all the app created, the player's code too. */
@@ -102,6 +103,8 @@ export interface Snapshot {
   contentSource: string;
   appVersion: string;
   versions: { electron: string; node: string; chrome: string };
+  /** Development only: the board shows "Solve bug" (BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON). */
+  devSolveBug: boolean;
 }
 
 export interface TicketContent {
@@ -162,6 +165,9 @@ export interface BugDetectiveApi {
   openVSCode(): Promise<void>;
   openAppInBrowser(): Promise<void>;
   startDevServer(): Promise<void>;
+  stopDevServer(): Promise<void>;
+  /** Development only: applies the reference fix of the ticket in progress to the player's code. */
+  solveBug(ticket: number): Promise<void>;
   openExternal(link: ExternalLink): Promise<void>;
 
   updateSettings(settings: Partial<Settings>): Promise<void>;

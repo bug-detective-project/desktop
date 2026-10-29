@@ -40,6 +40,8 @@ const schemas = {
   openVSCode: none,
   openAppInBrowser: none,
   startDevServer: none,
+  stopDevServer: none,
+  solveBug: z.tuple([ticket]),
   openExternal: z.tuple([z.enum(Object.keys(EXTERNAL_LINKS) as [keyof typeof EXTERNAL_LINKS])]),
   updateSettings: z.tuple([
     z
@@ -116,6 +118,8 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
       await openUrl(url.href);
     },
     startDevServer: () => game.startDevServer(),
+    stopDevServer: () => game.stopDevServer(),
+    solveBug: (n) => game.solveBug(n),
     openExternal: (link) => openUrl(EXTERNAL_LINKS[link]),
     updateSettings: (settings) => game.updateSettings(settings),
     exportProgress: async () => {

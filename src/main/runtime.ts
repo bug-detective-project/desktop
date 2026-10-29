@@ -59,6 +59,7 @@ export interface GameRuntime {
   workspacePorts(): Promise<WorkspacePorts | null>;
   isDevServerUp(): Promise<boolean>;
   startDevServer(): Promise<void>;
+  stopDevServer(): Promise<void>;
   openVSCode(): Promise<void>;
 
   runQa(request: QaRequest): Promise<QaResult>;
@@ -66,6 +67,8 @@ export interface GameRuntime {
   /** The files the last QA run tested (its own copy of the workspace). */
   testedFiles(): Promise<ArchiveFile[]>;
 
+  /** Development only: the working tree gets the reference patch, as if the player had fixed the bug. */
+  solveBug(stage: number, patch: string): Promise<void>;
   /** The stage commit with the reference patch applied. */
   referenceFiles(stage: number, patch: string): Promise<ArchiveFile[]>;
   /** Creates or recreates the approved-snapshot tag and the review branch. */
@@ -348,6 +351,10 @@ export class DockerRuntime implements GameRuntime {
     await (await this.runningWorkspace()).startDevServer();
   }
 
+  async stopDevServer() {
+    await (await this.runningWorkspace()).stopDevServer();
+  }
+
   async openVSCode() {
     const workspace = await this.runningWorkspace();
     const { vscode } = await this.env();
@@ -359,6 +366,10 @@ export class DockerRuntime implements GameRuntime {
 
   async testedFiles() {
     return (await this.qa()).testedFiles();
+  }
+
+  async solveBug(stage: number, patch: string) {
+    await (await this.runningWorkspace()).solveBug(stage, patch);
   }
 
   async referenceFiles(stage: number, patch: string) {

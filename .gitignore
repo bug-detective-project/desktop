@@ -8,3 +8,6 @@ playwright-report/
 
 # Personal helper: builds the installer from WSL and installs it on Windows.
 install-windows.sh
+
+# Development settings (src/main/index.ts loads it; see .env.example).
+.env

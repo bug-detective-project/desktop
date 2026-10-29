@@ -82,6 +82,16 @@ Development builds (`pnpm run dev`, or `out/` started without packaging) have:
 
 Neither is set up in the packaged app or in the e2e tests (`BUGDETECTIVE_E2E=1`); the download code is excluded from the installer (`electron-builder.yml`).
 
+## Development settings (`.env`)
+
+Development builds (`pnpm run dev`, or `out/` started without packaging) load `desktop/.env` at start. Copy `.env.example` to `.env`; the file is git-ignored, never packaged, and ignored by the e2e tests (they pass their own variables). Variables already set in the environment win over the file.
+
+| Variable | Effect |
+| --- | --- |
+| `BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true` | Shows **Solve bug** on the board card in progress. A click puts the ticket's `reference.patch` into your code: every file the patch touches goes back to the stage version (your edits to those files are lost), then the patch is applied. Other files, the index and commits stay. Move the card to In QA afterwards as usual. The packaged app never shows it. |
+
+Restart the app after changing `.env`.
+
 ## Running directly in WSL 2 (Linux)
 
 The app also runs as a Linux app inside WSL 2, shown on the Windows desktop through WSLg. Requirements:

@@ -68,16 +68,8 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   }
   return (
     <div className="space-y-2">
-      {status && !status.devServerUp && (
-        <Tooltip content={t('ticket.devServerDown')} className="w-full">
-          <Button className="w-full" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
-            {busy !== 'dev' && <Icon name="play" />}
-            {t('ticket.startDevServer')}
-          </Button>
-        </Tooltip>
-      )}
       <div className="grid grid-cols-2 gap-2">
-        <Tooltip content={t('ticket.vscodeHint')}>
+        <Tooltip content={t('ticket.vscodeHint')} hoverOnly>
           <Button variant="primary" className="w-full" disabled={!dockerUp} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
             {busy !== 'vscode' && <Icon name="code" />}
             {t('ticket.openVSCode')}
@@ -89,6 +81,21 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
           {status?.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
         </Button>
       </div>
+      {status?.devServerUp ? (
+        <Tooltip content={t('ticket.devServerUp')} className="w-full" hoverOnly>
+          <Button className="w-full" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.stopDevServer())} data-testid="stop-dev-server">
+            {busy !== 'dev' && <Icon name="pause" />}
+            {t('ticket.stopDevServer')}
+          </Button>
+        </Tooltip>
+      ) : (
+        <Tooltip content={t('ticket.devServerDown')} className="w-full" hoverOnly>
+          <Button className="w-full" disabled={!dockerUp || !status} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
+            {busy !== 'dev' && <Icon name="play" />}
+            {t('ticket.startDevServer')}
+          </Button>
+        </Tooltip>
+      )}
     </div>
   );
 }

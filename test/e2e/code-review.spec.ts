@@ -90,6 +90,8 @@ test('an identical solution says so and shows the player changes against the ori
     await expect(page.getByTestId('identical-message')).toHaveText('Your solution is identical to the reference');
     await expect(page.getByTestId('baseline-diff')).toContainText('client/src/pages/TicketDetails.tsx');
     await expect(page.getByTestId('comparison')).toHaveCount(0);
+    // The reference diff would repeat the same changes: it is not shown.
+    await expect(page.getByTestId('review-reference')).toHaveCount(0);
   } finally {
     await close();
   }

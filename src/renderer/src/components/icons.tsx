@@ -18,6 +18,7 @@ export type IconName =
   | 'refresh'
   | 'code'
   | 'play'
+  | 'pause'
   | 'server'
   | 'hardDrive'
   | 'info'
@@ -113,6 +114,12 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   play: <polygon points="6 3 20 12 6 21 6 3" />,
+  pause: (
+    <>
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
   server: (
     <>
       <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />

@@ -364,11 +364,61 @@ test('an unread message that is shown open counts as read, without clicking it',
     await page.getByTestId('open-review').click();
     await page.getByTestId('accept-review').click();
     await expect(page.getByTestId('board')).toBeVisible();
-    await expect(page.getByTestId('nav-dashboard').getByTestId('unread-count')).toHaveText('1');
-    // ...and opening the Dashboard shows it open, which marks it read.
+    // Done: a toast sends the player to the Dashboard, where a red "1" marks the next task (it wins over the unread count).
+    await expect(page.getByTestId('toast-info').last()).toContainText('Go to the Dashboard to get your next task');
+    await expect(page.getByTestId('nav-dashboard').getByTestId('pending-count')).toHaveText('1');
+    await expect(page.getByTestId('unread-count')).toHaveCount(0);
+    // ...and opening the Dashboard shows the message open, which marks it read; the red badge stays until the next task is taken.
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('unread-count')).toHaveCount(0);
+    await expect(page.getByTestId('pending-count')).toHaveText('1');
+    await page.getByTestId('next-assignment').click();
+    await expect(page.getByTestId('pending-count')).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});
+
+test('"Solve bug" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON is on', async () => {
+  const off = await launch();
+  try {
+    await startFirstTicket(off.page);
+    await dragCard(off.page, 1, 'inProgress');
+    await expect(off.page.getByTestId('solve-bug')).toHaveCount(0);
+  } finally {
+    await off.close();
+  }
+
+  const { page, close } = await launch({}, { env: { BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON: 'true' } });
+  try {
+    await startFirstTicket(page);
+    await expect(page.getByTestId('solve-bug')).toHaveCount(0);
+    await dragCard(page, 1, 'inProgress');
+    await page.getByTestId('solve-bug').click();
+    await expect(page.getByTestId('toast-info').last()).toContainText('reference fix is now in your code');
+    // The click stays on the button: the ticket panel does not open.
+    await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});
+
+test('cards have a Move button in To Do and In Progress, and a Review button in Code Review', async () => {
+  const { page, close } = await launch({ qa: ['passed'] });
+  try {
+    await startFirstTicket(page);
+    const card = page.getByTestId('card-1');
+    await card.getByTestId('move-card').click();
+    await expect(card).toHaveAttribute('data-status', 'inProgress');
+    // The click stays on the button: the ticket panel does not open.
+    await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
+    await card.getByTestId('move-card').click();
+    await expect(card).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
+    await expect(card.getByTestId('move-card')).toHaveCount(0);
+    await card.getByTestId('review-card').click();
+    await expect(page.getByTestId('code-review')).toBeVisible();
+    await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
   } finally {
     await close();
   }

@@ -12,7 +12,8 @@
     "me": "ME",
     "unread_one": "{{count}} unread message",
     "unread_other": "{{count}} unread messages",
-    "language": "Language: {{language}}"
+    "language": "Language: {{language}}",
+    "pending": "A new task is waiting on the Dashboard"
   },
   "common": {
     "checkAgain": "Check again",
@@ -166,7 +167,11 @@
       "codeReview": "Tickets that pass QA wait here for review.",
       "done": "Tickets land here once you accept their review."
     },
-    "testing": "Testing"
+    "testing": "Testing",
+    "solveBug": "Solve bug",
+    "solvedBug": "The reference fix is now in your code. Move the card to In QA to test it.",
+    "move": "Move",
+    "review": "Review"
   },
   "ticket": {
     "tabs": {
@@ -178,6 +183,8 @@
     "openVSCode": "Open in VS Code",
     "openBrowser": "Open app in browser",
     "startDevServer": "Start dev server",
+    "stopDevServer": "Stop dev server",
+    "devServerUp": "The app is running. Stop it here to free its ports, or to restart it after changing settings.",
     "devServerDown": "The app is not running. Run npm run dev in the VS Code terminal, or start it here.",
     "readOnly": "This ticket is done. It is read-only.",
     "openReview": "Open code review",
@@ -267,7 +274,9 @@
     "referenceSection": "Diff: proposed solution with the original code",
     "referenceIntro": "What {{name}} changed in the code the ticket started from to fix the bug.",
     "removedByReference": "Removed by the reference",
-    "addedByReference": "Added by the reference"
+    "addedByReference": "Added by the reference",
+    "doneNext": "Ticket done! Go to the Dashboard to get your next task.",
+    "doneLast": "Ticket done! That was the last one."
   },
   "comparison": {
     "files_one": "{{count}} file differs",
@@ -367,7 +376,8 @@
         "exporting": "exporting",
         "restoring": "restoring",
         "cleaningDocker": "Docker is being cleaned up",
-        "removingDocker": "everything is being removed from Docker"
+        "removingDocker": "everything is being removed from Docker",
+        "solvingBug": "the bug is being solved (development)"
       }
     },
     "dangerZone": "Danger zone",
@@ -441,6 +451,7 @@
     "failed": "Something went wrong: {{message}}",
     "noReview": "The review of this ticket is not available.",
     "reviewFailed": "The review could not be opened, and your code was restored: {{message}}",
-    "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}"
+    "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
+    "solveBugNotAllowed": "Only the ticket in progress can be solved."
   }
 }

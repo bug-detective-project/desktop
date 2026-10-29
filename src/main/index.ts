@@ -34,6 +34,14 @@ const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : und
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
 const devTools = !app.isPackaged && !isE2E;
 
+// Development only: desktop/.env (never packaged; the e2e tests pass their variables themselves).
+const envFile = join(appRoot, '.env');
+if (!app.isPackaged && !isE2E && existsSync(envFile)) {
+  process.loadEnvFile(envFile);
+}
+// "Solve bug" on the board card: BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true, never in the installed app.
+const devSolveBug = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
+
 const contentConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('local'), repoPath: z.string(), manifestPath: z.string() }),
   z.object({
@@ -166,6 +174,7 @@ async function main(): Promise<void> {
     runtime: runtime(),
     appVersion: app.getVersion(),
     versions: { electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome },
+    devSolveBug,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';

@@ -14,6 +14,10 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
     await expect(panel.getByTestId('open-vscode')).toBeEnabled();
     await expect(panel.getByTestId('open-browser')).toContainText(':5173');
+    // The dev server button is always there: it starts the server, then stops it.
+    await panel.getByTestId('start-dev-server').click();
+    await panel.getByTestId('stop-dev-server').click();
+    await expect(panel.getByTestId('start-dev-server')).toBeVisible();
     // The workspace is on player/ticket-1, but git branch names are never shown.
     await expect(panel).not.toContainText('player/');
 

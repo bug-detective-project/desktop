@@ -8,7 +8,7 @@ import type { Column, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { STAGE } from '../components/stage.ts';
-import { Badge, Spinner } from '../components/ui.tsx';
+import { Badge, Button, Spinner } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
@@ -17,6 +17,13 @@ const DRAG_TYPE = 'application/x-bugdetective-ticket';
 function lastQaFailed(ticket: TicketState): boolean {
   const last = ticket.attempts.at(-1);
   return ticket.status !== 'inQa' && last !== undefined && last.result.status !== 'passed';
+}
+
+interface CardAction {
+  label: string;
+  testId: string;
+  busy: boolean;
+  onClick: () => void;
 }
 
 function TicketCard({
@@ -30,6 +37,9 @@ function TicketCard({
   onOpen,
   onDragStart,
   onDragEnd,
+  onSolveBug,
+  solving,
+  action,
 }: {
   ticket: TicketState;
   title: string;
@@ -44,6 +54,11 @@ function TicketCard({
   onOpen: () => void;
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
+  /** Development only (BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON): shows "Solve bug" on the card. */
+  onSolveBug?: () => void;
+  solving: boolean;
+  /** The small button on the key's line: "Move" (To Do, In Progress) or "Review" (Code Review). */
+  action?: CardAction;
 }) {
   const { t } = useTranslation();
   return (
@@ -69,6 +84,14 @@ function TicketCard({
     >
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+        {action && (
+          // The card opens on click and Enter; the button keeps both to itself.
+          <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            <Button size="xs" busy={action.busy} onClick={action.onClick} data-testid={action.testId}>
+              {t(action.label)}
+            </Button>
+          </span>
+        )}
         {testing && (
           <span data-testid="card-qa-running">
             <Badge tone="warn">
@@ -82,6 +105,14 @@ function TicketCard({
       {lastQaFailed(ticket) && (
         <div className="mt-2.5" data-testid="card-qa-failed">
           <Badge tone="danger">{t('qa.badge.failed')}</Badge>
+        </div>
+      )}
+      {onSolveBug && (
+        // The card opens on click and Enter; the button keeps both to itself.
+        <div className="mt-2.5" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <Button size="xs" busy={solving} onClick={onSolveBug} data-testid="solve-bug">
+            {t('board.solveBug')}
+          </Button>
         </div>
       )}
     </div>
@@ -107,7 +138,15 @@ function boardHint(snapshot: Snapshot): string {
   return 'board.hint';
 }
 
-export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTicket: (ticket: number) => void }) {
+export function Board({
+  snapshot,
+  onOpenTicket,
+  onOpenReview,
+}: {
+  snapshot: Snapshot;
+  onOpenTicket: (ticket: number) => void;
+  onOpenReview: (ticket: number) => void;
+}) {
   const { t } = useTranslation();
   const toast = useToast();
   const { state } = snapshot;
@@ -124,6 +163,40 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
     canMove(ticket) || (ticket.ticket === state.currentTicket && (ticket.status === 'inQa' || ticket.status === 'codeReview'));
 
   // In QA pulses only while a QA run is in progress; In Progress always does.
+  const moveForward = async (ticket: number, to: Column) => {
+    try {
+      await api.move(ticket, to);
+    } catch (error) {
+      toast.error(error);
+    }
+  };
+
+  // The same moves as dragging: To Do → In Progress, In Progress → In QA; Code Review opens the review.
+  const cardAction = (ticket: TicketState): CardAction | undefined => {
+    if (ticket.status === 'codeReview' && ticket.ticket === state.currentTicket) {
+      return { label: 'board.review', testId: 'review-card', busy: false, onClick: () => onOpenReview(ticket.ticket) };
+    }
+    const to = ticket.status === 'todo' ? 'inProgress' : ticket.status === 'inProgress' ? 'inQa' : null;
+    if (!to || !canMove(ticket)) {
+      return undefined;
+    }
+    return {
+      label: 'board.move',
+      testId: 'move-card',
+      busy: snapshot.busy === (to === 'inProgress' ? 'starting' : 'qa'),
+      onClick: () => void moveForward(ticket.ticket, to),
+    };
+  };
+
+  const solveBug = async (ticket: number) => {
+    try {
+      await api.solveBug(ticket);
+      toast.info(t('board.solvedBug'));
+    } catch (error) {
+      toast.error(error);
+    }
+  };
+
   const pulses = (column: Column) => (column === 'inQa' ? snapshot.busy === 'qa' : STAGE[column].pulse);
 
   const endDrag = () => {
@@ -228,6 +301,13 @@ export function Board({ snapshot, onOpenTicket }: { snapshot: Snapshot; onOpenTi
                       setDragging(ticket);
                     }}
                     onDragEnd={endDrag}
+                    onSolveBug={
+                      snapshot.devSolveBug && ticket.ticket === state.currentTicket && ticket.status === 'inProgress'
+                        ? () => void solveBug(ticket.ticket)
+                        : undefined
+                    }
+                    solving={snapshot.busy === 'solvingBug'}
+                    action={cardAction(ticket)}
                   />
                 ))}
               </div>

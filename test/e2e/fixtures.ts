@@ -15,7 +15,7 @@ export interface Launched {
  * Launches the built app (pnpm run build) with the fake runtime: prerequisites and QA outcomes
  * come from the scenario, content comes from the local SupportDesk checkout.
  */
-export async function launch(scenario: object = {}, options: { userData?: string } = {}): Promise<Launched> {
+export async function launch(scenario: object = {}, options: { userData?: string; env?: Record<string, string> } = {}): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
@@ -27,6 +27,7 @@ export async function launch(scenario: object = {}, options: { userData?: string
       BUGDETECTIVE_E2E: '1',
       BUGDETECTIVE_USER_DATA: userData,
       BUGDETECTIVE_E2E_SCENARIO: JSON.stringify(scenario),
+      ...options.env,
     },
   });
   const page = await app.firstWindow();

@@ -145,6 +145,25 @@ if [ "$current" != "$branch" ]; then
   fi
 fi`,
 
+  /**
+   * Development only ("Solve bug"): the files the reference patch (stdin) touches go back to the
+   * stage commit, then the patch is applied to the working tree. The player's changes to those
+   * files are lost; other files and the index stay as they are.
+   */
+  solveBug: `set -eu
+stage="$1"; patch="/tmp/bugdetective-solve-$stage.patch"
+cat > "$patch"
+cd ${WORKSPACE_DIR}
+git apply --numstat "$patch" | cut -f3- | while IFS= read -r file; do
+  if git cat-file -e "refs/tags/stage-$stage:$file" 2>/dev/null; then
+    git restore --source="refs/tags/stage-$stage" --worktree -- "$file"
+  else
+    rm -f -- "$file"
+  fi
+done
+git apply --whitespace=nowarn "$patch"
+rm -f "$patch"`,
+
   /** Diff of the working tree (including new files) against the stage commit, without touching the real index. */
   playerDiff: `set -eu
 stage="$1"; idx=/tmp/bugdetective-diff.index
@@ -568,6 +587,11 @@ export class Workspace {
     await this.exec(['git', 'apply', '--whitespace=nowarn', '-'], { input: patch, timeoutMs: 60_000 });
   }
 
+  /** Development only: replaces the player's fix with the reference patch (see the solveBug script). */
+  async solveBug(stage: number, patch: string): Promise<void> {
+    await this.script('solveBug', [ticketArg(stage)], { input: patch, timeoutMs: 60_000 });
+  }
+
   /** Files of the stage commit with the reference patch applied. */
   async referenceFiles(stage: number, patch: string): Promise<ArchiveFile[]> {
     const { stdout } = await this.script('referenceTree', [ticketArg(stage)], { input: patch, timeoutMs: 60_000 });
@@ -727,6 +751,30 @@ export class Workspace {
       '-c',
       'exec npm run dev > /tmp/supportdesk-dev.log 2>&1',
     ]);
+    await this.waitForDevServer(true, 30_000);
+  }
+
+  /**
+   * Stops `npm run dev`, whether it was started here or in the VS Code terminal: the npm and
+   * concurrently wrappers, Vite and the API's `node --watch`. The bracket in each pattern keeps
+   * pkill from matching the shell that runs it.
+   */
+  async stopDevServer(): Promise<void> {
+    await this.docker.exec(
+      this.names.container,
+      ['sh', '-c', "pkill -f '[n]pm run dev'; pkill -f '[c]oncurrently'; pkill -f '[n]ode_modules/.bin/vite'; pkill -f '[n]ode --watch'; true"],
+      { user: 'node', timeoutMs: 10_000 },
+    );
+    await this.waitForDevServer(false, 10_000);
+  }
+
+  /** Polls until the dev server answers (or stops answering); gives up quietly after `timeoutMs`. */
+  private async waitForDevServer(up: boolean, timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if ((await this.isDevServerUp()) === up) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   async bundle(): Promise<Buffer> {

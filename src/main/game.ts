@@ -56,6 +56,8 @@ export interface GameOptions {
   runtime: GameRuntime;
   appVersion: string;
   versions: Snapshot['versions'];
+  /** Development only: allows "Solve bug" (never set by the packaged app). */
+  devSolveBug?: boolean;
   /** Called after every change, with the new snapshot. */
   onChange?: (snapshot: Snapshot) => void;
   clock?: () => Date;
@@ -119,6 +121,7 @@ export class Game {
       contentSource: `${this.options.content.kind}: ${this.options.content.describe()}`,
       appVersion: this.options.appVersion,
       versions: this.options.versions,
+      devSolveBug: this.options.devSolveBug ?? false,
     };
   }
 
@@ -508,6 +511,29 @@ export class Game {
   async startDevServer(): Promise<void> {
     await this.requireDocker();
     await this.options.runtime.startDevServer();
+  }
+
+  async stopDevServer(): Promise<void> {
+    await this.requireDocker();
+    await this.options.runtime.stopDevServer();
+  }
+
+  /** Development only: puts the ticket's reference fix into the player's code, so the rest of the flow can be tested quickly. */
+  async solveBug(ticket: number): Promise<void> {
+    const current = this.state.tickets.find((item) => item.ticket === ticket);
+    if (!this.options.devSolveBug || ticket !== this.state.currentTicket || current?.status !== 'inProgress') {
+      throw new GameError('solveBugNotAllowed');
+    }
+    await this.requireDocker();
+    await this.beforePlayerCode();
+    await this.exclusive('solvingBug', async () => {
+      const patch = await this.options.packages.readText(ticket, 'reference.patch');
+      if (!patch) {
+        throw new GameError('solveBugNotAllowed', `Ticket ${ticket} has no reference patch`);
+      }
+      this.appendLog(`» Solving ticket ${ticket} with its reference patch (development)`);
+      await this.options.runtime.solveBug(ticket, patch);
+    });
   }
 
   /** The URL of the player's app on the published port. */
