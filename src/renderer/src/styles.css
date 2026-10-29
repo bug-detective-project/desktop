@@ -102,6 +102,15 @@ body,
   height: 100%;
 }
 
+/*
+ * The smallest screen the layout is designed for: a 14-inch laptop (1920 x 1080 at 150% scaling,
+ * minus the taskbar and the title bar). A smaller window scrolls instead of squeezing the screens.
+ */
+#root {
+  min-width: 1280px;
+  min-height: 640px;
+}
+
 body {
   @apply bg-background font-sans text-foreground antialiased selection:bg-primary/20;
 }

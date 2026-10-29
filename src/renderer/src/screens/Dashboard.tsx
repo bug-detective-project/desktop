@@ -949,7 +949,7 @@ export function Dashboard({
       className="mx-auto h-full min-h-[560px] max-w-10xl p-6"
       data-testid="dashboard"
     >
-      <div className="relative grid h-full grid-cols-[248px_340px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:grid-cols-[320px_400px_minmax(0,1fr)]">
+      <div className="relative grid h-full grid-cols-[320px_400px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <aside
           className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-border bg-muted/40"
           aria-label={t('dashboard.desk')}

@@ -335,7 +335,7 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
       {!running ? (
         <p className="text-base text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-4 gap-3">
           {(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const).map((id) => {
             const item = items?.find((entry) => entry.id === id);
             return (

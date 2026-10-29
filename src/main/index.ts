@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { app, BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, screen, session, shell } from 'electron';
 import { z } from 'zod';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -125,11 +125,13 @@ function hardenSessions(): void {
 }
 
 function createWindow(): BrowserWindow {
+  // Fits a 14-inch laptop's work area; the renderer scrolls below its 1280 x 640 minimum layout.
+  const { workAreaSize } = screen.getPrimaryDisplay();
   const window = new BrowserWindow({
-    width: 1360,
-    height: 880,
-    minWidth: 1024,
-    minHeight: 700,
+    width: Math.min(1360, workAreaSize.width),
+    height: Math.min(880, workAreaSize.height),
+    minWidth: 960,
+    minHeight: 540,
     show: false,
     title: 'Bug Detective',
     // Windows takes the icon from the executable; Linux (and WSLg) needs it on the window.

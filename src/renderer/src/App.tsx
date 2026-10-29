@@ -63,7 +63,12 @@ export function App() {
     );
   }
   if (!checklistDone) {
-    return <Checklist snapshot={snapshot} onContinue={() => setChecklistDone(true)} />;
+    // Scrolls inside the window, so the page itself only scrolls below the minimum size.
+    return (
+      <div className="h-full overflow-y-auto">
+        <Checklist snapshot={snapshot} onContinue={() => setChecklistDone(true)} />
+      </div>
+    );
   }
 
   const openReview = (ticket: number) => {
