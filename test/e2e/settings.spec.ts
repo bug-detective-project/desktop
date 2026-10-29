@@ -9,7 +9,14 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
   const saves = await mkdtemp(join(tmpdir(), 'Meus saves '));
   try {
     await startFirstTicket(page);
+    // Settings is a gear button after the language menu, not a navigation tab.
+    await expect(page.getByRole('navigation').getByTestId('nav-settings')).toHaveCount(0);
+    await expect(page.getByTestId('nav-settings')).toHaveText('');
+    await expect(page.getByTestId('nav-settings')).toHaveAccessibleName('Settings');
+    const [language, gear] = await Promise.all([page.getByTestId('language-menu').boundingBox(), page.getByTestId('nav-settings').boundingBox()]);
+    expect(gear!.x).toBeGreaterThan(language!.x);
     await page.getByTestId('nav-settings').click();
+    await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
     const settings = page.getByTestId('settings');
 
     // Preferences: language and theme apply at once.

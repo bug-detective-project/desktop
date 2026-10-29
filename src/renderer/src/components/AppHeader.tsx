@@ -14,15 +14,14 @@ import type { IconName } from './icons.tsx';
 
 export type View = 'dashboard' | 'board' | 'settings' | 'review';
 
-const NAV: { id: Exclude<View, 'review'>; icon: IconName }[] = [
+const NAV: { id: Exclude<View, 'review' | 'settings'>; icon: IconName }[] = [
   { id: 'dashboard', icon: 'mail' },
   { id: 'board', icon: 'board' },
-  { id: 'settings', icon: 'settings' },
 ];
 
 /**
- * The persistent app header: brand, navigation (the Dashboard item counts the unread messages), theme, language and the
- * player. Docker problems show in the banner below it.
+ * The persistent app header: brand, navigation (the Dashboard item counts the unread messages), theme, language, the
+ * settings (a gear button) and the player. Docker problems show in the banner below it.
  */
 export function AppHeader({
   snapshot,
@@ -109,6 +108,19 @@ export function AppHeader({
             <Icon name={dark ? 'moon' : 'sun'} className="size-4 text-muted-foreground" />
           </button>
           <LanguageMenu language={language} />
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className={`inline-flex size-8 items-center justify-center rounded-full border shadow-xs transition-all ${
+              view === 'settings' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted'
+            }`}
+            title={t('nav.settings')}
+            aria-label={t('nav.settings')}
+            aria-current={view === 'settings' ? 'page' : undefined}
+            data-testid="nav-settings"
+          >
+            <Icon name="settings" className="size-4" />
+          </button>
           <div className="flex size-8 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-sm font-semibold text-primary" aria-hidden>
             {t('header.me')}
           </div>
