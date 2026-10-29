@@ -188,6 +188,13 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(options.getByRole('menuitemradio')).toHaveCount(2);
     await expect(options).toHaveText('');
     await expect(page.getByTestId('language-en')).toHaveAttribute('aria-checked', 'true');
+    // The flags are react-country-flag SVGs shipped with the app: each one loads, with no network.
+    const flags = options.locator('img');
+    await expect(flags).toHaveCount(2);
+    await expect(flags.nth(0)).toHaveAttribute('src', './flags/us.svg');
+    await expect(flags.nth(1)).toHaveAttribute('src', './flags/br.svg');
+    const loaded = () => flags.evaluateAll((images) => images.map((image) => (image as HTMLImageElement).naturalWidth > 0));
+    await expect.poll(loaded).toEqual([true, true]);
     await page.getByTestId('language-pt').click();
     await expect(options).toHaveCount(0);
     await expect(page.getByTestId('nav-board')).toHaveText('Quadro');
