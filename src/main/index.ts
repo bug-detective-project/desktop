@@ -86,7 +86,10 @@ const platform: Platform | null = isE2E ? null : currentPlatform();
 
 function runtime(): GameRuntime {
   if (!platform) {
-    return new FakeRuntime(process.env.BUGDETECTIVE_E2E_SCENARIO);
+    const fake = new FakeRuntime(process.env.BUGDETECTIVE_E2E_SCENARIO);
+    // The e2e tests reach it with app.evaluate to simulate changes made outside the app.
+    (globalThis as { bugDetectiveFake?: FakeRuntime }).bugDetectiveFake = fake;
+    return fake;
   }
   const contextRoot = app.isPackaged ? join(process.resourcesPath, 'docker') : join(appRoot, 'build', 'docker');
   return new DockerRuntime(platform, { contextRoot });

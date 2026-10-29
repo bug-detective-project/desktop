@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { dragCard, launch, startFirstTicket } from './fixtures.ts';
+import { dragCard, launch, simulate, startFirstTicket } from './fixtures.ts';
 
 /** Drops a card on a column it cannot go to and expects the explanation (drags occasionally get lost, so retry). */
 async function dropExplains(page: Page, card: Locator, column: string, message: string) {
@@ -602,6 +602,84 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     await expect(row).toHaveAttribute('data-tone', 'warn');
     // Stopped is only a warning on its row: the section title stays green.
     await expect(page.getByTestId('environment-card')).toHaveAttribute('data-tone', 'ok');
+  } finally {
+    await close();
+  }
+});
+
+test('the dev server row follows a server started or stopped in the VS Code terminal (polled every 5 s)', async () => {
+  const { app, page, close } = await launch();
+  try {
+    await startFirstTicket(page);
+    await page.getByTestId('nav-dashboard').click();
+    const row = page.getByTestId('env-devServer');
+    await expect(row).toHaveAttribute('data-up', 'false');
+    // Started outside the app: the row catches up on its next check, without a click.
+    await simulate(app, { devServerUp: true });
+    await expect(row).toHaveAttribute('data-up', 'true', { timeout: 8000 });
+    await expect(row).toContainText('Running');
+    await expect(page.getByTestId('desk-stop-server')).toBeVisible();
+    await simulate(app, { devServerUp: false });
+    await expect(row).toHaveAttribute('data-up', 'false', { timeout: 8000 });
+    await expect(page.getByTestId('desk-start-server')).toBeVisible();
+  } finally {
+    await close();
+  }
+});
+
+test('starting or stopping the dev server shows an error toast when it fails, and the row keeps its state', async () => {
+  const { app, page, close } = await launch({ devServerFails: true });
+  try {
+    await startFirstTicket(page);
+    await page.getByTestId('nav-dashboard').click();
+    const row = page.getByTestId('env-devServer');
+    await page.getByTestId('desk-start-server').click();
+    await expect(page.getByTestId('toast-error')).toContainText('npm run dev failed');
+    await expect(row).toHaveAttribute('data-up', 'false');
+    await expect(page.getByTestId('desk-start-server')).toBeEnabled();
+
+    await simulate(app, { devServerUp: true });
+    await expect(row).toHaveAttribute('data-up', 'true', { timeout: 8000 });
+    await page.getByTestId('desk-stop-server').click();
+    await expect(page.getByTestId('toast-error').last()).toContainText('pkill failed');
+    await expect(row).toHaveAttribute('data-up', 'true');
+  } finally {
+    await close();
+  }
+});
+
+test('the work desk shows the ticket download in progress, with its progress bar', async () => {
+  const { page, close } = await launch({ unlockDelayMs: 3000 });
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('next-assignment').click();
+    const task = page.getByTestId('assignment-card');
+    await expect(task).toHaveAttribute('data-state', 'unlocking');
+    await expect(task).toContainText('Downloading and setting up the ticket');
+    await expect(task.getByRole('progressbar')).toBeVisible();
+    await expect(page.getByTestId('next-assignment')).toHaveCount(0);
+    // When the download ends, the app goes to the Board with the new ticket.
+    await expect(page.getByTestId('card-1')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await close();
+  }
+});
+
+test('the work desk asks to start Docker when it stops while the next assignment waits', async () => {
+  const { app, page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    const task = page.getByTestId('assignment-card');
+    await expect(task).toHaveAttribute('data-state', 'queued');
+    await simulate(app, { docker: 'notRunning' });
+    await expect(task).toHaveAttribute('data-state', 'dockerDown', { timeout: 5000 });
+    await expect(task).toContainText('Start Docker Desktop to download your next ticket.');
+    await expect(page.getByTestId('next-assignment')).toHaveCount(0);
+    await expect(page.getByTestId('email-next')).toHaveCount(0);
+
+    await page.getByTestId('desk-start-docker').click();
+    await expect(task).toHaveAttribute('data-state', 'queued', { timeout: 5000 });
+    await expect(page.getByTestId('next-assignment')).toBeEnabled();
   } finally {
     await close();
   }

@@ -43,6 +43,16 @@ export async function launch(scenario: object = {}, options: { userData?: string
   };
 }
 
+/**
+ * Simulates a change made outside the app on the fake runtime (src/main/index.ts exposes it in
+ * e2e mode): Docker Desktop stopping, or `npm run dev` started or stopped in the VS Code terminal.
+ */
+export async function simulate(app: ElectronApplication, change: { docker?: 'running' | 'notRunning'; devServerUp?: boolean }): Promise<void> {
+  await app.evaluate((_electron, value) => {
+    (globalThis as unknown as { bugDetectiveFake: { simulate(change: unknown): void } }).bugDetectiveFake.simulate(value);
+  }, change);
+}
+
 /** Passes the checklist and unlocks the first ticket. */
 export async function startFirstTicket(page: Page): Promise<void> {
   await page.getByTestId('start-playing').click();

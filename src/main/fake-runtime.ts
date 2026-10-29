@@ -29,6 +29,10 @@ interface Scenario {
   vscodeFails: boolean;
   /** Docker resources a cleanup cannot remove (by name), with Docker's reason. */
   cleanupFails: string[];
+  /** Starting and stopping the dev server fail. */
+  devServerFails: boolean;
+  /** How long importing a stage takes, so the "unlocking" state can be seen. */
+  unlockDelayMs: number;
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -44,6 +48,8 @@ const DEFAULT_SCENARIO: Scenario = {
   review: 'different',
   vscodeFails: false,
   cleanupFails: [],
+  devServerFails: false,
+  unlockDelayMs: 0,
 };
 
 const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
@@ -259,6 +265,7 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async importStage(stage: number, files: ArchiveFile[]) {
+    await new Promise((resolve) => setTimeout(resolve, this.scenario.unlockDelayMs));
     const commit = createHash('sha1').update(`stage-${stage}:${files.length}`).digest('hex');
     this.stages.set(stage, commit);
     return commit;
@@ -307,11 +314,26 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async startDevServer() {
+    if (this.scenario.devServerFails) {
+      throw new Error('npm run dev failed (fake)');
+    }
     this.devServerUp = true;
   }
 
   async stopDevServer() {
+    if (this.scenario.devServerFails) {
+      throw new Error('pkill failed (fake)');
+    }
     this.devServerUp = false;
+  }
+
+  /**
+   * For the e2e tests (through Playwright's app.evaluate): changes made outside the app, such as
+   * Docker Desktop stopping or `npm run dev` started in the VS Code terminal.
+   */
+  simulate(change: { docker?: EngineState; devServerUp?: boolean }) {
+    if (change.docker) this.scenario.docker = change.docker;
+    if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
   }
 
   async openVSCode() {}
