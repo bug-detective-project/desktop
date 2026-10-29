@@ -3,7 +3,7 @@
     "name": "Lanternfish Labs",
     "tagline": "A small software consultancy that builds and maintains apps for growing companies.",
     "summary": "A twelve-person remote consultancy. Pairing when someone is stuck, weekly planning on Mondays.",
-    "about": "Lanternfish Labs is a twelve-person consultancy. Most of the team works remotely, with a weekly planning call on Mondays and pairing sessions whenever someone is stuck. New developers start on a client project right away, with small, real bug fixes as onboarding."
+    "about": "Lanternfish Labs is a twelve-person consultancy. Most of the team works remotely, with a weekly planning call on Mondays and pairing sessions whenever someone is stuck. New developers start on a client project right away, fixing small, real bugs from their first week."
   },
   "client": {
     "name": "Harborline Outfitters",
@@ -43,13 +43,13 @@
         "body": "Thanks for sorting out the assignments; Marcus says the team trusts the success messages again.\n\nElena reports that priority changes don't survive a page refresh. The screen says it worked, and there are no errors anywhere. This one is about following the data, so expect to spend some time in the Network tab.\n\nRafaela"
       },
       "4": {
-        "subject": "Last onboarding ticket: SD-245",
-        "body": "Great progress. This is the last one of your onboarding, and it's marked **Critical**.\n\nSince the latest release, some tickets open as a completely blank page. The server logs are clean, so you'll need the browser to tell you what's going on. Priya says it's her favorite kind of bug to teach.\n\nRafaela"
+        "subject": "Last ticket of the sprint: SD-245",
+        "body": "Great progress. This is the last one of this sprint, and it's marked **Critical**.\n\nSince the latest release, some tickets open as a completely blank page. The server logs are clean, so you'll need the browser to tell you what's going on. Priya says it's her favorite kind of bug to teach.\n\nRafaela"
       }
     },
     "completion": {
-      "subject": "You finished your onboarding!",
-      "body": "That's all four tickets: navigation, assignment, priority and the blank screen. Hannah, Marcus and Elena all sent their thanks, and Harborline's support team is having a much calmer week.\n\nYou traced async state, followed data across the client and the server, and debugged a crash with nothing but the browser console. That's exactly the kind of work we do every day.\n\nThanks for your effort, and welcome to the team for real.\n\nRafaela"
+      "subject": "Sprint done: four tickets closed!",
+      "body": "That's all four tickets: navigation, assignment, priority and the blank screen. Hannah, Marcus and Elena all sent their thanks, and Harborline's support team is having a much calmer week.\n\nYou traced async state, followed data across the client and the server, and debugged a crash with nothing but the browser console. That's exactly the kind of work we do every day.\n\nThanks for the effort. On Monday we plan the next sprint.\n\nRafaela"
     }
   }
 }

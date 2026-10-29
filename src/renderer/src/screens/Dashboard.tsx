@@ -193,7 +193,7 @@ function DeskSentence({ children }: { children: ReactNode }) {
 /**
  * Current task: what the player works on and the one next action, for every game state. The
  * order matters: missing downloads block everything, then an unlock in progress, then the active
- * ticket, the queued next one (or Docker to start first), the end of the onboarding.
+ * ticket, the queued next one (or Docker to start first), the end of the sprint.
  */
 function CurrentTask({
   snapshot,

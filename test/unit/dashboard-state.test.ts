@@ -49,7 +49,7 @@ describe('deskState', () => {
     expect(deskState(snapshot({ nextTicket: 2, dockerState: null }), undefined)).toBe('dockerDown');
   });
 
-  it('shows the end of the onboarding, or nothing before the first message', () => {
+  it('shows the end of the sprint, or nothing before the first message', () => {
     expect(deskState(snapshot({}, [{ kind: 'welcome' }, { kind: 'completion' }]), undefined)).toBe('allDone');
     expect(deskState(snapshot({ environment: null }), undefined)).toBe('none');
   });

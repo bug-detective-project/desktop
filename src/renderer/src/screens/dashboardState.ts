@@ -5,7 +5,7 @@ import type { Language, TicketState } from '@shared/types.ts'
 /**
  * The Current task state. The order matters: missing downloads block everything, then an unlock
  * in progress, then the active ticket, the queued next one (or Docker to start first), the end of
- * the onboarding.
+ * the sprint.
  */
 export type DeskState = 'download' | 'unlocking' | 'active' | 'dockerDown' | 'queued' | 'allDone' | 'none'
 
