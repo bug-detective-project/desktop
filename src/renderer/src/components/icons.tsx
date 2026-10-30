@@ -2,20 +2,25 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Briefcase,
   Check,
   ChevronDown,
   CircleAlert,
   CircleCheckBig,
   CircleQuestionMark,
+  ClipboardList,
   Code,
+  Contact,
   Download,
   ExternalLink,
   HardDrive,
+  Inbox,
   Info,
   Laptop,
   LoaderCircle,
   Mail,
   Moon,
+  Package,
   Pause,
   Play,
   RefreshCw,
@@ -26,6 +31,7 @@ import {
   Sun,
   Trash2,
   TriangleAlert,
+  Users,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -58,6 +64,13 @@ const ICONS = {
   rotateCcw: RotateCcw,
   trash: Trash2,
   x: X,
+  // The Dashboard's work desk.
+  clipboardList: ClipboardList,
+  package: Package,
+  users: Users,
+  briefcase: Briefcase,
+  contact: Contact,
+  inbox: Inbox,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

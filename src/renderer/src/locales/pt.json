@@ -23,7 +23,9 @@
     "working": "Processando…",
     "learnMore": "Como instalar",
     "showLog": "Mostrar detalhes",
-    "hideLog": "Ocultar detalhes"
+    "hideLog": "Ocultar detalhes",
+    "retry": "Tentar de novo",
+    "contentFailed": "Não foi possível carregar o ticket."
   },
   "checklist": {
     "title": "Antes de começar",

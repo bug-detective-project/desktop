@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { dragCard, launch, simulate, startFirstTicket } from './fixtures.ts';
+import { dragCard, expectFlagsLoaded, launch, simulate, startFirstTicket } from './fixtures.ts';
 
 /** Drops a card on a column it cannot go to and expects the explanation (drags occasionally get lost, so retry). */
 async function dropExplains(page: Page, card: Locator, column: string, message: string) {
@@ -183,22 +183,18 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     const languageMenu = page.getByTestId('language-menu');
     await expect(languageMenu).toHaveText('');
     await expect(languageMenu).toHaveAttribute('aria-label', 'Language: English');
+    await expectFlagsLoaded(languageMenu, ['en']);
     await languageMenu.click();
     const options = page.getByTestId('language-options');
     await expect(options.getByRole('menuitemradio')).toHaveCount(2);
     await expect(options).toHaveText('');
     await expect(page.getByTestId('language-en')).toHaveAttribute('aria-checked', 'true');
-    // The flags are react-country-flag SVGs shipped with the app: each one loads, with no network.
-    const flags = options.locator('img');
-    await expect(flags).toHaveCount(2);
-    await expect(flags.nth(0)).toHaveAttribute('src', './flags/us.svg');
-    await expect(flags.nth(1)).toHaveAttribute('src', './flags/br.svg');
-    const loaded = () => flags.evaluateAll((images) => images.map((image) => (image as HTMLImageElement).naturalWidth > 0));
-    await expect.poll(loaded).toEqual([true, true]);
+    await expectFlagsLoaded(options, ['en', 'pt']);
     await page.getByTestId('language-pt').click();
     await expect(options).toHaveCount(0);
     await expect(page.getByTestId('nav-board')).toHaveText('Quadro');
     await expect(languageMenu).toHaveAttribute('aria-label', 'Idioma: Português (Brasil)');
+    await expectFlagsLoaded(languageMenu, ['pt']);
     await languageMenu.click();
     await page.keyboard.press('Escape');
     await expect(options).toHaveCount(0);

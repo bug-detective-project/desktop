@@ -54,6 +54,11 @@ export type BusyTask =
   | 'solvingBug'
   | null;
 
+/** Opening VS Code waits for every task except QA (it tests its own copy of the code, so the player may look meanwhile). */
+export function blocksVSCode(busy: BusyTask): boolean {
+  return busy !== null && busy !== 'qa';
+}
+
 /** leftovers: QA leftovers and images of older app versions; everything: all the app created, the player's code too. */
 export type DockerCleanupScope = 'leftovers' | 'everything';
 
@@ -181,6 +186,8 @@ export interface BugDetectiveApi {
   /** Picks a save file and returns what it contains, so the player can confirm before overwriting. */
   inspectSave(): Promise<{ token: string; summary: SaveSummary } | null>;
   restoreProgress(token: string): Promise<void>;
+  /** The player cancelled the restore: the main process stops keeping the save. */
+  discardSave(token: string): Promise<void>;
   /** Starts over; the workspace's branches from this game are archived on the next unlock. */
   newGame(): Promise<void>;
   /** Removes QA leftovers and images of older versions; the player's work stays. */

@@ -76,3 +76,28 @@ describe('archive path safety', () => {
     expect(() => readZip(writeZip(codeFiles), { stripTopDirectory: true })).toThrow(UnsafeArchiveError);
   });
 });
+
+describe('zip bombs', () => {
+  const bomb = () => writeZip([{ path: 'zeros.bin', data: new Uint8Array(10 * 1024 * 1024), executable: false }]);
+
+  it('refuses an archive larger than the limit when extracted, before inflating it', () => {
+    const zip = bomb();
+    expect(zip.length).toBeLessThan(100 * 1024);
+    expect(() => readZip(zip, { maxBytes: 1024 * 1024 })).toThrow(UnsafeArchiveError);
+    expect(readZip(zip)[0].data.length).toBe(10 * 1024 * 1024);
+  });
+
+  it('refuses an archive with too many files', () => {
+    const zip = writeZip([1, 2, 3].map((n) => textFile(`file-${n}.txt`, 'x')));
+    expect(() => readZip(zip, { maxEntries: 2 })).toThrow(/too large when extracted/);
+  });
+
+  it('trusts no declared size: a header claiming 4 GB is refused, not allocated', () => {
+    const zip = new Uint8Array(writeZip([textFile('a.txt', 'hello')]));
+    const view = new DataView(zip.buffer);
+    // The central directory entry (signature 0x02014b50) keeps the uncompressed size at offset 24.
+    const central = zip.findIndex((_, index) => index + 4 <= zip.length && view.getUint32(index, true) === 0x02014b50);
+    view.setUint32(central + 24, 0xf0000000, true);
+    expect(() => readZip(zip)).toThrow(UnsafeArchiveError);
+  });
+});

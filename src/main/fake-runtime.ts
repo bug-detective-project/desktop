@@ -295,10 +295,6 @@ export class FakeRuntime implements GameRuntime {
     return this.scenario.branch ?? this.branch;
   }
 
-  async playerDiff(stage: number) {
-    return `diff --git a/client/src/pages/TicketDetails.tsx b/client/src/pages/TicketDetails.tsx\n--- a/client/src/pages/TicketDetails.tsx\n+++ b/client/src/pages/TicketDetails.tsx\n@@ -1 +1 @@\n-// stage ${stage}\n+// fixed by the player\n`;
-  }
-
   async resetDatabase() {}
 
   async hasRepository() {
@@ -309,8 +305,8 @@ export class FakeRuntime implements GameRuntime {
     return { client: 5173, api: 3001 };
   }
 
-  async isDevServerUp() {
-    return this.devServerUp;
+  async workspaceStatus() {
+    return { ports: await this.workspacePorts(), devServerUp: this.devServerUp, branch: await this.currentBranch() };
   }
 
   async startDevServer() {

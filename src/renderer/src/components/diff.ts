@@ -22,17 +22,29 @@ export function parseDiff(diff: string): DiffFile[] {
   let file: DiffFile | null = null;
   let oldLine = 0;
   let newLine = 0;
+  // Inside a hunk every line is content, even one that looks like a header ("--- " is a removed "-- ").
+  let inHunk = false;
   for (const line of diff.split('\n')) {
     const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
     if (header) {
       file = { path: header[2], oldPath: header[1], status: 'modified', binary: false, lines: [] };
       files.push(file);
+      inHunk = false;
       continue;
     }
     if (!file) {
       continue;
     }
-    if (file.lines.length === 0) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/.exec(line);
+    if (hunk) {
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      file.lines.push({ kind: 'hunk', text: line });
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) {
+      // The file's header, up to its first hunk: only the kind of change matters.
       if (line.startsWith('new file mode')) {
         file.status = 'added';
       } else if (line.startsWith('deleted file mode')) {
@@ -42,16 +54,10 @@ export function parseDiff(diff: string): DiffFile[] {
       } else if (line.startsWith('Binary files ')) {
         file.binary = true;
       }
-    }
-    if (/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity|rename |old mode|new mode|Binary files |\\ No newline)/.test(line)) {
       continue;
     }
-    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/.exec(line);
-    if (hunk) {
-      oldLine = Number(hunk[1]);
-      newLine = Number(hunk[2]);
-      file.lines.push({ kind: 'hunk', text: line });
-    } else if (line.startsWith('+')) {
+    // "\ No newline at end of file" carries no line.
+    if (line.startsWith('+')) {
       file.lines.push({ kind: 'add', text: line.slice(1), newNumber: newLine++ });
     } else if (line.startsWith('-')) {
       file.lines.push({ kind: 'del', text: line.slice(1), oldNumber: oldLine++ });

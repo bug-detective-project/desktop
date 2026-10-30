@@ -105,12 +105,33 @@ export async function writeTar(files: readonly ArchiveFile[]): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+/** Defaults of readZip's limits: far above any stage package or save, far below what would exhaust memory. */
+export const ZIP_LIMITS = { maxBytes: 1024 * 1024 * 1024, maxEntries: 100_000 };
+
 /**
  * Reads a zip archive. With `stripTopDirectory`, the single top-level folder that GitHub puts in
- * branch archives (`repo-branch/`) is removed from every path.
+ * branch archives (`repo-branch/`) is removed from every path. The sizes the archive declares are
+ * checked before anything is extracted (a zip bomb is refused, not inflated): fflate allocates each
+ * entry at its declared size and never writes past it.
  */
-export function readZip(bytes: Uint8Array, options: { stripTopDirectory?: boolean } = {}): ArchiveFile[] {
-  const entries = Object.entries(unzipSync(bytes)).filter(([name]) => !name.endsWith('/'));
+export function readZip(
+  bytes: Uint8Array,
+  options: { stripTopDirectory?: boolean; maxBytes?: number; maxEntries?: number } = {},
+): ArchiveFile[] {
+  const { maxBytes, maxEntries } = { ...ZIP_LIMITS, ...options };
+  let total = 0;
+  let count = 0;
+  const unzipped = unzipSync(bytes, {
+    filter: (entry) => {
+      total += entry.originalSize;
+      count += 1;
+      if (total > maxBytes || count > maxEntries) {
+        throw new UnsafeArchiveError(`The archive is too large when extracted (more than ${maxBytes} bytes or ${maxEntries} files)`);
+      }
+      return true;
+    },
+  });
+  const entries = Object.entries(unzipped).filter(([name]) => !name.endsWith('/'));
   let prefix = '';
   if (options.stripTopDirectory) {
     const tops = new Set(entries.map(([name]) => name.split('/')[0]));

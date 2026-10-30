@@ -61,6 +61,7 @@ const api: BugDetectiveApi = {
   exportProgress: () => call('exportProgress'),
   inspectSave: () => call('inspectSave'),
   restoreProgress: (token) => call('restoreProgress', token),
+  discardSave: (token) => call('discardSave', token),
   newGame: () => call('newGame'),
   cleanDockerLeftovers: () => call('cleanDockerLeftovers'),
   removeDockerData: () => call('removeDockerData'),

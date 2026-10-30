@@ -88,6 +88,33 @@ describe('comparison diff', () => {
     expect(visibleFiles(files).map((file) => file.path)).toEqual(['src/a.ts']);
   });
 
+  it('keeps content lines that look like headers inside a hunk, with their line numbers', () => {
+    // A removed SQL comment "-- old" reads "--- old"; an added "++ x" reads "+++ x".
+    const [file] = parseDiff(
+      [
+        'diff --git a/seed.sql b/seed.sql',
+        'index 1..2 100644',
+        '--- a/seed.sql',
+        '+++ b/seed.sql',
+        '@@ -1,3 +1,3 @@',
+        '--- old comment',
+        '+++ new counter',
+        ' SELECT 1;',
+        '-index 1;',
+        '+index 2;',
+        '\\ No newline at end of file',
+      ].join('\n'),
+    );
+    expect(file.lines.map((line) => [line.kind, line.text, line.oldNumber, line.newNumber])).toEqual([
+      ['hunk', '@@ -1,3 +1,3 @@', undefined, undefined],
+      ['del', '-- old comment', 1, undefined],
+      ['add', '++ new counter', undefined, 1],
+      ['context', 'SELECT 1;', 2, 2],
+      ['del', 'index 1;', 3, undefined],
+      ['add', 'index 2;', undefined, 3],
+    ]);
+  });
+
   it('treats an empty diff as identical solutions', () => {
     expect(visibleFiles(parseDiff(''))).toEqual([]);
   });

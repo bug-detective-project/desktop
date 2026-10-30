@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { dragCard, launch, startFirstTicket } from './fixtures.ts';
+import { dragCard, expectFlagsLoaded, launch, startFirstTicket } from './fixtures.ts';
 
 test('settings: preferences, developer tools, backup and about tabs', async () => {
   const { app, page, close } = await launch();
@@ -19,7 +19,8 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
     const settings = page.getByTestId('settings');
 
-    // Preferences: language and theme apply at once.
+    // Preferences: language and theme apply at once. Each language option shows its flag.
+    await expectFlagsLoaded(page.getByTestId('settings-pane-preferences'), ['en', 'pt']);
     await page.getByTestId('language-pt').click();
     await expect(settings.getByRole('heading', { level: 1 })).toHaveText('Configurações');
     await page.getByTestId('language-en').click();

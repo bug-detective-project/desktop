@@ -57,6 +57,7 @@ const schemas = {
   exportProgress: none,
   inspectSave: none,
   restoreProgress: z.tuple([z.string().uuid()]),
+  discardSave: z.tuple([z.string().uuid()]),
   newGame: none,
   cleanDockerLeftovers: none,
   removeDockerData: none,
@@ -154,6 +155,7 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
       return game.inspectSave(file, basename(file));
     },
     restoreProgress: (token) => game.restoreProgress(token),
+    discardSave: (token) => game.discardSave(token),
     newGame: () => game.newGame(),
     cleanDockerLeftovers: () => game.cleanDockerLeftovers(),
     removeDockerData: () => game.removeDockerData(),

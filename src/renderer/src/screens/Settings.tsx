@@ -509,6 +509,13 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
   const toast = useToast();
   const { busy, run } = useAction();
   const [pending, setPending] = useState<{ token: string; summary: SaveSummary } | null>(null);
+  // Cancelling lets the main process drop the save it keeps for the restore (it can be hundreds of MB).
+  const cancelRestore = () => {
+    if (pending) {
+      void api.discardSave(pending.token).catch(() => {});
+    }
+    setPending(null);
+  };
   const [confirmNewGame, setConfirmNewGame] = useState(false);
   const [confirmRemoveDocker, setConfirmRemoveDocker] = useState(false);
   const cleanup = useCleanupResult();
@@ -695,7 +702,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
         </Modal>
       )}
       {pending && (
-        <Modal title={t('settings.restoreTitle')} onClose={() => setPending(null)} data-testid="restore-dialog">
+        <Modal title={t('settings.restoreTitle')} onClose={cancelRestore} data-testid="restore-dialog">
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4 text-base">
             <dt className="text-muted-foreground">{t('settings.restoreFile')}</dt>
             <dd className="font-mono text-sm font-semibold break-all">{pending.summary.fileName}</dd>
@@ -716,7 +723,9 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             </div>
           )}
           <div className="mt-5 flex justify-end gap-2">
-            <Button onClick={() => setPending(null)}>{t('common.cancel')}</Button>
+            <Button onClick={cancelRestore} data-testid="cancel-restore">
+              {t('common.cancel')}
+            </Button>
             <Button
               variant="danger"
               onClick={() => {

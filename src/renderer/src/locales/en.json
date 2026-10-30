@@ -23,7 +23,9 @@
     "working": "Working…",
     "learnMore": "How to install",
     "showLog": "Show details",
-    "hideLog": "Hide details"
+    "hideLog": "Hide details",
+    "retry": "Try again",
+    "contentFailed": "Could not load the ticket."
   },
   "checklist": {
     "title": "Before you start",

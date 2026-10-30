@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ReviewComparison, Snapshot, TicketContent } from '@shared/api.ts';
+import type { ReviewComparison, Snapshot } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
 import { TICKET_COUNT } from '@shared/types.ts';
 import { api } from '../api.ts';
@@ -10,6 +10,8 @@ import { Markdown } from '../components/Markdown.tsx';
 import { SplitDiff } from '../components/SplitDiff.tsx';
 import { parseDiff, visibleFiles } from '../components/diff.ts';
 import { Icon } from '../components/icons.tsx';
+import { ContentError } from '../components/ContentError.tsx';
+import { useTicketContent } from '../components/useTicketContent.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { Button, Card, LogView, SectionTitle, StagePill, Tooltip } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
@@ -124,20 +126,11 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
   const toast = useToast();
   const ticket = findTicket(snapshot.state, ticketNumber)!;
   const language = snapshot.state.settings.language;
-  const [content, setContent] = useState<TicketContent | null>(null);
   const [comparison, setComparison] = useState<ReviewComparison | null>(null);
   const [showWhitespace, setShowWhitespace] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let ignore = false;
-    void api.ticketContent(ticketNumber, language).then((loaded) => {
-      if (!ignore) setContent(loaded);
-    });
-    return () => {
-      ignore = true;
-    };
-  }, [ticketNumber, language, ticket.status]);
+  const { content, failed, retry } = useTicketContent(ticket, language);
 
   // Stored with the approved snapshot: available offline and with Docker stopped.
   useEffect(() => {
@@ -194,6 +187,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
       </header>
       <Card>
         <SectionTitle>{t('review.explanation')}</SectionTitle>
+        {failed && <ContentError onRetry={retry} />}
         {content?.reviewMarkdown && <Markdown testId="review-markdown">{content.reviewMarkdown}</Markdown>}
       </Card>
       <DropdownCard title={t('review.comparison')} testId="review-comparison">

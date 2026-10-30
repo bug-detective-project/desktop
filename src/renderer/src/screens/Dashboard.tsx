@@ -1,11 +1,13 @@
 import type { Snapshot } from '@shared/api.ts'
+import { blocksVSCode } from '@shared/api.ts'
 import { findTicket } from '@shared/kanban.ts'
 import type { InboxMessage, Language, TicketState } from '@shared/types.ts'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../api.ts'
-import { DeskIcon } from '../components/deskIcons.tsx'
+import { Icon } from '../components/icons.tsx'
+import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
 import { Badge, Button, LogView, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
@@ -87,7 +89,7 @@ function SectionLabel({
   aside,
   tone,
 }: {
-  icon: Parameters<typeof DeskIcon>[0]['name']
+  icon: IconName
   children: ReactNode
   aside?: ReactNode
   /** Title and icon in green (all fine) or red (a problem) for Local environment; primary for Current task. */
@@ -98,7 +100,7 @@ function SectionLabel({
       <h3
         className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : tone === 'primary' ? 'text-primary' : 'text-foreground'}`}
       >
-        <DeskIcon
+        <Icon
           name={icon}
           className={`size-3.5 ${tone ? '' : 'text-muted-foreground'}`}
         />
@@ -118,7 +120,7 @@ function SectionLabel({
 function IconTile({ icon }: { icon: 'inbox' | 'users' }) {
   return (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-      <DeskIcon
+      <Icon
         name={icon}
         className="size-[18px]"
       />
@@ -150,14 +152,14 @@ function WorkspaceButtons({
       <Button
         size="sm"
         variant="card"
-        disabled={dockerDown}
+        disabled={dockerDown || blocksVSCode(snapshot.busy)}
         busy={actions.busy === 'vscode'}
         title={t('ticket.openVSCode')}
         onClick={() => actions.run('vscode', () => api.openVSCode())}
         data-testid="desk-vscode"
       >
         {actions.busy !== 'vscode' && (
-          <DeskIcon
+          <Icon
             name="code"
             className="size-3.5"
           />
@@ -174,7 +176,7 @@ function WorkspaceButtons({
         data-testid="desk-browser"
       >
         {actions.busy !== 'browser' && (
-          <DeskIcon
+          <Icon
             name="externalLink"
             className="size-3.5"
           />
@@ -250,7 +252,7 @@ function CurrentTask({
           data-testid="install-environment"
         >
           {!installing && (
-            <DeskIcon
+            <Icon
               name="download"
               className="size-3.5"
             />
@@ -310,7 +312,7 @@ function CurrentTask({
           onClick={action.onClick}
           data-testid="desk-primary"
         >
-          <DeskIcon
+          <Icon
             name={action.icon}
             className="size-3.5"
           />
@@ -340,7 +342,7 @@ function CurrentTask({
             onClick={() => actions.run('docker', () => api.startDocker())}
             data-testid="desk-start-docker"
           >
-            <DeskIcon
+            <Icon
               name="play"
               className="size-3.5"
             />
@@ -365,7 +367,7 @@ function CurrentTask({
           onClick={actions.nextAssignment}
           data-testid="next-assignment"
         >
-          <DeskIcon
+          <Icon
             name="download"
             className="size-3.5"
           />
@@ -389,7 +391,7 @@ function CurrentTask({
           className="mt-2 w-full"
           onClick={actions.openBoard}
         >
-          <DeskIcon
+          <Icon
             name="board"
             className="size-3.5"
           />
@@ -398,12 +400,12 @@ function CurrentTask({
         <Button
           size="sm"
           className="w-full"
-          disabled={dockerDown}
+          disabled={dockerDown || blocksVSCode(snapshot.busy)}
           busy={actions.busy === 'vscode'}
           onClick={() => actions.run('vscode', () => api.openVSCode())}
         >
           {actions.busy !== 'vscode' && (
-            <DeskIcon
+            <Icon
               name="code"
               className="size-3.5"
             />
@@ -484,7 +486,7 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
       data-up={up === null ? undefined : String(up)}
     >
       <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[tone].circle}`}>
-        <DeskIcon
+        <Icon
           name="laptop"
           className="size-[13px]"
         />
@@ -516,7 +518,7 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
             {busy ? (
               <Spinner className="size-3.5" />
             ) : (
-              <DeskIcon
+              <Icon
                 name={up ? 'pause' : 'play'}
                 className="size-3.5"
               />
@@ -562,7 +564,7 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
             data-tone={row.tone}
           >
             <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[row.tone].circle}`}>
-              <DeskIcon
+              <Icon
                 name={row.busy ? 'spinner' : row.icon}
                 className="size-[13px]"
               />
@@ -667,7 +669,7 @@ function MessageView({
                   onClick={() => actions.openTicket(viewed.ticket)}
                   data-testid="view-done-ticket"
                 >
-                  <DeskIcon
+                  <Icon
                     name="board"
                     className="size-3.5"
                   />
@@ -700,7 +702,7 @@ function MessageView({
                   onClick={actions.nextAssignment}
                   data-testid="email-next-assignment"
                 >
-                  <DeskIcon
+                  <Icon
                     name="download"
                     className="size-3.5"
                   />
@@ -811,7 +813,7 @@ function ProjectDrawer({
             title={t('dashboard.close')}
             data-testid="project-drawer-close"
           >
-            <DeskIcon
+            <Icon
               name="x"
               className="size-4"
             />
@@ -983,7 +985,7 @@ export function Dashboard({
               aria-controls="project-drawer"
               data-testid="project-drawer-toggle"
             >
-              <DeskIcon
+              <Icon
                 name="users"
                 className="size-3.5"
               />

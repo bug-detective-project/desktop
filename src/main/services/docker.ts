@@ -28,6 +28,7 @@ export interface ExecOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   onLine?: RunOptions['onLine'];
+  maxStdout?: number;
 }
 
 export class DockerUnavailableError extends Error {
@@ -200,6 +201,7 @@ export class Docker {
       timeoutMs: options.timeoutMs,
       signal: options.signal,
       onLine: options.onLine,
+      maxStdout: options.maxStdout,
     });
   }
 

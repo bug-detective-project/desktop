@@ -5,6 +5,7 @@
  * passed as positional arguments ("$1", "$2"), never interpolated into the script.
  */
 import { createHash } from 'node:crypto';
+import { MAX_SAVE_BYTES } from './backup.ts';
 import { readTar, writeTar } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
 import { LABEL, mountArg } from './docker.ts';
@@ -163,16 +164,6 @@ git apply --numstat "$patch" | cut -f3- | while IFS= read -r file; do
 done
 git apply --whitespace=nowarn "$patch"
 rm -f "$patch"`,
-
-  /** Diff of the working tree (including new files) against the stage commit, without touching the real index. */
-  playerDiff: `set -eu
-stage="$1"; idx=/tmp/bugdetective-diff.index
-cd ${WORKSPACE_DIR}
-rm -f "$idx"
-if [ -f .git/index ]; then cp .git/index "$idx"; fi
-GIT_INDEX_FILE="$idx" git add -A
-GIT_INDEX_FILE="$idx" git diff --cached --no-color --no-ext-diff --no-renames "stage-$stage" -- . ':(exclude)package-lock.json'
-rm -f "$idx"`,
 
   /** The reference of a ticket: the stage commit plus its reference patch (stdin), as a tar of the whole tree. */
   referenceTree: `set -eu
@@ -393,6 +384,11 @@ export interface WorkspacePorts {
   api: number;
 }
 
+/** The host ports the workspace container publishes. */
+export function publishedPorts(info: ContainerInfo): WorkspacePorts {
+  return { client: info.ports[CONTAINER_PORTS.client], api: info.ports[CONTAINER_PORTS.api] };
+}
+
 export interface WorkspaceOptions {
   docker: Docker;
   image: string;
@@ -429,10 +425,7 @@ export class Workspace {
   /** Published host ports, or null when the container does not exist. */
   async ports(): Promise<WorkspacePorts | null> {
     const info = await this.info();
-    if (!info) {
-      return null;
-    }
-    return { client: info.ports[CONTAINER_PORTS.client], api: info.ports[CONTAINER_PORTS.api] };
+    return info ? publishedPorts(info) : null;
   }
 
   private async pickPort(preferred: number, avoid: Set<number>): Promise<number> {
@@ -577,10 +570,6 @@ export class Workspace {
 
   async checkoutPlayerBranch(stage: number): Promise<void> {
     await this.script('checkoutPlayerBranch', [String(stage)], { timeoutMs: 60_000 });
-  }
-
-  async playerDiff(stage: number): Promise<string> {
-    return (await this.script('playerDiff', [String(stage)], { timeoutMs: 60_000 })).stdout.toString('utf8');
   }
 
   async applyPatch(patch: string): Promise<void> {
@@ -777,8 +766,9 @@ export class Workspace {
     }
   }
 
+  /** The repository as a git bundle; larger than a save may be, it fails instead of being cut short. */
   async bundle(): Promise<Buffer> {
-    return (await this.script('bundle', [], { timeoutMs: 120_000 })).stdout;
+    return (await this.script('bundle', [], { timeoutMs: 120_000, maxStdout: MAX_SAVE_BYTES })).stdout;
   }
 
   async verifyBundle(bundle: Uint8Array): Promise<void> {

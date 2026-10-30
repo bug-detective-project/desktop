@@ -10,12 +10,12 @@ import { z } from 'zod';
 import type { RuleContext } from '../../shared/kanban.ts';
 import { SCHEMA_VERSION } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
-import { readZip, sha256Hex, writeZip } from './content/archive.ts';
+import { UnsafeArchiveError, readZip, sha256Hex, writeZip } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
 import { migrateState } from './state.ts';
 
 export const SAVE_EXTENSION = 'bdsave';
-const MAX_SAVE_BYTES = 512 * 1024 * 1024;
+export const MAX_SAVE_BYTES = 512 * 1024 * 1024;
 
 export const saveManifestSchema = z.object({
   format: z.literal('bug-detective-save'),
@@ -41,7 +41,8 @@ export interface SaveContents {
   reviews?: Map<string, Uint8Array>;
 }
 
-export function createSave(contents: SaveContents, appVersion: string, now: string): Uint8Array {
+/** Builds a save; one larger than readSave accepts would export fine and never restore, so it throws. */
+export function createSave(contents: SaveContents, appVersion: string, now: string, maxBytes = MAX_SAVE_BYTES): Uint8Array {
   const files: ArchiveFile[] = [
     { path: 'state.json', data: Buffer.from(`${JSON.stringify(contents.state, null, 2)}\n`), executable: false },
   ];
@@ -62,7 +63,11 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
     createdAt: now,
     files: Object.fromEntries(files.map((file) => [file.path, sha256Hex(file.data)])),
   };
-  return writeZip([...files, { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)), executable: false }]);
+  const save = writeZip([...files, { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)), executable: false }]);
+  if (save.length > maxBytes) {
+    throw new Error(`The save would be larger than ${maxBytes} bytes, the most a save can restore`);
+  }
+  return save;
 }
 
 export interface ValidatedSave extends SaveContents {
@@ -78,7 +83,10 @@ export function readSave(bytes: Uint8Array, ctx: RuleContext): ValidatedSave {
   let files: ArchiveFile[];
   try {
     files = readZip(bytes);
-  } catch {
+  } catch (error) {
+    if (error instanceof UnsafeArchiveError) {
+      throw new InvalidSaveError(`The file is not a valid Bug Detective save: ${error.message}`);
+    }
     throw new InvalidSaveError('The file is not a Bug Detective save (not a valid zip)');
   }
   const byPath = new Map(files.map((file) => [file.path, file]));

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
+import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
@@ -70,6 +71,23 @@ describe('Game', () => {
     expect(content.solutionMarkdown).toBeNull();
     expect(content.reviewMarkdown).toBeNull();
     expect(content.referencePatch).toBeNull();
+  });
+
+  it('keeps both changes when two of them overlap, in memory and on disk', async () => {
+    const { game } = createGame();
+    await game.init();
+    const welcome = game.current.inbox[0].id;
+    // Neither call waits for the other: the second must start from the state the first left.
+    await Promise.all([game.updateSettings({ theme: 'dark' }), game.markInboxRead(welcome)]);
+    expect(game.current.settings.theme).toBe('dark');
+    expect(game.current.inbox[0].read).toBe(true);
+    const saved = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')) as typeof game.current;
+    expect(saved.settings.theme).toBe('dark');
+    expect(saved.inbox[0].read).toBe(true);
+    // A change refused by the rules does not block the ones after it.
+    await expect(game.askSenior(1)).rejects.toMatchObject({ code: 'noSuchTicket' });
+    await game.updateSettings({ theme: 'light' });
+    expect(game.current.settings.theme).toBe('light');
   });
 
   it('leaves the workspace untouched when the download fails, and can retry', async () => {
@@ -213,6 +231,78 @@ describe('Game', () => {
     await game.move(1, 'inProgress');
     await expect(game.move(1, 'inQa')).rejects.toMatchObject({ code: 'environmentNotReady' });
     expect(status(game)).toBe('inProgress');
+    // QA was reserved for the checks and is released when it cannot start.
+    expect(game.snapshot().busy).toBeNull();
+  });
+
+  it('reserves QA before its slow checks, so no other task starts in between', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'] } });
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    let release: (() => void) | undefined;
+    const environment = runtime.environment.bind(runtime);
+    vi.spyOn(runtime, 'environment').mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return environment();
+    });
+    const submit = game.move(1, 'inQa');
+    await vi.waitFor(() => expect(release).toBeDefined());
+    expect(game.snapshot().busy).toBe('qa');
+    await expect(game.cleanDockerLeftovers()).rejects.toMatchObject({ code: 'busy' });
+    release!();
+    await submit;
+    await game.waitForQa();
+    expect(status(game)).toBe('codeReview');
+    expect(game.snapshot().busy).toBeNull();
+  });
+
+  it('opens VS Code during QA but not during other tasks, and never brings the code back while another task runs', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'], qaDelayMs: 200 } });
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    const openVSCode = vi.spyOn(runtime, 'openVSCode');
+    await game.move(1, 'inQa');
+    await game.openVSCode();
+    expect(openVSCode).toHaveBeenCalledTimes(1);
+    await game.waitForQa();
+
+    // A cleanup that waits until released: an exclusive task in progress.
+    let release: (() => void) | undefined;
+    const clean = runtime.cleanDocker.bind(runtime);
+    vi.spyOn(runtime, 'cleanDocker').mockImplementation(async (scope) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return clean(scope);
+    });
+    const blockWorkspace = async () => {
+      release = undefined;
+      const cleaning = game.cleanDockerLeftovers();
+      await vi.waitFor(() => expect(release).toBeDefined());
+      return async () => {
+        release!();
+        await cleaning;
+      };
+    };
+
+    await game.openReview(1);
+    expect(game.current.reviewSession).not.toBeNull();
+    const unblock = await blockWorkspace();
+    await expect(game.openVSCode()).rejects.toMatchObject({ code: 'busy' });
+    // An action refused as busy leaves the review checked out: nothing ran before the busy check.
+    await expect(game.exportProgress(join(dir, 'progress.bdsave'))).rejects.toMatchObject({ code: 'busy' });
+    expect(game.current.reviewSession).not.toBeNull();
+    expect(openVSCode).toHaveBeenCalledTimes(1);
+    await unblock();
+
+    // With nothing else running, opening VS Code on the player's code brings it back first.
+    await game.openVSCode();
+    expect(game.current.reviewSession).toBeNull();
+    expect(openVSCode).toHaveBeenCalledTimes(2);
   });
 
   it('pauses Docker actions while Docker is stopped', async () => {
@@ -313,6 +403,52 @@ describe('Game', () => {
     await game.newGame();
     expect(game.current.lastExport).toBeUndefined();
     expect(backupStatus(game.current)).toBe('none');
+  });
+
+  it('keeps one save to restore at a time, and drops it when the restore is cancelled', async () => {
+    const { game, runtime } = createGame();
+    // A save with progress needs the workspace repository; the fake runtime has none of its own.
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    await game.init();
+    await game.nextAssignment();
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+
+    const first = await game.inspectSave(file, 'progress.bdsave');
+    const second = await game.inspectSave(file, 'progress.bdsave');
+    // Choosing another file replaces the first choice.
+    await expect(game.restoreProgress(first.token)).rejects.toMatchObject({ code: 'invalidSave' });
+    await game.discardSave(second.token);
+    await expect(game.restoreProgress(second.token)).rejects.toMatchObject({ code: 'invalidSave' });
+
+    const third = await game.inspectSave(file, 'progress.bdsave');
+    await game.discardSave(first.token);
+    await game.restoreProgress(third.token);
+    expect(game.current.currentTicket).toBe(1);
+  });
+
+  it('answers the workspace status from the last check while another task changes the workspace', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    const first = await game.workspaceStatus();
+    const status = vi.spyOn(runtime, 'workspaceStatus');
+    let release: (() => void) | undefined;
+    const clean = runtime.cleanDocker.bind(runtime);
+    vi.spyOn(runtime, 'cleanDocker').mockImplementation(async (scope) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return clean(scope);
+    });
+    const cleaning = game.cleanDockerLeftovers();
+    await vi.waitFor(() => expect(release).toBeDefined());
+    expect(await game.workspaceStatus()).toEqual(first);
+    expect(status).not.toHaveBeenCalled();
+    release!();
+    await cleaning;
+    await game.workspaceStatus();
+    expect(status).toHaveBeenCalledTimes(1);
   });
 
   it('measures disk usage only while Docker runs', async () => {

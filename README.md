@@ -268,3 +268,5 @@ Nothing is published automatically. To publish a content release:
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE): free for noncommercial use; redistributions must keep the license and its `Required Notice:` line (the credit). Commercial use needs a separate license from the author.
+
+The installer places the licenses of third-party material next to the app, in `resources/THIRD_PARTY_NOTICES.md`. `pnpm run build` writes it to `out/THIRD_PARTY_NOTICES.md` (`tools/write-notices.ts`): the hand-written [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), for files copied into this repository (the flag-icons SVGs; add an entry whenever you vendor one), followed by the license of every npm package Vite bundles into main, preload and renderer (React, lucide-react, react-markdown, the fonts, …), collected by the `bundledLicenses` plugin (`tools/notices.ts`). Production dependencies (`zod`, `fflate`, `tar-stream`) stay in `node_modules` with their own license files, and the development-only React DevTools chunk is left out.

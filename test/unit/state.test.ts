@@ -115,4 +115,49 @@ describe('migrations', () => {
     expect(() => migrateState({ ...state, settings: { ...state.settings, language: 'fr' } }, ctx)).toThrow();
     expect(() => migrateState({ ...state, tickets: [{ ticket: 1, status: 'archived' }] }, ctx)).toThrow();
   });
+
+  it('rejects a state whose fields disagree with the Kanban rules', () => {
+    const done = (state: ReturnType<typeof rules.createInitialState>, ticket: number) =>
+      rules.acceptReview({ ...state, tickets: state.tickets.map((item) => (item.ticket === ticket ? { ...item, status: 'codeReview' as const } : item)) }, ticket, ctx);
+    let two = rules.unlockTicket(rules.createInitialState(ctx), 1, 'a', ctx);
+    two = rules.unlockTicket(done(two, 1), 2, 'b', ctx);
+    // A state the rules made is valid.
+    expect(migrateState(two, ctx)).toEqual(two);
+
+    const invalid = {
+      'the current ticket is missing': { ...two, currentTicket: 3 },
+      'the current ticket is not the last one': { ...two, currentTicket: 1 },
+      'tickets but no current ticket': { ...two, currentTicket: null },
+      'a repeated ticket': { ...two, tickets: [two.tickets[0], two.tickets[0]], currentTicket: 1 },
+      'a gap in the tickets': { ...two, tickets: [two.tickets[1]] },
+      'an unfinished ticket before the last': { ...two, tickets: [{ ...two.tickets[0], status: 'inProgress' }, two.tickets[1]] },
+      'too many tickets': {
+        ...two,
+        tickets: [1, 2, 3, 4, 5].map((ticket) => ({ ...two.tickets[0], ticket, status: 'done' })),
+        currentTicket: 5,
+      },
+      'a review of a locked ticket': {
+        ...two,
+        reviewSession: {
+          ticket: 3,
+          phase: 'open',
+          startedAt: ctx.now,
+          returnPoint: { branch: null, head: 'a'.repeat(40), indexTree: 'b'.repeat(40), excludesFile: null },
+          wipCommit: null,
+        },
+      },
+    };
+    for (const [name, state] of Object.entries(invalid)) {
+      expect(() => migrateState(state, ctx), name).toThrow();
+    }
+  });
+
+  it('keeps an incoherent state file aside and starts a new game, instead of failing on every start', async () => {
+    const state = rules.unlockTicket(rules.createInitialState(ctx), 1, 'a', ctx);
+    await writeFile(join(dir, 'state.json'), JSON.stringify({ ...state, currentTicket: 3 }));
+    const { state: loaded, recovered } = await new StateStore(dir).load(ctx);
+    expect(recovered).toBe(true);
+    expect(loaded.tickets).toEqual([]);
+    expect((await readdir(dir)).some((name) => /^state\.corrupt-\d+\.json$/.test(name))).toBe(true);
+  });
 });

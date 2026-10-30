@@ -10,6 +10,8 @@ files:
   # The window icon (Linux); Windows takes resources/icon.png as the executable and installer icon.
   - resources/icon.png
   - '!**/*.map'
+  # Shipped once as resources/THIRD_PARTY_NOTICES.md (extraResources below), not inside the archive.
+  - '!out/THIRD_PARTY_NOTICES.md'
   # React Developer Tools download (src/main/devtools.ts): development only, never loaded when packaged.
   - '!out/main/chunks/downloadChromeExtension-*.js'
 # Docker build contexts (workspace and QA images, with the QA CLI) and their tags.
@@ -19,6 +21,10 @@ extraResources:
   # Run by the uninstaller (resources/installer.nsh) to remove the app's Docker data.
   - from: resources/remove-docker-data.ps1
     to: remove-docker-data.ps1
+  # Licenses of third-party material bundled into the app (the flag SVGs, the bundled npm packages),
+  # written by tools/write-notices.ts after the build and installed next to the app.
+  - from: out/THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
 asar: true
 npmRebuild: false
 win:

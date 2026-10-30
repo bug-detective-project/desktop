@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { blocksVSCode } from '@shared/api.ts';
 import type { Snapshot, TicketContent, WorkspaceStatus } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
 import type { ChatEntry, TicketState } from '@shared/types.ts';
@@ -10,6 +11,8 @@ import { DiffView } from '../components/DiffView.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { QaCommentView } from '../components/QaComment.tsx';
 import { Icon } from '../components/icons.tsx';
+import { ContentError } from '../components/ContentError.tsx';
+import { useTicketContent } from '../components/useTicketContent.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { Badge, Button, LogView, StagePill, Tabs, Tooltip } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
@@ -19,23 +22,6 @@ type Tab = 'ticket' | 'qa' | 'history' | 'senior';
 // Rows of the ticket's field table that show live data or a colored badge, in both languages.
 const STATUS_FIELDS = new Set(['Status']);
 const TYPE_FIELDS = new Set(['Issue type', 'Tipo de item']);
-
-/** Loads the ticket's texts again whenever the ticket, its progress or the language changes. */
-function useTicketContent(ticket: TicketState, language: 'en' | 'pt') {
-  const [content, setContent] = useState<TicketContent | null>(null);
-  const { ticket: number, status, hintsRevealed, solutionRevealed } = ticket;
-  useEffect(() => {
-    let ignore = false;
-    void api.ticketContent(number, language).then((loaded) => {
-      if (!ignore) setContent(loaded);
-    });
-    return () => {
-      ignore = true;
-    };
-    // status, hints and solution decide what the main process returns, so they trigger a reload.
-  }, [number, language, status, hintsRevealed, solutionRevealed]);
-  return content;
-}
 
 function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: TicketState }) {
   const { t } = useTranslation();
@@ -70,7 +56,7 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <Tooltip content={t('ticket.vscodeHint')} hoverOnly>
-          <Button variant="primary" className="w-full" disabled={!dockerUp} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
+          <Button variant="primary" className="w-full" disabled={!dockerUp || blocksVSCode(snapshot.busy)} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
             {busy !== 'vscode' && <Icon name="code" />}
             {t('ticket.openVSCode')}
           </Button>
@@ -239,7 +225,7 @@ export function TicketPanel({
   const { t } = useTranslation();
   const ticket = findTicket(snapshot.state, ticketNumber)!;
   const language = snapshot.state.settings.language;
-  const content = useTicketContent(ticket, language);
+  const { content, failed, retry } = useTicketContent(ticket, language);
   const [tab, setTab] = useState<Tab>('ticket');
   const senior = story(language).people.senior.name;
   const qaRunning = ticket.status === 'inQa';
@@ -301,6 +287,7 @@ export function TicketPanel({
           />
         </div>
         <div className="flex-1 overflow-y-auto p-5">
+          {(tab === 'ticket' || tab === 'senior') && failed && <ContentError onRetry={retry} />}
           {tab === 'ticket' && content && (
             <Markdown
               testId="ticket-markdown"
@@ -332,7 +319,7 @@ export function TicketPanel({
             </div>
           )}
           {tab === 'history' && <History ticket={ticket} snapshot={snapshot} />}
-          {tab === 'senior' && <Conversation snapshot={snapshot} ticket={ticket} content={content} />}
+          {tab === 'senior' && !failed && <Conversation snapshot={snapshot} ticket={ticket} content={content} />}
         </div>
       </aside>
     </div>

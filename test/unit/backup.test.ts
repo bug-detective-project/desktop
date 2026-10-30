@@ -21,6 +21,16 @@ describe('export and restore manifest', () => {
   const state = progress();
   const save = createSave({ state, bundle, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now);
 
+  it('refuses a save whose game state disagrees with the Kanban rules', () => {
+    const broken = createSave({ state: { ...state, currentTicket: 3 }, bundle, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now);
+    expect(() => readSave(broken, ctx)).toThrow(InvalidSaveError);
+    expect(() => readSave(broken, ctx)).toThrow(/current ticket must be 1/);
+  });
+
+  it('refuses to create a save larger than a restore accepts', () => {
+    expect(() => createSave({ state, bundle, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now, 100)).toThrow(/larger than 100 bytes/);
+  });
+
   it('round-trips state, bundle and packages', () => {
     const restored = readSave(save, ctx);
     expect(restored.state).toEqual(state);
@@ -70,5 +80,16 @@ describe('export and restore manifest', () => {
   it('accepts a save of a new game without a repository', () => {
     const empty = createSave({ state: rules.createInitialState(ctx), bundle: null, packages: new Map() }, '0.1.0', ctx.now);
     expect(readSave(empty, ctx).bundle).toBeNull();
+  });
+});
+
+describe('save size when extracted', () => {
+  it('refuses a save that would be too large when extracted, with the reason', () => {
+    const zip = new Uint8Array(writeZip([textFile('state.json', '{}')]));
+    const view = new DataView(zip.buffer);
+    const central = zip.findIndex((_, index) => index + 4 <= zip.length && view.getUint32(index, true) === 0x02014b50);
+    view.setUint32(central + 24, 0xf0000000, true);
+    expect(() => readSave(zip, ctx)).toThrow(InvalidSaveError);
+    expect(() => readSave(zip, ctx)).toThrow(/too large when extracted/);
   });
 });

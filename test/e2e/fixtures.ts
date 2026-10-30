@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 import { expect } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 export interface Launched {
   app: ElectronApplication;
@@ -82,4 +82,13 @@ export async function dragCard(page: Page, ticket: number, column: 'inProgress' 
   }
   const toasts = [...(await page.getByTestId('toast-error').allTextContents()), ...(await page.getByTestId('toast-info').allTextContents())];
   throw new Error(`Dragging card ${ticket} to ${column} had no effect${toasts.length ? ` (toasts: ${toasts.join(' | ')})` : ''}`);
+}
+
+/** The flags inside `scope` are exactly these languages', in order, and every one has loaded (they are bundled: no network). */
+export async function expectFlagsLoaded(scope: Locator, languages: readonly string[]): Promise<void> {
+  const flags = scope.locator('img[data-testid^="flag-"]');
+  await expect(flags).toHaveCount(languages.length);
+  await expect
+    .poll(() => flags.evaluateAll((images) => images.map((image) => [image.dataset.testid, (image as HTMLImageElement).naturalWidth > 0])))
+    .toEqual(languages.map((language) => [`flag-${language}`, true]));
 }

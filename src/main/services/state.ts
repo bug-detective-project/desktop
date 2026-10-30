@@ -15,6 +15,7 @@ import {
   MIN_QA_TIMEOUT_SECONDS,
   SCHEMA_VERSION,
   THEMES,
+  TICKET_COUNT,
 } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
 import { writeFileAtomic } from './content/store.ts';
@@ -134,7 +135,30 @@ export const gameStateSchema = z.object({
         .nullable(),
     })
     .nullable(),
-});
+})
+  // The fields agree with each other as the Kanban rules leave them: tickets are unlocked one after
+  // another, the last one is the active one, and only it may be unfinished. A hand-edited state or
+  // save that breaks this is invalid, rather than loaded into a game the rules cannot handle.
+  .superRefine((state, ctx) => {
+    const issue = (message: string, path: (string | number)[]) => ctx.addIssue({ code: 'custom', message, path });
+    if (state.tickets.length > TICKET_COUNT) {
+      issue(`At most ${TICKET_COUNT} tickets`, ['tickets']);
+    }
+    state.tickets.forEach((ticket, index) => {
+      if (ticket.ticket !== index + 1) {
+        issue(`Ticket ${index + 1} expected, found ${ticket.ticket}`, ['tickets', index, 'ticket']);
+      } else if (index < state.tickets.length - 1 && ticket.status !== 'done') {
+        issue(`Ticket ${ticket.ticket} is not the last one, so it must be done`, ['tickets', index, 'status']);
+      }
+    });
+    const last = state.tickets.at(-1)?.ticket ?? null;
+    if (state.currentTicket !== last) {
+      issue(`The current ticket must be ${last ?? 'none'}, not ${state.currentTicket ?? 'none'}`, ['currentTicket']);
+    }
+    if (state.reviewSession && !state.tickets.some((ticket) => ticket.ticket === state.reviewSession!.ticket)) {
+      issue(`The review is for ticket ${state.reviewSession.ticket}, which is not unlocked`, ['reviewSession', 'ticket']);
+    }
+  });
 
 // ---------------------------------------------------------------------------
 // Migrations. Each one takes the raw JSON of version N and returns version N + 1.

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -137,5 +137,30 @@ test('the QA tab groups the errors of each run in a dropdown, the latest run ope
     await expect(passed.getByTestId('qa-errors')).toHaveCount(0);
   } finally {
     await close();
+  }
+});
+
+test('a ticket whose texts cannot be loaded says so, and loads after "Try again"', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+  const { page, close } = await launch({}, { userData });
+  try {
+    await startFirstTicket(page);
+    // A damaged package: the hints file is no longer valid JSON.
+    const hints = join(userData, 'packages', 'stage-1', 'hints.en.json');
+    const original = await readFile(hints, 'utf8');
+    await writeFile(hints, '{ damaged');
+    await page.getByTestId('card-1').click();
+    const panel = page.getByTestId('ticket-panel');
+    await expect(panel.getByTestId('content-error')).toContainText('Could not load the ticket.');
+    await expect(page.getByTestId('toast-error')).toBeVisible();
+    await expect(panel.getByTestId('ticket-markdown')).toHaveCount(0);
+
+    await writeFile(hints, original);
+    await panel.getByTestId('content-retry').click();
+    await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
+    await expect(panel.getByTestId('content-error')).toHaveCount(0);
+  } finally {
+    await close();
+    await rm(userData, { recursive: true, force: true });
   }
 });

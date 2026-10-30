@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
-import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison } from '../shared/api.ts';
+import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison, WorkspaceStatus } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
 import { planCleanup } from './services/cleanup.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
@@ -16,7 +16,7 @@ import { Prerequisites } from './services/prerequisites.ts';
 import type { Environment } from './services/prerequisites.ts';
 import type { PrerequisiteReport } from '../shared/api.ts';
 import { QaRunner } from './services/qa.ts';
-import { Workspace, resourceNames } from './services/workspace.ts';
+import { Workspace, publishedPorts, resourceNames } from './services/workspace.ts';
 import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 export type LineHandler = (line: string) => void;
@@ -52,12 +52,12 @@ export interface GameRuntime {
   /** Discards everything on player/ticket-N and returns it to the clean stage commit. */
   resetToStage(stage: number): Promise<{ changes: number; commits: number }>;
   currentBranch(): Promise<string | null>;
-  playerDiff(stage: number): Promise<string>;
   resetDatabase(): Promise<void>;
   hasRepository(): Promise<boolean>;
 
   workspacePorts(): Promise<WorkspacePorts | null>;
-  isDevServerUp(): Promise<boolean>;
+  /** Ports, dev server and branch. Read-only: never creates, starts or recreates anything. */
+  workspaceStatus(): Promise<WorkspaceStatus>;
   startDevServer(): Promise<void>;
   stopDevServer(): Promise<void>;
   openVSCode(): Promise<void>;
@@ -323,10 +323,6 @@ export class DockerRuntime implements GameRuntime {
     return (await this.runningWorkspace()).currentBranch();
   }
 
-  async playerDiff(stage: number) {
-    return (await this.runningWorkspace()).playerDiff(stage);
-  }
-
   async resetDatabase() {
     const workspace = await this.runningWorkspace();
     const key = await workspace.dependencyKey();
@@ -343,8 +339,14 @@ export class DockerRuntime implements GameRuntime {
     return (await this.runningWorkspace()).ports();
   }
 
-  async isDevServerUp() {
-    return (await this.runningWorkspace()).isDevServerUp();
+  async workspaceStatus(): Promise<WorkspaceStatus> {
+    const workspace = await this.workspace();
+    const info = await workspace.info();
+    if (!info?.running) {
+      return { ports: null, devServerUp: false, branch: null };
+    }
+    const [devServerUp, branch] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch()]);
+    return { ports: publishedPorts(info), devServerUp, branch };
   }
 
   async startDevServer() {

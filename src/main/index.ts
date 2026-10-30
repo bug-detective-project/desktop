@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { app, BrowserWindow, screen, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
 import { z } from 'zod';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -18,6 +18,7 @@ import { GitHubContentSource } from './services/content/github.ts';
 import { LocalContentSource } from './services/content/local.ts';
 import type { ContentSource } from './services/content/source.ts';
 import { PackageStore } from './services/content/store.ts';
+import { skipWhileRunning } from './services/poll.ts';
 import { runCommand } from './services/process.ts';
 import { loadReviewConfig } from './services/review/config.ts';
 import { ReviewStore } from './services/review/store.ts';
@@ -206,13 +207,23 @@ async function main(): Promise<void> {
   app.on('window-all-closed', () => app.quit());
 
   // Detects Docker stopping or starting during a session (shown as a banner in the UI).
-  const poll = async () => {
-    await game.refreshDockerState();
-  };
+  // A check can take longer than the interval (docker version waits up to 15 s): never two at once.
+  const poll = skipWhileRunning(() => game.refreshDockerState());
   void poll().then(() => game.checkPrerequisites().catch(() => {}));
   setInterval(() => void poll(), isE2E ? 1000 : 10_000);
   // Leftover QA containers from a crash are removed once Docker answers.
   void game.cleanupLeftovers();
 }
 
-void main();
+// A failed start (a game saved by a newer version, an invalid content-source.json, ...) must not
+// leave the process running without a window: say why, then quit.
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (isE2E) {
+    // Nobody is there to close a dialog: the e2e tests read the reason from stderr.
+    console.error(`Bug Detective could not start: ${message}`);
+  } else {
+    dialog.showErrorBox('Bug Detective could not start', message);
+  }
+  app.quit();
+});

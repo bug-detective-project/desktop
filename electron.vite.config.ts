@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 import type { Plugin } from 'vite';
+import { bundledLicenses } from './tools/notices.ts';
 
 /**
  * The production CSP lives in index.html. Vite's dev server injects inline scripts and styles
@@ -22,7 +23,10 @@ function devContentSecurityPolicy(): Plugin {
 }
 
 export default defineConfig({
+  // Every build records the npm packages it bundles, for out/THIRD_PARTY_NOTICES.md (tools/write-notices.ts).
   main: {
+    // React Developer Tools (development only) is left out of the installer: see electron-builder.yml.
+    plugins: [bundledLicenses({ skipChunks: /downloadChromeExtension-/ })],
     build: {
       externalizeDeps: true,
       rollupOptions: {
@@ -31,6 +35,7 @@ export default defineConfig({
     },
   },
   preload: {
+    plugins: [bundledLicenses()],
     build: {
       // Sandboxed preloads must be CommonJS and self-contained.
       externalizeDeps: false,
@@ -42,7 +47,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(import.meta.dirname, 'src/renderer'),
-    plugins: [react(), tailwindcss(), devContentSecurityPolicy()],
+    plugins: [react(), tailwindcss(), devContentSecurityPolicy(), bundledLicenses()],
     resolve: {
       alias: { '@shared': resolve(import.meta.dirname, 'src/shared') },
     },

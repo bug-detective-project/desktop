@@ -14,7 +14,7 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Called with each complete output line (stdout and stderr), for progress display. */
   onLine?: (line: string, stream: 'stdout' | 'stderr') => void;
-  /** Maximum bytes of stdout kept in memory (default 64 MB). */
+  /** Maximum bytes of stdout (default 64 MB). More output stops the command, which then fails: output is never cut short. */
   maxStdout?: number;
 }
 
@@ -74,16 +74,23 @@ export const runCommand: CommandRunner = (command, args, options = {}) =>
     let stdoutBytes = 0;
     let stderr = '';
     let timedOut = false;
+    let overflowed = false;
     let settled = false;
 
     const outLines = options.onLine && lineSplitter((line) => options.onLine!(line, 'stdout'));
     const errLines = options.onLine && lineSplitter((line) => options.onLine!(line, 'stderr'));
 
     child.stdout.on('data', (chunk: Buffer) => {
-      if (stdoutBytes < maxStdout) {
-        stdout.push(chunk);
-        stdoutBytes += chunk.length;
+      if (overflowed) {
+        return;
       }
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > maxStdout) {
+        overflowed = true;
+        kill();
+        return;
+      }
+      stdout.push(chunk);
       outLines?.push(chunk.toString('utf8'));
     });
     child.stderr.on('data', (chunk: Buffer) => {
@@ -116,6 +123,11 @@ export const runCommand: CommandRunner = (command, args, options = {}) =>
       options.signal?.removeEventListener('abort', kill);
       outLines?.flush();
       errLines?.flush();
+      if (overflowed) {
+        // A partial output (a cut-off git bundle, for example) must never pass for a complete one.
+        resolve({ code: -1, stdout: Buffer.alloc(0), stderr: `${stderr}The output was larger than ${maxStdout} bytes\n`, timedOut });
+        return;
+      }
       resolve({ code, stdout: Buffer.concat(stdout), stderr, timedOut });
     };
 
