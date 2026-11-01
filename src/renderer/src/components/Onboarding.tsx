@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { Snapshot } from '@shared/api.ts';
 import { COLUMNS } from '@shared/types.ts';
 import { api } from '../api.ts';
-import { story } from '../content.ts';
+import { company } from '../content.ts';
 import { useToast } from '../toast-context.ts';
 import { Icon } from './icons.tsx';
 import { ONBOARDING_STEPS, placeBalloon, unionBox } from './onboardingSteps.ts';
@@ -40,7 +40,7 @@ export function Onboarding({
   const toast = useToast();
   const [index, setIndex] = useState(WELCOME);
   const [finishing, setFinishing] = useState(false);
-  const manager = story(snapshot.state.settings.language).people.manager;
+  const manager = company(snapshot.state.settings.language).people.manager;
   const closable = mode === 'replay';
 
   const go = (next: number) => {
@@ -129,7 +129,7 @@ export function Onboarding({
         <h2 className="mt-5 text-xl font-bold tracking-tight text-foreground">{t(welcome ? 'onboarding.welcome.title' : 'onboarding.closing.title')}</h2>
         <p className="mt-2 text-base leading-relaxed text-muted-foreground">
           {t(welcome ? 'onboarding.welcome.body' : closable ? 'onboarding.closing.bodyReplay' : 'onboarding.closing.body', {
-            company: story(snapshot.state.settings.language).company.name,
+            company: company(snapshot.state.settings.language).company.name,
           })}
         </p>
         <div className="mt-6 flex items-center justify-between gap-3">

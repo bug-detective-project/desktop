@@ -1,6 +1,6 @@
 /** What the Dashboard's work desk shows, as pure functions of the snapshot (unit-tested). */
 import type { EnvironmentItemId, Snapshot } from '@shared/api.ts'
-import type { Language, TicketState } from '@shared/types.ts'
+import type { InboxMessage, Language, TicketState } from '@shared/types.ts'
 
 /**
  * The Current task state. The order matters: missing downloads block everything, then an unlock
@@ -96,4 +96,39 @@ export function environmentSummary(rows: EnvRow[]): 'ok' | 'warn' | 'danger' {
   if (rows.some((row) => row.tone === 'danger')) return 'danger'
   if (rows.some((row) => row.tone === 'warn')) return 'warn'
   return 'ok'
+}
+
+export interface MessageText {
+  subject: string
+  body: string
+}
+
+/** The story texts the inbox shows. */
+export interface StoryMessages {
+  welcome: MessageText
+  completion: MessageText
+  trackCompletion: MessageText
+  assignments: Record<string, MessageText>
+}
+
+/**
+ * The text of an inbox message. Assignments are keyed by ticket id (front-1, …); a ticket without
+ * its own message in the story gets the generic one, so any number of tickets works.
+ */
+export function inboxMessageText(
+  messages: StoryMessages,
+  message: InboxMessage,
+  fallback: MessageText,
+  idOf: (ticket: number) => string | undefined,
+): MessageText {
+  if (message.kind === 'welcome') return messages.welcome
+  // Both completions may name the track ({{track}}: front, back or fullstack).
+  const named = (text: MessageText): MessageText => ({
+    subject: text.subject.replaceAll('{{track}}', message.track ?? ''),
+    body: text.body.replaceAll('{{track}}', message.track ?? ''),
+  })
+  if (message.kind === 'completion') return named(messages.completion)
+  if (message.kind === 'trackCompletion') return named(messages.trackCompletion)
+  const id = message.ticket === undefined ? undefined : idOf(message.ticket)
+  return (id && messages.assignments[id]) || fallback
 }

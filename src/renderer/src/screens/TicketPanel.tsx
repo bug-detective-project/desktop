@@ -6,7 +6,7 @@ import type { Snapshot, TicketContent, WorkspaceStatus } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
 import type { ChatEntry, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
-import { story } from '../content.ts';
+import { company } from '../content.ts';
 import { DiffView } from '../components/DiffView.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { QaCommentView } from '../components/QaComment.tsx';
@@ -89,7 +89,7 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
 function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticket: TicketState; content: TicketContent | null }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const people = story(snapshot.state.settings.language).people;
+  const people = company(snapshot.state.settings.language).people;
   const senior = people.senior.name;
   const [busy, setBusy] = useState(false);
   const total = snapshot.hintsTotal[ticket.ticket] ?? 3;
@@ -227,7 +227,7 @@ export function TicketPanel({
   const language = snapshot.state.settings.language;
   const { content, failed, retry } = useTicketContent(ticket, language);
   const [tab, setTab] = useState<Tab>('ticket');
-  const senior = story(language).people.senior.name;
+  const senior = company(language).people.senior.name;
   const qaRunning = ticket.status === 'inQa';
 
   // Jump to the QA tab when a QA run finishes with a new comment (adjusted during render).

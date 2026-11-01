@@ -5,7 +5,7 @@ import logo from '../assets/logo.png';
 import { api } from '../api.ts';
 import { LANGUAGES } from '@shared/types.ts';
 import type { Language } from '@shared/types.ts';
-import { story } from '../content.ts';
+import { company as companyStory } from '../content.ts';
 import { useToast } from '../toast-context.ts';
 import { Flag } from './Flag.tsx';
 import { LANGUAGE_NAMES } from './languages.ts';
@@ -41,7 +41,7 @@ export function AppHeader({
 }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const company = story(snapshot.state.settings.language).company.name;
+  const company = companyStory(snapshot.state.settings.language).company.name;
   const unread = snapshot.state.inbox.filter((message) => !message.read).length;
   // A next assignment waiting on the Dashboard: a red "1" that stays until the player picks it up (it wins over the unread count).
   const pending = snapshot.nextTicket !== null;

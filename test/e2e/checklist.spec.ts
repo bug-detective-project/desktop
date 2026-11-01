@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launch } from './fixtures.ts';
+import { launch, takeNextTicket } from './fixtures.ts';
 
 test('the first-run checklist blocks the game until every prerequisite passes', async () => {
   const { page, close } = await launch({ docker: 'notRunning', devcontainers: false });
@@ -47,7 +47,7 @@ test('the app shows a banner and pauses Docker actions when Docker stops mid-ses
   try {
     await page.getByTestId('start-playing').click();
     await expect(page.getByTestId('docker-banner')).toHaveCount(0);
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await page.getByTestId('card-1').waitFor();
     await expect(page.getByTestId('docker-banner')).toBeVisible();
     await expect(page.getByTestId('docker-banner')).toContainText('Docker is not running');

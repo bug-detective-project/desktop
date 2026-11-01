@@ -1,10 +1,11 @@
 import type { Snapshot } from '@shared/api.ts'
 import { blocksVSCode } from '@shared/api.ts'
 import { findTicket } from '@shared/kanban.ts'
-import type { InboxMessage, Language, TicketState } from '@shared/types.ts'
+import type { GameState, InboxMessage, Language, TicketState, TrackChoice } from '@shared/types.ts'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api } from '../api.ts'
 import { Icon } from '../components/icons.tsx'
 import type { IconName } from '../components/icons.tsx'
@@ -13,18 +14,19 @@ import { ticketTitle } from '../components/ticketTitle.ts'
 import { Badge, Button, LogView, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
 import type { Story } from '../content.ts'
 import { story } from '../content.ts'
+import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx'
 import { useToast } from '../toast-context.ts'
-import { deskState, environmentRows, environmentSummary } from './dashboardState.ts'
+import { deskState, environmentRows, environmentSummary, inboxMessageText } from './dashboardState.ts'
 import type { DeskState, Tone } from './dashboardState.ts'
 
 const locale = (language: Language) => (language === 'pt' ? 'pt-BR' : 'en-US')
 
-function messageText(content: Story, message: InboxMessage) {
-  if (message.kind === 'welcome') return content.messages.welcome
-  if (message.kind === 'completion') return content.messages.completion
-  return content.messages.assignments[
-    String(message.ticket) as keyof Story['messages']['assignments']
-  ]
+function messageText(content: Story, message: InboxMessage, t: TFunction, state: GameState) {
+  const idOf = (ticket: number) => state.tickets.find((item) => item.ticket === ticket)?.id
+  return inboxMessageText(content.messages, message, {
+    subject: t('dashboard.genericAssignmentSubject'),
+    body: t('dashboard.genericAssignmentBody'),
+  }, idOf)
 }
 
 /** The first paragraph of a message body, without markdown marks. */
@@ -132,7 +134,7 @@ interface Actions {
   openBoard: () => void
   openTicket: (ticket: number) => void
   openReview: (ticket: number) => void
-  nextAssignment: () => void
+  nextAssignment: (track: TrackChoice) => void
   run: (id: string, action: () => Promise<unknown>) => void
   busy: string | null
 }
@@ -359,20 +361,13 @@ function CurrentTask({
       <Tag>{t('dashboard.queued')}</Tag>,
       <>
         <DeskSentence>{t('dashboard.queuedBody')}</DeskSentence>
-        <Button
-          size="sm"
-          variant="primary"
+        <NextAssignmentMenu
+          snapshot={snapshot}
           className="mt-2 w-full"
           disabled={needsEnvironment || snapshot.busy !== null}
-          onClick={actions.nextAssignment}
-          data-testid="next-assignment"
-        >
-          <Icon
-            name="download"
-            className="size-3.5"
-          />
-          {t('dashboard.nextAssignment')}
-        </Button>
+          onChoose={actions.nextAssignment}
+          testId="next-assignment"
+        />
       </>,
     )
   }
@@ -594,9 +589,9 @@ function MessageView({
 }) {
   const { t } = useTranslation()
   const language = snapshot.state.settings.language
-  const content = story(language)
+  const content = story(language, snapshot.projectStory)
   const manager = content.people.manager
-  const text = message ? messageText(content, message) : undefined
+  const text = message ? messageText(content, message, t, snapshot.state) : undefined
   const viewed =
     message?.kind === 'assignment' && message.ticket !== undefined
       ? findTicket(snapshot.state, message.ticket)
@@ -694,20 +689,13 @@ function MessageView({
                   <h4 className="text-base font-bold text-foreground">{t('dashboard.nextTitle')}</h4>
                   <p className="mt-0.5 text-base text-muted-foreground">{t('dashboard.nextBody')}</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="primary"
+                <NextAssignmentMenu
+                  snapshot={snapshot}
                   className="shrink-0"
                   disabled={snapshot.busy !== null}
-                  onClick={actions.nextAssignment}
-                  data-testid="email-next-assignment"
-                >
-                  <Icon
-                    name="download"
-                    className="size-3.5"
-                  />
-                  {t('dashboard.nextAssignment')}
-                </Button>
+                  onChoose={actions.nextAssignment}
+                  testId="email-next-assignment"
+                />
               </div>
             )}
           </div>
@@ -720,13 +708,15 @@ function MessageView({
 /** The drawer with the project context and the contacts; it covers the reading pane. */
 function ProjectDrawer({
   language,
+  projectStory,
   onClose,
 }: {
   language: Language
+  projectStory: Snapshot['projectStory']
   onClose: () => void
 }) {
   const { t } = useTranslation()
-  const content = story(language)
+  const content = story(language, projectStory)
   const senior = content.people.senior
   const closeButton = useRef<HTMLButtonElement>(null)
   // The latest onClose, so the effect below runs once per opening, not on every snapshot.
@@ -893,7 +883,7 @@ export function Dashboard({
   const toast = useToast()
   const { state } = snapshot
   const language = state.settings.language
-  const content = story(language)
+  const content = story(language, snapshot.projectStory)
   const threads = [...state.inbox].reverse()
   const [selectedId, setSelectedId] = useState<string | null>(
     threads[0]?.id ?? null,
@@ -939,8 +929,8 @@ export function Dashboard({
     openBoard: onOpenBoard,
     openTicket: onOpenTicket,
     openReview: onOpenReview,
-    nextAssignment: () =>
-      void api.nextAssignment().then(onOpenBoard).catch(toast.error),
+    nextAssignment: (track) =>
+      void api.nextAssignment(track).then(onOpenBoard).catch(toast.error),
     run,
     busy,
   }
@@ -1013,7 +1003,7 @@ export function Dashboard({
             data-testid="inbox"
           >
             {threads.map((message) => {
-              const text = messageText(content, message)
+              const text = messageText(content, message, t, state)
               const isOpen = message.id === selected?.id
               return (
                 <li
@@ -1073,6 +1063,7 @@ export function Dashboard({
         {drawerOpen && !onboarding && (
           <ProjectDrawer
             language={language}
+            projectStory={snapshot.projectStory}
             onClose={closeDrawer}
           />
         )}

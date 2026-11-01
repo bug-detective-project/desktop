@@ -16,11 +16,12 @@ import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
 import { GitHubContentSource } from './services/content/github.ts';
 import { LocalContentSource } from './services/content/local.ts';
+import { chooseContentSource, parseLocalProjects, parseProjectsCatalog, starterProject } from './services/projects.ts';
+import projectsJson from '../../content/projects.json' with { type: 'json' };
 import type { ContentSource } from './services/content/source.ts';
 import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { runCommand } from './services/process.ts';
-import { loadReviewConfig } from './services/review/config.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
 
@@ -48,43 +49,47 @@ const devSkipOnboarding = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGD
 const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E_SHOW_ONBOARDING ?? '');
 
 const contentConfigSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local'), repoPath: z.string(), manifestPath: z.string() }),
-  z.object({
-    kind: z.literal('github'),
-    repository: z.string(),
-    release: z.string().optional(),
-    baseUrl: z.string().optional(),
-  }),
+  z.object({ kind: z.literal('local'), qaDir: z.string() }),
+  z.object({ kind: z.literal('github'), repository: z.string(), baseUrl: z.string().optional() }),
 ]);
 
+/** The projects the app uses (content/projects.json, bundled into the app). */
+const catalog = parseProjectsCatalog(projectsJson);
+/** The project being played: the starter one, until switching projects exists. */
+const project = starterProject(catalog);
+
+function projectId(): string {
+  return project.id;
+}
+
 /**
- * Development uses the local SupportDesk checkout. The installed app downloads from GitHub, unless
- * %APPDATA%\Bug Detective\content-source.json chooses another source.
+ * Development only: desktop/projects.local.json may point projects at local qa folders
+ * ({ "supportdesk": "../supportdesk-qa" }); without it, development downloads from GitHub too.
+ */
+function localProjectDirs(): Record<string, string> {
+  const file = join(appRoot, 'projects.local.json');
+  if (app.isPackaged || !existsSync(file)) {
+    return {};
+  }
+  return parseLocalProjects(JSON.parse(readFileSync(file, 'utf8')), catalog);
+}
+
+/**
+ * The project's content comes from its repository (content/projects.json), or from a local qa
+ * folder in development (projects.local.json). %APPDATA%\Bug Detective\content-source.json
+ * overrides both.
  */
 function contentSource(): ContentSource {
   const configFile = join(app.getPath('userData'), 'content-source.json');
-  const packageJson = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')) as {
-    bugDetective: { contentRepository: string; contentRelease: string };
-  };
-  let config: z.infer<typeof contentConfigSchema> = app.isPackaged
-    ? { kind: 'github', repository: packageJson.bugDetective.contentRepository, release: packageJson.bugDetective.contentRelease }
-    : {
-        kind: 'local',
-        repoPath: process.env.BUGDETECTIVE_SUPPORTDESK ?? resolve(appRoot, '..', 'supportdesk-private'),
-        manifestPath: process.env.BUGDETECTIVE_MANIFEST ?? join(appRoot, 'build', 'stage-packages', 'manifest.json'),
-      };
+  const choice = chooseContentSource(project, { packaged: app.isPackaged, localDirs: localProjectDirs(), baseDir: appRoot });
+  let config: z.infer<typeof contentConfigSchema> =
+    choice.kind === 'local' ? { kind: 'local', qaDir: choice.qaDir } : { kind: 'github', repository: choice.repository };
   if (existsSync(configFile)) {
     config = contentConfigSchema.parse(JSON.parse(readFileSync(configFile, 'utf8')));
   }
   return config.kind === 'local'
-    ? new LocalContentSource({ repoPath: config.repoPath, manifestPath: config.manifestPath, runner: runCommand })
-    : new GitHubContentSource({ repository: config.repository, release: config.release, baseUrl: config.baseUrl });
-}
-
-/** The learning project the app plays (package.json bugDetective.project), for its review configuration. */
-function projectId(): string {
-  const packageJson = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')) as { bugDetective: { project: string } };
-  return packageJson.bugDetective.project;
+    ? new LocalContentSource({ qaDir: config.qaDir, runner: runCommand })
+    : new GitHubContentSource({ repository: config.repository, project: project.id, minVersion: project.version, baseUrl: config.baseUrl });
 }
 
 const platform: Platform | null = isE2E ? null : currentPlatform();
@@ -97,7 +102,7 @@ function runtime(): GameRuntime {
     return fake;
   }
   const contextRoot = app.isPackaged ? join(process.resourcesPath, 'docker') : join(appRoot, 'build', 'docker');
-  return new DockerRuntime(platform, { contextRoot });
+  return new DockerRuntime(platform, { contextRoot, qaBuildRoot: join(app.getPath('userData'), 'docker') });
 }
 
 /** Opens an allowlisted URL with the platform's browser command (WSL: the Windows browser). */
@@ -177,9 +182,9 @@ async function main(): Promise<void> {
   let window: BrowserWindow | null = null;
   const game = new Game({
     store: new StateStore(userData),
-    packages: new PackageStore(join(userData, 'packages')),
-    reviews: new ReviewStore(join(userData, 'reviews')),
-    review: loadReviewConfig(projectId()),
+    // Downloaded packages and reviews belong to the project they came from.
+    packages: new PackageStore(join(userData, 'projects', projectId(), 'packages')),
+    reviews: new ReviewStore(join(userData, 'projects', projectId(), 'reviews')),
     content: contentSource(),
     runtime: runtime(),
     appVersion: app.getVersion(),

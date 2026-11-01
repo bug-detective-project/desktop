@@ -1,5 +1,5 @@
 /** The typed contract between the renderer and the main process (exposed by the preload script). */
-import type { Column, GameState, Language, Settings } from './types.ts';
+import type { Column, GameState, Language, Settings, Track, TrackChoice } from './types.ts';
 
 export type EngineState = 'notInstalled' | 'notRunning' | 'starting' | 'running';
 export type CheckId = 'docker' | 'wsl' | 'vscode' | 'devcontainers';
@@ -92,10 +92,39 @@ export interface ReviewComparison {
   baselineIgnoringWhitespace: string;
 }
 
+export interface StoryMessage {
+  subject: string;
+  body: string;
+}
+
+/** The project's part of the story (story.<lang>.json on its qa branch): the client, the project and the manager's messages. */
+export interface ProjectStory {
+  client: { name: string; about: string; contacts: string; reporters: { name: string; role: string }[] };
+  project: { name: string; about: string; stack: string };
+  messages: {
+    welcome: StoryMessage;
+    /** By ticket id (front-1, back-1, …). */
+    assignments: Record<string, StoryMessage>;
+    /** The project is done (the first track completed). */
+    completion: StoryMessage;
+    /** A later track completed; {{track}} names it. */
+    trackCompletion: StoryMessage;
+  };
+}
+
+/** A track's queue: its next ticket (or null when it is finished), and how many of its tickets are Done. */
+export interface TrackQueue {
+  next: { id: string; track: Track; title: Record<Language, string> } | null;
+  done: number;
+  total: number;
+}
+
 export interface Snapshot {
   state: GameState;
-  /** Ticket that "Get Next Assignment" would unlock, or null. */
+  /** The number the next unlocked ticket gets, or null when none can be taken now (one open, or none left). */
   nextTicket: number | null;
+  /** Each track's queue, or null until the project's content is downloaded. */
+  queues: Record<TrackChoice, TrackQueue> | null;
   titles: Record<number, Record<Language, string>>;
   hintsTotal: Record<number, number>;
   busy: BusyTask;
@@ -106,6 +135,8 @@ export interface Snapshot {
   log: string[];
   reviewNotice: ReviewNotice | null;
   contentSource: string;
+  /** The project's story per language, or null until the project's content is downloaded. */
+  projectStory: Record<Language, ProjectStory> | null;
   appVersion: string;
   versions: { electron: string; node: string; chrome: string };
   /** Development only: the board shows "Solve bug" (BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON). */
@@ -154,7 +185,7 @@ export interface BugDetectiveApi {
   /** Disk space used by the game's images and volumes. Needs Docker running; can take a few seconds. */
   diskUsage(): Promise<DiskUsageItem[]>;
 
-  nextAssignment(): Promise<void>;
+  nextAssignment(track: TrackChoice): Promise<void>;
   move(ticket: number, to: Column): Promise<void>;
   askSenior(ticket: number): Promise<void>;
   revealSolution(ticket: number): Promise<void>;

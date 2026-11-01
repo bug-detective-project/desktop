@@ -1,0 +1,47 @@
+{
+  "company": {
+    "name": "Lanternfish Labs",
+    "tagline": "A small software consultancy that builds and maintains apps for growing companies.",
+    "summary": "A twelve-person remote consultancy. Pairing when someone is stuck, weekly planning on Mondays.",
+    "about": "Lanternfish Labs is a twelve-person consultancy. Most of the team works remotely, with a weekly planning call on Mondays and pairing sessions whenever someone is stuck. New developers start on a client project right away, fixing small, real bugs from their first week."
+  },
+  "people": {
+    "manager": {
+      "name": "Rafaela Nunes",
+      "role": "Engineering manager",
+      "email": "rafaela@lanternfish.labs"
+    },
+    "senior": {
+      "name": "Priya Raman",
+      "role": "Senior developer"
+    }
+  },
+  "pendingProject": {
+    "client": {
+      "name": "Your first client",
+      "about": "The project and its client appear here once the project is downloaded (Dashboard → Download and install).",
+      "contacts": "—",
+      "reporters": []
+    },
+    "project": {
+      "name": "Project",
+      "about": "Not downloaded yet.",
+      "stack": "—"
+    },
+    "messages": {
+      "welcome": {
+        "subject": "Welcome to Lanternfish Labs!",
+        "body": "Hi, great to have you with us!\n\nI'm Rafaela, the engineering manager. Your project is on its way: once it is downloaded (Dashboard → Download and install), you'll find the client, the project and your first ticket here.\n\nRafaela"
+      },
+      "assignments": {},
+      "completion": {
+        "subject": "Sprint done",
+        "body": "Thanks for the effort.\n\nRafaela"
+      },
+      "trackCompletion": {
+        "subject": "The {{track}} track is done",
+        "body": "You finished every {{track}} ticket.\n\nRafaela"
+      }
+    }
+  }
+}

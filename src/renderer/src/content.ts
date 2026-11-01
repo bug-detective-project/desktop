@@ -1,11 +1,21 @@
+import type { ProjectStory } from '@shared/api.ts';
 import type { Language } from '@shared/types.ts';
-import storyEn from '../../../content/story.en.json';
-import storyPt from '../../../content/story.pt.json';
+import companyEn from '../../../content/company.en.json';
+import companyPt from '../../../content/company.pt.json';
 
-export type Story = typeof storyEn;
+/** The app's own story: the company, its people, and what shows before a project is downloaded. */
+export type Company = typeof companyEn;
+/** The company plus the story of the project being played. */
+export type Story = Omit<Company, 'pendingProject'> & ProjectStory;
 
-const stories: Record<Language, Story> = { en: storyEn, pt: storyPt };
+const companies: Record<Language, Company> = { en: companyEn, pt: companyPt };
 
-export function story(language: Language): Story {
-  return stories[language];
+export function company(language: Language): Company {
+  return companies[language];
+}
+
+/** The project's story comes with its content (the snapshot); until then, the pending texts show. */
+export function story(language: Language, projectStory: Record<Language, ProjectStory> | null): Story {
+  const { pendingProject, ...base } = company(language);
+  return { ...base, ...(projectStory?.[language] ?? pendingProject) };
 }

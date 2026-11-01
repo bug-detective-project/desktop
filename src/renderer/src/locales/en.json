@@ -83,6 +83,8 @@
     "previousDirective": "You are viewing the directive for a previous ticket ({{key}}, done). Your active assignment is {{active}}.",
     "previousDirectiveNoActive": "You are viewing the directive for a ticket you already finished ({{key}}).",
     "nextAssignment": "Get next assignment",
+    "genericAssignmentSubject": "Your next ticket",
+    "genericAssignmentBody": "A new ticket is waiting for you. Open it on the Board when you are ready.",
     "unlocking": "Downloading and setting up the ticket…",
     "startOnBoard": "Start ticket on Board",
     "viewQa": "View QA verification on Board",
@@ -131,7 +133,17 @@
     "nextTitle": "Next action: get your next assignment",
     "nextBody": "The ticket is downloaded and your workspace is set up for it. One ticket at a time.",
     "startServer": "Start server",
-    "stopServer": "Stop server"
+    "stopServer": "Stop server",
+    "chooseTrack": "Choose the track of the next ticket",
+    "track": {
+      "front": "Front",
+      "back": "Back",
+      "fullstack": "Fullstack"
+    },
+    "trackNext": "Next: {{key}} · {{progress}} done",
+    "trackNextFullstack": "Next: {{track}} · {{key}} · {{progress}} done",
+    "trackDone": "Track done · {{done}}/{{total}}",
+    "downloadProjectFirst": "Download the project first."
   },
   "onboarding": {
     "welcome": {
@@ -546,6 +558,7 @@
     "noReview": "The review of this ticket is not available.",
     "reviewFailed": "The review could not be opened, and your code was restored: {{message}}",
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
-    "solveBugNotAllowed": "Only the ticket in progress can be solved."
+    "solveBugNotAllowed": "Only the ticket in progress can be solved.",
+    "incompletePublication": "The project's publication is incomplete. Try again later."
   }
 }

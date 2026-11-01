@@ -29,7 +29,7 @@ describe('QA time limit in minutes', () => {
 
 describe('backup status', () => {
   const start = rules.createInitialState(ctx('2026-10-20T10:00:00.000Z'));
-  const unlocked = rules.unlockTicket(start, 1, 'abc', ctx('2026-10-21T10:00:00.000Z'));
+  const unlocked = rules.unlockTicket(start, 1, { id: 'front-1', track: 'front', commit: 'abc', manifestVersion: '1.0.0', counts: { front: 4, back: 0 } }, ctx('2026-10-21T10:00:00.000Z'));
 
   it('has nothing to protect before the first ticket', () => {
     expect(backupStatus(start)).toBe('none');

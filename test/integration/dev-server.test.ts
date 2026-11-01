@@ -16,13 +16,13 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { loadReviewConfig } from '../../src/main/services/review/config.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk-private');
+// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
+const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const PREFIX = 'bugdetective-devserver-test';
 const platform = currentPlatform();
 
@@ -53,18 +53,13 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
   await (await workspace()).destroy();
   game = new Game({
     store: new StateStore(dir),
     packages: new PackageStore(join(dir, 'packages')),
     reviews: new ReviewStore(join(dir, 'reviews')),
-    review: loadReviewConfig('supportdesk'),
-    content: new LocalContentSource({
-      repoPath: supportdesk,
-      manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),
-      runner: runCommand,
-    }),
+    content: new LocalContentSource({ qaDir: supportdeskQa, runner: runCommand }),
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },

@@ -27,10 +27,10 @@ docs/                  design-system.md (tokens, components and screen layout)
 resources/icon.png     app icon (executable, installer, window); the header logo is src/renderer/src/assets/logo.png
 src/shared/            types, the Kanban state machine, QA message selection
 docker/workspace/      the player's workspace image (+ the port forwarder)
-docker/qa/             the QA image (Node 26 + Playwright Chromium + the SupportDesk QA CLI)
-content/               company story and manager messages (story.en.json, story.pt.json), and
-                       projects/<projectId>/review.json (each learning project's review configuration)
-tools/                 build-stage-packages.ts, prepare-resources.ts, sync-windows.sh, win.sh
+docker/qa/             the base of the QA image (Node 26 + Playwright Chromium); the app adds the project's QA CLI at run time
+content/               company.en.json, company.pt.json (the company, its people, and the texts shown before a
+                       project is downloaded) and projects.json (every game project: id, repository, starter, version)
+tools/                 publish-project.ts, prepare-resources.ts, sync-windows.sh, win.sh
 tools/lint/            the isolated ESLint toolchain (config.js, its own package.json)
 .husky/                git hooks (pre-commit, pre-push)
 test/unit|integration|e2e|manual
@@ -41,23 +41,44 @@ test/unit|integration|e2e|manual
 - Windows 10/11 with WSL 2 and Docker Desktop (WSL 2 backend)
 - VS Code (the app installs the Dev Containers extension)
 - For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
-- `../supportdesk-private` next to this folder: a clone of the SupportDesk repository (see below)
+- For the automated tests and for editing game content only: `../supportdesk` and `../supportdesk-qa` next to this folder, a clone of the SupportDesk repository and its published `qa` branch (see below). `pnpm run dev` and `pnpm run build` need no game project: the app downloads each project's content, QA CLI included, at run time.
 
 ### Getting the SupportDesk repository
 
-Clone it next to `desktop/`, so the two folders are siblings:
+> **You never need to create a branch in a project listed in `content/projects.json` to run the app.** Every project is already published on GitHub (`main`, `qa`, the ticket branches and their tags), and the app downloads everything from there at run time. To run the tests or edit content, all you do is clone the repository and check out its existing `qa` branch with the two commands below. The ticket branches are created only by `scripts/build-tickets.sh` when content authors change them.
+
+SupportDesk is one public repository, `bug-detective-project/supportdesk`, with three kinds of branches:
+
+| Branch | Holds |
+| --- | --- |
+| `main` | The SupportDesk app, with every bug fixed |
+| `qa` | The QA suite and the game content at its root: the QA CLI, `tickets/<id>/` per ticket and the published `manifest.json` |
+| `front-1` … `front-4` and `back-1` … `back-4` | One single-commit branch per ticket: `main` with that ticket's bug |
+
+Clone it next to `desktop/` and check out the `qa` branch as a second folder (a git worktree), so the three folders are siblings:
 
 ```sh
 cd ..    # the folder that holds desktop/
-git clone git@github.com:bug-detective-project/supportdesk-private.git
+git clone git@github.com:bug-detective-project/supportdesk.git
+git -C supportdesk worktree add ../supportdesk-qa qa
 ```
 
-The default branch (`main`) is all that needs to be checked out. The tools read the `stage-1` … `stage-4` branches from the clone as they are: the local branch when there is one, otherwise `origin/stage-N`, which `git clone` already fetched. **Never create, rename or rebuild the `stage-N` branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `qa/scripts/build-stages.sh` in that repository). If a tool says a stage branch is missing, run `git -C ../supportdesk-private fetch origin`. If `stage-N` branches were created by hand, reset them to the published ones:
+`worktree add … qa` checks out the published `qa` branch (git sets up the local `qa` to track `origin/qa`); it does not create a new branch on GitHub.
+
+To develop with that local content, copy `desktop/projects.local.example.json` to `desktop/projects.local.json` (ignored by git, never packaged): one qa folder per project, relative to `desktop/`:
+
+```json
+{ "supportdesk": "../supportdesk-qa" }
+```
+
+Without it, `pnpm run dev` downloads every project from GitHub like the installed app. The automated tests read `../supportdesk-qa` directly and need the worktree.
+
+The tools read the ticket branches from the clone as they are: the local branch when there is one, otherwise `origin/<id>`, which `git clone` already fetched. **Never create, rename or rebuild the ticket branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `scripts/build-tickets.sh` in `supportdesk-qa/`). If a tool says a ticket branch is missing, run `git -C ../supportdesk fetch origin`. If ticket branches were created by hand, reset them to the published ones:
 
 ```sh
-cd ../supportdesk-private
+cd ../supportdesk
 git fetch origin
-for n in 1 2 3 4; do git branch -f --track stage-$n origin/stage-$n; done
+for id in front-1 front-2 front-3 front-4 back-1 back-2 back-3 back-4; do git branch -f --track $id origin/$id; done
 ```
 
 ## Development on Windows
@@ -65,13 +86,14 @@ for n in 1 2 3 4; do git branch -f --track stage-$n origin/stage-$n; done
 ```powershell
 pnpm install --frozen-lockfile
 pnpm run electron:install  # downloads the Electron binary (Electron 45 does it lazily)
-pnpm run dev               # prepares build/docker and build/stage-packages, then starts Electron
+pnpm run dev               # prepares build/docker, then starts Electron
 ```
 
 `pnpm run dev` and `pnpm run build` first run:
 
-- `tools/prepare-resources.ts`: copies `docker/` and the QA CLI (`../supportdesk-private/qa` without `stages/`) into `build/docker/` and writes content-addressed image tags to `build/docker/images.json`;
-- `tools/build-stage-packages.ts`: builds `build/stage-packages/` (one zip per stage + `manifest.json`), which the local content source verifies against.
+- `tools/prepare-resources.ts`: copies `docker/` into `build/docker/` and writes `build/docker/images.json` (the workspace image tag and `qaBase`, the hash of `docker/qa/`). The QA image tag combines `qaBase` with the project's QA CLI, and its build context is assembled at run time in `%APPDATA%\Bug Detective\docker\qa-<hash>\`.
+
+With a local qa folder, the content source builds the project manifest in memory from that folder and the ticket branches every time a ticket is unlocked, with the same code as `publish:project`, so development always uses the current content.
 
 ## Inspecting the UI (Chrome and React DevTools)
 
@@ -152,8 +174,8 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Command | Where | What |
 | --- | --- | --- |
-| `pnpm test` | WSL or Windows | Builds `build/stage-packages/` first (`pretest`, needs the `../supportdesk-private` clone), then Vitest unit tests: Kanban rules, state and migrations, QA result parsing and messages, checksums, content sources (local git repo and a mock GitHub server), backup manifests, Windows detection, the game controller, the code review (review configuration and path matching, comparison parsing, review data, the checkout and return state machine with crash recovery) |
-| `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock stage 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA (`qa-flow`, `bugdetective-test-*` resources); the code review: approved snapshot from an uncommitted fix, review branch and its recreation, checkout and return with uncommitted/untracked/excluded files, edits on the review branch, crash recovery, a Done review, the return before QA, export/restore and a new game (`review-flow`, `bugdetective-review-test-*` resources); the Docker cleanup, leftovers and everything (`docker-cleanup`, `bugdetective-cleanup-test-*` resources and image tags of its own); the dev server: Start and Stop server, a server started from the terminal, no process left behind (`dev-server`, `bugdetective-devserver-test-*` resources). Never touches the player's resources. Run `pnpm run build` first. |
+| `pnpm test` | WSL or Windows | Vitest unit tests (some read the `../supportdesk-qa` worktree): Kanban rules, state validation, QA result parsing and messages, checksums, the project manifest and `publish:project`, content sources (local git repos and a mock GitHub server), backup manifests, Windows detection, the game controller, the code review (review configuration and path matching, comparison parsing, review data, the checkout and return state machine with crash recovery) |
+| `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker: unlock ticket 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA (`qa-flow`, `bugdetective-test-*` resources); the code review: approved snapshot from an uncommitted fix, review branch and its recreation, checkout and return with uncommitted/untracked/excluded files, edits on the review branch, crash recovery, a Done review, the return before QA, export/restore and a new game (`review-flow`, `bugdetective-review-test-*` resources); the Docker cleanup, leftovers and everything (`docker-cleanup`, `bugdetective-cleanup-test-*` resources and image tags of its own); the dev server: Start and Stop server, a server started from the terminal, no process left behind (`dev-server`, `bugdetective-devserver-test-*` resources). Never touches the player's resources. Run `pnpm run build` first. |
 | `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime (its scenario comes from `launch()`; `simulate()` in `test/e2e/fixtures.ts` changes it while the app runs, e.g. Docker stopping or a dev server started in the terminal): first-run checklist, Rafaela's onboarding (mandatory the first time, starts over after a restart, the "?" replay, the development skip), window size (every screen fits 1280 × 640 and scrolls below it), the Dashboard (work desk states, drawer, Local environment and the dev server row), Docker banner, Kanban drag rules, ticket panel, code review (layout, file list, split diff, whitespace toggle, identical solutions, review banner, button states), language, restart, Settings tabs (versions, disk usage, QA limit, last export, locked actions) |
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |
 | `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
@@ -203,7 +225,7 @@ When the code lives in WSL 2, the Windows installer is built with Windows Node.j
 **Every build:**
 
 ```sh
-tools/sync-windows.sh                              # copies desktop/ and ../supportdesk-private/ to C:\Users\<you>\bugdetective-dev
+tools/sync-windows.sh                              # copies desktop/, ../supportdesk/ and ../supportdesk-qa/ to C:\Users\<you>\bugdetective-dev
 tools/win.sh pnpm install --frozen-lockfile        # Windows node_modules (never shared with WSL)
 tools/win.sh pnpm run electron:install             # the Windows Electron binary
 tools/win.sh pnpm run dist:win                     # build + installer
@@ -228,24 +250,30 @@ The version number comes from `package.json`. A rebuild with the same version st
 
 | | |
 | --- | --- |
-| State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, migrations in `services/state.ts`) |
-| Stage packages | `%APPDATA%\Bug Detective\packages\stage-N.zip` and `stage-N\` (outside the Docker volume) |
-| Review data | `%APPDATA%\Bug Detective\reviews\ticket-N\` (`snapshot.zip`, `reference.zip`, `review.json`) for every ticket that passed QA; included in exports |
-| Review configuration | `bugDetective.project` in `package.json` picks `content/projects/<projectId>/review.json`: `{ "exclude": ["<glob>", …], "includeTests": true }`. Built-in excludes always apply on top (dependencies, lockfiles, `*.db`, `*.sqlite*`, `dist/`, `build/`, `coverage/`, `.env*`, logs). |
-| Content source | Development: the local SupportDesk checkout (`BUGDETECTIVE_SUPPORTDESK`, `BUGDETECTIVE_MANIFEST` override the paths). Installed app: GitHub, `bugDetective.contentRepository` / `contentRelease` in `package.json`. `%APPDATA%\Bug Detective\content-source.json` overrides both: `{ "kind": "local", "repoPath": "...", "manifestPath": "..." }` or `{ "kind": "github", "repository": "owner/name", "release": "latest" }` |
+| State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, validated in `services/state.ts`; a file of another schema version is kept aside as `state.corrupt-<time>.json` and a new game starts, with no migrations) |
+| Ticket packages | `%APPDATA%\Bug Detective\projects\<projectId>\packages\stage-N.zip` and `stage-N\`, by queue position (outside the Docker volume) |
+| Review data | `%APPDATA%\Bug Detective\projects\<projectId>\reviews\ticket-N\` (`snapshot.zip`, `reference.zip`, `review.json`) for every ticket that passed QA; included in exports |
+| Project content | Installed app: `%APPDATA%\Bug Detective\projects\<projectId>\content\` (`qa.zip`, `code\<commit>.zip` for every ticket, `cache.json`). Filled when the app starts online with nothing downloaded and by **Download and install**; picking a ticket looks for a newer publication first and falls back to the cache offline. The first download needs the internet. |
+| Review configuration | `review.json` at the root of the project's `qa` branch, optional: `{ "exclude": ["<glob>", …], "includeTests": true }`. Built-in excludes always apply on top (dependencies, lockfiles, `*.db`, `*.sqlite*`, `dist/`, `build/`, `coverage/`, `.env*`, logs). |
+| Projects | `content/projects.json` lists every game project: `{ "projects": [{ "id", "repository": "owner/name", "starter", "version" }] }`. Exactly one is the starter, which the app plays until project switching exists. `publish:project` keeps it up to date. Validated at start: an invalid file stops the app with an error dialog. |
+| Content source | Each project downloads from its `repository`; the manifest must declare the project's `id` and be at least its `version` (an older one is reported as an incomplete publication). Development: a project listed in `desktop/projects.local.json` reads its local qa folder instead. The installed app always downloads. `%APPDATA%\Bug Detective\content-source.json` overrides both: `{ "kind": "local", "qaDir": "..." }` or `{ "kind": "github", "repository": "owner/name" }` |
 | Data folder | `BUGDETECTIVE_USER_DATA` replaces `%APPDATA%\Bug Detective` (tests, clean-profile checks) |
 | Docker resources | Volumes `bugdetective-workspace` (the player's repository), `bugdetective-vscode-server`, `bugdetective-qa-cache` (dependency cache), `bugdetective-qa-input` (the copy of the workspace the last QA run tested); container `bugdetective-workspace`; images `bugdetective-workspace:<hash>`, `bugdetective-qa:<hash>`; QA containers `bugdetective-qa-*`. All labeled `bugdetective.role`. |
 
-## Publishing stages (GitHub)
+## Publishing a project (GitHub)
 
-Each game project has two repositories in the `bug-detective-project` organization: a private one with the source, the QA suite and every branch (`supportdesk-private`, remote `origin` in `../supportdesk-private`) and a public one with only the `stage-N` branches and the content releases (`supportdesk`, remote `public`). The installed app reads the public one (`bugDetective.contentRepository`).
+Each game project is one public repository in the `bug-detective-project` organization, with `main` (the app), `qa` (the QA suite and the content) and one branch per ticket. **The `qa` branch is the publication:** its `manifest.json` lists every ticket with its branch, its commit, its tag and the SHA-256 digests of its code and package. There are no GitHub Releases. The desktop app finds each project's repository in `content/projects.json`.
 
-Nothing is published automatically. To publish a content release:
+Tickets are named `<track>-<order>`, with the tracks `front` and `back` (`front-1`, `front-2`, …, `back-1`, …). The same name is the ticket's branch, its folder `tickets/<id>/` on `qa`, and its `id` in the manifest. The number of tickets comes from those folders; nothing in the app or the scripts assumes a count. The player picks the track of each ticket in **Get next assignment ▾** (front, back, or fullstack, which alternates), so tickets are played in any order; `build-tickets.sh` makes each ticket's `gate1/` cover every other ticket.
 
-1. Push every branch to the private repository (`git push origin --all`) and the `stage-1` … `stage-4` branches to the public one (`git push public stage-1 stage-2 stage-3 stage-4`). Keep `qa/` off the stage branches.
-2. `pnpm run build:stages --version 1.0.0` (or `node tools/build-stage-packages.ts --repo ../supportdesk-private --version 1.0.0`).
-3. Create a GitHub Release on the public repository and upload every file of `build/stage-packages/`: `gh release create v1.0.0 -R bug-detective-project/supportdesk --target stage-1 build/stage-packages/*`.
-4. The app downloads `releases/latest/download/manifest.json`, then the package of the unlocked stage and `archive/refs/heads/stage-N.zip`. It checks the package's SHA-256 and the stage files' digest against the manifest before using anything. If a branch moves after the release, its digest no longer matches: publish a new release.
+Nothing is published automatically. To publish:
+
+1. In the `qa` worktree (`../supportdesk-qa`): `scripts/build-tickets.sh` rebuilds every ticket branch from `main`, then `scripts/verify-tickets.sh` checks that each one fails Gate 2 with its bug and passes both gates after its `reference.patch`.
+2. In `desktop/`: `pnpm run publish:project --project supportdesk --version 2.0.1` (the qa folder comes from `projects.local.json`; `--qa ../supportdesk-qa` works too; add `--dry-run` to only validate and print the manifest). It checks every ticket folder (all files present, including `reference.patch`; names `front-<n>`/`back-<n>` without gaps), refuses a version that is not newer than the published one, writes `manifest.json`, tags every ticket commit that has no tag yet (`<id>-v<version>`), commits on `qa`, records the version in `content/projects.json` (adding the project, with the repository of its `origin` remote, when it is new), and prints the push command. **It never pushes.**
+3. Run the printed command in `../supportdesk`: `git push origin main qa <ticket branches> --force-with-lease && git push origin <new tags>`.
+4. Commit `content/projects.json` in `desktop/`. Until a desktop build has the new version, its app still accepts the older publication; once it has it, an older `qa` (not pushed yet, or a stale cache) is refused.
+
+The app downloads `archive/refs/heads/qa.zip` (the manifest and every ticket package) and then `archive/<commit>.zip` for the ticket being unlocked. It checks the manifest's project and counts, the package digest and the code digest before using anything. The tag keeps each published commit reachable after a ticket branch is force-pushed; a commit GitHub no longer has is reported as an incomplete publication.
 
 ## How the workspace and VS Code fit together
 

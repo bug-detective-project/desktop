@@ -16,6 +16,7 @@ import { Prerequisites } from './services/prerequisites.ts';
 import type { Environment } from './services/prerequisites.ts';
 import type { PrerequisiteReport } from '../shared/api.ts';
 import { QaRunner } from './services/qa.ts';
+import { qaImageTag, writeQaContext } from './services/qa-image.ts';
 import { Workspace, publishedPorts, resourceNames } from './services/workspace.ts';
 import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
@@ -35,6 +36,8 @@ export interface GameRuntime {
   startDocker(onPoll?: (state: EngineState) => void): Promise<EngineState>;
   installDevContainers(): Promise<void>;
 
+  /** The QA tool of the project being played (its qa branch without the tickets), or null before it is downloaded. */
+  setQaTool(files: ArchiveFile[] | null): void;
   environment(): Promise<EnvironmentReport>;
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
@@ -92,13 +95,18 @@ export interface GameRuntime {
 export interface ImageConfig {
   /** Folder with workspace/, qa/ and images.json (build/docker in development, resources/docker when packaged). */
   contextRoot: string;
+  /** Where the QA image's build contexts are assembled (docker/qa/ plus the project's QA tool). */
+  qaBuildRoot: string;
+  /** The QA image repository; bugdetective-qa, so every game shares one image per QA tool. */
+  qaRepository?: string;
   /** Prefix of every Docker resource name (tests use their own). */
   prefix?: string;
 }
 
 interface ImageTags {
   workspace: string;
-  qa: string;
+  /** Hash of the app's docker/qa/ files; the QA tag also hashes the project's QA tool. */
+  qaBase: string;
 }
 
 /** Docker's own words for a failed removal ("Error response from daemon: …"), or that it did not answer. */
@@ -117,6 +125,9 @@ export class DockerRuntime implements GameRuntime {
   private readonly platform: Platform;
   private readonly prerequisites: Prerequisites;
   private readonly contextRoot: string;
+  private readonly qaBuildRoot: string;
+  private readonly qaRepository: string;
+  private qaTool: ArchiveFile[] | null = null;
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -125,6 +136,8 @@ export class DockerRuntime implements GameRuntime {
     this.platform = platform;
     this.prerequisites = new Prerequisites(platform);
     this.contextRoot = images.contextRoot;
+    this.qaBuildRoot = images.qaBuildRoot;
+    this.qaRepository = images.qaRepository ?? 'bugdetective-qa';
     this.names = resourceNames(images.prefix);
   }
 
@@ -138,6 +151,15 @@ export class DockerRuntime implements GameRuntime {
   private async imageTags(): Promise<ImageTags> {
     this.tags ??= JSON.parse(await readFile(join(this.contextRoot, 'images.json'), 'utf8')) as ImageTags;
     return this.tags;
+  }
+
+  setQaTool(files: ArchiveFile[] | null): void {
+    this.qaTool = files;
+  }
+
+  /** The QA image of the current QA tool, or null before the project's content is downloaded. */
+  private async qaTag(): Promise<string | null> {
+    return this.qaTool ? qaImageTag((await this.imageTags()).qaBase, this.qaTool, this.qaRepository) : null;
   }
 
   /** The docker CLI, if the engine is running. */
@@ -169,10 +191,18 @@ export class DockerRuntime implements GameRuntime {
   private async qa(): Promise<QaRunner> {
     return new QaRunner({
       docker: await this.docker(),
-      image: (await this.imageTags()).qa,
+      image: await this.requireQaTag(),
       dockerHostPath: (path) => this.platform.dockerHostPath(path),
       names: this.names,
     });
+  }
+
+  private async requireQaTag(): Promise<string> {
+    const tag = await this.qaTag();
+    if (!tag) {
+      throw new Error("The project's QA tool has not been downloaded yet");
+    }
+    return tag;
   }
 
   async checkPrerequisites() {
@@ -198,9 +228,10 @@ export class DockerRuntime implements GameRuntime {
   async environment(): Promise<EnvironmentReport> {
     const docker = await this.docker();
     const tags = await this.imageTags();
+    const qa = await this.qaTag();
     const items: EnvironmentItem[] = [
       { id: 'workspaceImage', ready: await docker.imageExists(tags.workspace) },
-      { id: 'qaImage', ready: await docker.imageExists(tags.qa) },
+      { id: 'qaImage', ready: qa !== null && (await docker.imageExists(qa)) },
     ];
     if (items[0].ready && (await docker.volumeExists(this.names.volume))) {
       const workspace = await this.runningWorkspace();
@@ -216,14 +247,15 @@ export class DockerRuntime implements GameRuntime {
   async installEnvironment(onLine: LineHandler) {
     const docker = await this.docker();
     const tags = await this.imageTags();
-    for (const [name, tag] of [
-      ['workspace', tags.workspace],
-      ['qa', tags.qa],
-    ] as const) {
-      if (!(await docker.imageExists(tag))) {
-        onLine(`» docker build ${tag}`);
-        await docker.build(this.platform.dockerHostPath(join(this.contextRoot, name)), tag, `${name}-image`, (line) => onLine(line));
-      }
+    if (!(await docker.imageExists(tags.workspace))) {
+      onLine(`» docker build ${tags.workspace}`);
+      await docker.build(this.platform.dockerHostPath(join(this.contextRoot, 'workspace')), tags.workspace, 'workspace-image', (line) => onLine(line));
+    }
+    const qa = await this.requireQaTag();
+    if (!(await docker.imageExists(qa))) {
+      const context = await writeQaContext(join(this.contextRoot, 'qa'), tags.qaBase, this.qaTool!, this.qaBuildRoot);
+      onLine(`» docker build ${qa}`);
+      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line));
     }
     // The workspace container moves to the new image first: the image of an older version is then
     // free and goes away with the other leftovers (an image a container still uses stays).
@@ -256,9 +288,10 @@ export class DockerRuntime implements GameRuntime {
   async diskUsage(): Promise<DiskUsageItem[]> {
     const docker = await this.docker();
     const tags = await this.imageTags();
+    const qa = await this.qaTag();
     const [workspaceImage, qaImage, volumes] = await Promise.all([
       docker.imageSize(tags.workspace),
-      docker.imageSize(tags.qa),
+      qa ? docker.imageSize(qa) : Promise.resolve(null),
       docker.volumeSizes([this.names.volume, this.names.cacheVolume]),
     ]);
     return [
@@ -276,7 +309,7 @@ export class DockerRuntime implements GameRuntime {
       scope,
       prefix: this.names.prefix,
       qaInputVolume: this.names.qaInputVolume,
-      currentImages: [tags.workspace, tags.qa],
+      currentImages: [tags.workspace, await this.qaTag()].filter((tag): tag is string => tag !== null),
     });
     const result: DockerCleanup = { removed: 0, failed: [] };
     for (const target of targets) {

@@ -4,11 +4,12 @@ import { DockerRuntime } from '../../src/main/runtime.ts';
 
 describe('installEnvironment', () => {
   it('moves the workspace to the new image before removing the images of older versions', async () => {
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
     const calls: string[] = [];
     const internals = runtime as unknown as Record<string, unknown>;
     internals.docker = async () => ({ imageExists: async () => true });
-    internals.imageTags = async () => ({ workspace: 'bugdetective-workspace:new', qa: 'bugdetective-qa:new' });
+    internals.imageTags = async () => ({ workspace: 'bugdetective-workspace:new', qaBase: 'abc' });
+    runtime.setQaTool([]);
     internals.runningWorkspace = async () => {
       calls.push('workspace');
       return { hasRepository: async () => false };
@@ -26,7 +27,7 @@ describe('installEnvironment', () => {
 
 describe('workspaceStatus', () => {
   const runtimeWith = (info: { running: boolean; ports: Record<number, number> } | null) => {
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
     const ensureRunning = vi.fn();
     (runtime as unknown as Record<string, unknown>).workspace = async () => ({
       info: async () => info,

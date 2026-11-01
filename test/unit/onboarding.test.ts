@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { migrateState } from '../../src/main/services/state.ts';
+import { parseState } from '../../src/main/services/state.ts';
 import en from '../../src/renderer/src/locales/en.json';
 import pt from '../../src/renderer/src/locales/pt.json';
 import { ONBOARDING_STEPS, placeBalloon, unionBox } from '../../src/renderer/src/components/onboardingSteps.ts';
 import * as rules from '../../src/shared/kanban.ts';
+import { unlocked } from '../helpers/tickets.ts';
 
 const ctx = { now: '2026-10-29T10:00:00.000Z', id: () => '00000000-0000-4000-8000-000000000001' };
 
@@ -17,16 +18,16 @@ describe('onboardingDue', () => {
   });
 
   it('counts a game with an unlocked ticket as seen: a save from before the onboarding is not interrupted', () => {
-    const playing = rules.unlockTicket(rules.createInitialState(ctx), 1, null, ctx);
+    const playing = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, null), ctx);
     expect(playing.onboardingSeen).toBeUndefined();
     expect(rules.onboardingDue(playing)).toBe(false);
   });
 
   it('loads state files with and without the flag', () => {
     const fresh = rules.createInitialState(ctx);
-    expect(migrateState(fresh, ctx).onboardingSeen).toBeUndefined();
-    expect(migrateState({ ...fresh, onboardingSeen: true }, ctx).onboardingSeen).toBe(true);
-    expect(() => migrateState({ ...fresh, onboardingSeen: 'yes' }, ctx)).toThrow();
+    expect(parseState(fresh).onboardingSeen).toBeUndefined();
+    expect(parseState({ ...fresh, onboardingSeen: true }).onboardingSeen).toBe(true);
+    expect(() => parseState({ ...fresh, onboardingSeen: 'yes' })).toThrow();
   });
 });
 

@@ -1,6 +1,7 @@
 /**
  * Game state persistence: one versioned JSON file in the app data folder, written atomically
- * (temp file + rename), migrated forward on load and validated before use.
+ * (temp file + rename) and validated before use. Only the current schema is read: an older file
+ * is kept aside and a new game starts (the app has not shipped, so there is nothing to migrate).
  */
 import { readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -9,13 +10,13 @@ import { createInitialState } from '../../shared/kanban.ts';
 import type { RuleContext } from '../../shared/kanban.ts';
 import {
   COLUMNS,
-  DEFAULT_QA_TIMEOUT_SECONDS,
   LANGUAGES,
   MAX_QA_TIMEOUT_SECONDS,
   MIN_QA_TIMEOUT_SECONDS,
   SCHEMA_VERSION,
   THEMES,
-  TICKET_COUNT,
+  TRACKS,
+  TRACK_CHOICES,
 } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
 import { writeFileAtomic } from './content/store.ts';
@@ -31,9 +32,13 @@ export const gameStateSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   createdAt: z.string(),
   currentTicket: z.number().int().nullable(),
+  tracks: z.object({ front: z.number().int().min(0), back: z.number().int().min(0) }).nullable(),
   tickets: z.array(
     z.object({
       ticket: z.number().int().min(1),
+      id: z.string().regex(/^(front|back)-[1-9][0-9]?$/),
+      track: z.enum(TRACKS),
+      manifestVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
       status: column,
       unlockedAt: z.string(),
       stageCommit: z.string().nullable(),
@@ -99,7 +104,8 @@ export const gameStateSchema = z.object({
   inbox: z.array(
     z.object({
       id: z.string(),
-      kind: z.enum(['welcome', 'assignment', 'completion']),
+      kind: z.enum(['welcome', 'assignment', 'completion', 'trackCompletion']),
+      track: z.enum(TRACK_CHOICES).optional(),
       ticket: z.number().int().optional(),
       at: z.string(),
       read: z.boolean(),
@@ -141,9 +147,22 @@ export const gameStateSchema = z.object({
   // save that breaks this is invalid, rather than loaded into a game the rules cannot handle.
   .superRefine((state, ctx) => {
     const issue = (message: string, path: (string | number)[]) => ctx.addIssue({ code: 'custom', message, path });
-    if (state.tickets.length > TICKET_COUNT) {
-      issue(`At most ${TICKET_COUNT} tickets`, ['tickets']);
+    if (state.tracks === null && state.tickets.length > 0) {
+      issue('Unlocked tickets need the track counts', ['tracks']);
     }
+    const ids = new Set<string>();
+    state.tickets.forEach((ticket, index) => {
+      const [track, order] = ticket.id.split('-');
+      if (track !== ticket.track) {
+        issue(`Ticket ${ticket.id} belongs to the ${track} track`, ['tickets', index, 'track']);
+      } else if (state.tracks && Number(order) > state.tracks[ticket.track]) {
+        issue(`Ticket ${ticket.id} is not one of the ${state.tracks[ticket.track]} ${ticket.track} tickets`, ['tickets', index, 'id']);
+      }
+      if (ids.has(ticket.id)) {
+        issue(`Ticket ${ticket.id} is unlocked twice`, ['tickets', index, 'id']);
+      }
+      ids.add(ticket.id);
+    });
     state.tickets.forEach((ticket, index) => {
       if (ticket.ticket !== index + 1) {
         issue(`Ticket ${index + 1} expected, found ${ticket.ticket}`, ['tickets', index, 'ticket']);
@@ -160,90 +179,21 @@ export const gameStateSchema = z.object({
     }
   });
 
-// ---------------------------------------------------------------------------
-// Migrations. Each one takes the raw JSON of version N and returns version N + 1.
-
-// Raw JSON of older schema versions: its shape is only known field by field.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Raw = Record<string, any>;
-
-/**
- * Version 1 (the first playtest build) stored `version`, `log`, `hintsUsed`, `solutionShown`
- * and a boolean `reviewAccepted`, and had no inbox, conversation, theme or QA timeout setting.
- */
-function migrateV1toV2(v1: Raw, ctx: RuleContext): Raw {
-  const log: Raw[] = Array.isArray(v1.log) ? v1.log : [];
-  const tickets = (Array.isArray(v1.tickets) ? v1.tickets : []).map((ticket: Raw) => {
-    const entries = log.filter((entry) => entry.ticket === ticket.ticket);
-    const hints = Number(ticket.hintsUsed ?? 0);
-    const conversation: Raw[] = [];
-    for (let index = 0; index < hints; index += 1) {
-      conversation.push({ at: ctx.now, from: 'player', kind: 'question' }, { at: ctx.now, from: 'senior', kind: 'hint', hintIndex: index });
-    }
-    if (ticket.solutionShown) {
-      conversation.push({ at: ctx.now, from: 'player', kind: 'solutionRequest' }, { at: ctx.now, from: 'senior', kind: 'solution' });
-    }
-    return {
-      ticket: ticket.ticket,
-      status: ticket.status,
-      unlockedAt: entries[0]?.at ?? ctx.now,
-      stageCommit: ticket.stageCommit ?? null,
-      attempts: ticket.attempts ?? [],
-      comments: ticket.comments ?? [],
-      hintsRevealed: hints,
-      solutionRevealed: Boolean(ticket.solutionShown),
-      reviewAcceptedAt: ticket.reviewAccepted ? (entries.find((entry) => entry.to === 'done')?.at ?? ctx.now) : null,
-      qaStartedAt: ticket.status === 'inQa' ? ctx.now : null,
-      playerDiff: null,
-      conversation,
-    };
-  });
-  const inbox: Raw[] = [{ id: ctx.id(), kind: 'welcome', at: v1.createdAt ?? ctx.now, read: true }];
-  for (const ticket of tickets) {
-    inbox.push({ id: ctx.id(), kind: 'assignment', ticket: ticket.ticket, at: ticket.unlockedAt, read: true });
-  }
-  return {
-    schemaVersion: 2,
-    createdAt: v1.createdAt ?? ctx.now,
-    currentTicket: v1.currentTicket ?? null,
-    tickets,
-    activity: log.map((entry) => ({ ticket: entry.ticket, from: entry.from ?? null, to: entry.to, at: entry.at, actor: entry.actor ?? 'system' })),
-    inbox,
-    settings: {
-      language: v1.settings?.language === 'pt' ? 'pt' : 'en',
-      qaTimeoutSeconds: DEFAULT_QA_TIMEOUT_SECONDS,
-      theme: 'system',
-    },
-  };
-}
-
-/** Version 3 added the review checked out in the workspace (none, in any older state). */
-function migrateV2toV3(v2: Raw): Raw {
-  return { ...v2, schemaVersion: 3, reviewSession: null };
-}
-
-const MIGRATIONS: Record<number, (raw: Raw, ctx: RuleContext) => Raw> = {
-  1: migrateV1toV2,
-  2: migrateV2toV3,
-};
-
 export class StateVersionError extends Error {}
 
-/** Brings raw JSON of any known version up to the current schema and validates it. */
-export function migrateState(raw: unknown, ctx: RuleContext): GameState {
-  let state = raw as Raw;
-  let version = Number(state?.schemaVersion ?? state?.version);
+/** Validates raw JSON of the current schema. Any other schema version is a StateVersionError. */
+export function parseState(raw: unknown): GameState {
+  const version = Number((raw as { schemaVersion?: unknown } | null)?.schemaVersion);
   if (!Number.isInteger(version) || version < 1) {
     throw new StateVersionError('The saved game has no schema version');
   }
   if (version > SCHEMA_VERSION) {
     throw new StateVersionError(`The saved game was created by a newer version of Bug Detective (schema ${version})`);
   }
-  while (version < SCHEMA_VERSION) {
-    state = MIGRATIONS[version](state, ctx);
-    version += 1;
+  if (version < SCHEMA_VERSION) {
+    throw new StateVersionError(`The saved game was made by an older, unsupported version of Bug Detective (schema ${version})`);
   }
-  return gameStateSchema.parse(state) as GameState;
+  return gameStateSchema.parse(raw) as GameState;
 }
 
 export class StateStore {
@@ -255,8 +205,8 @@ export class StateStore {
   }
 
   /**
-   * Loads the saved game, migrating it if needed. A missing file starts a new game; an
-   * unreadable one is kept aside as state.corrupt-<time>.json and a new game starts.
+   * Loads the saved game. A missing file starts a new game; an unreadable one, or one of an older
+   * schema, is kept aside as state.corrupt-<time>.json and a new game starts.
    */
   async load(ctx: RuleContext, language: 'en' | 'pt' = 'en'): Promise<{ state: GameState; recovered: boolean }> {
     let text: string;
@@ -269,7 +219,7 @@ export class StateStore {
       throw error;
     }
     try {
-      const state = migrateState(JSON.parse(text), ctx);
+      const state = parseState(JSON.parse(text));
       return { state, recovered: false };
     } catch (error) {
       if (error instanceof StateVersionError && /newer version/.test(error.message)) {

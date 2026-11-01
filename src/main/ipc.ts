@@ -8,13 +8,14 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 import { EXTERNAL_LINKS } from '../shared/api.ts';
 import type { Envelope } from '../shared/api.ts';
-import { COLUMNS, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, TICKET_COUNT } from '../shared/types.ts';
+import { COLUMNS, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, TRACK_CHOICES } from '../shared/types.ts';
 import type { Game } from './game.ts';
 import { GameError } from './game.ts';
 import { SAVE_EXTENSION } from './services/backup.ts';
 import { DockerUnavailableError } from './services/docker.ts';
 
-const ticket = z.number().int().min(1).max(TICKET_COUNT);
+// A queue position; the game checks it against the project's ticket total.
+const ticket = z.number().int().min(1).max(99);
 const none = z.tuple([]);
 
 const schemas = {
@@ -25,7 +26,7 @@ const schemas = {
   refreshEnvironment: none,
   installEnvironment: none,
   diskUsage: none,
-  nextAssignment: none,
+  nextAssignment: z.tuple([z.enum(TRACK_CHOICES)]),
   move: z.tuple([ticket, z.enum(COLUMNS)]),
   askSenior: z.tuple([ticket]),
   revealSolution: z.tuple([ticket]),
@@ -98,7 +99,7 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     refreshEnvironment: () => game.refreshEnvironment(),
     installEnvironment: () => game.installEnvironment(),
     diskUsage: () => game.diskUsage(),
-    nextAssignment: () => game.nextAssignment(),
+    nextAssignment: (track) => game.nextAssignment(track),
     move: (n, to) => game.move(n, to),
     askSenior: (n) => game.askSenior(n),
     revealSolution: (n) => game.revealSolution(n),

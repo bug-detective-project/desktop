@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EnvironmentReport, Snapshot } from '../../src/shared/api.ts';
 import type { TicketState } from '../../src/shared/types.ts';
-import { deskState, environmentRows, environmentSummary } from '../../src/renderer/src/screens/dashboardState.ts';
+import { deskState, environmentRows, environmentSummary, inboxMessageText } from '../../src/renderer/src/screens/dashboardState.ts';
 
 const READY: EnvironmentReport = {
   items: [
@@ -101,5 +101,38 @@ describe('environmentRows', () => {
     const rows = environmentRows(snapshot({ environment: beforeFirst }), t);
     expect(rows[3]).toMatchObject({ tone: 'neutral', status: 'dashboard.envStatus.notYet' });
     expect(environmentSummary(rows)).toBe('ok');
+  });
+});
+
+describe('inbox message text', () => {
+  const messages = {
+    welcome: { subject: 'Welcome', body: 'Hi' },
+    completion: { subject: 'Done', body: 'Thanks' },
+    trackCompletion: { subject: 'The {{track}} track is done', body: 'All {{track}} tickets closed.' },
+    assignments: { 'back-1': { subject: 'First back ticket', body: 'Go' } },
+  };
+  const fallback = { subject: 'Your next ticket', body: 'On the Board.' };
+  const message = (kind: 'welcome' | 'assignment' | 'completion' | 'trackCompletion', ticket?: number) => ({ id: 'm', kind, ticket, at: '', read: false });
+  const idOf = (ticket: number) => (ticket === 1 ? 'back-1' : undefined);
+
+  it('uses the story message of each kind, assignments by ticket id', () => {
+    expect(inboxMessageText(messages, message('welcome'), fallback, idOf).subject).toBe('Welcome');
+    expect(inboxMessageText(messages, message('completion'), fallback, idOf).subject).toBe('Done');
+    expect(inboxMessageText(messages, message('assignment', 1), fallback, idOf).subject).toBe('First back ticket');
+  });
+
+  it('names the track in the project completion too', () => {
+    const story = { ...messages, completion: { subject: 'Project done', body: 'You completed the {{track}} track.' } };
+    const done = { ...message('completion'), track: 'back' as const };
+    expect(inboxMessageText(story, done, fallback, idOf).body).toBe('You completed the back track.');
+  });
+
+  it('names the completed track in a track completion', () => {
+    const done = { ...message('trackCompletion'), track: 'fullstack' as const };
+    expect(inboxMessageText(messages, done, fallback, idOf)).toEqual({ subject: 'The fullstack track is done', body: 'All fullstack tickets closed.' });
+  });
+
+  it('falls back to a generic assignment when the story has none for the ticket', () => {
+    expect(inboxMessageText(messages, message('assignment', 5), fallback, idOf)).toEqual(fallback);
   });
 });

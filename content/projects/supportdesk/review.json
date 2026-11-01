@@ -1,4 +1,0 @@
-{
-  "exclude": ["**/test-results/**", "**/playwright-report/**", "**/.vite/**", "**/*.tsbuildinfo", "server/data/**"],
-  "includeTests": true
-}

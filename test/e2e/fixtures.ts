@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
@@ -13,11 +13,14 @@ export interface Launched {
 
 /**
  * Launches the built app (pnpm run build) with the fake runtime: prerequisites and QA outcomes
- * come from the scenario, content comes from the local SupportDesk checkout.
+ * come from the scenario, content comes from the local SupportDesk qa folder (../supportdesk-qa,
+ * set through content-source.json so the tests never download).
  */
 export async function launch(scenario: object = {}, options: { userData?: string; env?: Record<string, string> } = {}): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
+  const qaDir = resolve(import.meta.dirname, '..', '..', '..', 'supportdesk-qa');
+  await writeFile(join(userData, 'content-source.json'), JSON.stringify({ kind: 'local', qaDir }));
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
   const app = await electron.launch({
@@ -56,7 +59,7 @@ export async function simulate(app: ElectronApplication, change: { docker?: 'run
 /** Passes the checklist and unlocks the first ticket. */
 export async function startFirstTicket(page: Page): Promise<void> {
   await page.getByTestId('start-playing').click();
-  await page.getByTestId('next-assignment').click();
+  await takeNextTicket(page);
   await page.getByTestId('board').waitFor();
   await page.getByTestId('card-1').waitFor();
 }
@@ -91,4 +94,10 @@ export async function expectFlagsLoaded(scope: Locator, languages: readonly stri
   await expect
     .poll(() => flags.evaluateAll((images) => images.map((image) => [image.dataset.testid, (image as HTMLImageElement).naturalWidth > 0])))
     .toEqual(languages.map((language) => [`flag-${language}`, true]));
+}
+
+/** Opens "Get next assignment ▾" and picks a track (front by default). */
+export async function takeNextTicket(page: Page, track: 'front' | 'back' | 'fullstack' = 'front', button = 'next-assignment'): Promise<void> {
+  await page.getByTestId(button).click();
+  await page.getByTestId(`next-assignment-${track}`).click();
 }

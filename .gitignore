@@ -11,3 +11,6 @@ install-windows.sh
 
 # Development settings (src/main/index.ts loads it; see .env.example).
 .env
+
+# Development only: local qa folders per project (see README.md, "Game projects").
+projects.local.json

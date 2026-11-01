@@ -16,7 +16,8 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard } from '../e2e/fixtures.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk-private');
+// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
+const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 
@@ -149,7 +150,7 @@ test('the full game loop with real Docker and VS Code', async () => {
     log(`ticket ${ticket}: 3 hints and the solution revealed`);
 
     // The player applies the fix in the workspace.
-    const patch = await readFile(join(supportdesk, 'qa', 'stages', `stage-${ticket}`, 'reference.patch'));
+    const patch = await readFile(join(supportdeskQa, 'tickets', `front-${ticket}`, 'reference.patch'));
     execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'apply', '-'], { input: patch });
 
     await submitQa(page, ticket, 'codeReview');

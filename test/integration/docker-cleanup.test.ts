@@ -13,12 +13,16 @@ import { currentPlatform } from '../../src/main/platform/index.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
 import { Docker, LABEL } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
+import { textFile } from '../../src/main/services/content/archive.ts';
+import { qaImageTag } from '../../src/main/services/qa-image.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const PREFIX = 'bugdetective-cleanup-test';
+// The QA image tag comes from the docker/qa hash and the project's QA tool, in the test's repository.
+const QA_TOOL = [textFile('run.ts', 'cleanup test\n')];
 const IMAGES = {
   workspace: `${PREFIX}-workspace-image:current`,
-  qa: `${PREFIX}-qa-image:current`,
+  qa: qaImageTag('cleanup-test', QA_TOOL, `${PREFIX}-qa-image`),
   old: `${PREFIX}-workspace-image:old`,
 };
 const platform = currentPlatform();
@@ -51,8 +55,9 @@ beforeAll(async () => {
   // The test's own image tags, made from the (labelled) workspace image built by the other tests.
   const built = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
   dir = await mkdtemp(join(tmpdir(), 'bd-cleanup-'));
-  await writeFile(join(dir, 'images.json'), JSON.stringify({ workspace: IMAGES.workspace, qa: IMAGES.qa }));
-  runtime = new DockerRuntime(platform, { contextRoot: dir, prefix: PREFIX });
+  await writeFile(join(dir, 'images.json'), JSON.stringify({ workspace: IMAGES.workspace, qaBase: 'cleanup-test' }));
+  runtime = new DockerRuntime(platform, { contextRoot: dir, qaBuildRoot: join(dir, 'qa'), qaRepository: `${PREFIX}-qa-image`, prefix: PREFIX });
+  runtime.setQaTool(QA_TOOL);
   await removeEverythingOfTheTest();
   for (const image of Object.values(IMAGES)) {
     await docker.checked(['image', 'tag', built.workspace, image]);

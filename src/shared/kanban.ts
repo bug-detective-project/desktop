@@ -3,9 +3,12 @@
  * GameRuleError. The main process applies every change through these functions, so the rules
  * hold no matter what the renderer sends.
  */
-import { DEFAULT_QA_TIMEOUT_SECONDS, TICKET_COUNT } from './types.ts';
+import { DEFAULT_QA_TIMEOUT_SECONDS, SCHEMA_VERSION, TRACKS } from './types.ts';
 import type {
   ActivityEntry,
+  Track,
+  TrackChoice,
+  TrackCounts,
   Column,
   GameState,
   Language,
@@ -54,9 +57,10 @@ export function isPlayerMoveAllowed(from: Column, to: Column): boolean {
 
 export function createInitialState(ctx: RuleContext, language: Language = 'en'): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: SCHEMA_VERSION,
     createdAt: ctx.now,
     currentTicket: null,
+    tracks: null,
     tickets: [],
     activity: [],
     inbox: [{ id: ctx.id(), kind: 'welcome', at: ctx.now, read: false }],
@@ -112,34 +116,68 @@ function move(
   return { ...next, activity: [...next.activity, { ticket, from, to, at: ctx.now, actor, reason }] };
 }
 
-/** The ticket "Get Next Assignment" would unlock, or null when it is not allowed right now. */
-export function nextTicketNumber(state: GameState): number | null {
-  if (state.currentTicket !== null && requireTicket(state, state.currentTicket).status !== 'done') {
-    return null;
-  }
-  const next = state.tickets.length + 1;
-  return next <= TICKET_COUNT ? next : null;
+/** Whether a new ticket may be taken now: none is open, or the open one is Done. */
+export function canTakeTicket(state: GameState): boolean {
+  return state.currentTicket === null || requireTicket(state, state.currentTicket).status === 'done';
 }
 
-export function assertCanUnlock(state: GameState, ticket: number): void {
-  if (state.currentTicket !== null && requireTicket(state, state.currentTicket).status !== 'done') {
+function orderOf(id: string): number {
+  return Number(id.slice(id.indexOf('-') + 1));
+}
+
+/** The next ticket of a track: the first of its fixed queue that this game has not unlocked. */
+function nextInTrack(state: GameState, counts: TrackCounts, track: Track): string | null {
+  const taken = new Set(state.tickets.filter((item) => item.track === track).map((item) => orderOf(item.id)));
+  for (let order = 1; order <= counts[track]; order += 1) {
+    if (!taken.has(order)) {
+      return `${track}-${order}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * The ticket a track choice gives. Fullstack alternates with the track of the last unlocked ticket
+ * (front first) and falls back to the other track when that one is finished.
+ */
+export function nextIdFor(state: GameState, counts: TrackCounts, choice: TrackChoice): string | null {
+  if (choice !== 'fullstack') {
+    return nextInTrack(state, counts, choice);
+  }
+  const last = state.tickets.at(-1)?.track;
+  const first: Track = last === 'front' ? 'back' : 'front';
+  const other: Track = first === 'front' ? 'back' : 'front';
+  return nextInTrack(state, counts, first) ?? nextInTrack(state, counts, other);
+}
+
+/** What the content source said about the ticket being unlocked. */
+export interface UnlockInfo {
+  id: string;
+  track: Track;
+  commit: string | null;
+  manifestVersion: string;
+  /** The project's tickets per track in that manifest. */
+  counts: TrackCounts;
+}
+
+export function unlockTicket(state: GameState, ticket: number, info: UnlockInfo, ctx: RuleContext): GameState {
+  if (!canTakeTicket(state)) {
     throw new GameRuleError('ticketNotDone', `Ticket ${state.currentTicket} must be Done first`);
   }
-  if (state.tickets.length >= TICKET_COUNT) {
-    throw new GameRuleError('noMoreTickets');
+  if (orderOf(info.id) > info.counts[info.track]) {
+    throw new GameRuleError('noMoreTickets', `${info.id} is not in the project`);
   }
-  if (ticket !== state.tickets.length + 1) {
-    throw new GameRuleError('wrongTicket', `The next ticket is ${state.tickets.length + 1}, not ${ticket}`);
+  if (ticket !== state.tickets.length + 1 || state.tickets.some((item) => item.id === info.id)) {
+    throw new GameRuleError('wrongTicket', `Ticket ${state.tickets.length + 1} must be a ticket not unlocked yet, not ${info.id}`);
   }
-}
-
-export function unlockTicket(state: GameState, ticket: number, stageCommit: string | null, ctx: RuleContext): GameState {
-  assertCanUnlock(state, ticket);
   const created: TicketState = {
     ticket,
+    id: info.id,
+    track: info.track,
+    manifestVersion: info.manifestVersion,
     status: 'todo',
     unlockedAt: ctx.now,
-    stageCommit,
+    stageCommit: info.commit,
     attempts: [],
     comments: [],
     hintsRevealed: 0,
@@ -152,6 +190,7 @@ export function unlockTicket(state: GameState, ticket: number, stageCommit: stri
   return {
     ...state,
     currentTicket: ticket,
+    tracks: info.counts,
     tickets: [...state.tickets, created],
     activity: [...state.activity, { ticket, from: null, to: 'todo', at: ctx.now, actor: 'system', reason: 'unlocked' }],
     inbox: [...state.inbox, { id: ctx.id(), kind: 'assignment', ticket, at: ctx.now, read: false }],
@@ -297,10 +336,43 @@ export function acceptReview(state: GameState, ticket: number, ctx: RuleContext)
     ...item,
     reviewAcceptedAt: ctx.now,
   }));
-  if (ticket === TICKET_COUNT) {
-    return { ...next, inbox: [...next.inbox, { id: ctx.id(), kind: 'completion', at: ctx.now, read: false }] };
+  return withTrackCompletions(next, ctx);
+}
+
+/** The tracks whose every ticket is Done; fullstack when both front and back are. A track without tickets never completes. */
+export function completedTracks(state: GameState): TrackChoice[] {
+  const counts = state.tracks;
+  if (!counts) {
+    return [];
   }
-  return next;
+  const done = (track: Track) =>
+    counts[track] > 0 && state.tickets.filter((item) => item.track === track && item.status === 'done').length >= counts[track];
+  const tracks: TrackChoice[] = TRACKS.filter(done);
+  return tracks.length === TRACKS.length ? [...tracks, 'fullstack'] : tracks;
+}
+
+/**
+ * One message per newly completed track: the first is the project's completion, the next ones
+ * are track completions. Each track gets its message once.
+ */
+function withTrackCompletions(state: GameState, ctx: RuleContext): GameState {
+  const announced = new Set(state.inbox.filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion').map((m) => m.track));
+  let inbox = state.inbox;
+  for (const track of completedTracks(state).filter((item) => !announced.has(item))) {
+    const kind = inbox.some((m) => m.kind === 'completion') ? 'trackCompletion' : 'completion';
+    inbox = [...inbox, { id: ctx.id(), kind, track, at: ctx.now, read: false }];
+  }
+  return inbox === state.inbox ? state : { ...state, inbox };
+}
+
+/**
+ * A newer publication changed the number of tickets per track: the queues follow it, never below
+ * the tickets already unlocked, and a track that is now complete gets its message.
+ */
+export function setTrackCounts(state: GameState, counts: TrackCounts, ctx: RuleContext): GameState {
+  const unlockedIn = (track: Track) => state.tickets.filter((item) => item.track === track).length;
+  const tracks = { front: Math.max(counts.front, unlockedIn('front')), back: Math.max(counts.back, unlockedIn('back')) };
+  return withTrackCompletions({ ...state, tracks }, ctx);
 }
 
 /**

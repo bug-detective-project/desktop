@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { dragCard, expectFlagsLoaded, launch, simulate, startFirstTicket } from './fixtures.ts';
+import { dragCard, expectFlagsLoaded, launch, simulate, startFirstTicket, takeNextTicket } from './fixtures.ts';
 
 /** Drops a card on a column it cannot go to and expects the explanation (drags occasionally get lost, so retry). */
 async function dropExplains(page: Page, card: Locator, column: string, message: string) {
@@ -67,13 +67,33 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     // One active ticket at a time: the next one is unlocked only now.
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('inbox-message')).toHaveCount(1 + 1);
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await expect(page.getByTestId('card-2')).toHaveAttribute('data-status', 'todo');
     // A Done ticket next to an active one: the active one decides the subtitle.
     await expect(hint).toHaveText('Move your ticket to In Progress and start your task.');
     await expect(page.getByTestId('card-1')).toHaveAttribute('draggable', 'false');
     const reopen = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
     expect(reopen).toContain('notActiveTicket');
+  } finally {
+    await close();
+  }
+});
+
+test('Get Next Assignment asks for the track and shows each track, its next ticket and progress', async () => {
+  const { page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    await expect(page.getByTestId('next-assignment')).toBeEnabled();
+    await page.getByTestId('next-assignment').click();
+    await expect(page.getByTestId('next-assignment-front')).toContainText('Front');
+    await expect(page.getByTestId('next-assignment-front')).toContainText('Next: SD-214 · 0/4 done');
+    await expect(page.getByTestId('next-assignment-back')).toContainText('Next: SD-252 · 0/4 done');
+    await expect(page.getByTestId('next-assignment-fullstack')).toContainText('Next: Front · SD-214 · 0/8 done');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('next-assignment-tracks')).toHaveCount(0);
+    await page.getByTestId('next-assignment').click();
+    await page.getByTestId('next-assignment-front').click();
+    await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo');
   } finally {
     await close();
   }
@@ -86,7 +106,7 @@ test('Get Next Assignment is unavailable until the current ticket is Done', asyn
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('next-assignment')).toHaveCount(0);
     await expect(page.getByTestId('dashboard')).not.toContainText('Finish the current ticket');
-    const result = await page.evaluate(() => window.bugDetective.nextAssignment().then(() => 'unlocked', (error: Error) => error.message));
+    const result = await page.evaluate(() => window.bugDetective.nextAssignment('front').then(() => 'unlocked', (error: Error) => error.message));
     expect(result).toContain('ticketNotDone');
   } finally {
     await close();
@@ -142,7 +162,7 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(page.getByTestId('email-next-assignment')).toBeEnabled();
     await expect(page.getByTestId('dashboard')).not.toContainText(/\d+ of \d+/);
 
-    await page.getByTestId('email-next-assignment').click();
+    await takeNextTicket(page, 'front', 'email-next-assignment');
     await page.getByTestId('card-1').waitFor();
     await page.getByTestId('nav-dashboard').click();
     await expect(task).toHaveAttribute('data-state', 'active');
@@ -422,7 +442,7 @@ test('Local environment always lists Docker, both images and the dependencies, w
     await expect(card).not.toContainText('All set');
 
     // Docker stops: every row stays, Docker with its stopped state.
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await expect(page.getByTestId('docker-banner')).toBeVisible({ timeout: 15_000 });
     await page.getByTestId('nav-dashboard').click();
     for (const row of rows) await expect(card.getByTestId(row)).toBeVisible();
@@ -444,7 +464,7 @@ test('an unread message that is shown open counts as read, without clicking it',
     await expect(page.getByTestId('unread-count')).toHaveCount(0);
 
     // A new directive arrives while the player is on the Board (after accepting the review)...
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await page.getByTestId('card-1').waitFor();
     await dragCard(page, 1, 'inProgress');
     await dragCard(page, 1, 'inQa');
@@ -462,7 +482,7 @@ test('an unread message that is shown open counts as read, without clicking it',
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('unread-count')).toHaveCount(0);
     await expect(page.getByTestId('pending-count')).toHaveText('1');
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await expect(page.getByTestId('pending-count')).toHaveCount(0);
   } finally {
     await close();
@@ -549,7 +569,7 @@ test('an older e-mail of a done ticket says so and links to it on the Board', as
     await page.getByTestId('desk-primary').click();
     await page.getByTestId('accept-review').click();
     await page.getByTestId('nav-dashboard').click();
-    await page.getByTestId('inbox-message').filter({ hasText: 'Your first ticket: SD-214' }).getByRole('button').click();
+    await page.getByTestId('inbox-message').filter({ hasText: 'New ticket: SD-214' }).getByRole('button').click();
     await expect(page.getByTestId('previous-directive')).toContainText('SD-214');
     await page.getByTestId('view-done-ticket').click();
     await expect(page.getByTestId('board')).toBeVisible();
@@ -567,7 +587,7 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     await expect(page.getByTestId('env-docker')).toBeVisible();
     await expect(page.getByTestId('env-devServer')).toHaveCount(0);
 
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     await page.getByTestId('card-1').waitFor();
     await page.getByTestId('nav-dashboard').click();
     const row = page.getByTestId('env-devServer');
@@ -655,7 +675,7 @@ test('the work desk shows the ticket download in progress, with its progress bar
   const { page, close } = await launch({ unlockDelayMs: 3000 });
   try {
     await page.getByTestId('start-playing').click();
-    await page.getByTestId('next-assignment').click();
+    await takeNextTicket(page);
     const task = page.getByTestId('assignment-card');
     await expect(task).toHaveAttribute('data-state', 'unlocking');
     await expect(task).toContainText('Downloading and setting up the ticket');

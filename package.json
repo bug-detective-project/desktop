@@ -20,12 +20,11 @@
   "scripts": {
     "electron:install": "install-electron --no",
     "prepare:resources": "node tools/prepare-resources.ts",
-    "build:stages": "node tools/build-stage-packages.ts",
-    "predev": "pnpm run prepare:resources && pnpm run build:stages",
+    "publish:project": "node tools/publish-project.ts",
+    "predev": "pnpm run prepare:resources",
     "dev": "electron-vite dev",
-    "build": "pnpm run prepare:resources && pnpm run build:stages && electron-vite build && node tools/write-notices.ts",
+    "build": "pnpm run prepare:resources && electron-vite build && node tools/write-notices.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "pretest": "pnpm run build:stages",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",
@@ -34,7 +33,7 @@
     "prepare": "husky",
     "lint": "node tools/lint/node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node tools/lint/node_modules/eslint/bin/eslint.js . --fix",
-    "pretest:integration": "pnpm run prepare:resources && pnpm run build:stages",
+    "pretest:integration": "pnpm run prepare:resources",
     "verify:push": "pnpm run typecheck && pnpm test && pnpm run test:integration"
   },
   "dependencies": {
@@ -69,11 +68,6 @@
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"
-  },
-  "bugDetective": {
-    "project": "supportdesk",
-    "contentRepository": "bug-detective-project/supportdesk",
-    "contentRelease": "latest"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": "node tools/lint/node_modules/eslint/bin/eslint.js --fix"

@@ -1,22 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { readTar, readZip, safeRelativePath, sha256Hex, textFile, treeDigest, UnsafeArchiveError, writeTar, writeZip } from '../../src/main/services/content/archive.ts';
 import { ContentVerificationError } from '../../src/main/services/content/manifest.ts';
-import type { StageEntry } from '../../src/main/services/content/manifest.ts';
-import { verifyPackageZip, verifyStage } from '../../src/main/services/content/source.ts';
+import type { TicketEntry } from '../../src/main/services/content/manifest.ts';
+import { verifyTicket } from '../../src/main/services/content/source.ts';
 
 const packageFiles = [textFile('ticket.en.md', '# SD-214\n'), textFile('gate2/ticket-1.spec.ts', 'test()\n')];
 const codeFiles = [textFile('package.json', '{}\n'), textFile('client/src/App.tsx', 'export {}\n')];
-const zip = writeZip(packageFiles);
 
-const entry: StageEntry = {
-  stage: 1,
-  branch: 'stage-1',
+const entry: TicketEntry = {
+  id: 'front-1',
+  track: 'front',
+  order: 1,
+  branch: 'front-1',
+  tag: 'front-1-v1.0.0',
   commit: 'a'.repeat(40),
-  commitMessage: 'SupportDesk release 1.1',
+  commitMessage: 'SupportDesk release front-1',
   codeDigest: treeDigest(codeFiles),
   codeFiles: codeFiles.length,
-  package: { file: 'stage-1-v1.0.0.zip', sha256: sha256Hex(zip), size: zip.length, digest: treeDigest(packageFiles) },
+  package: { path: 'tickets/front-1', files: packageFiles.length, digest: treeDigest(packageFiles) },
 };
+const ticket = { counts: { front: 4, back: 0 }, manifestVersion: '1.0.0', entry, packageFiles, codeFiles };
 
 describe('tree digest', () => {
   it('does not depend on file order or archive format', async () => {
@@ -39,26 +42,18 @@ describe('tree digest', () => {
 
 describe('verification', () => {
   it('accepts content that matches the manifest', () => {
-    expect(() => verifyStage({ entry, packageZip: zip, packageFiles: readZip(zip), codeFiles })).not.toThrow();
+    expect(() => verifyTicket(ticket)).not.toThrow();
   });
 
-  it('rejects a package whose bytes differ, before parsing it', () => {
-    const tampered = new Uint8Array(zip);
-    tampered[tampered.length - 30] ^= 0xff;
-    expect(() => verifyPackageZip(entry, tampered)).toThrow(ContentVerificationError);
-    expect(() => verifyPackageZip(entry, zip.subarray(0, zip.length - 1))).toThrow(ContentVerificationError);
-  });
-
-  it('rejects stage code that differs from the manifest', () => {
+  it('rejects ticket code that differs from the manifest', () => {
     const changed = [codeFiles[0], textFile('client/src/App.tsx', 'export const x = 1;\n')];
-    expect(() => verifyStage({ entry, packageZip: zip, packageFiles: readZip(zip), codeFiles: changed })).toThrow(/stage code/);
-    expect(() => verifyStage({ entry, packageZip: zip, packageFiles: readZip(zip), codeFiles: [codeFiles[0]] })).toThrow(/stage code/);
+    expect(() => verifyTicket({ ...ticket, codeFiles: changed })).toThrow(/ticket code/);
+    expect(() => verifyTicket({ ...ticket, codeFiles: [codeFiles[0]] })).toThrow(/ticket code/);
   });
 
   it('rejects package contents that differ from the manifest', () => {
-    const other = writeZip([textFile('ticket.en.md', '# changed\n')]);
-    const forged = { ...entry, package: { ...entry.package, sha256: sha256Hex(other), size: other.length } };
-    expect(() => verifyStage({ entry: forged, packageZip: other, packageFiles: readZip(other), codeFiles })).toThrow(/package contents/);
+    expect(() => verifyTicket({ ...ticket, packageFiles: [textFile('ticket.en.md', '# changed\n'), packageFiles[1]] })).toThrow(ContentVerificationError);
+    expect(() => verifyTicket({ ...ticket, packageFiles: [packageFiles[0]] })).toThrow(/package/);
   });
 });
 

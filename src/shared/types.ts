@@ -1,12 +1,18 @@
 /** Types shared by the main process, the preload bridge and the renderer. */
 
-export const TICKET_COUNT = 4;
 export const HINTS_PER_TICKET = 3;
 export const DEFAULT_QA_TIMEOUT_SECONDS = 180;
 export const MIN_QA_TIMEOUT_SECONDS = 60;
 export const MAX_QA_TIMEOUT_SECONDS = 1800;
 
 /** The workspace branch where the player works on a ticket. */
+
+/** The career tracks with tickets of their own; fullstack combines them. */
+export const TRACKS = ['front', 'back'] as const;
+export type Track = (typeof TRACKS)[number];
+export const TRACK_CHOICES = ['front', 'back', 'fullstack'] as const;
+export type TrackChoice = (typeof TRACK_CHOICES)[number];
+export type TrackCounts = Record<Track, number>;
 
 export const COLUMNS = ['todo', 'inProgress', 'inQa', 'codeReview', 'done'] as const;
 export type Column = (typeof COLUMNS)[number];
@@ -85,7 +91,13 @@ export interface ChatEntry {
 }
 
 export interface TicketState {
+  /** The order in which the player unlocked the ticket (1, 2, 3…); never reused in a game. */
   ticket: number;
+  /** The ticket's id in the project manifest, for example front-1. */
+  id: string;
+  track: Track;
+  /** The version of the project manifest the ticket was unlocked from. */
+  manifestVersion: string;
   status: Column;
   unlockedAt: string;
   /** Commit of the imported stage snapshot in the workspace repository. */
@@ -111,12 +123,14 @@ export interface ActivityEntry {
   reason?: 'unlocked' | 'started' | 'submitted' | 'qaPassed' | 'qaFailed' | 'qaTimeout' | 'qaInterrupted' | 'qaError' | 'reviewAccepted';
 }
 
-export type InboxKind = 'welcome' | 'assignment' | 'completion';
+export type InboxKind = 'welcome' | 'assignment' | 'completion' | 'trackCompletion';
 
 export interface InboxMessage {
   id: string;
   kind: InboxKind;
   ticket?: number;
+  /** completion (the project) and trackCompletion: the track that was completed. */
+  track?: TrackChoice;
   at: string;
   read: boolean;
 }
@@ -149,13 +163,15 @@ export interface ReviewSession {
   wipCommit: string | null;
 }
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 5;
 
 export interface GameState {
   schemaVersion: typeof SCHEMA_VERSION;
   createdAt: string;
   /** The active ticket (the last unlocked one), or null before the first assignment. */
   currentTicket: number | null;
+  /** How many tickets each track has, from the manifest of the last unlock; null before the first one. */
+  tracks: TrackCounts | null;
   tickets: TicketState[];
   /** Append-only. */
   activity: ActivityEntry[];

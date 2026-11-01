@@ -90,7 +90,7 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
       await expect(second.page.getByTestId('ticket-title')).toContainText('Anterior e Próximo');
       await second.page.getByTestId('close-panel').click();
       await second.page.getByTestId('nav-dashboard').click();
-      await expect(second.page.getByTestId('inbox')).toContainText('Seu primeiro ticket: SD-214');
+      await expect(second.page.getByTestId('inbox')).toContainText('Novo ticket: SD-214');
     } finally {
       await second.close();
     }
@@ -146,7 +146,7 @@ test('a ticket whose texts cannot be loaded says so, and loads after "Try again"
   try {
     await startFirstTicket(page);
     // A damaged package: the hints file is no longer valid JSON.
-    const hints = join(userData, 'packages', 'stage-1', 'hints.en.json');
+    const hints = join(userData, 'projects', 'supportdesk', 'packages', 'stage-1', 'hints.en.json');
     const original = await readFile(hints, 'utf8');
     await writeFile(hints, '{ damaged');
     await page.getByTestId('card-1').click();

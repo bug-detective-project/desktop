@@ -9,11 +9,11 @@ import { textFile } from '../../src/main/services/content/archive.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { loadReviewConfig, parseReviewConfig } from '../../src/main/services/review/config.ts';
+import { parseReviewConfig } from '../../src/main/services/review/config.ts';
 import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from '../../src/main/services/review/review.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import type { StoredReview } from '../../src/main/services/review/store.ts';
-import { StateStore, migrateState } from '../../src/main/services/state.ts';
+import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { parseDiff, splitRows, visibleFiles } from '../../src/renderer/src/components/diff.ts';
 
@@ -186,7 +186,7 @@ describe('review store', () => {
     await store.save(stored(1));
     await store.save(stored(2));
     const state = { ...rules.createInitialState(ctx), tickets: [] };
-    const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now), ctx);
+    const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now));
     expect([...save.reviews.keys()]).toHaveLength(6);
 
     const restored = new ReviewStore(join(dir, 'restored'));
@@ -197,17 +197,8 @@ describe('review store', () => {
 
   it('restores saves made before reviews existed', async () => {
     const state = rules.createInitialState(ctx);
-    const save = readSave(createSave({ state, bundle: null, packages: new Map() }, '0.1.0', ctx.now), ctx);
+    const save = readSave(createSave({ state, bundle: null, packages: new Map() }, '0.1.0', ctx.now));
     expect(save.reviews.size).toBe(0);
-  });
-});
-
-describe('state migration', () => {
-  it('migrates a version 2 state with no review checked out', () => {
-    const { reviewSession: _none, ...v2 } = { ...rules.createInitialState(ctx), schemaVersion: 2 };
-    const state = migrateState(v2, ctx);
-    expect(state.schemaVersion).toBe(3);
-    expect(state.reviewSession).toBeNull();
   });
 });
 
@@ -215,18 +206,13 @@ describe('state migration', () => {
 // The game: capture on QA pass, automatic checkout and return
 
 const localSource = () =>
-  new LocalContentSource({
-    repoPath: resolve(root, '..', 'supportdesk-private'),
-    manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),
-    runner: runCommand,
-  });
+  new LocalContentSource({ qaDir: resolve(root, '..', 'supportdesk-qa'), runner: runCommand });
 
 function createGame(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] }))) {
   const game = new Game({
     store: new StateStore(dir),
     packages: new PackageStore(join(dir, 'packages')),
     reviews: new ReviewStore(join(dir, 'reviews')),
-    review: loadReviewConfig('supportdesk'),
     content: localSource(),
     runtime,
     appVersion: '0.1.0',

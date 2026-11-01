@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createSave, InvalidSaveError, readSave } from '../../src/main/services/backup.ts';
 import { readZip, sha256Hex, textFile, writeZip } from '../../src/main/services/content/archive.ts';
 import * as rules from '../../src/shared/kanban.ts';
+import { unlocked } from '../helpers/tickets.ts';
 
 const ctx = { now: '2026-10-26T10:00:00.000Z', id: (() => { let n = 0; return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`; })() };
 const bundle = new Uint8Array(Buffer.from('# v2 git bundle\n'));
 const packageZip = writeZip([textFile('ticket.en.md', '# SD-214\n')]);
 
 function progress() {
-  let state = rules.unlockTicket(rules.createInitialState(ctx), 1, 'a'.repeat(40), ctx);
+  let state = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'.repeat(40)), ctx);
   state = rules.playerMove(state, 1, 'inProgress', ctx);
   return state;
 }
@@ -23,8 +24,8 @@ describe('export and restore manifest', () => {
 
   it('refuses a save whose game state disagrees with the Kanban rules', () => {
     const broken = createSave({ state: { ...state, currentTicket: 3 }, bundle, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now);
-    expect(() => readSave(broken, ctx)).toThrow(InvalidSaveError);
-    expect(() => readSave(broken, ctx)).toThrow(/current ticket must be 1/);
+    expect(() => readSave(broken)).toThrow(InvalidSaveError);
+    expect(() => readSave(broken)).toThrow(/current ticket must be 1/);
   });
 
   it('refuses to create a save larger than a restore accepts', () => {
@@ -32,17 +33,17 @@ describe('export and restore manifest', () => {
   });
 
   it('round-trips state, bundle and packages', () => {
-    const restored = readSave(save, ctx);
+    const restored = readSave(save);
     expect(restored.state).toEqual(state);
     expect(Buffer.from(restored.bundle!).toString()).toBe('# v2 git bundle\n');
     expect(sha256Hex(restored.packages.get(1)!)).toBe(sha256Hex(packageZip));
-    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 1, appVersion: '0.1.0', schemaVersion: 3 });
+    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 1, appVersion: '0.1.0', schemaVersion: 5 });
     expect(Object.keys(restored.manifest.files).sort()).toEqual(['packages/stage-1.zip', 'state.json', 'workspace.bundle']);
   });
 
   it('rejects files that are not saves', () => {
-    expect(() => readSave(new Uint8Array(Buffer.from('hello')), ctx)).toThrow(InvalidSaveError);
-    expect(() => readSave(writeZip([textFile('readme.txt', 'x')]), ctx)).toThrow(/no manifest/);
+    expect(() => readSave(new Uint8Array(Buffer.from('hello')))).toThrow(InvalidSaveError);
+    expect(() => readSave(writeZip([textFile('readme.txt', 'x')]))).toThrow(/no manifest/);
   });
 
   it('rejects a manifest with the wrong format or a newer schema', () => {
@@ -54,32 +55,33 @@ describe('export and restore manifest', () => {
             : file,
         ),
       );
-    expect(() => readSave(edit({ format: 'something-else' }), ctx)).toThrow(/manifest is invalid/);
-    expect(() => readSave(edit({ formatVersion: 2 }), ctx)).toThrow(/manifest is invalid/);
-    expect(() => readSave(edit({ schemaVersion: 99 }), ctx)).toThrow(/newer version/);
+    expect(() => readSave(edit({ format: 'something-else' }))).toThrow(/manifest is invalid/);
+    expect(() => readSave(edit({ formatVersion: 2 }))).toThrow(/manifest is invalid/);
+    expect(() => readSave(edit({ schemaVersion: 99 }))).toThrow(/newer version/);
+    expect(() => readSave(edit({ schemaVersion: 4 }))).toThrow(/older, unsupported/);
   });
 
   it('rejects damaged or unexpected entries', () => {
     const damaged = rebuild(save, (files) => files.map((file) => (file.path === 'workspace.bundle' ? textFile(file.path, 'changed') : file)));
-    expect(() => readSave(damaged, ctx)).toThrow(/workspace.bundle does not match/);
+    expect(() => readSave(damaged)).toThrow(/workspace.bundle does not match/);
     const missing = rebuild(save, (files) => files.filter((file) => file.path !== 'packages/stage-1.zip'));
-    expect(() => readSave(missing, ctx)).toThrow(/packages\/stage-1.zip does not match/);
+    expect(() => readSave(missing)).toThrow(/packages\/stage-1.zip does not match/);
     const extra = rebuild(save, (files) => [...files, textFile('evil.sh', 'rm -rf /')]);
-    expect(() => readSave(extra, ctx)).toThrow(/unexpected file/);
+    expect(() => readSave(extra)).toThrow(/unexpected file/);
   });
 
   it('rejects a save whose state is invalid or inconsistent', () => {
     const badState = createSave({ state: { ...progress(), currentTicket: 'one' } as never, bundle, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now);
-    expect(() => readSave(badState, ctx)).toThrow(/state is invalid/);
+    expect(() => readSave(badState)).toThrow(/state is invalid/);
     const noBundle = createSave({ state: progress(), bundle: null, packages: new Map([[1, packageZip]]) }, '0.1.0', ctx.now);
-    expect(() => readSave(noBundle, ctx)).toThrow(/no workspace repository/);
+    expect(() => readSave(noBundle)).toThrow(/no workspace repository/);
     const noPackage = createSave({ state: progress(), bundle, packages: new Map() }, '0.1.0', ctx.now);
-    expect(() => readSave(noPackage, ctx)).toThrow(/missing the package for ticket 1/);
+    expect(() => readSave(noPackage)).toThrow(/missing the package for ticket 1/);
   });
 
   it('accepts a save of a new game without a repository', () => {
     const empty = createSave({ state: rules.createInitialState(ctx), bundle: null, packages: new Map() }, '0.1.0', ctx.now);
-    expect(readSave(empty, ctx).bundle).toBeNull();
+    expect(readSave(empty).bundle).toBeNull();
   });
 });
 
@@ -89,7 +91,7 @@ describe('save size when extracted', () => {
     const view = new DataView(zip.buffer);
     const central = zip.findIndex((_, index) => index + 4 <= zip.length && view.getUint32(index, true) === 0x02014b50);
     view.setUint32(central + 24, 0xf0000000, true);
-    expect(() => readSave(zip, ctx)).toThrow(InvalidSaveError);
-    expect(() => readSave(zip, ctx)).toThrow(/too large when extracted/);
+    expect(() => readSave(zip)).toThrow(InvalidSaveError);
+    expect(() => readSave(zip)).toThrow(/too large when extracted/);
   });
 });

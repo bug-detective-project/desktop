@@ -3,9 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ReviewComparison, Snapshot } from '@shared/api.ts';
 import { findTicket } from '@shared/kanban.ts';
-import { TICKET_COUNT } from '@shared/types.ts';
 import { api } from '../api.ts';
-import { story } from '../content.ts';
+import { company } from '../content.ts';
 import { Markdown } from '../components/Markdown.tsx';
 import { SplitDiff } from '../components/SplitDiff.tsx';
 import { parseDiff, visibleFiles } from '../components/diff.ts';
@@ -151,7 +150,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
     try {
       await api.acceptReview(ticketNumber);
       // The ticket is Done: the next one (if any) waits on the Dashboard.
-      toast.info(t(snapshot.state.tickets.length < TICKET_COUNT ? 'review.doneNext' : 'review.doneLast'));
+      toast.info(t(snapshot.queues?.fullstack.next ? 'review.doneNext' : 'review.doneLast'));
       onBack();
     } catch (error) {
       toast.error(error);
@@ -217,7 +216,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
       {/* An identical solution already shows the same diff (original → your solution) above. */}
       {!(comparison && isIdentical(comparison, showWhitespace)) && (
         <DropdownCard title={t('review.referenceSection')} testId="review-reference">
-          <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: story(language).people.senior.name })}</p>
+          <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: company(language).people.senior.name })}</p>
           {content?.referencePatch && (
             <SplitDiff
               diff={content.referencePatch}

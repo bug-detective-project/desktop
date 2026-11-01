@@ -83,6 +83,8 @@
     "previousDirective": "Você está vendo a mensagem de um ticket anterior ({{key}}, concluído). Sua tarefa ativa é o {{active}}.",
     "previousDirectiveNoActive": "Você está vendo a mensagem de um ticket que já concluiu ({{key}}).",
     "nextAssignment": "Pegar próxima tarefa",
+    "genericAssignmentSubject": "Seu próximo ticket",
+    "genericAssignmentBody": "Um novo ticket está esperando por você. Abra no Kanban quando estiver pronto.",
     "unlocking": "Baixando e preparando o ticket…",
     "startOnBoard": "Começar o ticket no Quadro",
     "viewQa": "Ver a verificação de QA no Quadro",
@@ -131,7 +133,17 @@
     "nextTitle": "Próximo passo: pegar a próxima tarefa",
     "nextBody": "O ticket é baixado e o seu workspace é preparado para ele. Um ticket de cada vez.",
     "startServer": "Iniciar servidor",
-    "stopServer": "Parar servidor"
+    "stopServer": "Parar servidor",
+    "chooseTrack": "Escolha a trilha do próximo ticket",
+    "track": {
+      "front": "Front",
+      "back": "Back",
+      "fullstack": "Fullstack"
+    },
+    "trackNext": "Próximo: {{key}} · {{progress}} concluídos",
+    "trackNextFullstack": "Próximo: {{track}} · {{key}} · {{progress}} concluídos",
+    "trackDone": "Trilha concluída · {{done}}/{{total}}",
+    "downloadProjectFirst": "Baixe o projeto primeiro."
   },
   "onboarding": {
     "welcome": {
@@ -546,6 +558,7 @@
     "noReview": "O review deste ticket não está disponível.",
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
-    "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido."
+    "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
+    "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde."
   }
 }

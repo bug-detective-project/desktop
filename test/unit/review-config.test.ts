@@ -4,7 +4,6 @@ import {
   excludeMatcher,
   excludePathspecs,
   globToRegExp,
-  loadReviewConfig,
   parseReviewConfig,
 } from '../../src/main/services/review/config.ts';
 
@@ -29,16 +28,6 @@ describe('review configuration', () => {
     for (const exclude of ['/etc/**', '../secrets/**', 'a;rm -rf', '$(id)', 'a b']) {
       expect(() => parseReviewConfig({ exclude: [exclude] })).toThrow();
     }
-  });
-
-  it('loads the file of the configured project, and only the defaults for an unknown one', () => {
-    const configs = { '../../content/projects/demo/review.json': { exclude: ['**/out/**'] } };
-    expect(loadReviewConfig('demo', configs).exclude).toContain('**/out/**');
-    expect(loadReviewConfig('other', configs).exclude).toEqual([...DEFAULT_EXCLUDES]);
-  });
-
-  it('ships a valid configuration for every bundled project', () => {
-    expect(loadReviewConfig('supportdesk').exclude.length).toBeGreaterThan(DEFAULT_EXCLUDES.length);
   });
 
   it('turns every glob into an explicit git exclude pathspec', () => {

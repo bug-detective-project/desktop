@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as rules from '../../src/shared/kanban.ts';
-import { StateStore, StateVersionError, migrateState } from '../../src/main/services/state.ts';
+import { StateStore, StateVersionError, parseState } from '../../src/main/services/state.ts';
+import { unlocked } from '../helpers/tickets.ts';
 
 const ctx = { now: '2026-10-26T10:00:00.000Z', id: (() => { let n = 0; return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`; })() };
 
@@ -20,13 +21,13 @@ describe('StateStore', () => {
   it('starts a new game when there is no saved state', async () => {
     const { state, recovered } = await new StateStore(dir).load(ctx, 'pt');
     expect(recovered).toBe(false);
-    expect(state.schemaVersion).toBe(3);
+    expect(state.schemaVersion).toBe(5);
     expect(state.settings.language).toBe('pt');
   });
 
   it('saves atomically and loads the same state back', async () => {
     const store = new StateStore(dir);
-    let state = rules.unlockTicket(rules.createInitialState(ctx), 1, 'abc', ctx);
+    let state = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'abc'), ctx);
     state = rules.playerMove(state, 1, 'inProgress', ctx);
     await store.save(state);
     expect(await readdir(dir)).toEqual(['state.json']);
@@ -58,71 +59,46 @@ describe('StateStore', () => {
   });
 });
 
-describe('migrations', () => {
-  const v1 = {
-    version: 1,
-    createdAt: '2026-10-01T09:00:00.000Z',
-    currentTicket: 2,
-    tickets: [
-      { ticket: 1, status: 'done', attempts: [], comments: [], hintsUsed: 3, solutionShown: true, reviewAccepted: true },
-      { ticket: 2, status: 'inQa', attempts: [], comments: [], hintsUsed: 1, solutionShown: false, reviewAccepted: false },
-    ],
-    log: [
-      { ticket: 1, from: null, to: 'todo', at: '2026-10-01T09:05:00.000Z' },
-      { ticket: 1, from: 'codeReview', to: 'done', at: '2026-10-02T09:00:00.000Z' },
-      { ticket: 2, from: null, to: 'todo', at: '2026-10-02T09:01:00.000Z' },
-    ],
-    settings: { language: 'pt' },
-  };
-
+describe('state validation', () => {
   it('loads a QA limit under the 1-minute minimum (older versions allowed 30 s) as 1 minute', () => {
     const base = rules.createInitialState(ctx);
-    expect(migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 45 } }, ctx).settings.qaTimeoutSeconds).toBe(60);
-    expect(migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 240 } }, ctx).settings.qaTimeoutSeconds).toBe(240);
-    expect(() => migrateState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 5000 } }, ctx)).toThrow();
+    expect(parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 45 } }).settings.qaTimeoutSeconds).toBe(60);
+    expect(parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 240 } }).settings.qaTimeoutSeconds).toBe(240);
+    expect(() => parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 5000 } })).toThrow();
   });
 
-  it('migrates version 1 to the current schema', () => {
-    const state = migrateState(v1, ctx);
-    expect(state.schemaVersion).toBe(3);
-    expect(state.settings).toEqual({ language: 'pt', qaTimeoutSeconds: 180, theme: 'system' });
-    expect(state.tickets[0]).toMatchObject({
-      hintsRevealed: 3,
-      solutionRevealed: true,
-      reviewAcceptedAt: '2026-10-02T09:00:00.000Z',
-      unlockedAt: '2026-10-01T09:05:00.000Z',
-    });
-    expect(state.tickets[0].conversation.filter((entry) => entry.kind === 'hint')).toHaveLength(3);
-    expect(state.tickets[1]).toMatchObject({ status: 'inQa', hintsRevealed: 1, reviewAcceptedAt: null });
-    expect(state.activity).toHaveLength(3);
-    expect(state.inbox.map((message) => message.kind)).toEqual(['welcome', 'assignment', 'assignment']);
+  it('keeps a state of an older schema aside and starts a new game, without migrating it', async () => {
+    const old = { ...rules.createInitialState(ctx), schemaVersion: 4 };
+    await writeFile(join(dir, 'state.json'), JSON.stringify(old));
+    const { state, recovered } = await new StateStore(dir).load(ctx);
+    expect(recovered).toBe(true);
+    expect(state.schemaVersion).toBe(5);
+    expect((await readdir(dir)).some((name) => /^state\.corrupt-\d+\.json$/.test(name))).toBe(true);
   });
 
-  it('loads and re-saves a migrated file', async () => {
-    await writeFile(join(dir, 'state.json'), JSON.stringify(v1));
-    const store = new StateStore(dir);
-    const { state } = await store.load(ctx);
-    // A ticket that was in QA in the old file is then recovered like any interrupted run.
-    const recovered = rules.recoverInterruptedQa(state, ctx);
-    expect(rules.findTicket(recovered, 2)!.status).toBe('inProgress');
-    await store.save(recovered);
-    expect(JSON.parse(await readFile(store.file, 'utf8')).schemaVersion).toBe(3);
+  it('rejects a state with tickets but no track counts, a repeated id or a ticket of the wrong track', () => {
+    const one = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'), ctx);
+    expect(() => parseState({ ...one, tracks: null })).toThrow();
+    expect(() => parseState({ ...one, tickets: [{ ...one.tickets[0], track: 'back' }] })).toThrow();
+    const done = { ...one, tickets: [{ ...one.tickets[0], status: 'done' }] };
+    const twice = { ...done, currentTicket: 2, tickets: [done.tickets[0], { ...one.tickets[0], ticket: 2 }] };
+    expect(() => parseState(twice)).toThrow();
   });
 
   it('rejects state without a version and invalid current state', () => {
-    expect(() => migrateState({}, ctx)).toThrow(StateVersionError);
+    expect(() => parseState({})).toThrow(StateVersionError);
     const state = rules.createInitialState(ctx);
-    expect(() => migrateState({ ...state, settings: { ...state.settings, language: 'fr' } }, ctx)).toThrow();
-    expect(() => migrateState({ ...state, tickets: [{ ticket: 1, status: 'archived' }] }, ctx)).toThrow();
+    expect(() => parseState({ ...state, settings: { ...state.settings, language: 'fr' } })).toThrow();
+    expect(() => parseState({ ...state, tickets: [{ ticket: 1, status: 'archived' }] })).toThrow();
   });
 
   it('rejects a state whose fields disagree with the Kanban rules', () => {
     const done = (state: ReturnType<typeof rules.createInitialState>, ticket: number) =>
       rules.acceptReview({ ...state, tickets: state.tickets.map((item) => (item.ticket === ticket ? { ...item, status: 'codeReview' as const } : item)) }, ticket, ctx);
-    let two = rules.unlockTicket(rules.createInitialState(ctx), 1, 'a', ctx);
-    two = rules.unlockTicket(done(two, 1), 2, 'b', ctx);
+    let two = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'), ctx);
+    two = rules.unlockTicket(done(two, 1), 2, unlocked(2, 'b'), ctx);
     // A state the rules made is valid.
-    expect(migrateState(two, ctx)).toEqual(two);
+    expect(parseState(two)).toEqual(two);
 
     const invalid = {
       'the current ticket is missing': { ...two, currentTicket: 3 },
@@ -131,7 +107,7 @@ describe('migrations', () => {
       'a repeated ticket': { ...two, tickets: [two.tickets[0], two.tickets[0]], currentTicket: 1 },
       'a gap in the tickets': { ...two, tickets: [two.tickets[1]] },
       'an unfinished ticket before the last': { ...two, tickets: [{ ...two.tickets[0], status: 'inProgress' }, two.tickets[1]] },
-      'too many tickets': {
+      'more tickets than the tracks have': {
         ...two,
         tickets: [1, 2, 3, 4, 5].map((ticket) => ({ ...two.tickets[0], ticket, status: 'done' })),
         currentTicket: 5,
@@ -148,12 +124,12 @@ describe('migrations', () => {
       },
     };
     for (const [name, state] of Object.entries(invalid)) {
-      expect(() => migrateState(state, ctx), name).toThrow();
+      expect(() => parseState(state), name).toThrow();
     }
   });
 
   it('keeps an incoherent state file aside and starts a new game, instead of failing on every start', async () => {
-    const state = rules.unlockTicket(rules.createInitialState(ctx), 1, 'a', ctx);
+    const state = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'), ctx);
     await writeFile(join(dir, 'state.json'), JSON.stringify({ ...state, currentTicket: 3 }));
     const { state: loaded, recovered } = await new StateStore(dir).load(ctx);
     expect(recovered).toBe(true);

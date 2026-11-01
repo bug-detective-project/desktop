@@ -1,5 +1,5 @@
 /**
- * Review configuration of a learning project (content/projects/<projectId>/review.json): the files
+ * Review configuration of a learning project (review.json at the root of its qa branch): the files
  * left out of the code comparison, the review branch and the automatic work-in-progress commit.
  * Built-in defaults always apply on top of a project's list. Nothing here is project-specific.
  */
@@ -96,11 +96,3 @@ export function excludesFileContent(config: ReviewConfig): string {
   return `${config.exclude.join('\n')}\n`;
 }
 
-// Bundled with the app: every content/projects/<projectId>/review.json.
-const PROJECT_CONFIGS = import.meta.glob<unknown>('../../../../content/projects/*/review.json', { eager: true, import: 'default' });
-
-/** The review configuration of the project the app plays (package.json bugDetective.project). */
-export function loadReviewConfig(projectId: string, configs: Record<string, unknown> = PROJECT_CONFIGS): ReviewConfig {
-  const entry = Object.entries(configs).find(([path]) => path.endsWith(`/projects/${projectId}/review.json`));
-  return parseReviewConfig(entry?.[1]);
-}

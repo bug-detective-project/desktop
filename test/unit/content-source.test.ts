@@ -1,128 +1,66 @@
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { writeZip } from '../../src/main/services/content/archive.ts';
+import { textFile, writeZip } from '../../src/main/services/content/archive.ts';
+import type { ArchiveFile } from '../../src/main/services/content/archive.ts';
 import { DownloadError, GitHubContentSource, validateBaseUrl } from '../../src/main/services/content/github.ts';
 import { LocalContentSource, gitArchive } from '../../src/main/services/content/local.ts';
 import { ContentVerificationError } from '../../src/main/services/content/manifest.ts';
-import type { StageManifest } from '../../src/main/services/content/manifest.ts';
-import { buildStagePackages } from '../../src/main/services/content/packages.ts';
+import type { ProjectManifest } from '../../src/main/services/content/manifest.ts';
+import { publishProject } from '../../src/main/services/content/publish.ts';
+import { IncompletePublicationError, TicketNotPublishedError } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
-import { runChecked, runCommand } from '../../src/main/services/process.ts';
+import { runCommand } from '../../src/main/services/process.ts';
+import { createProjectRepo } from '../helpers/project-repo.ts';
+import type { ProjectRepo } from '../helpers/project-repo.ts';
 
 let root: string;
-let repo: string;
-let out: string;
-let manifest: StageManifest;
+let repo: ProjectRepo;
+let manifest: ProjectManifest;
 
-async function git(...args: string[]) {
-  return (await runChecked(runCommand, 'git', ['-C', repo, ...args])).stdout.toString('utf8').trim();
-}
-
-/** A tiny SupportDesk-like repository: main with qa/stages/stage-1, and an orphan stage-1 branch. */
+/** A published project with 2 front tickets and 1 back ticket. */
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'bd-content-'));
-  repo = join(root, 'supportdesk');
-  out = join(root, 'packages');
-  await mkdir(join(repo, 'qa', 'stages', 'stage-1', 'gate2'), { recursive: true });
-  await runChecked(runCommand, 'git', ['init', '-q', '-b', 'main', repo]);
-  await git('config', 'user.email', 'test@example.com');
-  await git('config', 'user.name', 'Test');
-  // core.autocrlf=true must not leak CRLF into the archive.
-  await git('config', 'core.autocrlf', 'true');
-  await writeFile(join(repo, 'qa', 'stages', 'stage-1', 'ticket.en.md'), '# SD-214: Details\n');
-  await writeFile(join(repo, 'qa', 'stages', 'stage-1', 'bug.patch'), 'authoring only\n');
-  await writeFile(join(repo, 'qa', 'stages', 'stage-1', 'gate2', 'ticket-1.spec.ts'), 'test()\n');
-  await git('add', '-A');
-  await git('commit', '-q', '-m', 'main');
-  await git('checkout', '-q', '--orphan', 'stage-1');
-  await git('rm', '-rq', '--cached', '.');
-  await rm(join(repo, 'qa'), { recursive: true });
-  await mkdir(join(repo, 'client'));
-  await writeFile(join(repo, 'package.json'), '{\n  "name": "supportdesk"\n}\n');
-  await writeFile(join(repo, 'client', 'App.tsx'), 'export {};\n');
-  await git('add', '-A');
-  await git('commit', '-q', '-m', 'SupportDesk release 1.1');
-  await git('checkout', '-q', '-f', 'main');
-  manifest = await buildStagePackages({ repo, out, version: '1.0.0', runner: runCommand });
+  repo = await createProjectRepo(root, { front: 2, back: 1 });
+  ({ manifest } = await publishProject({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand }));
 });
 
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe('build-stage-packages', () => {
-  it('writes a versioned zip per stage and a manifest with checksums', async () => {
-    expect(manifest.stages).toHaveLength(1);
-    const [entry] = manifest.stages;
-    expect(entry).toMatchObject({ stage: 1, branch: 'stage-1', commitMessage: 'SupportDesk release 1.1', codeFiles: 2 });
-    expect(entry.package.file).toBe('stage-1-v1.0.0.zip');
-    expect(JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8'))).toEqual(manifest);
-  });
-
-  it('keeps LF line endings regardless of core.autocrlf', async () => {
-    const files = await gitArchive(runCommand, 'git', repo, 'stage-1');
-    for (const file of files) {
-      expect(Buffer.from(file.data).includes(13), file.path).toBe(false);
-    }
-  });
-});
-
 describe('LocalContentSource', () => {
-  const source = () => new LocalContentSource({ repoPath: repo, manifestPath: join(out, 'manifest.json'), runner: runCommand });
-
-  it('reads the stage branch and the package, verified against the manifest', async () => {
-    const stage = await source().fetchStage(1);
-    expect(stage.codeFiles.map((file) => file.path).sort()).toEqual(['client/App.tsx', 'package.json']);
-    expect(stage.packageFiles.map((file) => file.path).sort()).toEqual(['gate2/ticket-1.spec.ts', 'ticket.en.md']);
+  it('reads a ticket by id, without its bug.patch', async () => {
+    const ticket = await new LocalContentSource({ qaDir: repo.qaDir, runner: runCommand }).fetchTicket('back-1');
+    expect(ticket.entry.id).toBe('back-1');
+    expect(ticket.counts).toEqual({ front: 2, back: 1 });
+    expect(ticket.packageFiles.map((file) => file.path)).toContain('reference.patch');
+    expect(ticket.packageFiles.map((file) => file.path)).not.toContain('bug.patch');
+    expect(ticket.codeFiles.find((file) => file.path === 'app.txt')?.data).toEqual(new TextEncoder().encode('bug back-1\n'));
   });
 
-  it('never includes bug.patch in the package', async () => {
-    const stage = await source().fetchStage(1);
-    expect(stage.packageFiles.some((file) => file.path === 'bug.patch')).toBe(false);
-  });
-
-  it('rejects a package folder that changed after the manifest was built', async () => {
-    const file = join(repo, 'qa', 'stages', 'stage-1', 'ticket.en.md');
-    const original = await readFile(file);
-    await writeFile(file, '# SD-214: Changed\n');
+  it('builds the manifest from the current branches, not from a stale committed one', async () => {
+    repo.git(repo.projectDir, 'checkout', '-q', 'front-1');
+    await writeFile(join(repo.projectDir, 'app.txt'), 'bug front-1, rebuilt\n');
+    repo.git(repo.projectDir, 'commit', '-q', '-am', 'Demo release front-1');
+    repo.git(repo.projectDir, 'checkout', '-q', 'main');
     try {
-      await expect(source().fetchStage(1)).rejects.toThrow(ContentVerificationError);
+      const ticket = await new LocalContentSource({ qaDir: repo.qaDir, runner: runCommand }).fetchTicket('front-1');
+      expect(ticket.entry.commit).toBe(repo.git(repo.qaDir, 'rev-parse', 'front-1'));
+      expect(ticket.entry.commit).not.toBe(manifest.entries[0].commit);
     } finally {
-      await writeFile(file, original);
+      repo.git(repo.projectDir, 'branch', '-q', '-f', 'front-1', manifest.entries[0].commit);
     }
   });
 
-  it('rejects an unknown stage', async () => {
-    await expect(source().fetchStage(2)).rejects.toThrow(/not in the manifest/);
-  });
-});
-
-describe('a fresh clone of the SupportDesk repository', () => {
-  it('reads the stage branches from origin when git created only the default branch locally', async () => {
-    const clone = join(root, 'clone');
-    await runChecked(runCommand, 'git', ['clone', '-q', repo, clone]);
-    const local = await runCommand('git', ['-C', clone, 'rev-parse', '--verify', '--quiet', 'refs/heads/stage-1']);
-    expect(local.code).not.toBe(0);
-
-    const cloned = await buildStagePackages({ repo: clone, out: join(root, 'clone-packages'), version: '1.0.0', runner: runCommand });
-    expect(cloned.stages[0]).toMatchObject({ commit: manifest.stages[0].commit, codeDigest: manifest.stages[0].codeDigest });
-    const source = new LocalContentSource({ repoPath: clone, manifestPath: join(root, 'clone-packages', 'manifest.json'), runner: runCommand });
-    expect((await source.fetchStage(1)).codeFiles.map((file) => file.path)).toContain('client/App.tsx');
-  });
-
-  it('says how to get a stage branch that is missing, instead of creating it', async () => {
-    const empty = join(root, 'no-stages');
-    await mkdir(join(empty, 'qa', 'stages', 'stage-1'), { recursive: true });
-    await writeFile(join(empty, 'qa', 'stages', 'stage-1', 'ticket.en.md'), '# SD-214\n');
-    await runChecked(runCommand, 'git', ['init', '-q', '-b', 'main', empty]);
-    await expect(buildStagePackages({ repo: empty, out: join(root, 'no-stages-out'), version: '1.0.0', runner: runCommand })).rejects.toThrow(
-      /has no stage-1 branch \(neither local nor origin\/stage-1\)\. Run "git -C .+ fetch origin"; never create the stage branches by hand\./,
-    );
+  it('reports a ticket that is not published, with the published counts', async () => {
+    const error = await new LocalContentSource({ qaDir: repo.qaDir, runner: runCommand }).fetchTicket('back-2').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TicketNotPublishedError);
+    expect((error as TicketNotPublishedError).counts).toEqual({ front: 2, back: 1 });
   });
 });
 
@@ -131,16 +69,26 @@ describe('GitHubContentSource (mock server)', () => {
   let baseUrl: string;
   const requests: string[] = [];
   let failNext = 0;
-  let tamperCode = false;
+  let qaFiles: ArchiveFile[];
+  const codeFiles = new Map<string, ArchiveFile[]>();
+  /** Per repository: how the mock GitHub serves it. */
+  const variants: Record<string, { qa: () => ArchiveFile[]; code?: (files: ArchiveFile[]) => ArchiveFile[]; missingCommits?: boolean }> = {};
 
   beforeAll(async () => {
-    const zip = await readFile(join(out, 'stage-1-v1.0.0.zip'));
-    const manifestJson = await readFile(join(out, 'manifest.json'));
-    const stageFiles = await gitArchive(runCommand, 'git', repo, 'stage-1');
-    const codeZip = () =>
-      writeZip(
-        (tamperCode ? [...stageFiles.slice(0, 1)] : stageFiles).map((file) => ({ ...file, path: `supportdesk-stage-1/${file.path}` })),
-      );
+    qaFiles = await gitArchive(runCommand, 'git', repo.qaDir, 'qa');
+    for (const entry of manifest.entries) {
+      codeFiles.set(entry.commit, await gitArchive(runCommand, 'git', repo.qaDir, entry.commit));
+    }
+    const tamper = (files: ArchiveFile[], path: string) => files.map((file) => (file.path === path ? textFile(path, 'changed\n') : file));
+    Object.assign(variants, {
+      demo: { qa: () => qaFiles },
+      'tampered-package': { qa: () => tamper(qaFiles, 'tickets/front-1/ticket.en.md') },
+      'tampered-code': { qa: () => qaFiles, code: (files: ArchiveFile[]) => tamper(files, 'app.txt') },
+      incomplete: { qa: () => qaFiles, missingCommits: true },
+      'missing-file': { qa: () => qaFiles.filter((file) => file.path !== 'tickets/front-1/hints.en.json') },
+    });
+    // GitHub archives have one top-level folder, and redirect to codeload.
+    const zipOf = (files: ArchiveFile[], top: string) => writeZip(files.map((file) => ({ ...file, path: `${top}/${file.path}` })));
     server = createServer((request, response) => {
       requests.push(request.url!);
       if (failNext > 0) {
@@ -148,32 +96,24 @@ describe('GitHubContentSource (mock server)', () => {
         response.writeHead(503).end();
         return;
       }
-      switch (request.url) {
-        case '/owner/supportdesk/releases/latest/download/manifest.json':
-          response.writeHead(200, { 'content-type': 'application/json' }).end(manifestJson);
-          return;
-        case '/owner/supportdesk/releases/latest/download/stage-1-v1.0.0.zip':
-          // GitHub redirects release assets to another host.
-          response.writeHead(302, { location: '/objects/stage-1-v1.0.0.zip' }).end();
-          return;
-        case '/objects/stage-1-v1.0.0.zip':
-          response.writeHead(200).end(zip);
-          return;
-        case '/owner/supportdesk/archive/refs/heads/stage-1.zip':
-          response.writeHead(302, { location: '/codeload/stage-1.zip' }).end();
-          return;
-        case '/codeload/stage-1.zip':
-          response.writeHead(200).end(codeZip());
-          return;
-        case '/owner/tampered/releases/latest/download/manifest.json':
-          response.writeHead(200).end(manifestJson);
-          return;
-        case '/owner/tampered/releases/latest/download/stage-1-v1.0.0.zip':
-          response.writeHead(200).end(Buffer.concat([zip, Buffer.from('x')]));
-          return;
-        default:
-          response.writeHead(404).end();
+      const qa = /^\/owner\/([a-z-]+)\/archive\/refs\/heads\/qa\.zip$/.exec(request.url!);
+      if (qa && variants[qa[1]]) {
+        response.writeHead(302, { location: `/codeload/${qa[1]}/qa.zip` }).end();
+        return;
       }
+      const codeloadQa = /^\/codeload\/([a-z-]+)\/qa\.zip$/.exec(request.url!);
+      if (codeloadQa) {
+        response.writeHead(200).end(zipOf(variants[codeloadQa[1]].qa(), `${codeloadQa[1]}-qa`));
+        return;
+      }
+      const commit = /^\/owner\/([a-z-]+)\/archive\/([0-9a-f]{40})\.zip$/.exec(request.url!);
+      const variant = commit && variants[commit[1]];
+      if (variant && !variant.missingCommits && codeFiles.has(commit[2])) {
+        const files = codeFiles.get(commit[2])!;
+        response.writeHead(200).end(zipOf(variant.code ? variant.code(files) : files, `${commit[1]}-${commit[2]}`));
+        return;
+      }
+      response.writeHead(404).end();
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -183,73 +123,87 @@ describe('GitHubContentSource (mock server)', () => {
     await new Promise((resolve) => server.close(resolve));
   });
 
-  const source = (repository = 'owner/supportdesk') => new GitHubContentSource({ repository, baseUrl, retries: 2 });
+  const source = (repository = 'owner/demo', project = 'demo') => new GitHubContentSource({ repository, project, baseUrl, retries: 2 });
 
-  it('downloads the branch archive and the release asset, following redirects', async () => {
+  it('downloads the qa branch and the ticket commit, following redirects', async () => {
     requests.length = 0;
-    const stage = await source().fetchStage(1);
-    expect(stage.codeFiles.map((file) => file.path).sort()).toEqual(['client/App.tsx', 'package.json']);
+    const ticket = await source().fetchTicket('back-1');
+    expect(ticket).toMatchObject({ counts: { front: 2, back: 1 }, manifestVersion: '1.0.0', entry: { id: 'back-1' } });
+    expect(ticket.packageFiles.map((file) => file.path)).not.toContain('bug.patch');
+    expect(ticket.codeFiles.map((file) => file.path).sort()).toEqual(['app.txt', 'package.json']);
     expect(requests).toEqual([
-      '/owner/supportdesk/releases/latest/download/manifest.json',
-      '/owner/supportdesk/releases/latest/download/stage-1-v1.0.0.zip',
-      '/objects/stage-1-v1.0.0.zip',
-      '/owner/supportdesk/archive/refs/heads/stage-1.zip',
-      '/codeload/stage-1.zip',
+      '/owner/demo/archive/refs/heads/qa.zip',
+      '/codeload/demo/qa.zip',
+      `/owner/demo/archive/${manifest.entries[2].commit}.zip`,
     ]);
   });
 
-  it('only downloads the requested stage', async () => {
-    requests.length = 0;
-    await source().fetchStage(1);
-    expect(requests.some((url) => /stage-[2-9]/.test(url))).toBe(false);
+  it('reports a ticket that is not published, with the published counts', async () => {
+    const error = await source().fetchTicket('front-3').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TicketNotPublishedError);
+    expect((error as TicketNotPublishedError).counts).toEqual({ front: 2, back: 1 });
+  });
+
+  it('rejects a package that does not match the manifest', async () => {
+    await expect(source('owner/tampered-package').fetchTicket('front-1')).rejects.toThrow(/package/);
+  });
+
+  it('rejects ticket code that does not match the manifest', async () => {
+    await expect(source('owner/tampered-code').fetchTicket('front-1')).rejects.toThrow(/code/);
+  });
+
+  it('rejects a package with a missing file', async () => {
+    await expect(source('owner/missing-file').fetchTicket('front-1')).rejects.toThrow(ContentVerificationError);
+  });
+
+  it('reports a ticket commit that GitHub does not have as an incomplete publication', async () => {
+    await expect(source('owner/incomplete').fetchTicket('front-1')).rejects.toThrow(IncompletePublicationError);
+  });
+
+  it('treats a manifest older than the version in projects.json as an incomplete publication', async () => {
+    const stale = new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, retries: 0, minVersion: '1.1.0' });
+    await expect(stale.fetchTicket('front-1')).rejects.toThrow(IncompletePublicationError);
+    const current = new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, retries: 0, minVersion: '1.0.0' });
+    await expect(current.fetchTicket('front-1')).resolves.toBeDefined();
+  });
+
+  it('rejects the manifest of another project', async () => {
+    await expect(source('owner/demo', 'other').fetchTicket('front-1')).rejects.toThrow(/another project/);
   });
 
   it('retries server errors', async () => {
     failNext = 2;
-    await expect(source().fetchStage(1)).resolves.toBeDefined();
+    await expect(source().fetchTicket('front-1')).resolves.toBeDefined();
   });
 
   it('gives up after the retries', async () => {
     failNext = 10;
-    await expect(source().fetchStage(1)).rejects.toThrow(DownloadError);
+    await expect(source().fetchTicket('front-1')).rejects.toThrow(DownloadError);
     failNext = 0;
   });
 
-  it('rejects a release asset that does not match its checksum', async () => {
-    await expect(source('owner/tampered').fetchStage(1)).rejects.toThrow(ContentVerificationError);
-  });
-
-  it('rejects a branch archive that does not match the manifest', async () => {
-    tamperCode = true;
-    try {
-      await expect(source().fetchStage(1)).rejects.toThrow(/stage code/);
-    } finally {
-      tamperCode = false;
-    }
-  });
-
-  it('reports a missing release', async () => {
-    await expect(source('owner/missing').fetchStage(1)).rejects.toThrow(/HTTP 404/);
+  it('reports a missing repository', async () => {
+    await expect(source('owner/missing').fetchTicket('front-1')).rejects.toThrow(/HTTP 404/);
   });
 
   it('accepts only https, or http on loopback', () => {
     expect(() => validateBaseUrl('http://example.com')).toThrow();
     expect(() => validateBaseUrl('https://user:pw@github.com')).toThrow();
     expect(validateBaseUrl('https://github.com').hostname).toBe('github.com');
-    expect(() => new GitHubContentSource({ repository: '../etc' })).toThrow();
-    expect(() => new GitHubContentSource({ repository: 'a/b', release: 'v1/../../x' })).toThrow();
+    expect(() => new GitHubContentSource({ repository: '../etc', project: 'demo' })).toThrow();
+    expect(() => new GitHubContentSource({ repository: 'a/b', project: 'Not An Id' })).toThrow();
   });
 
   it('enforces a size limit', async () => {
-    const small = new GitHubContentSource({ repository: 'owner/supportdesk', baseUrl, maxBytes: 100, retries: 0 });
-    await expect(small.fetchStage(1)).rejects.toThrow(/larger than/);
+    const small = new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, maxBytes: 100, retries: 0 });
+    await expect(small.fetchTicket('front-1')).rejects.toThrow(/larger than/);
   });
 });
 
 describe('PackageStore', () => {
   it('stores the zip and an extracted folder, replacing an older copy atomically', async () => {
     const store = new PackageStore(join(root, 'João Silva', 'packages'));
-    const zip = await readFile(join(out, 'stage-1-v1.0.0.zip'));
+    const zip = writeZip([textFile('ticket.en.md', '# SD-214: Details\n')]);
     expect(store.has(1)).toBe(false);
     await store.save(1, zip);
     await store.save(1, zip);
@@ -257,5 +211,6 @@ describe('PackageStore', () => {
     expect(await store.readText(1, 'ticket.en.md')).toBe('# SD-214: Details\n');
     expect(await store.readText(1, 'missing.md')).toBeNull();
     expect(Buffer.compare(await store.readZip(1), zip)).toBe(0);
+    expect(await readFile(join(store.dir(1), 'ticket.en.md'), 'utf8')).toBe('# SD-214: Details\n');
   });
 });

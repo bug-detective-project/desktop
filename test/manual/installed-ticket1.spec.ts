@@ -15,7 +15,8 @@ import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk-private');
+// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
+const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
@@ -26,7 +27,7 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   const userData = await mkdtemp(join(tmpdir(), 'João Silva installed-'));
   await writeFile(
     join(userData, 'content-source.json'),
-    JSON.stringify({ kind: 'local', repoPath: supportdesk, manifestPath: join(root, 'build', 'stage-packages', 'manifest.json') }),
+    JSON.stringify({ kind: 'local', qaDir: supportdeskQa }),
   );
   // Start from no workspace at all, like a new player.
   const leftovers = execFileSync(DOCKER, ['ps', '-aq', '--filter', 'label=bugdetective.role=qa'], { encoding: 'utf8' }).split(/\s+/).filter(Boolean);
@@ -79,7 +80,7 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   await page.getByTestId('close-panel').click();
   log('QA on the buggy stage: Gate 2 failed');
 
-  const patch = await readFile(join(supportdesk, 'qa', 'stages', 'stage-1', 'reference.patch'));
+  const patch = await readFile(join(supportdeskQa, 'tickets', 'front-1', 'reference.patch'));
   execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'apply', '-'], { input: patch });
   await card.dragTo(page.getByTestId('column-inQa'));
   await expect(card).toHaveAttribute('data-status', 'inQa');

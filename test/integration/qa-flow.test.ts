@@ -17,14 +17,14 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { loadReviewConfig } from '../../src/main/services/review/config.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import { Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk-private');
+// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
+const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const PREFIX = 'bugdetective-test';
 const platform = currentPlatform();
 
@@ -37,12 +37,7 @@ function createGame(stateDir = dir) {
     store: new StateStore(stateDir),
     packages: new PackageStore(join(stateDir, 'packages')),
     reviews: new ReviewStore(join(stateDir, 'reviews')),
-    review: loadReviewConfig('supportdesk'),
-    content: new LocalContentSource({
-      repoPath: supportdesk,
-      manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),
-      runner: runCommand,
-    }),
+    content: new LocalContentSource({ qaDir: supportdeskQa, runner: runCommand }),
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },
@@ -93,7 +88,7 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
   // Start from a clean test namespace (never the player's "bugdetective-*" resources).
   const ws = await workspace();
   await ws.destroy();
@@ -124,7 +119,7 @@ describe('QA with real Docker', () => {
 
     const ws = await workspace();
     expect(await ws.currentBranch()).toBe('player/ticket-1');
-    expect((await ws.git(['log', '--format=%s', 'stage-1'])).trim()).toBe('SupportDesk release 1.1');
+    expect((await ws.git(['log', '--format=%s', 'stage-1'])).trim()).toBe('SupportDesk release front-1');
     expect((await ws.git(['rev-list', '--count', 'HEAD'])).trim()).toBe('1');
     expect((await ws.git(['config', 'core.autocrlf'])).trim()).toBe('false');
     // Snapshot import keeps LF line endings.
@@ -171,7 +166,7 @@ describe('QA with real Docker', () => {
 
   it('passes both gates after reference.patch is applied inside the workspace container', async () => {
     const ws = await workspace();
-    await ws.applyPatch(await readFile(join(supportdesk, 'qa', 'stages', 'stage-1', 'reference.patch'), 'utf8'));
+    await ws.applyPatch(await readFile(join(supportdeskQa, 'tickets', 'front-1', 'reference.patch'), 'utf8'));
     const { result, peakQaMiB } = await measureDuring(submit(game, 1));
     console.log(`fixed QA: ${result.seconds.toFixed(1)} s, peak QA container ${peakQaMiB.toFixed(0)} MiB`);
     expect(result.ticket.attempts.at(-1)!.result).toMatchObject({ gate: 2, status: 'passed' });
@@ -195,7 +190,7 @@ describe('QA with real Docker', () => {
     expect((await ws.git(['rev-parse', 'player/ticket-1'])).trim()).toBe(before);
     // The uncommitted fix of ticket 1 was stashed, not lost.
     expect(await ws.git(['stash', 'list'])).toContain('before ticket 2');
-    expect((await ws.git(['log', '--format=%s', 'stage-2'])).trim().split('\n')).toEqual(['SupportDesk release 1.2', 'SupportDesk release 1.1']);
+    expect((await ws.git(['log', '--format=%s', 'stage-2'])).trim().split('\n')).toEqual(['SupportDesk release front-2', 'SupportDesk release front-1']);
   });
 
   it('starting a ticket discards leftovers: changes, untracked files and extra commits', async () => {

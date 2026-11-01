@@ -191,6 +191,9 @@ export class FakeRuntime implements GameRuntime {
     this.scenario.devcontainers = true;
   }
 
+  /** The fake runtime never builds images, so the QA tool only has to be accepted. */
+  setQaTool(_files: ArchiveFile[] | null): void {}
+
   async environment(): Promise<EnvironmentReport> {
     const ready = this.scenario.environmentReady;
     return {

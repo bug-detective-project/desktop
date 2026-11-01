@@ -16,23 +16,29 @@ import type {
   SaveSummary,
   Snapshot,
   TicketContent,
+  TrackQueue,
   WorkspaceStatus,
 } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
 import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS } from '../shared/types.ts';
-import type { Column, GameState, Language, ReviewSession, Settings } from '../shared/types.ts';
+import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { createSave, readSave } from './services/backup.ts';
-import { fileText } from './services/content/archive.ts';
+import { fileText, writeZip } from './services/content/archive.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
 import type { ValidatedSave } from './services/backup.ts';
-import type { ContentSource } from './services/content/source.ts';
+import { FirstDownloadError } from './services/content/cache.ts';
+import { projectContentOf, qaToolFiles } from './services/content/project-files.ts';
+import type { ProjectFiles } from './services/content/project-files.ts';
+import { IncompletePublicationError, TicketNotPublishedError, countsOf } from './services/content/source.ts';
+import type { ContentSource, FetchedTicket, ProjectContent } from './services/content/source.ts';
 import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
 import { excludeMatcher, excludePathspecs, excludesFileContent } from './services/review/config.ts';
+import { parseReviewConfig } from './services/review/config.ts';
 import type { ReviewConfig } from './services/review/config.ts';
 import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from './services/review/review.ts';
 import type { ReviewMeta, ReviewStore } from './services/review/store.ts';
@@ -48,12 +54,23 @@ export class GameError extends Error {
   }
 }
 
+/** Content errors the player can act on get their own code; anything else is shown as it is. */
+export function contentError(error: unknown): unknown {
+  if (error instanceof IncompletePublicationError) {
+    return new GameError('incompletePublication', error.message);
+  }
+  if (error instanceof FirstDownloadError) {
+    return new GameError('contentNeedsInternet', error.message);
+  }
+  return error;
+}
+
 export interface GameOptions {
   store: StateStore;
   packages: PackageStore;
   reviews: ReviewStore;
-  /** The review configuration of the project being played. */
-  review: ReviewConfig;
+  /** Tests only: a review configuration instead of the one in the project's content. */
+  review?: ReviewConfig;
   content: ContentSource;
   runtime: GameRuntime;
   appVersion: string;
@@ -92,6 +109,12 @@ export class Game {
   private lastWorkspaceStatus: WorkspaceStatus | null = null;
   /** The last queued state change (see commit). */
   private commits: Promise<void> = Promise.resolve();
+  /** The project's review configuration and story, once its content is available. */
+  private projectFiles: ProjectFiles | null = null;
+  /** The project's content (manifest and qa files), once it is available. */
+  private content: ProjectContent | null = null;
+  /** The first download of the project's content, started at init when nothing was downloaded. */
+  private contentDownload: Promise<void> = Promise.resolve();
 
   constructor(options: GameOptions) {
     this.options = options;
@@ -111,6 +134,71 @@ export class Game {
     }
     this.recoverReview = recovered.reviewSession !== null;
     await this.loadTicketMeta();
+    const content = await this.options.content.current().catch(() => null);
+    if (content) {
+      this.useContent(content);
+    } else {
+      // Small (the qa branch and the code of each ticket): the story is there before the setup.
+      this.contentDownload = this.options.content.prepare().then(
+        (downloaded) => this.useContent(downloaded),
+        () => {},
+      );
+    }
+  }
+
+  /** Resolves when the content download started by init has finished (or failed). */
+  contentLoaded(): Promise<void> {
+    return this.contentDownload;
+  }
+
+  /** The project's content is available: its QA tool, review configuration and story. */
+  private useContent(content: ProjectContent): void {
+    this.projectFiles = projectContentOf(content.qaFiles);
+    this.content = content;
+    this.options.runtime.setQaTool(qaToolFiles(content.qaFiles));
+    this.emit();
+  }
+
+  /** The tickets per track: the downloaded manifest's, else the last unlock's. */
+  private counts(): TrackCounts | null {
+    return this.content ? countsOf(this.content.manifest) : this.state.tracks;
+  }
+
+  private titleOf(id: string): Record<Language, string> {
+    const read = (language: Language) => {
+      const file = this.content?.qaFiles.find((item) => item.path === `tickets/${id}/ticket.${language}.md`);
+      return (file && /^#\s+(.+)$/m.exec(fileText(file))?.[1]?.trim()) || id;
+    };
+    return { en: read('en'), pt: read('pt') };
+  }
+
+  private queues(): Snapshot['queues'] {
+    const counts = this.counts();
+    if (!counts) {
+      return null;
+    }
+    const done = (track?: Track) => this.state.tickets.filter((item) => item.status === 'done' && (!track || item.track === track)).length;
+    const queue = (choice: TrackChoice): TrackQueue => {
+      const id = rules.nextIdFor(this.state, counts, choice);
+      const track = choice === 'fullstack' ? undefined : choice;
+      return {
+        next: id ? { id, track: id.split('-')[0] as Track, title: this.titleOf(id) } : null,
+        done: done(track),
+        total: track ? counts[track] : counts.front + counts.back,
+      };
+    };
+    return { front: queue('front'), back: queue('back'), fullstack: queue('fullstack') };
+  }
+
+  /** The number of the next ticket, when one can be taken now. */
+  private nextTicket(): number | null {
+    const counts = this.counts();
+    const left = counts !== null && rules.nextIdFor(this.state, counts, 'fullstack') !== null;
+    return left && rules.canTakeTicket(this.state) ? this.state.tickets.length + 1 : null;
+  }
+
+  private get review(): ReviewConfig {
+    return this.options.review ?? this.projectFiles?.review ?? parseReviewConfig();
   }
 
   get current(): GameState {
@@ -120,7 +208,8 @@ export class Game {
   snapshot(): Snapshot {
     return {
       state: this.state,
-      nextTicket: rules.nextTicketNumber(this.state),
+      nextTicket: this.nextTicket(),
+      queues: this.queues(),
       titles: this.titles,
       hintsTotal: this.hintsTotal,
       busy: this.busy,
@@ -130,6 +219,7 @@ export class Game {
       log: this.log,
       reviewNotice: this.reviewNotice,
       contentSource: `${this.options.content.kind}: ${this.options.content.describe()}`,
+      projectStory: this.projectFiles?.story ?? null,
       appVersion: this.options.appVersion,
       versions: this.options.versions,
       devSolveBug: this.options.devSolveBug ?? false,
@@ -270,7 +360,15 @@ export class Game {
 
   async installEnvironment(): Promise<EnvironmentReport> {
     await this.requireDocker();
-    await this.exclusive('installing', () => this.options.runtime.installEnvironment((line) => this.appendLog(line)));
+    await this.exclusive('installing', async () => {
+      this.appendLog(`» Downloading the project from ${this.options.content.describe()}`);
+      try {
+        this.useContent(await this.options.content.prepare());
+      } catch (error) {
+        throw contentError(error);
+      }
+      await this.options.runtime.installEnvironment((line) => this.appendLog(line));
+    });
     return this.refreshEnvironment();
   }
 
@@ -278,25 +376,51 @@ export class Game {
   // Assignments
 
   /**
-   * Unlocks the next stage. Download and verification happen first; the workspace is only
-   * touched once everything is verified, so a failed download can simply be retried.
+   * Unlocks the next ticket of a track (fullstack alternates). Download and verification happen
+   * first; the workspace is only touched once everything is verified, so a failed download can
+   * simply be retried.
    */
-  async nextAssignment(): Promise<void> {
-    const ticket = rules.nextTicketNumber(this.state);
-    if (ticket === null) {
-      this.apply((state) => {
-        rules.assertCanUnlock(state, state.tickets.length + 1);
-        return state;
-      });
-      throw new GameError('noMoreTickets');
+  async nextAssignment(choice: TrackChoice = 'front'): Promise<void> {
+    if (!rules.canTakeTicket(this.state)) {
+      throw new GameError('ticketNotDone');
     }
     await this.requireDocker();
     await this.exclusive('unlocking', async () => {
       await this.beforePlayerCode();
-      this.appendLog(`» Fetching stage ${ticket} from ${this.options.content.describe()}`);
-      const fetched = await this.options.content.fetchStage(ticket);
-      this.appendLog(`» Verified ${fetched.codeFiles.length} files and the stage package (SHA-256)`);
-      await this.options.packages.save(ticket, fetched.packageZip);
+      if (!this.content) {
+        try {
+          this.useContent(await this.options.content.prepare());
+        } catch (error) {
+          throw contentError(error);
+        }
+      }
+      const id = rules.nextIdFor(this.state, this.counts()!, choice);
+      if (!id) {
+        throw new GameError('noMoreTickets');
+      }
+      const ticket = this.state.tickets.length + 1;
+      this.appendLog(`» Fetching ${id} from ${this.options.content.describe()}`);
+      let fetched: FetchedTicket;
+      try {
+        fetched = await this.options.content.fetchTicket(id);
+      } catch (error) {
+        if (error instanceof TicketNotPublishedError) {
+          // A newer publication has fewer tickets in that track: its queue ends, nothing else changes.
+          const content = await this.options.content.current().catch(() => null);
+          if (content) {
+            this.useContent(content);
+          }
+          await this.commit((state, ctx) => rules.setTrackCounts(state, error.counts, ctx));
+          throw new GameError('noMoreTickets', error.message);
+        }
+        throw contentError(error);
+      }
+      this.appendLog(`» Verified ${fetched.entry.id} (${fetched.codeFiles.length} files and the ticket package, SHA-256)`);
+      await this.options.packages.save(ticket, writeZip(fetched.packageFiles));
+      const content = await this.options.content.current().catch(() => null);
+      if (content) {
+        this.useContent(content);
+      }
       // The volume outlives the saved game: work from another game is archived, never reused.
       const archived = await this.options.runtime.claimWorkspace(this.state.createdAt);
       if (archived > 0) {
@@ -306,9 +430,10 @@ export class Game {
       await this.options.runtime.claimWorkspace(this.state.createdAt);
       this.appendLog(`» Imported as commit ${commit.slice(0, 12)}`);
       await this.options.runtime.checkoutPlayerBranch(ticket);
-      this.appendLog(`» Workspace ready for ticket ${ticket}`);
+      this.appendLog(`» Workspace ready for ticket ${ticket} (${fetched.entry.id})`);
       await this.options.runtime.resetDatabase().catch(() => {});
-      await this.commit((state, ctx) => rules.unlockTicket(state, ticket, commit, ctx));
+      const info = { id: fetched.entry.id, track: fetched.entry.track, commit, manifestVersion: fetched.manifestVersion, counts: fetched.counts };
+      await this.commit((state, ctx) => rules.unlockTicket(state, ticket, info, ctx));
       await this.loadTicketMeta();
     });
     await this.refreshEnvironment().catch(() => {});
@@ -593,7 +718,7 @@ export class Game {
   // Code review: approved snapshot, review branch, automatic checkout and return
 
   private get excludes(): string[] {
-    return excludePathspecs(this.options.review);
+    return excludePathspecs(this.review);
   }
 
   /**
@@ -602,9 +727,9 @@ export class Game {
    * player's diff against the stage.
    */
   private async captureApproval(ticket: number): Promise<string> {
-    const { runtime, packages, reviews, review } = this.options;
+    const { runtime, packages, reviews } = this.options;
     this.appendLog('» Saving the approved solution for the code review');
-    const excluded = excludeMatcher(review);
+    const excluded = excludeMatcher(this.review);
     const snapshot = (await runtime.testedFiles()).filter((file) => !excluded(file.path));
     const reference = await runtime.referenceFiles(ticket, (await packages.readText(ticket, 'reference.patch')) ?? '');
     const meta = { ticket, approvedAt: this.ctx().now, language: this.state.settings.language };
@@ -698,7 +823,7 @@ export class Game {
       await this.saveSession(session);
       session = { ...session, wipCommit: await runtime.reviewSaveWork(WIP_MESSAGE, this.excludes), phase: 'switching' };
       await this.saveSession(session);
-      await runtime.reviewSwitch(ticket, excludesFileContent(this.options.review));
+      await runtime.reviewSwitch(ticket, excludesFileContent(this.review));
       await this.saveSession({ ...session, phase: 'open' });
     } catch (error) {
       await this.returnToPlayerCode().catch(() => {});
@@ -797,7 +922,7 @@ export class Game {
     this.pendingSave = null;
     let validated: ValidatedSave;
     try {
-      validated = readSave(new Uint8Array(await readFile(file)), this.ctx());
+      validated = readSave(new Uint8Array(await readFile(file)));
     } catch (error) {
       throw new GameError('invalidSave', (error as Error).message);
     }

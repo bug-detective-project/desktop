@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { QaComment } from '@shared/types.ts';
-import { story } from '../content.ts';
+import { company } from '../content.ts';
 import { Icon } from './icons.tsx';
 import { Markdown } from './Markdown.tsx';
 import type { DemoTab } from './onboardingSteps.ts';
@@ -18,7 +18,7 @@ const AT = '2026-10-29T10:00:00.000Z';
 export function OnboardingTicketDemo({ tab }: { tab: DemoTab }) {
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'pt' ? 'pt' : 'en';
-  const senior = story(language).people.senior.name;
+  const senior = company(language).people.senior.name;
   const locale = language === 'pt' ? 'pt-BR' : 'en-US';
   const time = (minutes: number) => new Date(Date.parse(AT) + minutes * 60_000).toLocaleString(locale);
   const failed: QaComment = {

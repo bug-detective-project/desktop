@@ -6,24 +6,21 @@ import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
+import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
+import { IncompletePublicationError, TicketNotPublishedError } from '../../src/main/services/content/source.ts';
 import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { loadReviewConfig } from '../../src/main/services/review/config.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
 import { readZip } from '../../src/main/services/content/archive.ts';
+import { unlocked } from '../helpers/tickets.ts';
 
-// The real SupportDesk checkout and the manifest from `pnpm run build:stages`.
+// The real SupportDesk qa folder (a worktree of its qa branch) and its ticket branches.
 const root = resolve(import.meta.dirname, '..', '..');
-const localSource = () =>
-  new LocalContentSource({
-    repoPath: resolve(root, '..', 'supportdesk-private'),
-    manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'),
-    runner: runCommand,
-  });
+const localSource = () => new LocalContentSource({ qaDir: resolve(root, '..', 'supportdesk-qa'), runner: runCommand });
 
 let dir: string;
 beforeEach(async () => {
@@ -41,7 +38,6 @@ function createGame(
     store: new StateStore(dir),
     packages: new PackageStore(join(dir, 'packages')),
     reviews: new ReviewStore(join(dir, 'reviews')),
-    review: loadReviewConfig('supportdesk'),
     content: options.content ?? localSource(),
     runtime,
     appVersion: '0.1.0',
@@ -61,6 +57,8 @@ describe('Game', () => {
     await game.init();
     await game.nextAssignment();
     expect(game.current.currentTicket).toBe(1);
+    expect(game.current.tracks).toEqual({ front: 4, back: 4 });
+    expect(rules.findTicket(game.current, 1)).toMatchObject({ id: 'front-1', track: 'front', manifestVersion: '0.0.0' });
     expect(status(game)).toBe('todo');
     expect(game.snapshot().titles[1].en).toMatch(/^SD-214:/);
     expect(game.snapshot().titles[1].pt).toMatch(/^SD-214:/);
@@ -90,11 +88,68 @@ describe('Game', () => {
     expect(game.current.settings.theme).toBe('light');
   });
 
+  it('reads the project content at start: the story, and the QA tool without the tickets', async () => {
+    const { game, runtime } = createGame();
+    const setQaTool = vi.spyOn(runtime, 'setQaTool');
+    await game.init();
+    expect(game.snapshot().projectStory?.en.project.name).toBe('SupportDesk');
+    expect(game.snapshot().projectStory?.pt.messages.assignments['front-1'].subject).toMatch(/SD-214/);
+    const tool = setQaTool.mock.calls.at(-1)![0]!.map((file) => file.path);
+    expect(tool).toContain('run.ts');
+    expect(tool.some((path) => path.startsWith('tickets/') || path === 'manifest.json' || path.startsWith('story.'))).toBe(false);
+  });
+
+  it('starts without the project content when nothing was downloaded yet, and downloads it in the background', async () => {
+    let release: (value: unknown) => void = () => {};
+    const later = new Promise((resolve) => (release = resolve));
+    const first: ContentSource = {
+      kind: 'github',
+      describe: () => 'mock',
+      current: async () => null,
+      prepare: async () => {
+        await later;
+        return localSource().prepare();
+      },
+      fetchTicket: (id: string) => localSource().fetchTicket(id),
+    };
+    const { game } = createGame({ content: first });
+    await game.init();
+    expect(game.snapshot().projectStory).toBeNull();
+    release(undefined);
+    await game.contentLoaded();
+    expect(game.snapshot().projectStory?.en.client.name).toBe('Harborline Outfitters');
+  });
+
+  it('downloads the project before installing the environment, and asks for internet the first time', async () => {
+    const order: string[] = [];
+    const offline: ContentSource = {
+      kind: 'github',
+      describe: () => 'mock',
+      current: async () => null,
+      prepare: async () => {
+        order.push('prepare');
+        throw new FirstDownloadError('offline');
+      },
+      fetchTicket: () => Promise.reject(new Error('offline')),
+    };
+    const { game, runtime } = createGame({ content: offline });
+    vi.spyOn(runtime, 'installEnvironment').mockImplementation(async () => {
+      order.push('install');
+    });
+    await game.init();
+    await game.contentLoaded();
+    order.length = 0;
+    await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'contentNeedsInternet' });
+    expect(order).toEqual(['prepare']);
+  });
+
   it('leaves the workspace untouched when the download fails, and can retry', async () => {
     const failing: ContentSource = {
       kind: 'github',
       describe: () => 'mock',
-      fetchStage: vi.fn().mockRejectedValueOnce(new Error('network down')).mockImplementation((stage: number) => localSource().fetchStage(stage)),
+      prepare: () => localSource().prepare(),
+      current: () => localSource().current(),
+      fetchTicket: vi.fn().mockRejectedValueOnce(new Error('network down')).mockImplementation((id: string) => localSource().fetchTicket(id)),
     };
     const { game, runtime } = createGame({ content: failing });
     const importStage = vi.spyOn(runtime, 'importStage');
@@ -106,6 +161,67 @@ describe('Game', () => {
     await game.nextAssignment();
     expect(importStage).toHaveBeenCalledTimes(1);
     expect(game.current.currentTicket).toBe(1);
+  });
+
+  it('ends the queue when a newer publication has fewer tickets, without touching the game', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'] } });
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(1);
+    const before = game.current.tickets;
+    const shrunk: ContentSource = {
+      kind: 'github',
+      describe: () => 'mock',
+      prepare: () => localSource().prepare(),
+      current: () => localSource().current(),
+      fetchTicket: (id: string) => Promise.reject(new TicketNotPublishedError(id, { front: 1, back: 0 })),
+    };
+    (game as unknown as { options: { content: ContentSource } }).options.content = shrunk;
+    const importStage = vi.spyOn(runtime, 'importStage');
+    await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'noMoreTickets' });
+    expect(game.current.tracks).toEqual({ front: 1, back: 0 });
+    expect(game.current.tickets).toEqual(before);
+    expect(game.current.inbox.filter((message) => message.kind === 'completion')).toHaveLength(1);
+    expect(importStage).not.toHaveBeenCalled();
+  });
+
+  it('shows the queue of each track in the snapshot', async () => {
+    const { game } = createGame();
+    await game.init();
+    const { queues } = game.snapshot();
+    expect(queues?.front).toMatchObject({ next: { id: 'front-1', track: 'front' }, done: 0, total: 4 });
+    expect(queues?.front.next?.title.pt).toMatch(/^SD-214:/);
+    expect(queues?.back).toMatchObject({ next: { id: 'back-1', track: 'back' }, done: 0, total: 4 });
+    expect(queues?.back.next?.title.en).toMatch(/^SD-252:/);
+    expect(queues?.fullstack).toMatchObject({ next: { id: 'front-1' }, done: 0, total: 8 });
+  });
+
+  it('unlocks the next ticket of the chosen track', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment('back');
+    expect(rules.findTicket(game.current, 1)).toMatchObject({ id: 'back-1', track: 'back' });
+    expect(game.snapshot().queues?.back.next?.id).toBe('back-2');
+    // Fullstack alternates: after a back ticket comes a front one.
+    expect(game.snapshot().queues?.fullstack.next?.id).toBe('front-1');
+    // The open ticket must be Done first.
+    expect(game.snapshot().nextTicket).toBeNull();
+  });
+
+  it('shows an incomplete publication with its own error code', async () => {
+    const incomplete: ContentSource = {
+      kind: 'github',
+      describe: () => 'mock',
+      prepare: () => localSource().prepare(),
+      current: () => localSource().current(),
+      fetchTicket: () => Promise.reject(new IncompletePublicationError('no commit')),
+    };
+    const { game } = createGame({ content: incomplete });
+    await game.init();
+    await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'incompletePublication' });
   });
 
   it('plays a ticket: QA fails, hints, solution, QA passes, review, Done, next ticket', async () => {
@@ -340,7 +456,7 @@ describe('Game', () => {
 
   it('recovers a QA run interrupted by a closed app on the next start', async () => {
     const ctx = { now: new Date().toISOString(), id: () => crypto.randomUUID() };
-    let state = rules.unlockTicket(rules.createInitialState(ctx), 1, 'abc', ctx);
+    let state = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'abc'), ctx);
     state = rules.playerMove(state, 1, 'inProgress', ctx);
     state = rules.playerMove(state, 1, 'inQa', ctx);
     await writeFile(join(dir, 'state.json'), JSON.stringify(state));

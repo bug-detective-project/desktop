@@ -20,7 +20,6 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { loadReviewConfig } from '../../src/main/services/review/config.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
@@ -28,7 +27,8 @@ import * as rules from '../../src/shared/kanban.ts';
 import { parseDiff, visibleFiles } from '../../src/renderer/src/components/diff.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const supportdesk = resolve(root, '..', 'supportdesk-private');
+// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
+const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const PREFIX = 'bugdetective-review-test';
 const platform = currentPlatform();
 
@@ -49,8 +49,7 @@ function createGame(stateDir: string) {
     store: new StateStore(stateDir),
     packages: new PackageStore(join(stateDir, 'packages')),
     reviews: new ReviewStore(join(stateDir, 'reviews')),
-    review: loadReviewConfig('supportdesk'),
-    content: new LocalContentSource({ repoPath: supportdesk, manifestPath: join(root, 'build', 'stage-packages', 'manifest.json'), runner: runCommand }),
+    content: new LocalContentSource({ qaDir: supportdeskQa, runner: runCommand }),
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },
@@ -72,7 +71,7 @@ const fingerprint = () =>
 git status --porcelain=v1 -uall --ignored | grep -v '^!! node_modules/' ; echo "node_modules: $(find node_modules -type f | wc -l)"
 find . -path ./.git -prune -o -type f -print | sort | xargs sha256sum | sha256sum`);
 
-const patch = (stage: number) => readFile(join(supportdesk, 'qa', 'stages', `stage-${stage}`, 'reference.patch'), 'utf8');
+const patch = (stage: number) => readFile(join(supportdeskQa, 'tickets', `front-${stage}`, 'reference.patch'), 'utf8');
 const changedFiles = (diff: string) => visibleFiles(parseDiff(diff)).map((file) => `${file.status} ${file.path}`);
 
 beforeAll(async () => {
@@ -80,7 +79,7 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new TestRuntime(platform, { contextRoot: join(root, 'build', 'docker'), prefix: PREFIX });
+  runtime = new TestRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
   await (await workspace()).destroy();
 });
 
@@ -138,7 +137,7 @@ sed -i 's/$/  /' client/src/searchParams.ts`);
     expect((await ws.git(['log', '--format=%H %P|%s', 'review/ticket-1', '-3'])).trim().split('\n')).toEqual([
       `${meta.commits.snapshot} ${meta.commits.reference}|Your approved solution — ticket 1`,
       `${meta.commits.reference} ${(await ws.git(['rev-parse', 'stage-1^{commit}'])).trim()}|Reference — ticket 1`,
-      expect.stringMatching(/SupportDesk release 1\.1$/),
+      expect.stringMatching(/SupportDesk release front-1$/),
     ]);
     for (const commit of [meta.commits.reference, meta.commits.snapshot]) {
       expect(JSON.parse(await ws.git(['show', `${commit}:.vscode/settings.json`]))).toMatchObject({ 'files.readonlyInclude': { '**': true } });

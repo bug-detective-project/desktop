@@ -1,0 +1,47 @@
+{
+  "company": {
+    "name": "Lanternfish Labs",
+    "tagline": "Uma pequena consultoria de software que cria e mantém aplicações para empresas em crescimento.",
+    "summary": "Uma consultoria remota de doze pessoas. Pareamento quando alguém trava, planejamento às segundas.",
+    "about": "A Lanternfish Labs é uma consultoria de doze pessoas. Quase todo o time trabalha remoto, com uma reunião de planejamento às segundas e sessões de pareamento sempre que alguém trava. Pessoas desenvolvedoras novas começam direto em um projeto de cliente, corrigindo bugs pequenos e reais desde a primeira semana."
+  },
+  "people": {
+    "manager": {
+      "name": "Rafaela Nunes",
+      "role": "Gerente de engenharia",
+      "email": "rafaela@lanternfish.labs"
+    },
+    "senior": {
+      "name": "Priya Raman",
+      "role": "Desenvolvedora sênior"
+    }
+  },
+  "pendingProject": {
+    "client": {
+      "name": "Seu primeiro cliente",
+      "about": "O projeto e o cliente aparecem aqui assim que o projeto for baixado (Dashboard → Baixar e instalar).",
+      "contacts": "—",
+      "reporters": []
+    },
+    "project": {
+      "name": "Projeto",
+      "about": "Ainda não foi baixado.",
+      "stack": "—"
+    },
+    "messages": {
+      "welcome": {
+        "subject": "Boas-vindas à Lanternfish Labs!",
+        "body": "Oi, que bom ter você com a gente!\n\nEu sou a Rafaela, gerente de engenharia. Seu projeto está a caminho: assim que ele for baixado (Dashboard → Baixar e instalar), você encontra aqui o cliente, o projeto e o seu primeiro ticket.\n\nRafaela"
+      },
+      "assignments": {},
+      "completion": {
+        "subject": "Sprint concluída",
+        "body": "Obrigada pelo empenho.\n\nRafaela"
+      },
+      "trackCompletion": {
+        "subject": "A trilha {{track}} foi concluída",
+        "body": "Você terminou todos os tickets da trilha {{track}}.\n\nRafaela"
+      }
+    }
+  }
+}

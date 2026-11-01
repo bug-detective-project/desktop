@@ -7,12 +7,11 @@
  *   reviews/ticket-N/…   the review data of each ticket that passed QA (approved snapshot, reference, comparison)
  */
 import { z } from 'zod';
-import type { RuleContext } from '../../shared/kanban.ts';
 import { SCHEMA_VERSION } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
 import { UnsafeArchiveError, readZip, sha256Hex, writeZip } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
-import { migrateState } from './state.ts';
+import { parseState } from './state.ts';
 
 export const SAVE_EXTENSION = 'bdsave';
 export const MAX_SAVE_BYTES = 512 * 1024 * 1024;
@@ -76,7 +75,7 @@ export interface ValidatedSave extends SaveContents {
 }
 
 /** Validates a .bdsave completely (manifest, checksums, state schema) before anything is restored. */
-export function readSave(bytes: Uint8Array, ctx: RuleContext): ValidatedSave {
+export function readSave(bytes: Uint8Array): ValidatedSave {
   if (bytes.length > MAX_SAVE_BYTES) {
     throw new InvalidSaveError('The file is too large to be a Bug Detective save');
   }
@@ -108,6 +107,9 @@ export function readSave(bytes: Uint8Array, ctx: RuleContext): ValidatedSave {
   if (manifest.schemaVersion > SCHEMA_VERSION) {
     throw new InvalidSaveError('This save was created by a newer version of Bug Detective');
   }
+  if (manifest.schemaVersion < SCHEMA_VERSION) {
+    throw new InvalidSaveError('This save was made by an older, unsupported version of Bug Detective');
+  }
   if (!manifest.files['state.json']) {
     throw new InvalidSaveError('The save has no game state');
   }
@@ -125,7 +127,7 @@ export function readSave(bytes: Uint8Array, ctx: RuleContext): ValidatedSave {
 
   let state: GameState;
   try {
-    state = migrateState(JSON.parse(Buffer.from(byPath.get('state.json')!.data).toString('utf8')), ctx);
+    state = parseState(JSON.parse(Buffer.from(byPath.get('state.json')!.data).toString('utf8')));
   } catch (error) {
     throw new InvalidSaveError(`The saved game state is invalid: ${(error as Error).message.slice(0, 300)}`);
   }
