@@ -618,8 +618,6 @@
     "needsUpdate": "Update Bug Detective to play this project.",
     "title": "Projects",
     "intro": "Pick your next project. Only one project stays on your computer: switching removes the current one from Docker and downloads the next. Your progress and PRs are kept.",
-    "active": "In progress",
-    "stack": "Technologies",
     "difficulty": "Difficulty",
     "tickets": "Tickets",
     "noDetails": "Connect to the internet to see the details.",
@@ -637,7 +635,15 @@
     "confirmKept": "Your progress, completed tickets and PRs are kept, and you can come back later (it is downloaded again). Export a backup first if you want a copy of your code.",
     "exportFirst": "Export backup",
     "confirm": "Switch project",
-    "switched": "{{name}} is your project now."
+    "switched": "{{name}} is your project now.",
+    "current": "Current project",
+    "brief": "Read the brief",
+    "closeBrief": "Close the brief",
+    "client": "Client: {{name}}",
+    "frontend": "Frontend",
+    "backend": "Backend",
+    "database": "Database",
+    "practice": "You'll practice"
   },
   "switch": {
     "pendingTitle": "The project switch is not finished",

@@ -618,8 +618,6 @@
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",
     "title": "Projetos",
     "intro": "Escolha o seu próximo projeto. Só um projeto fica no seu computador: trocar remove o atual do Docker e baixa o próximo. O seu progresso e os seus PRs ficam guardados.",
-    "active": "Em andamento",
-    "stack": "Tecnologias",
     "difficulty": "Dificuldade",
     "tickets": "Tickets",
     "noDetails": "Conecte-se à internet para ver os detalhes.",
@@ -637,7 +635,15 @@
     "confirmKept": "O seu progresso, os tickets concluídos e os PRs ficam guardados, e você pode voltar depois (ele é baixado de novo). Exporte um backup antes se quiser uma cópia do seu código.",
     "exportFirst": "Exportar backup",
     "confirm": "Trocar de projeto",
-    "switched": "{{name}} é o seu projeto agora."
+    "switched": "{{name}} é o seu projeto agora.",
+    "current": "Projeto atual",
+    "brief": "Ler o briefing",
+    "closeBrief": "Fechar o briefing",
+    "client": "Cliente: {{name}}",
+    "frontend": "Frontend",
+    "backend": "Backend",
+    "database": "Banco de dados",
+    "practice": "Você vai praticar"
   },
   "switch": {
     "pendingTitle": "A troca de projeto não terminou",

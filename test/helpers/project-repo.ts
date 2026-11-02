@@ -72,6 +72,7 @@ export function ticketIds(counts: TicketCounts): string[] {
 
 /** What a test project may add to its brief: package.json bugDetective.project.stack and the story's skills. */
 export interface ProjectBrief {
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
   stack?: { frontend?: string; backend?: string; database?: string };
   skills?: { en: string[]; pt: string[] };
 }
@@ -97,7 +98,7 @@ export async function createProjectRepo(dir: string, counts: TicketCounts, name 
   git(qaDir, 'checkout', '-q', '--orphan', 'qa');
   git(qaDir, 'rm', '-r', '-q', '-f', '.');
   await writeFiles(qaDir, {
-    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id, name, ...(brief.stack && { stack: brief.stack }) } } }, null, 2)}\n`,
+    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id, name, ...(brief.difficulty && { difficulty: brief.difficulty }), ...(brief.stack && { stack: brief.stack }) } } }, null, 2)}\n`,
     'story.en.json': projectStory(name, ticketIds(counts), brief.skills?.en),
     'story.pt.json': projectStory(name, ticketIds(counts), brief.skills?.pt),
   });

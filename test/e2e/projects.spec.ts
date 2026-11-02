@@ -35,11 +35,12 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     await page.getByTestId('nav-projects').click();
     const card = page.getByTestId('project-supportdesk');
     await expect(card).toContainText(supportdesk.story.en.project.name);
-    await expect(card.getByTestId('project-active')).toHaveText('In progress');
-    await expect(card.getByTestId('project-difficulty')).toHaveText(`${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`);
-    await expect(card.getByTestId('project-tickets')).toHaveText(`Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`);
-    // The active project has no switch button.
-    await expect(card.getByRole('button')).toHaveCount(0);
+    await expect(card.getByTestId('project-current')).toHaveText('Current project');
+    await expect(card.getByTestId('project-difficulty')).toContainText(`${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`);
+    await expect(card.getByTestId('project-tickets').first()).toHaveText(`Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`);
+    // The active project has no switch button, only its brief.
+    await expect(page.getByTestId('switch-supportdesk')).toHaveCount(0);
+    await expect(page.getByTestId('project-supportdesk-brief')).toBeEnabled();
   } finally {
     await close();
   }
