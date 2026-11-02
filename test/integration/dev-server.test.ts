@@ -1,5 +1,5 @@
 /**
- * The SupportDesk dev server in the real workspace container: "Start server" runs `npm run dev`,
+ * A project's dev server (the notes fixture's) in the real workspace container: "Start server" runs `npm run dev`,
  * "Stop server" stops it, also when the player started it in the VS Code terminal, and leaves no
  * process behind. Uses the "bugdetective-devserver-test" resource prefix, never the player's volumes.
  *
@@ -19,10 +19,9 @@ import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
-const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const PREFIX = 'bugdetective-devserver-test';
 const platform = currentPlatform();
 
@@ -50,6 +49,7 @@ async function devProcesses(): Promise<string[]> {
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bd-devserver-'));
+  const notes = await createNotesProject(join(dir, 'project'));
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
@@ -59,7 +59,7 @@ beforeAll(async () => {
     store: new StateStore(dir),
     packages: new PackageStore(join(dir, 'packages')),
     reviews: new ReviewStore(join(dir, 'reviews')),
-    content: new LocalContentSource({ qaDir: supportdeskQa, runner: runCommand }),
+    content: new LocalContentSource({ qaDir: notes.qaDir, runner: runCommand }),
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },

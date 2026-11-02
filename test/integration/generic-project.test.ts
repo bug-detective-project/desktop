@@ -3,7 +3,7 @@
  * patch and review configuration), laid out like a published one (main, a qa worktree with
  * tickets/<id>/, and the ticket branches front-1, front-2 and back-1), with real Docker and git:
  * the code review technique through configuration only, and a queue of three tickets that proves
- * nothing depends on SupportDesk or on four tickets. The project has no QA suite, so QA is
+ * nothing depends on one project or on four tickets. The project has no QA suite, so QA is
  * replaced by its first step only: the copy of the workspace QA tests.
  */
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -25,6 +25,7 @@ import { StateStore } from '../../src/main/services/state.ts';
 import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { projectStory, ticketFiles, writeFiles } from '../helpers/project-repo.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
 import { readQaFiles } from '../../src/main/services/content/local-manifest.ts';
 import type { QaResult } from '../../src/shared/types.ts';
 import { parseDiff, visibleFiles } from '../../src/renderer/src/components/diff.ts';
@@ -42,15 +43,15 @@ class FixtureRuntime extends DockerRuntime {
     return { ticket: request.ticket, gate: 2, status: 'passed', message: '', tests: [], durationMs: 1 };
   }
   override async openVSCodeReview() {}
-  // The fixture has no QA tool of its own: the QA image is SupportDesk's, which the other tests build.
+  // The fixture has no QA tool of its own: the QA image is the notes fixture's.
   override setQaTool() {
-    super.setQaTool(supportdeskTool);
+    super.setQaTool(notesTool);
   }
   override async resetDatabase() {}
 }
 
 let dir: string;
-let supportdeskTool: Awaited<ReturnType<typeof qaToolFiles>>;
+let notesTool: Awaited<ReturnType<typeof qaToolFiles>>;
 let docker: Docker;
 let runtime: FixtureRuntime;
 
@@ -136,7 +137,7 @@ let project: { qaDir: string; patches: Record<string, string> };
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bd-generic-'));
-  supportdeskTool = qaToolFiles(await readQaFiles(resolve(root, '..', 'supportdesk-qa'), runCommand));
+  notesTool = qaToolFiles(await readQaFiles((await createNotesProject(join(dir, 'notes'))).qaDir, runCommand));
   project = await fixtureProject();
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');

@@ -26,6 +26,7 @@ import { Workspace } from '../../src/main/services/workspace.ts';
 import type { EnvironmentReport } from '../../src/shared/api.ts';
 import type { QaResult } from '../../src/shared/types.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
 import type { ProjectRepo } from '../helpers/project-repo.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -34,7 +35,7 @@ const platform = currentPlatform();
 
 let tool: Awaited<ReturnType<typeof qaToolFiles>>;
 
-/** Real Docker and git; QA copies the workspace and passes; the QA image is SupportDesk's (built by the other tests). */
+/** Real Docker and git; QA copies the workspace and passes; the QA image is the notes fixture's (a small one, without Chromium). */
 class SwitchRuntime extends DockerRuntime {
   override async runQa(request: QaRequest): Promise<QaResult> {
     const qa = await (this as unknown as { qa(): Promise<QaRunner> }).qa();
@@ -98,7 +99,7 @@ const nothingLeft = async (project: string) => {
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bd-switch-'));
-  tool = qaToolFiles(await readQaFiles(resolve(root, '..', 'supportdesk-qa'), runCommand));
+  tool = qaToolFiles(await readQaFiles((await createNotesProject(join(dir, 'notes'))).qaDir, runCommand));
   repos['switch-a'] = await createProjectRepo(join(dir, 'repos'), { front: 1, back: 0 }, 'Switch A', 'switch-a');
   repos['switch-b'] = await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Switch B', 'switch-b');
   const { cli } = await platform.locateDocker();

@@ -19,25 +19,27 @@ import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { Workspace } from '../../src/main/services/workspace.ts';
+import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
+import type { ProjectRepo } from '../helpers/project-repo.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
-const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const PREFIX = 'bugdetective-test';
 const platform = currentPlatform();
 
 let dir: string;
 let docker: Docker;
 let runtime: DockerRuntime;
+// The notes fixture laid out like a published project (test/helpers/notes-project.ts).
+let notes: ProjectRepo;
 
 function createGame(stateDir = dir) {
   return new Game({
     store: new StateStore(stateDir),
     packages: new PackageStore(join(stateDir, 'packages')),
     reviews: new ReviewStore(join(stateDir, 'reviews')),
-    content: new LocalContentSource({ qaDir: supportdeskQa, runner: runCommand }),
+    content: new LocalContentSource({ qaDir: notes.qaDir, runner: runCommand }),
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },
@@ -85,6 +87,7 @@ async function submit(game: Game, ticket: number) {
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'João Silva bd-integration-'));
+  notes = await createNotesProject(join(dir, 'project'));
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
@@ -119,17 +122,17 @@ describe('QA with real Docker', () => {
 
     const ws = await workspace();
     expect(await ws.currentBranch()).toBe('player/ticket-1');
-    expect((await ws.git(['log', '--format=%s', 'stage-1'])).trim()).toBe('SupportDesk release front-1');
+    expect((await ws.git(['log', '--format=%s', 'stage-1'])).trim()).toBe('Notes release front-1');
     expect((await ws.git(['rev-list', '--count', 'HEAD'])).trim()).toBe('1');
     expect((await ws.git(['config', 'core.autocrlf'])).trim()).toBe('false');
     // Snapshot import keeps LF line endings.
     const crlf = await docker.exec(runtime.names.container, ['grep', '-rlI', '--exclude-dir=node_modules', '--exclude-dir=.git', '\r', '.'], {
       user: 'node',
-      workdir: '/workspaces/supportdesk',
+      workdir: WORKSPACE_DIR,
     });
     expect(crlf.stdout.toString('utf8').trim()).toBe('');
     // The package lives in the app data folder, not in the volume.
-    const listing = await docker.exec(runtime.names.container, ['ls', '-a', '/workspaces/supportdesk'], { user: 'node' });
+    const listing = await docker.exec(runtime.names.container, ['ls', '-a', WORKSPACE_DIR], { user: 'node' });
     expect(listing.stdout.toString('utf8')).not.toMatch(/gate2|reference\.patch|hints/);
     expect(rules.findTicket(game.current, 1)!.stageCommit).toMatch(/^[0-9a-f]{40}$/);
   });
@@ -149,10 +152,10 @@ describe('QA with real Docker', () => {
   it('counts an infinite loop as a timeout and removes the QA container', async () => {
     await game.updateSettings({ qaTimeoutSeconds: 60 });
     const ws = await workspace();
-    // A synchronous infinite loop when the ticket list module loads (the dev server is not running).
-    await docker.execChecked(runtime.names.container, ['sh', '-c', 'printf "\\nwhile (true) {}\\n" >> client/src/pages/TicketList.tsx'], {
+    // A synchronous infinite loop when the module the ticket's test imports loads.
+    await docker.execChecked(runtime.names.container, ['sh', '-c', 'printf "\\nwhile (true) {}\\n" >> client/notes.js'], {
       user: 'node',
-      workdir: '/workspaces/supportdesk',
+      workdir: WORKSPACE_DIR,
     });
     const { ticket, seconds } = await submit(game, 1);
     console.log(`timeout QA: ${seconds.toFixed(1)} s`);
@@ -160,23 +163,23 @@ describe('QA with real Docker', () => {
     expect(ticket.attempts.at(-1)!.result.status).toBe('timeout');
     expect(ticket.comments.at(-1)).toMatchObject({ kind: 'timeout', timeoutSeconds: 60 });
     expect((await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`))).toEqual([]);
-    await ws.git(['checkout', '--', 'client/src/pages/TicketList.tsx']);
+    await ws.git(['checkout', '--', 'client/notes.js']);
     await game.updateSettings({ qaTimeoutSeconds: 180 });
   });
 
   it('passes both gates after reference.patch is applied inside the workspace container', async () => {
     const ws = await workspace();
-    await ws.applyPatch(await readFile(join(supportdeskQa, 'tickets', 'front-1', 'reference.patch'), 'utf8'));
+    await ws.applyPatch(await readFile(join(notes.qaDir, 'tickets', 'front-1', 'reference.patch'), 'utf8'));
     const { result, peakQaMiB } = await measureDuring(submit(game, 1));
     console.log(`fixed QA: ${result.seconds.toFixed(1)} s, peak QA container ${peakQaMiB.toFixed(0)} MiB`);
     expect(result.ticket.attempts.at(-1)!.result).toMatchObject({ gate: 2, status: 'passed' });
     expect(result.ticket.status).toBe('codeReview');
-    expect(result.ticket.playerDiff).toContain('client/src/pages/TicketDetails.tsx');
-    expect(result.ticket.playerDiff).toContain('TicketDetails.navigation.test.tsx');
+    expect(result.ticket.playerDiff).toContain('client/notes.js');
+    expect(result.ticket.playerDiff).toContain('test/front-1.test.js');
     // QA never touched the player's files.
     expect((await ws.git(['status', '--porcelain'])).trim().split('\n').sort()).toEqual([
-      '?? client/src/pages/TicketDetails.navigation.test.tsx',
-      'M client/src/pages/TicketDetails.tsx',
+      '?? test/front-1.test.js',
+      'M client/notes.js',
     ]);
     await game.acceptReview(1);
     expect(rules.findTicket(game.current, 1)!.status).toBe('done');
@@ -190,7 +193,7 @@ describe('QA with real Docker', () => {
     expect((await ws.git(['rev-parse', 'player/ticket-1'])).trim()).toBe(before);
     // The uncommitted fix of ticket 1 was stashed, not lost.
     expect(await ws.git(['stash', 'list'])).toContain('before ticket 2');
-    expect((await ws.git(['log', '--format=%s', 'stage-2'])).trim().split('\n')).toEqual(['SupportDesk release front-2', 'SupportDesk release front-1']);
+    expect((await ws.git(['log', '--format=%s', 'stage-2'])).trim().split('\n')).toEqual(['Notes release front-2', 'Notes release front-1']);
   });
 
   it('starting a ticket discards leftovers: changes, untracked files and extra commits', async () => {
@@ -200,9 +203,9 @@ describe('QA with real Docker', () => {
       [
         'sh',
         '-c',
-        'echo "// leftover commit" >> server/src/app.ts && git commit -qam "leftover" && echo "// dirty" >> client/src/App.tsx && echo junk > junk.txt && mkdir -p tmpdir && echo x > tmpdir/x.txt',
+        'echo "// leftover commit" >> server/api.js && git commit -qam "leftover" && echo "// dirty" >> client/notes.js && echo junk > junk.txt && mkdir -p tmpdir && echo x > tmpdir/x.txt',
       ],
-      { user: 'node', workdir: '/workspaces/supportdesk' },
+      { user: 'node', workdir: WORKSPACE_DIR },
     );
     expect((await ws.git(['status', '--porcelain'])).trim()).not.toBe('');
 
@@ -245,6 +248,12 @@ describe('QA with real Docker', () => {
 
   it('recovers QA interrupted by a closed app and removes the leftover container', async () => {
     expect(rules.findTicket(game.current, 2)!.status).toBe('inProgress');
+    // The notes QA takes a second: a 30 s pause in a module gate 1 imports keeps it running.
+    await docker.execChecked(
+      runtime.names.container,
+      ['sh', '-c', 'printf "\\nAtomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30000);\\n" >> client/sort.js'],
+      { user: 'node', workdir: WORKSPACE_DIR },
+    );
     await game.move(2, 'inQa');
     await new Promise((resolve) => setTimeout(resolve, 4000));
     const running = (await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`));
@@ -260,14 +269,15 @@ describe('QA with real Docker', () => {
     expect(ticket.comments.at(-1)!.kind).toBe('interrupted');
     expect((await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`))).toEqual([]);
     await game.waitForQa().catch(() => {});
+    await (await workspace()).git(['checkout', '--', 'client/sort.js']);
   });
 
   it('a new game on a used workspace archives the old branches and starts from the clean stage', async () => {
     const ws = await workspace();
     // Leftover work of the previous game on its current branch, as after quitting mid-ticket.
-    await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo "// leftover" >> client/src/App.tsx'], {
+    await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo "// leftover" >> client/notes.js'], {
       user: 'node',
-      workdir: '/workspaces/supportdesk',
+      workdir: WORKSPACE_DIR,
     });
     const oldBranches = (await ws.git(['branch', '--list', 'player/*', '--format=%(refname:short)'])).trim().split('\n').sort();
     expect(oldBranches).toContain('player/ticket-1');
