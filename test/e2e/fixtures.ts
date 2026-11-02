@@ -1,12 +1,16 @@
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
+import { SUPPORTDESK_CHOICE_FILE } from './global-setup.ts';
+import type { SupportdeskChoice } from './global-setup.ts';
 
 /** The SupportDesk qa folder next to the desktop folder, the content of the e2e tests. */
-export const supportdeskQa = resolve(import.meta.dirname, '..', '..', '..', 'supportdesk-qa');
+/** SupportDesk's qa folder for these tests, chosen by global-setup.ts (the local worktree or the pinned publication). */
+export const supportdeskQa = (JSON.parse(readFileSync(SUPPORTDESK_CHOICE_FILE, 'utf8')) as SupportdeskChoice).qaDir;
 
 export interface Launched {
   app: ElectronApplication;

@@ -3,6 +3,8 @@ out/
 dist/
 build/
 test-results/
+# The e2e tests' pinned SupportDesk publication (test/e2e/global-setup.ts).
+test/.cache/
 playwright-report/
 *.tsbuildinfo
 
