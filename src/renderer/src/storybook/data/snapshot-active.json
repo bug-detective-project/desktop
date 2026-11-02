@@ -1,0 +1,354 @@
+{
+  "state": {
+    "schemaVersion": 7,
+    "project": "notes",
+    "otherProjects": {},
+    "projectSources": {
+      "notes": {
+        "repository": "local/notes",
+        "qaRef": "qa",
+        "minVersion": null
+      }
+    },
+    "projectSwitch": null,
+    "createdAt": "2026-11-02T22:49:22.890Z",
+    "currentTicket": 1,
+    "tracks": {
+      "front": 2,
+      "back": 1
+    },
+    "tickets": [
+      {
+        "ticket": 1,
+        "id": "front-1",
+        "track": "front",
+        "manifestVersion": "0.0.0",
+        "status": "inProgress",
+        "unlockedAt": "2026-11-02T22:49:24.218Z",
+        "stageCommit": "7df11751c2cdc61811816be34e465766070f30b3",
+        "attempts": [],
+        "comments": [],
+        "hintsRevealed": 0,
+        "solutionRevealed": false,
+        "reviewAcceptedAt": null,
+        "qaStartedAt": null,
+        "playerDiff": null,
+        "conversation": []
+      }
+    ],
+    "activity": [
+      {
+        "ticket": 1,
+        "from": null,
+        "to": "todo",
+        "at": "2026-11-02T22:49:24.218Z",
+        "actor": "system",
+        "reason": "unlocked"
+      },
+      {
+        "ticket": 1,
+        "from": "todo",
+        "to": "inProgress",
+        "at": "2026-11-02T22:49:24.494Z",
+        "actor": "player",
+        "reason": "started"
+      }
+    ],
+    "inbox": [
+      {
+        "id": "8bf84476-a094-4557-ad08-9f16100f1caa",
+        "kind": "welcome",
+        "at": "2026-11-02T22:49:22.890Z",
+        "read": true
+      },
+      {
+        "id": "de71089f-152d-49f2-93c3-276c8e3c5abb",
+        "kind": "assignment",
+        "ticket": 1,
+        "at": "2026-11-02T22:49:24.218Z",
+        "read": false
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "qaTimeoutSeconds": 180,
+      "theme": "system"
+    },
+    "reviewSession": null
+  },
+  "nextTicket": null,
+  "queues": {
+    "front": {
+      "next": {
+        "id": "front-2",
+        "track": "front",
+        "title": {
+          "en": "Long previews are not cut",
+          "pt": "Prévias longas não são cortadas"
+        }
+      },
+      "done": 0,
+      "total": 2
+    },
+    "back": {
+      "next": {
+        "id": "back-1",
+        "track": "back",
+        "title": {
+          "en": "Search is case-sensitive",
+          "pt": "A busca diferencia maiúsculas"
+        }
+      },
+      "done": 0,
+      "total": 1
+    },
+    "fullstack": {
+      "next": {
+        "id": "back-1",
+        "track": "back",
+        "title": {
+          "en": "Search is case-sensitive",
+          "pt": "A busca diferencia maiúsculas"
+        }
+      },
+      "done": 0,
+      "total": 3
+    }
+  },
+  "projectsUnlocked": false,
+  "projects": [
+    {
+      "id": "notes",
+      "active": true,
+      "played": true,
+      "details": {
+        "name": {
+          "en": "Notes",
+          "pt": "Notes"
+        },
+        "about": {
+          "en": "A note-taking app.",
+          "pt": "Um app de notas."
+        },
+        "client": {
+          "en": "Notes Inc.",
+          "pt": "Notes Inc."
+        },
+        "stack": {
+          "frontend": "Plain JavaScript",
+          "backend": "Node.js",
+          "database": "JSON file"
+        },
+        "skills": {
+          "en": [
+            "Reading a failing test",
+            "Small fixes"
+          ],
+          "pt": [
+            "Ler um teste que falha",
+            "Correções pequenas"
+          ]
+        },
+        "difficulty": "beginner",
+        "counts": {
+          "front": 2,
+          "back": 1
+        }
+      },
+      "progress": {
+        "front": {
+          "done": 0,
+          "total": 2
+        },
+        "back": {
+          "done": 0,
+          "total": 1
+        }
+      },
+      "unavailable": null
+    }
+  ],
+  "projectNeedsUpdate": false,
+  "starterNeedsUpdate": false,
+  "projectSwitchLeft": null,
+  "titles": {
+    "1": {
+      "en": "An empty title shows nothing",
+      "pt": "Um título vazio não mostra nada"
+    }
+  },
+  "hintsTotal": {
+    "1": 3
+  },
+  "busy": null,
+  "dockerState": "running",
+  "prerequisites": {
+    "checks": [
+      {
+        "id": "docker",
+        "status": "ok",
+        "version": "4.37.1"
+      },
+      {
+        "id": "wsl",
+        "status": "ok",
+        "detail": "docker-desktop (WSL 2)",
+        "version": "2.3.24.0"
+      },
+      {
+        "id": "vscode",
+        "status": "ok",
+        "version": "1.95.1"
+      },
+      {
+        "id": "devcontainers",
+        "status": "ok",
+        "version": "0.388.0"
+      }
+    ],
+    "allOk": true,
+    "dockerState": "running"
+  },
+  "environment": {
+    "items": [
+      {
+        "id": "workspaceImage",
+        "ready": true
+      },
+      {
+        "id": "qaImage",
+        "ready": true
+      }
+    ],
+    "ready": true
+  },
+  "log": [],
+  "reviewNotice": null,
+  "contentSource": "local: /tmp/notes-project/notes-qa",
+  "projectStory": {
+    "en": {
+      "client": {
+        "name": "Notes Inc.",
+        "about": "A small company that keeps notes.",
+        "contacts": "Ana",
+        "reporters": [
+          {
+            "name": "Ana",
+            "role": "Lead"
+          }
+        ]
+      },
+      "project": {
+        "name": "Notes",
+        "about": "A note-taking app.",
+        "stack": "Node.js",
+        "skills": [
+          "Reading a failing test",
+          "Small fixes"
+        ]
+      },
+      "messages": {
+        "welcome": {
+          "subject": "Welcome to Notes",
+          "body": "Welcome to Notes."
+        },
+        "assignments": {
+          "front-1": {
+            "subject": "Ticket front-1",
+            "body": "Ticket front-1."
+          },
+          "front-2": {
+            "subject": "Ticket front-2",
+            "body": "Ticket front-2."
+          },
+          "back-1": {
+            "subject": "Ticket back-1",
+            "body": "Ticket back-1."
+          }
+        },
+        "completion": {
+          "subject": "All done",
+          "body": "All done."
+        },
+        "trackCompletion": {
+          "subject": "Track {{track}} done",
+          "body": "Track {{track}} done."
+        }
+      }
+    },
+    "pt": {
+      "client": {
+        "name": "Notes Inc.",
+        "about": "Uma pequena empresa que guarda notas.",
+        "contacts": "Ana",
+        "reporters": [
+          {
+            "name": "Ana",
+            "role": "Líder"
+          }
+        ]
+      },
+      "project": {
+        "name": "Notes",
+        "about": "Um app de notas.",
+        "stack": "Node.js",
+        "skills": [
+          "Ler um teste que falha",
+          "Correções pequenas"
+        ]
+      },
+      "messages": {
+        "welcome": {
+          "subject": "Boas-vindas ao Notes",
+          "body": "Boas-vindas ao Notes."
+        },
+        "assignments": {
+          "front-1": {
+            "subject": "Ticket front-1",
+            "body": "Ticket front-1."
+          },
+          "front-2": {
+            "subject": "Ticket front-2",
+            "body": "Ticket front-2."
+          },
+          "back-1": {
+            "subject": "Ticket back-1",
+            "body": "Ticket back-1."
+          }
+        },
+        "completion": {
+          "subject": "Tudo pronto",
+          "body": "Tudo pronto."
+        },
+        "trackCompletion": {
+          "subject": "Trilha {{track}} concluída",
+          "body": "Trilha {{track}} concluída."
+        }
+      }
+    }
+  },
+  "appVersion": "0.1.0",
+  "versions": {
+    "electron": "45.0.0",
+    "node": "24.22.0",
+    "chrome": "156.0.8078.48"
+  },
+  "devSolveBug": false,
+  "onboardingDue": false,
+  "devSkipOnboarding": false,
+  "devCatalog": {
+    "file": "/tmp/bug-detective-data/catalog.local.json",
+    "settings": {},
+    "error": null,
+    "testFile": true,
+    "inUse": "file /tmp/bug-detective-data/test-catalog.json",
+    "fallback": false,
+    "projects": [
+      {
+        "id": "notes",
+        "qaRef": "qa",
+        "source": "local: /tmp/notes-project/notes-qa"
+      }
+    ]
+  }
+}

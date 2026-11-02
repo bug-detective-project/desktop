@@ -1,0 +1,293 @@
+{
+  "state": {
+    "schemaVersion": 7,
+    "project": "notes",
+    "otherProjects": {},
+    "projectSources": {
+      "notes": {
+        "repository": "local/notes",
+        "qaRef": "qa",
+        "minVersion": null
+      }
+    },
+    "projectSwitch": null,
+    "createdAt": "2026-11-02T22:49:22.890Z",
+    "currentTicket": null,
+    "tracks": null,
+    "tickets": [],
+    "activity": [],
+    "inbox": [
+      {
+        "id": "8bf84476-a094-4557-ad08-9f16100f1caa",
+        "kind": "welcome",
+        "at": "2026-11-02T22:49:22.890Z",
+        "read": true
+      }
+    ],
+    "settings": {
+      "language": "en",
+      "qaTimeoutSeconds": 180,
+      "theme": "system"
+    },
+    "reviewSession": null
+  },
+  "nextTicket": 1,
+  "queues": {
+    "front": {
+      "next": {
+        "id": "front-1",
+        "track": "front",
+        "title": {
+          "en": "An empty title shows nothing",
+          "pt": "Um título vazio não mostra nada"
+        }
+      },
+      "done": 0,
+      "total": 2
+    },
+    "back": {
+      "next": {
+        "id": "back-1",
+        "track": "back",
+        "title": {
+          "en": "Search is case-sensitive",
+          "pt": "A busca diferencia maiúsculas"
+        }
+      },
+      "done": 0,
+      "total": 1
+    },
+    "fullstack": {
+      "next": {
+        "id": "front-1",
+        "track": "front",
+        "title": {
+          "en": "An empty title shows nothing",
+          "pt": "Um título vazio não mostra nada"
+        }
+      },
+      "done": 0,
+      "total": 3
+    }
+  },
+  "projectsUnlocked": false,
+  "projects": [
+    {
+      "id": "notes",
+      "active": true,
+      "played": false,
+      "details": {
+        "name": {
+          "en": "Notes",
+          "pt": "Notes"
+        },
+        "about": {
+          "en": "A note-taking app.",
+          "pt": "Um app de notas."
+        },
+        "client": {
+          "en": "Notes Inc.",
+          "pt": "Notes Inc."
+        },
+        "stack": {
+          "frontend": "Plain JavaScript",
+          "backend": "Node.js",
+          "database": "JSON file"
+        },
+        "skills": {
+          "en": [
+            "Reading a failing test",
+            "Small fixes"
+          ],
+          "pt": [
+            "Ler um teste que falha",
+            "Correções pequenas"
+          ]
+        },
+        "difficulty": "beginner",
+        "counts": {
+          "front": 2,
+          "back": 1
+        }
+      },
+      "progress": null,
+      "unavailable": null
+    }
+  ],
+  "projectNeedsUpdate": false,
+  "starterNeedsUpdate": false,
+  "projectSwitchLeft": null,
+  "titles": {},
+  "hintsTotal": {},
+  "busy": null,
+  "dockerState": "running",
+  "prerequisites": {
+    "checks": [
+      {
+        "id": "docker",
+        "status": "ok",
+        "version": "4.37.1"
+      },
+      {
+        "id": "wsl",
+        "status": "ok",
+        "detail": "docker-desktop (WSL 2)",
+        "version": "2.3.24.0"
+      },
+      {
+        "id": "vscode",
+        "status": "ok",
+        "version": "1.95.1"
+      },
+      {
+        "id": "devcontainers",
+        "status": "ok",
+        "version": "0.388.0"
+      }
+    ],
+    "allOk": true,
+    "dockerState": "running"
+  },
+  "environment": {
+    "items": [
+      {
+        "id": "workspaceImage",
+        "ready": true
+      },
+      {
+        "id": "qaImage",
+        "ready": true
+      }
+    ],
+    "ready": true
+  },
+  "log": [],
+  "reviewNotice": null,
+  "contentSource": "local: /tmp/notes-project/notes-qa",
+  "projectStory": {
+    "en": {
+      "client": {
+        "name": "Notes Inc.",
+        "about": "A small company that keeps notes.",
+        "contacts": "Ana",
+        "reporters": [
+          {
+            "name": "Ana",
+            "role": "Lead"
+          }
+        ]
+      },
+      "project": {
+        "name": "Notes",
+        "about": "A note-taking app.",
+        "stack": "Node.js",
+        "skills": [
+          "Reading a failing test",
+          "Small fixes"
+        ]
+      },
+      "messages": {
+        "welcome": {
+          "subject": "Welcome to Notes",
+          "body": "Welcome to Notes."
+        },
+        "assignments": {
+          "front-1": {
+            "subject": "Ticket front-1",
+            "body": "Ticket front-1."
+          },
+          "front-2": {
+            "subject": "Ticket front-2",
+            "body": "Ticket front-2."
+          },
+          "back-1": {
+            "subject": "Ticket back-1",
+            "body": "Ticket back-1."
+          }
+        },
+        "completion": {
+          "subject": "All done",
+          "body": "All done."
+        },
+        "trackCompletion": {
+          "subject": "Track {{track}} done",
+          "body": "Track {{track}} done."
+        }
+      }
+    },
+    "pt": {
+      "client": {
+        "name": "Notes Inc.",
+        "about": "Uma pequena empresa que guarda notas.",
+        "contacts": "Ana",
+        "reporters": [
+          {
+            "name": "Ana",
+            "role": "Líder"
+          }
+        ]
+      },
+      "project": {
+        "name": "Notes",
+        "about": "Um app de notas.",
+        "stack": "Node.js",
+        "skills": [
+          "Ler um teste que falha",
+          "Correções pequenas"
+        ]
+      },
+      "messages": {
+        "welcome": {
+          "subject": "Boas-vindas ao Notes",
+          "body": "Boas-vindas ao Notes."
+        },
+        "assignments": {
+          "front-1": {
+            "subject": "Ticket front-1",
+            "body": "Ticket front-1."
+          },
+          "front-2": {
+            "subject": "Ticket front-2",
+            "body": "Ticket front-2."
+          },
+          "back-1": {
+            "subject": "Ticket back-1",
+            "body": "Ticket back-1."
+          }
+        },
+        "completion": {
+          "subject": "Tudo pronto",
+          "body": "Tudo pronto."
+        },
+        "trackCompletion": {
+          "subject": "Trilha {{track}} concluída",
+          "body": "Trilha {{track}} concluída."
+        }
+      }
+    }
+  },
+  "appVersion": "0.1.0",
+  "versions": {
+    "electron": "45.0.0",
+    "node": "24.22.0",
+    "chrome": "156.0.8078.48"
+  },
+  "devSolveBug": false,
+  "onboardingDue": false,
+  "devSkipOnboarding": false,
+  "devCatalog": {
+    "file": "/tmp/bug-detective-data/catalog.local.json",
+    "settings": {},
+    "error": null,
+    "testFile": true,
+    "inUse": "file /tmp/bug-detective-data/test-catalog.json",
+    "fallback": false,
+    "projects": [
+      {
+        "id": "notes",
+        "qaRef": "qa",
+        "source": "local: /tmp/notes-project/notes-qa"
+      }
+    ]
+  }
+}

@@ -6,3 +6,5 @@ packages:
 # (`pnpm run electron:install`), so no package needs one.
 allowBuilds:
   electron-winstaller: false
+  # Storybook's bundler: its binary comes from a per-platform optional dependency.
+  esbuild: false

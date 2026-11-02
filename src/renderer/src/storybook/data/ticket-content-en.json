@@ -1,0 +1,10 @@
+{
+  "ticket": 1,
+  "ticketMarkdown": "# An empty title shows nothing\n\nNotes without a title must show Untitled.\n",
+  "hints": [],
+  "hintsTotal": 3,
+  "solutionMarkdown": null,
+  "reviewMarkdown": null,
+  "referencePatch": null,
+  "playerDiff": null
+}

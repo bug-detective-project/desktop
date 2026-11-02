@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "paths": { "@shared/*": ["./src/shared/*"] }
   },
-  "include": ["src", "test", "tools", "*.config.ts"]
+  "include": ["src", "test", "tools", "*.config.ts", ".storybook"]
 }

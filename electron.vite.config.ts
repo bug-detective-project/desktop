@@ -1,8 +1,7 @@
 import { resolve } from 'node:path';
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 import type { Plugin } from 'vite';
+import { rendererAlias, rendererPlugins } from './renderer.config.ts';
 import { bundledLicenses } from './tools/notices.ts';
 
 /**
@@ -47,10 +46,8 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(import.meta.dirname, 'src/renderer'),
-    plugins: [react(), tailwindcss(), devContentSecurityPolicy(), bundledLicenses()],
-    resolve: {
-      alias: { '@shared': resolve(import.meta.dirname, 'src/shared') },
-    },
+    plugins: [...rendererPlugins(), devContentSecurityPolicy(), bundledLicenses()],
+    resolve: { alias: rendererAlias },
     build: {
       // Fonts and images stay files: the CSP allows 'self' only, not data: fonts.
       assetsInlineLimit: 0,

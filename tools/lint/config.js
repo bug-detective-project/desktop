@@ -11,7 +11,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['out/**', 'dist/**', 'build/**', 'node_modules/**', 'tools/lint/node_modules/**', 'test-results/**', 'playwright-report/**', 'test/.cache/**'],
+    ignores: ['out/**', 'dist/**', 'build/**', 'node_modules/**', 'tools/lint/node_modules/**', 'test-results/**', 'playwright-report/**', 'test/.cache/**', 'storybook-static/**', 'coverage/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
