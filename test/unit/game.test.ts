@@ -722,14 +722,22 @@ function fakeCatalog(initial: ResolvedProject[]) {
 }
 
 describe('Game with several projects', () => {
-  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] }))) {
+  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] })), firstFront = 1) {
     const repos = {
-      first: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 0 }, 'First'),
+      first: await createProjectRepo(join(dir, 'repos'), { front: firstFront, back: 0 }, 'First'),
       second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
     };
     const sources: { id: string; repository: string; minVersion: string | null }[] = [];
     const versions: Record<string, string> = {};
     const broken: Record<string, Error> = {};
+    // The repository each ticket was fetched from; a test may hold a fetch until it opens the gate.
+    const fetched: string[] = [];
+    let gate: Promise<void> = Promise.resolve();
+    const hold = () => {
+      let open!: () => void;
+      gate = new Promise((resolve) => (open = resolve));
+      return () => open();
+    };
     const catalog = fakeCatalog([
       { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
       { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
@@ -748,7 +756,15 @@ describe('Game with several projects', () => {
               const error = broken[project.id];
               return { kind: 'github', describe: () => project.id, prepare: () => Promise.reject(error), current: async () => null, fetchTicket: () => Promise.reject(error) };
             }
-            return withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
+            const source = withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
+            return {
+              ...source,
+              fetchTicket: async (id, signal) => {
+                fetched.push(project.repository);
+                await gate;
+                return source.fetchTicket(id, signal);
+              },
+            };
           },
           packages: (id) => new PackageStore(join(dir, 'projects', id, 'packages')),
           reviews: (id) => new ReviewStore(join(dir, 'projects', id, 'reviews')),
@@ -757,7 +773,7 @@ describe('Game with several projects', () => {
         appVersion: '0.1.0',
         versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
       });
-    return { make, runtime, catalog, sources, versions, broken };
+    return { make, runtime, catalog, sources, versions, broken, fetched, hold };
   }
 
   async function finishFirstTicket(game: Game) {
@@ -841,6 +857,43 @@ describe('Game with several projects', () => {
     const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
     await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'otherProjectsLeft' });
     expect(removeProjects).toHaveBeenCalledWith(['second']);
+  });
+
+  it('fetches the next ticket of a project that moved from the repository the catalog now names', async () => {
+    const { make, catalog, fetched } = await twoProjects();
+    const game = make();
+    await game.init();
+    catalog.set([
+      { id: 'first', repository: 'owner/moved', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
+    await game.refreshCatalog();
+    await game.nextAssignment('front');
+    expect(fetched).toEqual(['owner/moved']);
+    expect(game.current.projectSources.first?.repository).toBe('owner/moved');
+  });
+
+  it('applies a catalog refreshed while a ticket is unlocked from the next ticket, never to that one', async () => {
+    const { make, catalog, fetched, hold } = await twoProjects(undefined, 2);
+    const game = make();
+    await game.init();
+    const open = hold();
+    const unlocking = game.nextAssignment('front');
+    await vi.waitFor(() => expect(fetched).toHaveLength(1));
+    catalog.set([
+      { id: 'first', repository: 'owner/moved', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
+    await game.refreshCatalog();
+    open();
+    await unlocking;
+    expect(fetched).toEqual(['owner/first']);
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(1);
+    await game.nextAssignment('front');
+    expect(fetched).toEqual(['owner/first', 'owner/moved']);
   });
 
   it('starts a new game in the starter of the catalog in use', async () => {

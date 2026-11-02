@@ -132,6 +132,8 @@ export class Game {
 
   /** The active project's content source and data folders (they change with a project switch). */
   private source: ContentSource;
+  /** The catalog entry the source was made from: a different one makes a new source. */
+  private sourceKey: string | null = null;
   private packages: PackageStore;
   private reviews: ReviewStore;
   /** What a downloaded project shows on the Projects screen, by id. */
@@ -236,6 +238,9 @@ export class Game {
     }
     await this.options.projects.catalog.refresh().catch(() => false);
     await this.loadCatalog().catch(() => {});
+    if (this.busy === null && this.followCatalog()) {
+      await this.loadContent();
+    }
     this.emit();
   }
 
@@ -252,6 +257,29 @@ export class Game {
     }
   }
 
+  private entryKey(id: string): string | null {
+    const entry = this.sourceOf(id);
+    return entry && JSON.stringify([entry.repository, entry.qaRef, entry.qaDir ?? null, entry.official]);
+  }
+
+  /**
+   * Follows the catalog when the active project's entry changed (it moved to another repository or
+   * ref, or the development settings changed): its content comes from the new source from the next
+   * ticket. Only when nothing runs, so a ticket being unlocked keeps the source it started with.
+   * Returns whether the source changed.
+   */
+  private followCatalog(): boolean {
+    const active = this.activeProject();
+    if (!this.options.projects || !active || this.state.projectSwitch || this.entryKey(active) === this.sourceKey) {
+      return false;
+    }
+    this.source = this.contentOf(active);
+    this.sourceKey = this.entryKey(active);
+    this.content = null;
+    this.projectFiles = null;
+    return true;
+  }
+
   /** Points the content source, the data folders and new Docker resources at a project. */
   private useProject(id: string): void {
     const projects = this.options.projects;
@@ -259,6 +287,7 @@ export class Game {
       return;
     }
     this.source = this.contentOf(id);
+    this.sourceKey = this.entryKey(id);
     this.packages = projects.packages(id);
     this.reviews = projects.reviews(id);
     this.options.runtime.setProject(id);
@@ -314,6 +343,11 @@ export class Game {
     if (this.options.projects) {
       await this.cleanOtherProjects().catch(() => {});
     }
+    await this.loadContent();
+  }
+
+  /** Uses the content already downloaded, otherwise starts downloading it. */
+  private async loadContent(): Promise<void> {
     const content = await this.source.current().catch(() => null);
     if (content) {
       await this.useContent(content);
@@ -696,6 +730,7 @@ export class Game {
     void this.refreshCatalog();
     await this.exclusive('unlocking', async () => {
       await this.beforePlayerCode();
+      this.followCatalog();
       if (!this.content) {
         try {
           await this.useContent(await this.source.prepare());
