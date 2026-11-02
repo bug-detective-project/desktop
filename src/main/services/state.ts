@@ -115,6 +115,14 @@ export const gameStateSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   project: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/).nullable(),
   otherProjects: z.record(z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), projectProgressSchema),
+  projectSources: z.record(
+    z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+    z.object({
+      repository: z.string().regex(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/),
+      qaRef: z.string().min(1).max(100),
+      minVersion: z.string().regex(/^\d+\.\d+\.\d+$/).nullable(),
+    }),
+  ),
   projectSwitch: z
     .object({ from: z.string(), to: z.string(), phase: z.literal('cleaning'), startedAt: z.string() })
     .nullable(),

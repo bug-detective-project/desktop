@@ -8,8 +8,8 @@ import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import type { ResolvedProject } from '../../src/main/services/catalog.ts';
+import type { ContentSource, ProjectContent } from '../../src/main/services/content/source.ts';
 import { IncompletePublicationError, TicketNotPublishedError, readZip } from '@bug-detective/catalog/contract';
-import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
@@ -686,6 +686,21 @@ describe('Game', () => {
   });
 });
 
+/** A content source whose manifests carry the given version (the local source always says 0.0.0). */
+function withVersion(source: ContentSource, version: () => string): ContentSource {
+  const content = (value: ProjectContent): ProjectContent => ({ ...value, manifest: { ...value.manifest, version: version() } });
+  return {
+    kind: source.kind,
+    describe: () => source.describe(),
+    prepare: async (signal) => content(await source.prepare(signal)),
+    current: async () => {
+      const value = await source.current();
+      return value ? content(value) : null;
+    },
+    fetchTicket: async (id, signal) => ({ ...(await source.fetchTicket(id, signal)), manifestVersion: version() }),
+  };
+}
+
 /** A projects catalog whose list a test can change; counts its refreshes. */
 function fakeCatalog(initial: ResolvedProject[]) {
   let list = initial;
@@ -712,6 +727,8 @@ describe('Game with several projects', () => {
       first: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 0 }, 'First'),
       second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
     };
+    const sources: { id: string; repository: string; minVersion: string | null }[] = [];
+    const versions: Record<string, string> = {};
     const catalog = fakeCatalog([
       { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
       { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
@@ -724,7 +741,10 @@ describe('Game with several projects', () => {
         content: new LocalContentSource({ qaDir: repos.first.qaDir, runner: runCommand }),
         projects: {
           catalog,
-          content: (project) => new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }),
+          content: (project, minVersion) => {
+            sources.push({ id: project.id, repository: project.repository, minVersion });
+            return withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
+          },
           packages: (id) => new PackageStore(join(dir, 'projects', id, 'packages')),
           reviews: (id) => new ReviewStore(join(dir, 'projects', id, 'reviews')),
         },
@@ -732,7 +752,7 @@ describe('Game with several projects', () => {
         appVersion: '0.1.0',
         versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
       });
-    return { make, runtime, catalog };
+    return { make, runtime, catalog, sources, versions };
   }
 
   async function finishFirstTicket(game: Game) {
@@ -855,6 +875,112 @@ describe('Game with several projects', () => {
     await game.nextAssignment('front');
     expect(catalog.refreshes).toBe(2);
     expect(game.current.tickets.map((ticket) => ticket.id)).toEqual(['front-1']);
+  });
+
+  it("records each project's source and raises its version floor, never lowering it", async () => {
+    const { make, sources, versions } = await twoProjects();
+    versions.first = '1.2.0';
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    expect(game.current.projectSources.first).toEqual({ repository: 'owner/first', qaRef: 'qa', minVersion: '1.2.0' });
+
+    versions.first = '1.1.0';
+    const next = make();
+    await next.init();
+    expect(next.current.projectSources.first.minVersion).toBe('1.2.0');
+    expect(sources.filter((item) => item.id === 'first').at(-1)?.minVersion).toBe('1.2.0');
+  });
+
+  it('never applies the floor to a source that is not the official one', async () => {
+    const { make, catalog, sources, versions } = await twoProjects();
+    versions.first = '1.2.0';
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: false },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
+    await make().init();
+    expect(sources.filter((item) => item.id === 'first').at(-1)?.minVersion).toBeNull();
+  });
+
+  it('keeps the floor of a project across a switch and back', async () => {
+    const { make, sources, versions } = await twoProjects();
+    versions.first = '1.2.0';
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    await game.switchProject('second');
+    await game.switchProject('first');
+    expect(sources.filter((item) => item.id === 'first').at(-1)?.minVersion).toBe('1.2.0');
+  });
+
+  it('follows the catalog when a project moves, and its stored source once it leaves the catalog', async () => {
+    const { make, catalog, sources } = await twoProjects();
+    const game = make();
+    await game.init();
+    catalog.set([
+      { id: 'first', repository: 'owner/first-moved', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
+    await make().init();
+    expect(sources.at(-1)).toMatchObject({ id: 'first', repository: 'owner/first-moved' });
+
+    catalog.set([{ id: 'second', repository: 'owner/second', qaRef: 'qa', starter: true, official: true }]);
+    const later = make();
+    await later.init();
+    expect(later.current.project).toBe('first');
+    expect(sources.at(-1)).toMatchObject({ id: 'first', repository: 'owner/first-moved' });
+  });
+
+  it('finishes a pending switch to a project that left the catalog', async () => {
+    const { make, runtime, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'volume', name: 'bugdetective-workspace' }]);
+    await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'switchIncomplete' });
+
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }]);
+    vi.mocked(runtime.removeProjects).mockResolvedValue([]);
+    const next = make();
+    await next.init();
+    expect(next.current).toMatchObject({ project: 'second', projectSwitch: null });
+  });
+
+  it('still removes from Docker a played project that left the catalog', async () => {
+    const { make, runtime, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    await game.switchProject('second');
+    await game.switchProject('first');
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }]);
+    const next = make();
+    await next.init();
+    const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([]);
+    await next.cleanDockerLeftovers();
+    expect(removeProjects).toHaveBeenCalledWith(['second']);
+  });
+
+  it('restores each project source and floor from a save', async () => {
+    const { make, runtime, versions } = await twoProjects();
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    versions.first = '1.2.0';
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+    versions.first = '1.0.0';
+    await game.newGame();
+    expect(game.current.projectSources).toEqual({ first: { repository: 'owner/first', qaRef: 'qa', minVersion: '1.0.0' } });
+
+    const { token } = await game.inspectSave(file, 'progress.bdsave');
+    await game.restoreProgress(token);
+    expect(game.current.projectSources.first.minVersion).toBe('1.2.0');
   });
 
   it('shows a project the catalog adds after a refresh', async () => {

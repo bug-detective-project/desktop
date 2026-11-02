@@ -27,7 +27,7 @@ import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SEC
 import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { createSave, readSave } from './services/backup.ts';
-import { IncompletePublicationError, TicketNotPublishedError, countsOf, fileText, parseReviewConfig, projectContentOf, qaToolFiles, writeZip } from '@bug-detective/catalog/contract';
+import { IncompletePublicationError, TicketNotPublishedError, compareVersions, countsOf, fileText, parseReviewConfig, projectContentOf, qaToolFiles, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig } from '@bug-detective/catalog/contract';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
@@ -154,22 +154,52 @@ export class Game {
     return this.catalog.find((item) => item.starter)?.id ?? null;
   }
 
+  /** Every project the catalog lists or this game played, except the active one. */
   private otherProjectIds(): string[] {
     const active = this.activeProject();
-    return this.catalog.map((item) => item.id).filter((id) => id !== active);
+    const ids = [...this.catalog.map((item) => item.id), ...Object.keys(this.state.projectSources), ...Object.keys(this.state.otherProjects)];
+    return [...new Set(ids)].filter((id) => id !== active);
   }
 
-  /** A project of the catalog in use. */
+  /** Where a project's content comes from: the catalog in use, else the source this game last used (a project that left the catalog). */
+  private sourceOf(id: string): ResolvedProject | null {
+    const listed = this.catalog.find((item) => item.id === id);
+    if (listed) {
+      return listed;
+    }
+    const known = this.state.projectSources[id];
+    return known ? { id, repository: known.repository, qaRef: known.qaRef, starter: false, official: true } : null;
+  }
+
   private projectEntry(id: string): ResolvedProject {
-    const entry = this.catalog.find((item) => item.id === id);
+    const entry = this.sourceOf(id);
     if (!entry) {
       throw new GameError('unknownProject', `${id} is not in the projects catalog`);
     }
     return entry;
   }
 
+  /** A project's content source, with its version floor when its source is the official one. */
   private contentOf(id: string): ContentSource {
-    return this.options.projects!.content(this.projectEntry(id), null);
+    const entry = this.projectEntry(id);
+    const floor = entry.official ? (this.state.projectSources[id]?.minVersion ?? null) : null;
+    return this.options.projects!.content(entry, floor);
+  }
+
+  /** The state with a project's source recorded, and its floor raised to an accepted official version. */
+  private withSource(state: GameState, id: string, accepted: string | null): GameState {
+    const entry = this.sourceOf(id);
+    if (!entry || !this.options.projects) {
+      return state;
+    }
+    const before = state.projectSources[id]?.minVersion ?? null;
+    const raised = entry.official && accepted !== null && (before === null || compareVersions(accepted, before) > 0) ? accepted : before;
+    const next = { repository: entry.repository, qaRef: entry.qaRef, minVersion: raised };
+    const current = state.projectSources[id];
+    if (current && current.repository === next.repository && current.qaRef === next.qaRef && current.minVersion === next.minVersion) {
+      return state;
+    }
+    return { ...state, projectSources: { ...state.projectSources, [id]: next } };
   }
 
   /** Reads the catalog in use (the cache or the bundled fallback). */
@@ -261,7 +291,7 @@ export class Game {
     }
     const content = await this.source.current().catch(() => null);
     if (content) {
-      this.useContent(content);
+      await this.useContent(content);
     } else {
       // Small (the qa branch and the code of each ticket): the story is there before the setup.
       this.contentDownload = this.source.prepare().then(
@@ -276,12 +306,16 @@ export class Game {
     return this.contentDownload;
   }
 
-  /** The project's content is available: its QA tool, review configuration and story. */
-  private useContent(content: ProjectContent): void {
+  /** The project's content is available: its QA tool, review configuration and story. Records its source and version. */
+  private async useContent(content: ProjectContent): Promise<void> {
     this.projectFiles = projectContentOf(content.qaFiles);
     this.content = content;
     this.options.runtime.setQaTool(qaToolFiles(content.qaFiles));
     this.emit();
+    const active = this.activeProject();
+    if (active && this.withSource(this.state, active, content.manifest.version) !== this.state) {
+      await this.commit((state) => this.withSource(state, active, content.manifest.version));
+    }
   }
 
   /** The tickets per track: the downloaded manifest's, else the last unlock's. */
@@ -496,7 +530,7 @@ export class Game {
       }
       this.appendLog(`» Downloading the project from ${this.source.describe()}`);
       try {
-        this.useContent(await this.source.prepare());
+        await this.useContent(await this.source.prepare());
       } catch (error) {
         throw contentError(error);
       }
@@ -533,9 +567,9 @@ export class Game {
       } catch (error) {
         throw contentError(error);
       }
-      await this.commit((state, ctx) => rules.beginSwitch(state, from, to, ctx));
+      await this.commit((state, ctx) => rules.beginSwitch(this.withSource(state, to, null), from, to, ctx));
       this.useProject(to);
-      this.useContent(content);
+      await this.useContent(content);
       this.titles = {};
       this.hintsTotal = {};
       await this.loadTicketMeta();
@@ -620,7 +654,7 @@ export class Game {
       await this.beforePlayerCode();
       if (!this.content) {
         try {
-          this.useContent(await this.source.prepare());
+          await this.useContent(await this.source.prepare());
         } catch (error) {
           throw contentError(error);
         }
@@ -639,7 +673,7 @@ export class Game {
           // A newer publication has fewer tickets in that track: its queue ends, nothing else changes.
           const content = await this.source.current().catch(() => null);
           if (content) {
-            this.useContent(content);
+            await this.useContent(content);
           }
           await this.commit((state, ctx) => rules.setTrackCounts(state, error.counts, ctx));
           throw new GameError('noMoreTickets', error.message);
@@ -650,7 +684,7 @@ export class Game {
       await this.packages.save(ticket, writeZip(fetched.packageFiles));
       const content = await this.source.current().catch(() => null);
       if (content) {
-        this.useContent(content);
+        await this.useContent(content);
       }
       // The volume outlives the saved game: work from another game is archived, never reused.
       const archived = await this.options.runtime.claimWorkspace(this.state.createdAt);
@@ -825,7 +859,7 @@ export class Game {
       this.useProject(starter);
       const content = await this.source.current().catch(() => null);
       if (content) {
-        this.useContent(content);
+        await this.useContent(content);
       }
       await this.cleanOtherProjects().catch(() => {});
     }
@@ -1268,7 +1302,7 @@ export class Game {
       await this.loadTicketMeta();
       const content = await this.source.current().catch(() => null);
       if (content) {
-        this.useContent(content);
+        await this.useContent(content);
       }
       await this.cleanOtherProjects().catch(() => {});
     });

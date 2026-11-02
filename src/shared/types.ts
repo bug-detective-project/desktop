@@ -163,7 +163,7 @@ export interface ReviewSession {
   wipCommit: string | null;
 }
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** What a game keeps of a project that is not the active one: its progress and its PRs' history. */
 export interface ProjectProgress {
@@ -172,6 +172,17 @@ export interface ProjectProgress {
   tickets: TicketState[];
   activity: ActivityEntry[];
   inbox: InboxMessage[];
+}
+
+/**
+ * Where a played project's content comes from, as the catalog last said, and the newest manifest
+ * version accepted from it (a floor: an older publication is ignored). It lets a project that left
+ * the catalog keep playing, and it survives a switch and a save.
+ */
+export interface ProjectSource {
+  repository: string;
+  qaRef: string;
+  minVersion: string | null;
 }
 
 /** A project switch in progress: written before Docker is touched, so a crash resumes it. */
@@ -184,10 +195,12 @@ export interface ProjectSwitch {
 
 export interface GameState {
   schemaVersion: typeof SCHEMA_VERSION;
-  /** The active project's id, or null for the starter project (before the first switch). */
+  /** The active project's id; null only until the game is pinned to the catalog's starter. */
   project: string | null;
   /** The progress of every other project played in this game, by id. */
   otherProjects: Record<string, ProjectProgress>;
+  /** The source and version floor of every project played in this game, by id. */
+  projectSources: Record<string, ProjectSource>;
   projectSwitch: ProjectSwitch | null;
   createdAt: string;
   /** The active ticket (the last unlocked one), or null before the first assignment. */

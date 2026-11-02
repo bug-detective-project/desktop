@@ -45,7 +45,7 @@ export interface ProjectFiles {
   reviews: Map<string, Uint8Array>;
 }
 
-export const SAVE_FORMAT_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 3;
 
 export interface SaveContents {
   state: GameState;

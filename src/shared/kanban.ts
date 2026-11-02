@@ -64,6 +64,7 @@ export function createInitialState(ctx: RuleContext, language: Language = 'en'):
     schemaVersion: SCHEMA_VERSION,
     project: null,
     otherProjects: {},
+    projectSources: {},
     projectSwitch: null,
     createdAt: ctx.now,
     currentTicket: null,
