@@ -14,7 +14,7 @@ import { Icon } from '../components/icons.tsx';
 import { ContentError } from '../components/ContentError.tsx';
 import { useTicketContent } from '../components/useTicketContent.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
-import { Badge, Button, LogView, StagePill, Tabs, Tooltip } from '../components/ui.tsx';
+import { Badge, Button, LogView, StagePill, Tabs, Tooltip, TrackBadge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 type Tab = 'ticket' | 'qa' | 'history' | 'senior';
@@ -22,6 +22,7 @@ type Tab = 'ticket' | 'qa' | 'history' | 'senior';
 // Rows of the ticket's field table that show live data or a colored badge, in both languages.
 const STATUS_FIELDS = new Set(['Status']);
 const TYPE_FIELDS = new Set(['Issue type', 'Tipo de item']);
+const TRACK_FIELDS = new Set(['Track', 'Trilha']);
 
 function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: TicketState }) {
   const { t } = useTranslation();
@@ -295,6 +296,8 @@ export function TicketPanel({
                 // The file is written when the ticket is created, so the status comes from the board instead.
                 if (STATUS_FIELDS.has(field)) return <StagePill status={ticket.status} />;
                 if (TYPE_FIELDS.has(field)) return <Badge tone={value.toLowerCase() === 'bug' ? 'danger' : 'neutral'}>{value}</Badge>;
+                // The card's tag, in the hue of the ticket's track, with the card's wording ("Front-end").
+                if (TRACK_FIELDS.has(field)) return <TrackBadge track={ticket.track} label={value} testId="ticket-track" />;
                 return undefined;
               }}
             >

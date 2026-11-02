@@ -87,17 +87,17 @@ const TRACK_TONES: Record<Track, string> = {
 };
 
 /** The ticket's track as a square tag, in a hue apart from the stages and the QA badges. */
-export function TrackBadge({ track }: { track: Track }) {
+export function TrackBadge({ track, label, testId = 'card-track' }: { track: Track; label?: string; testId?: string }) {
   const { t } = useTranslation();
   const name = t(`dashboard.track.${track}`);
   return (
     <span
       className={`inline-flex shrink-0 items-center rounded-sm border px-1.5 py-0.5 text-[10px] leading-none font-bold tracking-wider uppercase ${TRACK_TONES[track]}`}
       title={t('board.trackBadge', { track: name })}
-      data-testid="card-track"
+      data-testid={testId}
       data-track={track}
     >
-      {name}
+      {label ?? name}
     </span>
   );
 }

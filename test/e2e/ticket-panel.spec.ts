@@ -12,6 +12,9 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     const panel = page.getByTestId('ticket-panel');
     await expect(panel.getByTestId('ticket-title')).toContainText('SD-214');
     await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
+    // The Track row shows the card's tag, with the card's wording.
+    await expect(panel.getByTestId('ticket-track')).toHaveAttribute('data-track', 'front');
+    await expect(panel.getByTestId('ticket-track')).toHaveText('Front-end');
     await expect(panel.getByTestId('open-vscode')).toBeEnabled();
     await expect(panel.getByTestId('open-browser')).toContainText(':5173');
     // The dev server button is always there: it starts the server, then stops it.
@@ -87,6 +90,7 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
       await second.page.getByTestId('nav-board').click();
       await second.page.getByTestId('card-1').click();
       await expect(second.page.getByTestId('ticket-markdown')).toContainText('Passos para reproduzir');
+      await expect(second.page.getByTestId('ticket-track')).toHaveText('Front-end');
       await expect(second.page.getByTestId('ticket-title')).toContainText('Anterior e Próximo');
       await second.page.getByTestId('close-panel').click();
       await second.page.getByTestId('nav-dashboard').click();
