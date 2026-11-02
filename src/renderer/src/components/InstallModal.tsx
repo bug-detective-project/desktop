@@ -25,14 +25,20 @@ export function InstallModal({ phase, lines, error, onClose }: { phase: InstallP
       data-testid="install-modal"
     >
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        {phase === 'failed' ? (
+        {phase === 'failed' && (
           <Notice tone="danger" data-testid="install-modal-error">
             {error}
           </Notice>
-        ) : (
+        )}
+        {phase === 'done' && (
+          <Notice tone="success" data-testid="install-modal-status">
+            {t('dashboard.installModal.done')}
+          </Notice>
+        )}
+        {phase === 'running' && (
           <p className="flex items-center gap-2 text-base font-medium" data-testid="install-modal-status">
-            {phase === 'running' ? <Spinner /> : <Icon name="checkCircle" className="size-4 text-emerald-500" />}
-            {t(phase === 'running' ? 'dashboard.installModal.running' : 'dashboard.installModal.done')}
+            <Spinner />
+            {t('dashboard.installModal.running')}
           </p>
         )}
         <LogView lines={lines} className="min-h-0 flex-1 select-text" follow={phase === 'running'} />

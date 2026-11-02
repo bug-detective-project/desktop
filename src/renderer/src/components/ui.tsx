@@ -70,12 +70,13 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
   );
 }
 
+// Pill and badge text uses the -800 tone in the light theme: they often sit on another tint (4.5:1).
 const TONES = {
   neutral: 'border-border bg-secondary text-secondary-foreground',
-  ok: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  ok: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400',
   warn: 'border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-400',
-  danger: 'border-destructive/20 bg-destructive/10 text-destructive',
-  brand: 'border-primary/20 bg-primary/10 text-primary',
+  danger: 'border-destructive/20 bg-destructive/10 text-red-800 dark:text-destructive',
+  brand: 'border-primary/20 bg-primary/10 text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary',
 };
 
 export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
@@ -251,14 +252,16 @@ export function Modal({
 }
 
 /** A notice block: warnings and destructive confirmations inside cards and modals. */
-export function Notice({ tone = 'warn', children, ...props }: { tone?: 'warn' | 'danger'; children: ReactNode; 'data-testid'?: string }) {
+export function Notice({ tone = 'warn', children, ...props }: { tone?: 'warn' | 'danger' | 'success'; children: ReactNode; 'data-testid'?: string }) {
   const styles = {
-    warn: 'border-amber-500/30 bg-amber-500/10 text-foreground',
-    danger: 'border-destructive/40 bg-destructive/5 text-foreground',
-  };
+    warn: { box: 'border-amber-500/30 bg-amber-500/10 text-foreground', icon: 'alertTriangle', color: 'text-amber-500' },
+    danger: { box: 'border-destructive/40 bg-destructive/5 text-foreground', icon: 'alertTriangle', color: 'text-destructive' },
+    success: { box: 'border-emerald-500/40 bg-emerald-500/5 text-foreground', icon: 'checkCircle', color: 'text-emerald-700 dark:text-emerald-400' },
+  } as const;
+  const { box, icon, color } = styles[tone];
   return (
-    <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-base ${styles[tone]}`} {...props}>
-      <Icon name="alertTriangle" className={`mt-0.5 size-4 ${tone === 'warn' ? 'text-amber-500' : 'text-destructive'}`} />
+    <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-base ${box}`} data-tone={tone} {...props}>
+      <Icon name={icon} className={`mt-0.5 size-4 ${color}`} />
       <div className="min-w-0">{children}</div>
     </div>
   );
