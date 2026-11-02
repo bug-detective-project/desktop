@@ -45,6 +45,15 @@ const PREFERRED_HOST_PORTS = { client: 5173, api: 3001 } as const;
 /** The player's branch for a ticket. Internal: never shown in the UI. */
 export const playerBranch = (stage: number) => `player/ticket-${stage}`;
 
+/**
+ * Stages every change except the excluded paths (the script's arguments, exclude pathspecs). Not
+ * `git add -A -- . <excludes>`: git fails when an exclude pathspec matches a path the project's
+ * .gitignore ignores (a review.json that excludes server/data/ while .gitignore ignores it), so it
+ * stages everything .gitignore allows, then unstages the excluded paths.
+ */
+const ADD_EXCEPT_EXCLUDED = `git add -A -- .
+for spec in "$@"; do git reset -q -- ":(glob)\${spec#:(exclude,glob)}"; done`;
+
 const SCRIPTS = {
   importStage: `set -eu
 stage="$1"; message="$2"; src="/tmp/bugdetective-import-$stage"
@@ -231,7 +240,7 @@ printf '%s\n%s\n%s\n%s\n' "$branch" "$head" "$index" "$excludes"`,
   reviewSaveWork: `set -eu
 message="$1"; shift
 cd ${WORKSPACE_DIR}
-git add -A -- . "$@"
+${ADD_EXCEPT_EXCLUDED}
 if git diff --cached --quiet; then echo -; exit 0; fi
 git -c core.hooksPath=/dev/null commit -q --no-verify -m "$message"
 git rev-parse HEAD`,
@@ -259,7 +268,7 @@ case "$current" in
   "review/ticket-$n"|"review-edits/ticket-$n-"*)
     if [ -n "$(git status --porcelain -- . "$@")" ]; then
       if [ "$current" = "review/ticket-$n" ]; then git checkout -q -b "review-edits/ticket-$n-$stamp"; fi
-      git add -A -- . "$@"
+      ${ADD_EXCEPT_EXCLUDED}
       git -c core.hooksPath=/dev/null commit -q --no-verify -m "$editsMessage"
       echo edits
     fi;;
