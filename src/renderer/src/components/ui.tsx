@@ -1,7 +1,7 @@
 /** Small building blocks shared by the screens. See docs/design-system.md for the rules they follow. */
 import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Column } from '@shared/types.ts';
+import type { Column, Track } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
 import { STAGE } from './stage.ts';
 
@@ -79,6 +79,27 @@ const TONES = {
 
 export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}>{children}</span>;
+}
+
+const TRACK_TONES: Record<Track, string> = {
+  front: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  back: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+};
+
+/** The ticket's track as a square tag, in a hue apart from the stages and the QA badges. */
+export function TrackBadge({ track }: { track: Track }) {
+  const { t } = useTranslation();
+  const name = t(`dashboard.track.${track}`);
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-sm border px-1.5 py-0.5 text-[10px] leading-none font-bold tracking-wider uppercase ${TRACK_TONES[track]}`}
+      title={t('board.trackBadge', { track: name })}
+      data-testid="card-track"
+      data-track={track}
+    >
+      {name}
+    </span>
+  );
 }
 
 /** The stage name in its hue. The dot shows for the pulsing stages, or always with `dot` (it pulses only where the stage does). */

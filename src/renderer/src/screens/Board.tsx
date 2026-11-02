@@ -8,7 +8,7 @@ import type { Column, TicketState } from '@shared/types.ts';
 import { api } from '../api.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { STAGE } from '../components/stage.ts';
-import { Badge, Button, Spinner } from '../components/ui.tsx';
+import { Badge, Button, Spinner, TrackBadge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
@@ -83,7 +83,10 @@ function TicketCard({
       } ${movable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <TrackBadge track={ticket.track} />
+          <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
+        </div>
         {action && (
           // The card opens on click and Enter; the button keeps both to itself.
           <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>

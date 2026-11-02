@@ -275,6 +275,7 @@
       "done": "Os tickets chegam aqui quando você aceita a revisão."
     },
     "testing": "Em teste",
+    "trackBadge": "Trilha {{track}}",
     "solveBug": "Resolver bug",
     "solvedBug": "A correção de referência está no seu código. Mova o card para Em QA para testá-la.",
     "move": "Mover",
@@ -590,7 +591,7 @@
     "confirmTitle": "Trocar para {{name}}?",
     "confirmRemoved": "O projeto atual sai do seu computador: o código dele no Docker, as imagens e as dependências são removidos.",
     "confirmKept": "O seu progresso, os tickets concluídos e os PRs ficam guardados, e você pode voltar depois (ele é baixado de novo). Exporte um backup antes se quiser uma cópia do seu código.",
-    "exportFirst": "Exportar backup antes",
+    "exportFirst": "Exportar backup",
     "confirm": "Trocar de projeto",
     "switched": "{{name}} é o seu projeto agora."
   },

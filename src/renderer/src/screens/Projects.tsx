@@ -99,7 +99,7 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
             <p className="text-base leading-relaxed">{t('projects.confirmRemoved')}</p>
             <p className="mt-2 text-base leading-relaxed">{t('projects.confirmKept')}</p>
           </Notice>
-          <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <div className="mt-5 flex justify-end gap-2 whitespace-nowrap" data-testid="switch-actions">
             <Button onClick={() => setConfirm(null)}>{t('common.cancel')}</Button>
             <Button
               busy={exporting}

@@ -94,6 +94,23 @@ test('Get Next Assignment asks for the track and shows each track, its next tick
     await page.getByTestId('next-assignment').click();
     await page.getByTestId('next-assignment-front').click();
     await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo');
+    // The card shows its track as a square tag before the key.
+    await expect(page.getByTestId('card-1').getByTestId('card-track')).toHaveAttribute('data-track', 'front');
+    await expect(page.getByTestId('card-1').getByTestId('card-track')).toHaveText('Front');
+  } finally {
+    await close();
+  }
+});
+
+test('a back ticket shows the back track on its card', async () => {
+  const { page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    await takeNextTicket(page, 'back');
+    const track = page.getByTestId('card-1').getByTestId('card-track');
+    await expect(track).toHaveAttribute('data-track', 'back');
+    await expect(track).toHaveText('Back');
+    await expect(track).toHaveAttribute('title', 'Back track');
   } finally {
     await close();
   }
@@ -349,7 +366,7 @@ test('a card shows only its key and title, and "Test failed" only after a failed
   try {
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
-    await expect(card).toHaveText(/^SD-214/);
+    await expect(card).toHaveText(/^FrontSD-214/);
     await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await expect(card).toHaveClass(/border-primary\/40/);
