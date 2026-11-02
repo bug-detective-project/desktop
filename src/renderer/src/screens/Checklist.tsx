@@ -96,7 +96,7 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
           {t('common.checkAgain')}
         </Button>
         <div className="flex items-center gap-3">
-          {report?.allOk && <span className="flex items-center gap-1.5 text-base font-medium text-emerald-600 dark:text-emerald-400">
+          {report?.allOk && <span className="flex items-center gap-1.5 text-base font-medium text-emerald-700 dark:text-emerald-400">
               <Icon name="checkCircle" /> {t('checklist.allOk')}
             </span>}
           <Button variant="primary" disabled={!report?.allOk || snapshot.starterNeedsUpdate} onClick={onContinue} data-testid="start-playing">

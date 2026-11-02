@@ -456,7 +456,7 @@ test('Local environment always lists Docker, both images and the dependencies, w
     await expect(card.getByTestId('env-projectDependencies')).toContainText('Not installed yet');
     // No summary badge: the title is green while everything works, red on a problem.
     await expect(card).toHaveAttribute('data-tone', 'ok');
-    await expect(card.getByRole('heading')).toHaveClass(/text-emerald-600/);
+    await expect(card.getByRole('heading')).toHaveClass(/text-emerald-700/);
     await expect(card).not.toContainText('All set');
 
     // Docker stops: every row stays, Docker with its stopped state.
@@ -627,7 +627,7 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     expect(size.height).toBe(size.lines);
     expect(size.width).toBe(size.height);
     // Play in green, pause in amber.
-    await expect(start).toHaveClass(/text-emerald-600/);
+    await expect(start).toHaveClass(/text-emerald-700/);
     await start.hover();
     await expect(row.getByRole('tooltip')).toBeVisible();
     await expect(row.getByRole('tooltip')).toHaveText('Start server');
@@ -638,7 +638,7 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     await expect(row).toHaveAttribute('data-tone', 'ok');
     const stop = page.getByTestId('desk-stop-server');
     await expect(stop).toHaveAccessibleName('Stop server');
-    await expect(stop).toHaveClass(/text-amber-600/);
+    await expect(stop).toHaveClass(/text-amber-700/);
     await stop.click();
     await expect(row).toHaveAttribute('data-up', 'false');
     await expect(page.getByTestId('desk-start-server')).toBeVisible();

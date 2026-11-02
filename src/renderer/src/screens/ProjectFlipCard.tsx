@@ -11,8 +11,8 @@ import { monogram } from './monogram.ts';
 
 /** Difficulty → filled bars and colors (the meter on the front). */
 const LEVELS = {
-  beginner: { filled: 1, bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
-  intermediate: { filled: 2, bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+  beginner: { filled: 1, bar: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+  intermediate: { filled: 2, bar: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400' },
   advanced: { filled: 3, bar: 'bg-destructive', text: 'text-destructive' },
 } as const;
 
@@ -85,7 +85,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             </div>
             <p className="line-clamp-4 text-base leading-relaxed text-muted-foreground">{details ? details.about[language] : t('projects.noDetails')}</p>
             {card.unavailable === 'appTooOld' && (
-              <p className="text-sm font-medium text-amber-600 dark:text-amber-400" data-testid="project-needs-update">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400" data-testid="project-needs-update">
                 {t('projects.needsUpdate')}
               </p>
             )}

@@ -102,7 +102,7 @@ function SectionLabel({
   return (
     <div className="flex min-w-0 items-center justify-between gap-2">
       <h3
-        className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : tone === 'primary' ? 'text-primary' : 'text-foreground'}`}
+        className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'primary' ? 'text-primary' : 'text-foreground'}`}
       >
         <Icon
           name={icon}
@@ -418,8 +418,8 @@ function CurrentTask({
 }
 
 const TONE_STYLES: Record<Tone, { circle: string; text: string }> = {
-  ok: { circle: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', text: 'text-emerald-600 dark:text-emerald-400' },
-  warn: { circle: 'bg-amber-500/10 text-amber-600 dark:text-amber-400', text: 'text-amber-600 dark:text-amber-400' },
+  ok: { circle: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', text: 'text-emerald-700 dark:text-emerald-400' },
+  warn: { circle: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
   danger: { circle: 'bg-destructive/10 text-destructive', text: 'text-destructive' },
   neutral: { circle: 'bg-muted text-muted-foreground', text: 'text-muted-foreground' },
 }
@@ -505,8 +505,8 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
             type="button"
             className={`inline-flex aspect-square h-full items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
               up
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400'
-                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400'
+                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400'
             }`}
             disabled={busy}
             onClick={() => void toggle()}

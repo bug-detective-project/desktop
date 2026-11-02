@@ -506,7 +506,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
           help={t('settings.backupHelp')}
           aside={
             outdated && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-sm leading-none font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400" data-testid="backup-outdated">
+              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-sm leading-none font-semibold whitespace-nowrap text-amber-700 dark:text-amber-400" data-testid="backup-outdated">
                 <Icon name="alertTriangle" className="size-3 text-amber-500" />
                 {t('settings.backupOutdated')}
               </span>
@@ -974,7 +974,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               {t(`settings.tabs.${id}`)}
               {id === 'backup' && outdated && (
                 <span
-                  className={`rounded-full border px-1.5 py-0.5 text-sm leading-none font-semibold ${active ? 'border-transparent bg-amber-400 text-amber-950' : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300'}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-sm leading-none font-semibold ${active ? 'border-transparent bg-amber-400 text-amber-950' : 'border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300'}`}
                   data-testid="backup-age"
                 >
                   {last ? shortAge(last.at, now) : '!'}

@@ -23,9 +23,9 @@ const CELL: Record<SplitCell['kind'], string> = {
   empty: 'bg-muted/50',
 };
 const NUMBER: Record<SplitCell['kind'], string> = {
-  context: 'text-muted-foreground/70',
-  del: 'bg-rose-500/18 text-rose-900/70 dark:text-rose-200/70',
-  add: 'bg-emerald-500/18 text-emerald-900/70 dark:text-emerald-200/70',
+  context: 'text-muted-foreground',
+  del: 'bg-rose-500/18 text-rose-900 dark:text-rose-200/70',
+  add: 'bg-emerald-500/18 text-emerald-900 dark:text-emerald-200/70',
   empty: 'bg-muted/50',
 };
 
@@ -45,7 +45,7 @@ function Counts({ file }: { file: DiffFile }) {
   const { added, removed } = changedLines(file);
   return (
     <span className="shrink-0 font-mono text-xs">
-      <span className="text-rose-600 dark:text-rose-400">−{removed}</span> <span className="text-emerald-600 dark:text-emerald-400">+{added}</span>
+      <span className="text-rose-700 dark:text-rose-400">−{removed}</span> <span className="text-emerald-700 dark:text-emerald-400">+{added}</span>
     </span>
   );
 }

@@ -72,8 +72,8 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
 
 const TONES = {
   neutral: 'border-border bg-secondary text-secondary-foreground',
-  ok: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  warn: 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  ok: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  warn: 'border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-400',
   danger: 'border-destructive/20 bg-destructive/10 text-destructive',
   brand: 'border-primary/20 bg-primary/10 text-primary',
 };
@@ -148,10 +148,10 @@ export function Tooltip({
 
 export function StatusIcon({ status }: { status: 'ok' | 'missing' | 'pending' | 'warning' }) {
   const styles = {
-    ok: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    ok: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     missing: 'bg-destructive/10 text-destructive',
-    pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   };
   const icons = { ok: 'check', missing: 'x', pending: 'spinner', warning: 'alertTriangle' } as const;
   return (
@@ -201,9 +201,11 @@ export function LogView({ lines, className = 'max-h-56', follow = false }: { lin
     }
   }, [follow, lines]);
   return (
+    // Focusable, so the log scrolls from the keyboard too.
     <pre
       ref={ref}
-      className={`${className} overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-xs leading-relaxed text-foreground`}
+      tabIndex={0}
+      className={`${className} overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-xs leading-relaxed text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none`}
       data-testid="log-view"
     >
       {lines.slice(-200).join('\n') || '…'}

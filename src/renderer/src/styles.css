@@ -28,7 +28,8 @@
   --muted-foreground: oklch(0.52 0.015 240);
   --accent: oklch(0.95 0.01 200);
   --accent-foreground: oklch(0.205 0.015 240);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* red-700: 4.5:1 or more on the tinted backgrounds of badges and notices (WCAG AA). */
+  --destructive: oklch(0.505 0.213 27.518);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.91 0.005 240);
   --input: oklch(0.91 0.005 240);

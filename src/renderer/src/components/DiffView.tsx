@@ -29,8 +29,8 @@ export function DiffView({ diff, testId, emptyText }: { diff: string | null; tes
               <tbody>
                 {file.lines.map((line, index) => (
                   <tr key={index} className={ROW[line.kind]} data-kind={line.kind}>
-                    <td className="w-10 pr-2 text-right text-muted-foreground/70 select-none">{line.oldNumber ?? ''}</td>
-                    <td className="w-10 pr-2 text-right text-muted-foreground/70 select-none">{line.newNumber ?? ''}</td>
+                    <td className="w-10 pr-2 text-right text-foreground/70 select-none">{line.oldNumber ?? ''}</td>
+                    <td className="w-10 pr-2 text-right text-foreground/70 select-none">{line.newNumber ?? ''}</td>
                     <td className="w-4 select-none">{SIGN[line.kind]}</td>
                     <td className="pr-4 whitespace-pre">{line.text}</td>
                   </tr>

@@ -662,5 +662,9 @@
     "pendingTitle": "A troca de projeto não terminou",
     "pendingBody": "O Docker ainda tem recursos do projeto anterior. Nada mais pode começar até eles serem removidos.",
     "retry": "Terminar a troca"
+  },
+  "markdown": {
+    "taskDone": "Feito",
+    "taskOpen": "A fazer"
   }
 }

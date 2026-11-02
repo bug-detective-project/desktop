@@ -662,5 +662,9 @@
     "pendingTitle": "The project switch is not finished",
     "pendingBody": "Docker still has resources of the previous project. Nothing else can start until they are removed.",
     "retry": "Finish the switch"
+  },
+  "markdown": {
+    "taskDone": "Done",
+    "taskOpen": "To do"
   }
 }

@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import type { Components, ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+/** A task list item's box ("- [x]"): read-only, and named for screen readers. */
+function TaskCheckbox({ checked }: { checked: boolean }) {
+  const { t } = useTranslation();
+  return <input type="checkbox" checked={checked} readOnly disabled aria-label={t(checked ? 'markdown.taskDone' : 'markdown.taskOpen')} className="mr-1.5 align-middle accent-primary" />;
+}
 
 // Links and images never load anything: the app shows no remote content.
 const components: Components = {
@@ -24,7 +31,7 @@ const components: Components = {
   table: ({ children }) => <table className="my-3 w-full border-collapse">{children}</table>,
   th: ({ children }) => <th className="border border-border bg-muted px-2 py-1 text-left font-medium text-foreground">{children}</th>,
   td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
-  input: ({ checked }) => <input type="checkbox" checked={checked} readOnly disabled className="mr-1.5 align-middle accent-primary" />,
+  input: ({ checked }) => <TaskCheckbox checked={checked ?? false} />,
 };
 
 type HastNode = NonNullable<ExtraProps['node']>['children'][number];

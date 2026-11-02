@@ -107,7 +107,7 @@ function Comparison({ comparison, showWhitespace }: { comparison: ReviewComparis
   return (
     <div className="space-y-4">
       <p className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-base font-medium text-foreground" data-testid="identical-message">
-        <Icon name="checkCircle" className="size-4 text-emerald-600 dark:text-emerald-400" />
+        <Icon name="checkCircle" className="size-4 text-emerald-700 dark:text-emerald-400" />
         {t('review.identical')}
       </p>
       <p className="text-base text-muted-foreground">{t('review.baselineIntro')}</p>
