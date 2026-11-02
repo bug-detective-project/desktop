@@ -58,7 +58,7 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 
 Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap`). Markdown (`Markdown.tsx`): `h1` 24px, paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-base`.
 
-**Contrast.** Text meets WCAG AA (4.5:1). In the light theme, colored text uses the `-700` tone, and `-800` on its own tinted background (`text-amber-800` on `bg-amber-500/10`); `--destructive` is red-700. Text is never faded with an opacity modifier on a tinted row (diff line numbers use `text-foreground/70`). The Storybook stories check it with axe (`pnpm run test:stories`).
+**Contrast.** Text meets WCAG AA (4.5:1). In the light theme, colored text uses the `-700` tone, and pills and badges, which sit on their own tint (and sometimes on another one), use `-800`; `--destructive` is red-700. Text is never faded with an opacity modifier on a tinted row (diff line numbers use `text-foreground/70`). The Storybook stories check it with axe (`pnpm run test:stories`).
 
 ## Workflow stage colors
 
@@ -67,10 +67,10 @@ One hue per Kanban column, in `components/stage.ts` and rendered by `StagePill` 
 | Stage | Pill | Dot |
 | --- | --- | --- |
 | To Do | `bg-secondary text-secondary-foreground border-border` | slate |
-| In Progress | `bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20` | blue, pulsing |
+| In Progress | `bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-500/20` | blue, pulsing |
 | In QA | `bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20` | amber, pulsing |
-| Code Review | `bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20` | indigo |
-| Done | `bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20` | emerald |
+| Code Review | `bg-indigo-500/10 text-indigo-800 dark:text-indigo-400 border-indigo-500/20` | indigo |
+| Done | `bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20` | emerald |
 
 Action buttons never take the stage color: "Read & accept code review" is a primary button.
 
@@ -78,7 +78,7 @@ Action buttons never take the stage color: "Read & accept code review" is a prim
 
 - `Button` (`ui.tsx`): `variant` `primary` (`bg-primary`), `secondary` (`bg-secondary border`), `card` (the secondary look on `bg-card`, for buttons on a tinted block), `ghost`, `danger` (`bg-destructive`), `review` (`bg-indigo-600`, the Code Review stage hue: "Open code review" of a card in Code Review, full width in the ticket panel); `size` `sm` (14px, `px-2.5`: docks, rails, banners) or `md` (16px). Next to a main action, the workspace buttons use the short labels "VS Code" and "Browser" ("Navegador"), with the full label as the tooltip, so the action row stays on one line in both languages; in the narrow current assignment card they stack below `xl`. `busy` shows a spinner.
 - **Icons** (`icons.tsx`): `lucide-react` components behind `<Icon name>`, drawn with `currentColor`. Icons inside buttons always inherit the button's text color: never give them their own color (no green icon inside a primary button).
-- `Card`, `SectionTitle`, `Badge` (tones `neutral`, `ok`, `warn`, `danger`, `brand`), `StagePill`, `StatusIcon`, `Tabs`, `LogView` (`bg-muted/60 font-mono text-xs`), `Modal`, `Notice` (amber warning or destructive block).
+- `Card`, `SectionTitle`, `Badge` (tones `neutral`, `ok`, `warn`, `danger`, `brand`), `StagePill`, `StatusIcon`, `Tabs`, `LogView` (`bg-muted/60 font-mono text-xs`), `Modal`, `Notice` (success in green with a check, amber warning or destructive block).
 - `Tooltip` (`ui.tsx`): a `bg-popover` hint below its child, as wide as the child (or placed and sized with `panelClassName`, e.g. `right-0 w-96` for an `info` icon), shown on hover and focus (`hoverOnly`: hover only, so a click does not keep it open; it uses the named group `group/tooltip`, so a `group` ancestor never opens it); the wrapper catches hover even when the child button is disabled. Used for explanations that would otherwise sit as paragraphs under buttons (ticket panel).
 - `SplitDiff.tsx`: the pull-request "Files changed" view. A file list (`font-mono`, one-sided files with a `Badge`: neutral for the left side only, `brand` for the right side only; renames as `old → new`; `−n +n` counts in rose and emerald), then one collapsible block per file (`bg-muted` header with a `chevronDown`) holding a fixed-layout two-pane table: line numbers in `w-14` columns, removed lines `bg-rose-500/12`, added lines `bg-emerald-500/12`, the missing side `bg-muted/50`, long lines wrap inside their pane. Binary files show a sentence instead of lines; files above 2,000 changed lines wait for "Load diff".
 - `ReviewBanner.tsx`: below the header (after the Docker banner), `bg-primary/10` while a review is checked out in the workspace, with the primary `sm` "Back to my code" button; amber with a close button for what happened when the code came back. Ticket keys only, never branch names.
