@@ -10,7 +10,7 @@
  */
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
-import { sha256Hex } from '../src/main/services/content/archive.ts';
+import { sha256Hex } from '@bug-detective/catalog/contract';
 
 const root = resolve(import.meta.dirname, '..');
 const out = join(root, 'build', 'docker');

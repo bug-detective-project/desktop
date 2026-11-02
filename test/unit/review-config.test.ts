@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_EXCLUDES,
-  excludeMatcher,
-  excludePathspecs,
-  globToRegExp,
-  parseReviewConfig,
-} from '../../src/main/services/review/config.ts';
+import { DEFAULT_EXCLUDES, parseReviewConfig } from '@bug-detective/catalog/contract';
+import { excludeMatcher, excludePathspecs, globToRegExp } from '../../src/main/services/review/config.ts';
 
 describe('review configuration', () => {
   it('always applies the built-in defaults, even without a project file', () => {

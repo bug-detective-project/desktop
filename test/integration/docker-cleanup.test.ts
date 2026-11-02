@@ -13,7 +13,7 @@ import { currentPlatform } from '../../src/main/platform/index.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
 import { Docker, LABEL } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { textFile } from '../../src/main/services/content/archive.ts';
+import { textFile } from '@bug-detective/catalog/contract';
 import { qaImageTag } from '../../src/main/services/qa-image.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');

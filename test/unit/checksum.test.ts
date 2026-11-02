@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readTar, readZip, safeRelativePath, sha256Hex, textFile, treeDigest, UnsafeArchiveError, writeTar, writeZip } from '../../src/main/services/content/archive.ts';
-import { ContentVerificationError } from '../../src/main/services/content/manifest.ts';
-import type { TicketEntry } from '../../src/main/services/content/manifest.ts';
+import { ContentVerificationError, UnsafeArchiveError, readTar, readZip, safeRelativePath, sha256Hex, textFile, treeDigest, writeTar, writeZip } from '@bug-detective/catalog/contract';
+import type { TicketEntry } from '@bug-detective/catalog/contract';
 import { verifyTicket } from '../../src/main/services/content/source.ts';
 
 const packageFiles = [textFile('ticket.en.md', '# SD-214\n'), textFile('gate2/ticket-1.spec.ts', 'test()\n')];

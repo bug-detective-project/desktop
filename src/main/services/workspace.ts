@@ -6,8 +6,8 @@
  */
 import { createHash } from 'node:crypto';
 import { MAX_SAVE_BYTES } from './backup.ts';
-import { readTar, writeTar } from './content/archive.ts';
-import type { ArchiveFile } from './content/archive.ts';
+import { readTar, writeTar } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';

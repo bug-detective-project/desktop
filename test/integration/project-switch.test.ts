@@ -13,7 +13,7 @@ import { currentPlatform } from '../../src/main/platform/index.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
 import type { QaRequest } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
-import { qaToolFiles } from '../../src/main/services/content/project-files.ts';
+import { qaToolFiles } from '@bug-detective/catalog/contract';
 import { readQaFiles } from '../../src/main/services/content/publish.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';

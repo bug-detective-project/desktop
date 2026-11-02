@@ -6,7 +6,8 @@
 import type { CommandRunner } from '../process.ts';
 import { gitArchive } from './git.ts';
 import { buildManifest, readQaFiles, readTicketPackage } from './publish.ts';
-import { entryById, countsOf, verifyTicket } from './source.ts';
+import { entryById, countsOf } from '@bug-detective/catalog/contract';
+import { verifyTicket } from './source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
 
 export { gitArchive } from './git.ts';

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { readZip } from './archive.ts';
+import { readZip } from '@bug-detective/catalog/contract';
 
 export async function writeFileAtomic(file: string, data: Uint8Array | string): Promise<void> {
   await mkdir(dirname(file), { recursive: true });

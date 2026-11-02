@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSave, InvalidSaveError, readSave } from '../../src/main/services/backup.ts';
-import { readZip, sha256Hex, textFile, writeZip } from '../../src/main/services/content/archive.ts';
+import { readZip, sha256Hex, textFile, writeZip } from '@bug-detective/catalog/contract';
 import * as rules from '../../src/shared/kanban.ts';
 import { unlocked } from '../helpers/tickets.ts';
 

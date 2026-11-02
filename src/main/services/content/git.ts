@@ -1,8 +1,8 @@
 /** Git helpers of the content tools and the local source: archives, ticket branch refs, line endings. */
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { readTar } from './archive.ts';
-import type { ArchiveFile } from './archive.ts';
+import { readTar } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 
 /** `git archive` of a ref, with line-ending conversion disabled so files keep LF on Windows. */
 export async function gitArchive(runner: CommandRunner, git: string, repoPath: string, ref: string): Promise<ArchiveFile[]> {

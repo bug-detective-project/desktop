@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { textFile } from '../../src/main/services/content/archive.ts';
+import { textFile } from '@bug-detective/catalog/contract';
 import { qaImageTag, writeQaContext } from '../../src/main/services/qa-image.ts';
 
 const tool = [textFile('run.ts', 'cli\n'), textFile('support/app.ts', 'support\n')];

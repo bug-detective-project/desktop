@@ -7,7 +7,7 @@ import { Game } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
-import { IncompletePublicationError, TicketNotPublishedError } from '../../src/main/services/content/source.ts';
+import { IncompletePublicationError, TicketNotPublishedError, readZip } from '@bug-detective/catalog/contract';
 import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
@@ -15,7 +15,6 @@ import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
-import { readZip } from '../../src/main/services/content/archive.ts';
 import { unlocked } from '../helpers/tickets.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
 

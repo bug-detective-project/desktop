@@ -7,8 +7,8 @@ import { createHash } from 'node:crypto';
 import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
-import { textFile } from './services/content/archive.ts';
-import type { ArchiveFile } from './services/content/archive.ts';
+import { textFile } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 

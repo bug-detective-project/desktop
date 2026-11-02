@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeZip } from '../../src/main/services/content/archive.ts';
+import { writeZip } from '@bug-detective/catalog/contract';
 import { CachedContentSource, FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import { gitArchive } from '../../src/main/services/content/git.ts';
 import { GitHubContentSource } from '../../src/main/services/content/github.ts';

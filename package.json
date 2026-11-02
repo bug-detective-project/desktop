@@ -37,6 +37,7 @@
     "verify:push": "pnpm run typecheck && pnpm test && pnpm run test:integration"
   },
   "dependencies": {
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.0.2",
     "fflate": "0.8.3",
     "tar-stream": "3.2.2",
     "zod": "4.6.7"

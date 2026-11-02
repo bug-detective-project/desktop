@@ -3,13 +3,10 @@
  * ticket packages) and the archive of the ticket's commit. No login or token: GitHub is a download
  * source only.
  */
-import { readZip } from './archive.ts';
-import type { ArchiveFile } from './archive.ts';
-import { ContentVerificationError, compareVersions, parseManifest } from './manifest.ts';
-import { projectContentOf } from './project-files.ts';
-import { IncompletePublicationError, entryById, countsOf, packageOf, verifyCode, verifyPackage, verifyTicket } from './source.ts';
+import { ContentVerificationError, IncompletePublicationError, compareVersions, countsOf, entryById, packageOf, parseManifest, projectContentOf, readZip, verifyCode, verifyPackage } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, TicketEntry } from '@bug-detective/catalog/contract';
+import { verifyTicket } from './source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
-import type { TicketEntry } from './manifest.ts';
 
 export interface GitHubSourceOptions {
   /** "owner/name" of the project's public repository (main, qa and the ticket branches). */

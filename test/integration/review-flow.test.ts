@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Game } from '../../src/main/game.ts';
 import { currentPlatform } from '../../src/main/platform/index.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
-import { readZip } from '../../src/main/services/content/archive.ts';
+import { readZip } from '@bug-detective/catalog/contract';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';

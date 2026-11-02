@@ -8,12 +8,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { sha256Hex, treeDigest } from './archive.ts';
-import type { ArchiveFile } from './archive.ts';
+import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, compareVersions, parseManifest, projectContentOf, sha256Hex, treeDigest } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectManifest, TicketEntry } from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, compareVersions, parseManifest } from './manifest.ts';
-import { projectContentOf } from './project-files.ts';
-import type { ProjectManifest, TicketEntry } from './manifest.ts';
 import { repositoryFromRemote, updateCatalog } from '../projects.ts';
 import type { CatalogProject } from '../projects.ts';
 

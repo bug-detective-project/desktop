@@ -12,8 +12,8 @@
 import { z } from 'zod';
 import { SCHEMA_VERSION } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
-import { UnsafeArchiveError, readZip, sha256Hex, writeZip } from './content/archive.ts';
-import type { ArchiveFile } from './content/archive.ts';
+import { UnsafeArchiveError, readZip, sha256Hex, writeZip } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { parseState } from './state.ts';
 
 export const SAVE_EXTENSION = 'bdsave';

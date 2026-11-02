@@ -10,13 +10,11 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readZip, writeZip } from './archive.ts';
-import type { ArchiveFile } from './archive.ts';
+import { ContentVerificationError, countsOf, entryById, packageOf, parseManifest, readZip, verifyCode, writeZip } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, TicketEntry } from '@bug-detective/catalog/contract';
 import { DownloadError } from './github.ts';
 import type { GitHubContentSource } from './github.ts';
-import { ContentVerificationError, parseManifest } from './manifest.ts';
-import type { TicketEntry } from './manifest.ts';
-import { entryById, countsOf, packageOf, verifyCode, verifyTicket } from './source.ts';
+import { verifyTicket } from './source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
 import { writeFileAtomic } from './store.ts';
 

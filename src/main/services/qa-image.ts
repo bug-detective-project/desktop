@@ -8,8 +8,8 @@ import { cp, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { sha256Hex, treeDigest } from './content/archive.ts';
-import type { ArchiveFile } from './content/archive.ts';
+import { sha256Hex, treeDigest } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 
 /** <repository>:<hash of the docker/qa files and the QA tool>. */
 export function qaImageTag(qaBase: string, tool: readonly ArchiveFile[], repository = 'bugdetective-qa'): string {

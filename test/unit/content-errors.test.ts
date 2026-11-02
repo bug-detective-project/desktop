@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameError, contentError } from '../../src/main/game.ts';
-import { IncompletePublicationError } from '../../src/main/services/content/source.ts';
+import { IncompletePublicationError } from '@bug-detective/catalog/contract';
 import en from '../../src/renderer/src/locales/en.json' with { type: 'json' };
 import pt from '../../src/renderer/src/locales/pt.json' with { type: 'json' };
 

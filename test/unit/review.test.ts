@@ -8,7 +8,7 @@ import { createSave, readSave } from '../../src/main/services/backup.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
-import { parseReviewConfig } from '../../src/main/services/review/config.ts';
+import { parseReviewConfig } from '@bug-detective/catalog/contract';
 import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from '../../src/main/services/review/review.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import type { StoredReview } from '../../src/main/services/review/store.ts';

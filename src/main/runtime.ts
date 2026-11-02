@@ -9,7 +9,7 @@ import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem,
 import type { Platform } from './platform/types.ts';
 import { planCleanup } from './services/cleanup.ts';
 import type { CleanupTarget } from './services/cleanup.ts';
-import type { ArchiveFile } from './services/content/archive.ts';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
 import type { EngineState , Docker} from './services/docker.ts';

@@ -166,6 +166,9 @@ importers:
 
   .:
     dependencies:
+      '@bug-detective/catalog':
+        specifier: github:bug-detective-project/catalog#v1.0.2
+        version: https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -361,6 +364,12 @@ packages:
   '@babel/types@7.29.11':
     resolution: {integrity: sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==}
     engines: {node: '>=6.9.0'}
+
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d':
+    resolution: {gitHosted: true, integrity: sha512-B+vXPfqvqOmbboyIJ4Evf/Lrv+kxs6qWcmrzFC1hV52Du/7Ezlf47Q39LJbVAhXmGl7b1bnFkLA1krUXXAShkg==, tarball: https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d}
+    version: 1.0.2
+    engines: {node: '>=26.12.1'}
+    hasBin: true
 
   '@cacheable/memory@2.2.0':
     resolution: {integrity: sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ==}
@@ -3092,6 +3101,16 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.11
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d':
+    dependencies:
+      fflate: 0.8.3
+      tar-stream: 3.2.2
+      zod: 4.6.7
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
 
   '@cacheable/memory@2.2.0':
     dependencies:
