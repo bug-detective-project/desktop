@@ -3,6 +3,7 @@
  * exported from the repository createNotesProject builds: the same contract as SupportDesk's CLI.
  */
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -98,6 +99,19 @@ describe('notes QA CLI', () => {
       await writeFile(join(paths.workspace, folder, 'test', 'broken.test.js'), "throw new Error('copied by mistake');\n");
     }
     expect(await qa(1, paths)).toMatchObject({ gate: 2, status: 'passed' });
+  });
+
+  it('--deps-only stores the dependencies under the key the workspace computes', async () => {
+    const { workspace } = await stage('front-1');
+    const cache = join(workspace, '..', 'deps');
+    await run(process.execPath, [join(notes.qaDir, 'run.ts'), '--ticket', '1', '--workspace', workspace, '--deps-cache', cache, '--deps-only', '--timeout', '120']);
+    // Workspace.dependencyKey: SHA-256 of the lockfile and the Node runtime.
+    const key = createHash('sha256')
+      .update(await readFile(join(workspace, 'package-lock.json')))
+      .update(`\0${process.version}\0${process.platform}\0${process.arch}`)
+      .digest('hex');
+    const { stdout } = await run('tar', ['-tf', join(cache, `${key}.tar`)]);
+    expect(stdout.split('\n')).toContain('node_modules/');
   });
 
   it('writes its messages in the language asked for', async () => {

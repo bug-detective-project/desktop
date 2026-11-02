@@ -1,13 +1,16 @@
 /**
  * The notes fixture's QA CLI: the same contract as SupportDesk's, without dependencies.
  *   node run.ts --ticket <n> --workspace <path> --package <dir> [--lang en|pt] [--json out.json]
- *               [--timeout 180] [--deps-cache <dir>]
+ *               [--timeout 180] [--deps-cache <dir>] [--deps-only]
  * It copies the workspace (without node_modules, .git and databases), adds the package's gate1/
  * (the regression tests of main) and runs them with `node --test`, then runs gate2/ (the ticket's
- * test). The result goes to --json in the desktop's format.
+ * test). The result goes to --json in the desktop's format. With --deps-only it installs the
+ * workspace's dependencies (npm ci) and stores node_modules in --deps-cache as <key>.tar, the key
+ * being the one the desktop computes (Workspace.dependencyKey), then exits.
  */
-import { spawn } from 'node:child_process';
-import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -41,12 +44,14 @@ const { values } = parseArgs({
     json: { type: 'string' },
     timeout: { type: 'string', default: '180' },
     'deps-cache': { type: 'string' },
+    'deps-only': { type: 'boolean', default: false },
   },
 });
 const ticket = Number(values.ticket);
 const timeoutSeconds = Number(values.timeout);
-if (!Number.isInteger(ticket) || !values.workspace || !values.package || !(timeoutSeconds > 0)) {
-  console.error('Usage: node run.ts --ticket <n> --workspace <path> --package <dir> [--lang en|pt] [--json out.json] [--timeout 180]');
+const depsOnly = values['deps-only'] === true;
+if (!Number.isInteger(ticket) || !values.workspace || !(depsOnly ? values['deps-cache'] : values.package) || !(timeoutSeconds > 0)) {
+  console.error('Usage: node run.ts --ticket <n> --workspace <path> --package <dir> [--lang en|pt] [--json out.json] [--timeout 180] [--deps-cache <dir> [--deps-only]]');
   process.exit(2);
 }
 const text = values.lang === 'pt' ? MESSAGES.pt : MESSAGES.en;
@@ -79,10 +84,40 @@ function nodeTest(cwd: string, files: string): Promise<{ status: Status; tests: 
   });
 }
 
-async function main(): Promise<void> {
+/** A copy of the workspace without node_modules, .git and databases. */
+async function copyWorkspace(): Promise<string> {
   const app = await mkdtemp(join(tmpdir(), 'notes-qa-'));
   const skip = new Set(['node_modules', '.git']);
   await cp(values.workspace!, app, { recursive: true, filter: (source) => !skip.has(basename(source)) && !source.endsWith('.db') });
+  return app;
+}
+
+/** --deps-only: npm ci in a copy, then node_modules into the cache under the desktop's key. */
+async function prepareDependencies(): Promise<void> {
+  const app = await copyWorkspace();
+  try {
+    execFileSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: app, stdio: 'inherit' });
+    // A project without dependencies gets no node_modules from npm; the workspace still expects one.
+    await mkdir(join(app, 'node_modules'), { recursive: true });
+    const key = createHash('sha256')
+      .update(await readFile(join(app, 'package-lock.json')))
+      .update(`\0${process.version}\0${process.platform}\0${process.arch}`)
+      .digest('hex');
+    await mkdir(values['deps-cache']!, { recursive: true });
+    const archive = join(values['deps-cache']!, `${key}.tar`);
+    execFileSync('tar', ['-cf', `${archive}.partial`, '-C', app, 'node_modules']);
+    await rename(`${archive}.partial`, archive);
+  } finally {
+    await rm(app, { recursive: true, force: true });
+  }
+}
+
+async function main(): Promise<void> {
+  if (depsOnly) {
+    await prepareDependencies();
+    process.exit(0);
+  }
+  const app = await copyWorkspace();
   let gate: 1 | 2 = 1;
   let result: { status: Status; tests: TestResult[] };
   try {
