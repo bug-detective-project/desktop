@@ -819,23 +819,24 @@ interface ProjectForm {
   folder: string;
 }
 
-/** The form of the development settings, from catalog.local.json. */
+/** A project's row as catalog.local.json sets it. */
+function projectFormOf(settings: LocalCatalog, id: string): ProjectForm {
+  const override = settings.projects?.[id];
+  if (override && 'qaDir' in override) return { kind: 'folder', ref: '', folder: override.qaDir };
+  if (override) return { kind: 'ref', ref: override.qaRef, folder: '' };
+  return { kind: 'published', ref: '', folder: '' };
+}
+
+/** The form of the development settings, from catalog.local.json. Projects get a row when they show up (see projectFormOf). */
 function formOf(view: DevCatalogView) {
-  const { catalog, projects = {} } = view.settings;
+  const { catalog } = view.settings;
   const kind: SourceKind = !catalog ? 'official' : 'github' in catalog ? 'github' : 'file';
   return {
     kind,
     repository: catalog && 'github' in catalog ? catalog.github : '',
     branch: catalog && 'github' in catalog ? (catalog.branch ?? 'main') : 'main',
     file: catalog && 'file' in catalog ? catalog.file : '',
-    projects: Object.fromEntries(
-      view.projects.map(({ id }): [string, ProjectForm] => {
-        const override = projects[id];
-        if (override && 'qaDir' in override) return [id, { kind: 'folder', ref: '', folder: override.qaDir }];
-        if (override) return [id, { kind: 'ref', ref: override.qaRef, folder: '' }];
-        return [id, { kind: 'published', ref: '', folder: '' }];
-      }),
-    ),
+    projects: {} as Record<string, ProjectForm>,
   };
 }
 
@@ -843,7 +844,8 @@ function formOf(view: DevCatalogView) {
 function settingsOf(view: DevCatalogView, form: ReturnType<typeof formOf>): LocalCatalog {
   const listed = new Set(view.projects.map((item) => item.id));
   const projects: NonNullable<LocalCatalog['projects']> = Object.fromEntries(Object.entries(view.settings.projects ?? {}).filter(([id]) => !listed.has(id)));
-  for (const [id, project] of Object.entries(form.projects)) {
+  for (const { id } of view.projects) {
+    const project = form.projects[id] ?? projectFormOf(view.settings, id);
     if (project.kind === 'ref') projects[id] = { qaRef: project.ref.trim() };
     if (project.kind === 'folder') projects[id] = { qaDir: project.folder.trim() };
   }
@@ -885,13 +887,15 @@ function Development({ view }: { view: DevCatalogView }) {
       await api.applyDevCatalog(settings);
       toast.info(t('settings.dev.applied'));
     });
-  const setProject = (id: string, change: Partial<ProjectForm>) => setForm((current) => ({ ...current, projects: { ...current.projects, [id]: { ...current.projects[id], ...change } } }));
+  const setProject = (id: string, change: Partial<ProjectForm>) =>
+    setForm((current) => ({ ...current, projects: { ...current.projects, [id]: { ...(current.projects[id] ?? projectFormOf(view.settings, id)), ...change } } }));
 
   return (
     <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-development">
       <div className="space-y-4">
         <PaneHeader title={t('settings.dev.title')} help={t('settings.dev.help', { file: view.file })} />
         {locked && <Notice data-testid="dev-catalog-test-file">{t('settings.dev.testFile')}</Notice>}
+        {view.fallback && <Notice data-testid="dev-catalog-fallback">{t('settings.dev.fallback')}</Notice>}
         {view.error && (
           <Notice tone="danger" data-testid="dev-catalog-error">
             {t('settings.dev.error', { message: view.error })}
@@ -927,7 +931,7 @@ function Development({ view }: { view: DevCatalogView }) {
       <div className="space-y-5">
         <PaneHeader title={t('settings.dev.projects')} help={t('settings.dev.projectsHelp')} />
         {view.projects.map((project) => {
-          const value = form.projects[project.id] ?? { kind: 'published', ref: '', folder: '' };
+          const value = form.projects[project.id] ?? projectFormOf(view.settings, project.id);
           return (
             <div key={project.id} className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid={`dev-project-${project.id}`}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -946,7 +950,7 @@ function Development({ view }: { view: DevCatalogView }) {
                 />
               </div>
               {value.kind === 'ref' && (
-                <input className={textInput} value={value.ref} placeholder="qa-next" onChange={(event) => setProject(project.id, { ref: event.target.value })} disabled={locked} spellCheck={false} data-testid={`dev-project-${project.id}-ref`} />
+                <input className={textInput} value={value.ref} placeholder="qa-next" onChange={(event) => setProject(project.id, { ref: event.target.value })} disabled={locked} spellCheck={false} data-testid={`dev-project-${project.id}-ref-name`} />
               )}
               {value.kind === 'folder' && <PathField value={value.folder} onChange={(folder) => setProject(project.id, { folder })} kind="folder" testId={`dev-project-${project.id}-folder-path`} disabled={locked} />}
             </div>
@@ -1023,8 +1027,8 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
       {tab === 'environment' && <Environment snapshot={snapshot} />}
       {tab === 'backup' && <Backup snapshot={snapshot} now={now} />}
       {tab === 'about' && <About snapshot={snapshot} />}
-      {/* Remounts with the settings just applied (or the file read again). */}
-      {tab === 'development' && snapshot.devCatalog && <Development key={JSON.stringify([snapshot.devCatalog.settings, snapshot.devCatalog.projects])} view={snapshot.devCatalog} />}
+      {/* Remounts with the settings just applied; a catalog refreshed in the background keeps the edits. */}
+      {tab === 'development' && snapshot.devCatalog && <Development key={JSON.stringify(snapshot.devCatalog.settings)} view={snapshot.devCatalog} />}
       {snapshot.busy === 'restoring' && <Restoring log={snapshot.log} />}
     </div>
   );

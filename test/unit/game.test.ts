@@ -951,6 +951,7 @@ describe('Game with several projects', () => {
       error: null,
       testFile: false,
       inUse: expect.any(String),
+      fallback: false,
       projects: [
         { id: 'first', qaRef: 'qa', source: 'github: owner/first (qa)' },
         { id: 'second', qaRef: 'qa', source: 'github: owner/second (qa)' },
@@ -1004,6 +1005,15 @@ describe('Game with several projects', () => {
     vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'volume', name: 'bugdetective-workspace' }]);
     await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'switchIncomplete' });
     await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'switchIncomplete' });
+    expect(dev.written).toEqual([]);
+  });
+
+  it('refuses to apply the development settings while BUGDETECTIVE_CATALOG_FILE decides the catalog', async () => {
+    const { make, catalog } = await twoProjects();
+    const dev = fakeDevCatalog(catalog);
+    const game = make({ devCatalog: { ...dev.options, testFile: true } });
+    await game.init();
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'notAllowed' });
     expect(dev.written).toEqual([]);
   });
 

@@ -158,6 +158,8 @@ async function fetchTextWithTimeout(url: string): Promise<string> {
 
 export class CatalogService {
   private options: CatalogServiceOptions;
+  /** The last current() fell back to the copy bundled at build time. */
+  private fallback = false;
   private readonly fetchText: (url: string) => Promise<string>;
 
   constructor(options: CatalogServiceOptions) {
@@ -207,6 +209,7 @@ export class CatalogService {
       (text) => JSON.parse(text) as CacheFile,
       () => null,
     );
+    this.fallback = false;
     if (cached?.source === this.describe()) {
       try {
         return this.resolve(cached.catalog);
@@ -214,7 +217,13 @@ export class CatalogService {
         this.options.log(`» Cached projects catalog ignored: ${(error as Error).message}`);
       }
     }
+    this.fallback = true;
     return this.resolve(JSON.parse(await readFile(this.options.fallbackFile, 'utf8')), true);
+  }
+
+  /** Whether the catalog in use is the bundled copy: the chosen source was never downloaded (or read). */
+  usingFallback(): boolean {
+    return this.fallback;
   }
 
   private url(): string {

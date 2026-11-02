@@ -55,6 +55,8 @@ export interface DevCatalogView {
   testFile: boolean;
   /** The catalog source in use: official, github owner/repo@branch or file <path>. */
   inUse: string;
+  /** The chosen catalog was never downloaded: the app uses the copy bundled at build time. */
+  fallback: boolean;
   /** The projects of the catalog in use and where each one's content comes from. */
   projects: { id: string; qaRef: string; source: string }[];
 }

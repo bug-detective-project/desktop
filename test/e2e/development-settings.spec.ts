@@ -98,3 +98,33 @@ test('development settings: a broken file opens with its error, and Apply writes
     await rm(userData, { recursive: true, force: true });
   }
 });
+
+test('development settings: a catalog that was never read shows that the bundled copy is in use', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: join(userData, 'no-such-catalog.json') } } });
+  try {
+    await openDevelopment(page);
+    await expect(page.getByTestId('dev-catalog-fallback')).toBeVisible();
+  } finally {
+    await close();
+    await rm(userData, { recursive: true, force: true });
+  }
+});
+
+test('development settings: unsaved edits survive the catalog in use changing in the background', async () => {
+  const { userData, catalog } = await dataFolder(supportdeskQa);
+  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } });
+  try {
+    await openDevelopment(page);
+    await page.getByTestId('dev-project-supportdesk-ref').click();
+    await page.getByTestId('dev-project-supportdesk-ref-name').fill('qa-draft');
+    await writeFile(catalog, JSON.stringify({ projects: [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }, { id: 'second', qaDir: supportdeskQa }] }));
+    // Opening Projects refreshes the catalog; here it happens while the tab stays open.
+    await page.evaluate(() => (window as unknown as { bugDetective: { loadProjects(): Promise<void> } }).bugDetective.loadProjects());
+    await expect(page.getByTestId('dev-project-second')).toBeVisible();
+    await expect(page.getByTestId('dev-project-supportdesk-ref-name')).toHaveValue('qa-draft');
+  } finally {
+    await close();
+    await rm(userData, { recursive: true, force: true });
+  }
+});

@@ -19,8 +19,9 @@ import type {
   TicketContent,
   TrackQueue,
   WorkspaceStatus,
+  DevCatalogView,
+  LocalCatalog,
 } from '../shared/api.ts';
-import type { DevCatalogView, LocalCatalog } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
@@ -108,7 +109,7 @@ export interface DevCatalogOptions {
 
 /** The projects catalog (see services/catalog.ts), with each project's content source and data folders. */
 export interface GameProjects {
-  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean>; describe?(): string };
+  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean>; describe?(): string; usingFallback?(): boolean };
   /** The content source of a project; minVersion is the oldest manifest version it may accept. */
   content(project: ResolvedProject, minVersion: string | null): ContentSource;
   packages(id: string): PackageStore;
@@ -271,6 +272,7 @@ export class Game {
       ...this.devSettings,
       testFile: dev.testFile,
       inUse: this.options.projects?.catalog.describe?.() ?? 'official',
+      fallback: this.options.projects?.catalog.usingFallback?.() ?? false,
       projects: this.catalog.map((item) => ({ id: item.id, qaRef: item.qaRef, source: item.qaDir !== undefined ? `local: ${item.qaDir}` : `github: ${item.repository} (${item.qaRef})` })),
     };
   }
@@ -283,6 +285,9 @@ export class Game {
     const dev = this.options.devCatalog;
     if (!dev) {
       throw new GameError('notAllowed', 'The development settings exist only in development');
+    }
+    if (dev.testFile) {
+      throw new GameError('notAllowed', 'BUGDETECTIVE_CATALOG_FILE decides the catalog');
     }
     this.requireNoSwitch();
     await this.exclusive('applyingCatalog', async () => {

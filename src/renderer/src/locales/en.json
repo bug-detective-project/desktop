@@ -555,6 +555,7 @@
       "help": "Where this copy of the app reads its projects from. Saved in {{file}}; editing that file by hand is the same.",
       "testFile": "BUGDETECTIVE_CATALOG_FILE is set, so it decides the catalog and these settings cannot be applied.",
       "error": "The settings file could not be used: {{message}}. Apply to replace it.",
+      "fallback": "The chosen catalog has not been downloaded or read yet, so the app is using the copy bundled with this build.",
       "source": "Projects catalog",
       "sourceHelp": "The list of projects the app offers.",
       "sources": {

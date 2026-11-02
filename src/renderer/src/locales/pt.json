@@ -555,6 +555,7 @@
       "help": "De onde esta cópia do app lê os projetos. Fica salvo em {{file}}; editar esse arquivo à mão dá no mesmo.",
       "testFile": "A variável BUGDETECTIVE_CATALOG_FILE está definida, então ela decide o catálogo e estas configurações não podem ser aplicadas.",
       "error": "Não foi possível usar o arquivo de configurações: {{message}}. Aplique para substituí-lo.",
+      "fallback": "O catálogo escolhido ainda não foi baixado nem lido, então o app está usando a cópia que veio com este build.",
       "source": "Catálogo de projetos",
       "sourceHelp": "A lista de projetos que o app oferece.",
       "sources": {

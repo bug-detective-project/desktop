@@ -187,6 +187,21 @@ describe('CatalogService', () => {
     expect((await catalog.current()).map((item) => [item.id, item.official])).toEqual([['supportdesk', true]]);
   });
 
+  it('says when the catalog in use is the bundled copy because the chosen one was never downloaded', async () => {
+    let online = false;
+    const catalog = service(async () => {
+      if (!online) throw new Error('offline');
+      return catalogJson(project('supportdesk', { starter: true }));
+    }, { choice: { kind: 'github', repository: 'me/catalog', branch: 'testar-x' } });
+    await catalog.refresh();
+    await catalog.current();
+    expect(catalog.usingFallback()).toBe(true);
+    online = true;
+    await catalog.refresh();
+    await catalog.current();
+    expect(catalog.usingFallback()).toBe(false);
+  });
+
   it('does not reuse a cache downloaded from another source', async () => {
     await writeFile(cacheFile, JSON.stringify({ source: 'github me/catalog@testar-x', fetchedAt: 'x', catalog: { projects: [project('other', { starter: true })] } }));
     expect((await service(async () => '').current()).map((item) => item.id)).toEqual(['supportdesk']);
