@@ -55,8 +55,6 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
               <>
                 <p className="text-base text-muted-foreground">{card.details.about[language]}</p>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                  <dt className="font-medium text-muted-foreground">{t('projects.stack')}</dt>
-                  <dd className="text-foreground">{card.details.stack[language]}</dd>
                   {card.details.difficulty && (
                     <>
                       <dt className="font-medium text-muted-foreground">{t('projects.difficulty')}</dt>

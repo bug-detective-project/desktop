@@ -760,8 +760,16 @@ export class Game {
       let details: ProjectCard['details'] = null;
       if (content) {
         const { story } = projectContentOf(content.qaFiles);
-        const pick = (field: 'name' | 'about' | 'stack') => ({ en: story.en.project[field], pt: story.pt.project[field] });
-        details = { name: pick('name'), about: pick('about'), stack: pick('stack'), difficulty: content.manifest.project.difficulty ?? null, counts: countsOf(content.manifest) };
+        const pick = (field: 'name' | 'about') => ({ en: story.en.project[field], pt: story.pt.project[field] });
+        details = {
+          name: pick('name'),
+          about: pick('about'),
+          client: { en: story.en.client.name, pt: story.pt.client.name },
+          stack: content.manifest.project.stack ?? null,
+          skills: { en: story.en.project.skills ?? [], pt: story.pt.project.skills ?? [] },
+          difficulty: content.manifest.project.difficulty ?? null,
+          counts: countsOf(content.manifest),
+        };
       }
       const progress = item.id === active ? { tickets: this.state.tickets, tracks: this.state.tracks } : (this.state.otherProjects[item.id] ?? null);
       const done = (track: Track) => progress?.tickets.filter((ticket) => ticket.track === track && ticket.status === 'done').length ?? 0;

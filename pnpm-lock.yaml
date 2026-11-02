@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       '@bug-detective/catalog':
-        specifier: github:bug-detective-project/catalog#v1.0.2
-        version: https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d
+        specifier: github:bug-detective-project/catalog#v1.1.0
+        version: https://codeload.github.com/bug-detective-project/catalog/tar.gz/b10b635fd0a12040b3ea428d1369f3dade72adf3
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -365,9 +365,9 @@ packages:
     resolution: {integrity: sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==}
     engines: {node: '>=6.9.0'}
 
-  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d':
-    resolution: {gitHosted: true, integrity: sha512-B+vXPfqvqOmbboyIJ4Evf/Lrv+kxs6qWcmrzFC1hV52Du/7Ezlf47Q39LJbVAhXmGl7b1bnFkLA1krUXXAShkg==, tarball: https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d}
-    version: 1.0.2
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/b10b635fd0a12040b3ea428d1369f3dade72adf3':
+    resolution: {gitHosted: true, integrity: sha512-I0zaWL2hE3wyNXBjCV9inUQWSGUwnbnXxy3ldQQRqDdusMntumNtDUtGos4JDV8q33LC38ZfSzwg0LcWEM9tPg==, tarball: https://codeload.github.com/bug-detective-project/catalog/tar.gz/b10b635fd0a12040b3ea428d1369f3dade72adf3}
+    version: 1.1.0
     engines: {node: '>=26.12.1'}
     hasBin: true
 
@@ -3102,7 +3102,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.11
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/8010a42716cf878b030585f8d35b10f85efa431d':
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/b10b635fd0a12040b3ea428d1369f3dade72adf3':
     dependencies:
       fflate: 0.8.3
       tar-stream: 3.2.2

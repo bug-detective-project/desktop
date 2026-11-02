@@ -19,6 +19,7 @@ import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
 import { unlocked } from '../helpers/tickets.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
+import type { ProjectBrief } from '../helpers/project-repo.ts';
 
 // The real SupportDesk qa folder (a worktree of its qa branch) and its ticket branches.
 const root = resolve(import.meta.dirname, '..', '..');
@@ -723,9 +724,9 @@ function fakeCatalog(initial: ResolvedProject[]) {
 }
 
 describe('Game with several projects', () => {
-  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] })), firstFront = 1) {
+  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] })), firstFront = 1, firstBrief: ProjectBrief = {}) {
     const repos = {
-      first: await createProjectRepo(join(dir, 'repos'), { front: firstFront, back: 0 }, 'First'),
+      first: await createProjectRepo(join(dir, 'repos'), { front: firstFront, back: 0 }, 'First', 'first', firstBrief),
       second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
     };
     const sources: { id: string; repository: string; minVersion: string | null }[] = [];
@@ -859,6 +860,24 @@ describe('Game with several projects', () => {
     const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
     await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'otherProjectsLeft' });
     expect(removeProjects).toHaveBeenCalledWith(['second']);
+  });
+
+  it('a project card carries the client, the stack and the skills of its brief', async () => {
+    const { make } = await twoProjects(undefined, 1, { stack: { frontend: 'React · Vite', database: 'SQLite' }, skills: { en: ['Async and state'], pt: ['Assincronia e estado'] } });
+    const game = make();
+    await game.init();
+    expect(game.snapshot().projects?.[0].details).toMatchObject({
+      client: { en: 'Client', pt: 'Client' },
+      stack: { frontend: 'React · Vite', database: 'SQLite' },
+      skills: { en: ['Async and state'], pt: ['Assincronia e estado'] },
+    });
+  });
+
+  it('a project without a stack or skills gets null and empty lists', async () => {
+    const { make } = await twoProjects();
+    const game = make();
+    await game.init();
+    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] } });
   });
 
   it('fetches the next ticket of a project that moved from the repository the catalog now names', async () => {

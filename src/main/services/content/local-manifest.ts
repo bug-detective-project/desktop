@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, treeDigest } from '@bug-detective/catalog/contract';
+import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectStackSchema, treeDigest } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectManifest, TicketEntry } from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
 
@@ -49,8 +49,8 @@ function gitIn(runner: CommandRunner, git: string, dir: string): Git {
 
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
 
-async function readProject(qaDir: string): Promise<{ id: string; name: string; difficulty?: (typeof DIFFICULTIES)[number] }> {
-  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown } } };
+async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
+  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown; stack?: unknown } } };
   try {
     json = JSON.parse(await readFile(join(qaDir, 'package.json'), 'utf8'));
   } catch {
@@ -64,7 +64,21 @@ async function readProject(qaDir: string): Promise<{ id: string; name: string; d
   if (difficulty !== undefined && !DIFFICULTIES.includes(difficulty as (typeof DIFFICULTIES)[number])) {
     throw new Error(`${qaDir}/package.json: bugDetective.project.difficulty must be one of ${DIFFICULTIES.join(', ')}`);
   }
-  return { id: project.id, name: project.name, ...(difficulty !== undefined && { difficulty: difficulty as (typeof DIFFICULTIES)[number] }) };
+  let stack: ProjectManifest['project']['stack'];
+  if (project.stack !== undefined) {
+    const parsed = projectStackSchema.safeParse(project.stack);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new Error(`${qaDir}/package.json: bugDetective.project.stack${issue?.path.length ? `.${issue.path.join('.')}` : ''}: ${issue?.message ?? 'invalid'}`);
+    }
+    stack = parsed.data;
+  }
+  return {
+    id: project.id,
+    name: project.name,
+    ...(difficulty !== undefined && { difficulty: difficulty as (typeof DIFFICULTIES)[number] }),
+    ...(stack !== undefined && { stack }),
+  };
 }
 
 /** The committed files of tickets/ (untracked files never reach the qa branch, so they never count). */

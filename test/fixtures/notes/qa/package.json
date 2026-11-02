@@ -7,7 +7,12 @@
     "project": {
       "id": "notes",
       "name": "Notes",
-      "difficulty": "beginner"
+      "difficulty": "beginner",
+      "stack": {
+        "frontend": "Plain JavaScript",
+        "backend": "Node.js",
+        "database": "JSON file"
+      }
     }
   },
   "scripts": {

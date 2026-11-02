@@ -13,7 +13,11 @@
   "project": {
     "name": "Notes",
     "about": "A note-taking app.",
-    "stack": "Node.js"
+    "stack": "Node.js",
+    "skills": [
+      "Reading a failing test",
+      "Small fixes"
+    ]
   },
   "messages": {
     "welcome": {

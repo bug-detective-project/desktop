@@ -152,7 +152,12 @@ export interface ProjectCard {
   details: {
     name: Record<Language, string>;
     about: Record<Language, string>;
-    stack: Record<Language, string>;
+    /** The client the project is built for (the story's client name). */
+    client: Record<Language, string>;
+    /** The project's technologies (the manifest's project.stack), or null when it has none. */
+    stack: { frontend?: string; backend?: string; database?: string } | null;
+    /** What the player practices (the story's project.skills); empty when it has none. */
+    skills: Record<Language, string[]>;
     difficulty: ProjectDifficulty | null;
     counts: Record<Track, number>;
   } | null;

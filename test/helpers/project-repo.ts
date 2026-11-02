@@ -45,12 +45,12 @@ export async function writeFiles(dir: string, files: Record<string, string>): Pr
 }
 
 /** A valid story.<lang>.json for a test project, with one assignment message per ticket. */
-export function projectStory(name: string, ids: string[]): string {
+export function projectStory(name: string, ids: string[], skills?: string[]): string {
   const message = (subject: string) => ({ subject, body: `${subject}.` });
   return `${JSON.stringify(
     {
       client: { name: 'Client', about: 'A client.', contacts: 'Someone', reporters: [{ name: 'Someone', role: 'Lead' }] },
-      project: { name, about: `The ${name} app.`, stack: 'Text files' },
+      project: { name, about: `The ${name} app.`, stack: 'Text files', ...(skills && { skills }) },
       messages: {
         welcome: message('Welcome'),
         assignments: Object.fromEntries(ids.map((id) => [id, message(`Ticket ${id}`)])),
@@ -70,7 +70,13 @@ export function ticketIds(counts: TicketCounts): string[] {
   ];
 }
 
-export async function createProjectRepo(dir: string, counts: TicketCounts, name = 'Demo', id = name.toLowerCase()): Promise<ProjectRepo> {
+/** What a test project may add to its brief: package.json bugDetective.project.stack and the story's skills. */
+export interface ProjectBrief {
+  stack?: { frontend?: string; backend?: string; database?: string };
+  skills?: { en: string[]; pt: string[] };
+}
+
+export async function createProjectRepo(dir: string, counts: TicketCounts, name = 'Demo', id = name.toLowerCase(), brief: ProjectBrief = {}): Promise<ProjectRepo> {
   const projectDir = join(dir, id);
   const qaDir = join(dir, `${id}-qa`);
   const git = (cwd: string, ...args: string[]) =>
@@ -91,9 +97,9 @@ export async function createProjectRepo(dir: string, counts: TicketCounts, name 
   git(qaDir, 'checkout', '-q', '--orphan', 'qa');
   git(qaDir, 'rm', '-r', '-q', '-f', '.');
   await writeFiles(qaDir, {
-    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id, name } } }, null, 2)}\n`,
-    'story.en.json': projectStory(name, ticketIds(counts)),
-    'story.pt.json': projectStory(name, ticketIds(counts)),
+    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id, name, ...(brief.stack && { stack: brief.stack }) } } }, null, 2)}\n`,
+    'story.en.json': projectStory(name, ticketIds(counts), brief.skills?.en),
+    'story.pt.json': projectStory(name, ticketIds(counts), brief.skills?.pt),
   });
   for (const id of ticketIds(counts)) {
     await writeFiles(join(qaDir, 'tickets', id), ticketFiles(id));
