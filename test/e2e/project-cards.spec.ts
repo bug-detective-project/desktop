@@ -62,8 +62,10 @@ test('a project card flips to its brief and back from its buttons, moving the fo
     await card.getByRole('heading', { name: 'Notes Board' }).click();
     await expect(back).toHaveAttribute('aria-hidden', 'true');
 
+    await expect(page.getByTestId('project-easy-brief')).toHaveText('View specifications');
     await page.getByTestId('project-easy-brief').click();
     await expect(page.getByTestId('project-easy-close-brief')).toBeFocused();
+    await expect(page.getByTestId('project-easy-close-brief')).toHaveAttribute('aria-label', 'Close the specifications');
     await expect(front).toHaveAttribute('aria-hidden', 'true');
     await expect(front).toHaveAttribute('inert', '');
     await expect(back).not.toHaveAttribute('aria-hidden', 'true');
@@ -160,7 +162,7 @@ test('in Portuguese the buttons stay on one line in a 1280 px window', async () 
   try {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 640));
     await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(1280);
-    await expect(page.getByTestId('project-easy-brief')).toHaveText('Ler o briefing');
+    await expect(page.getByTestId('project-easy-brief')).toHaveText('Ver especificações');
     await expect(page.getByTestId('switch-easy')).toHaveText('Jogar este projeto');
     for (const id of ['project-easy-brief', 'switch-easy']) {
       const box = (await page.getByTestId(id).boundingBox())!;
@@ -168,7 +170,7 @@ test('in Portuguese the buttons stay on one line in a 1280 px window', async () 
     }
     await page.getByTestId('project-easy-brief').click();
     await expect(page.getByTestId('project-easy-back').getByTestId('project-client')).toHaveText('Cliente: Client');
-    await expect(page.getByTestId('project-easy-close-brief')).toHaveAttribute('aria-label', 'Fechar o briefing');
+    await expect(page.getByTestId('project-easy-close-brief')).toHaveAttribute('aria-label', 'Fechar especificações');
   } finally {
     await close();
   }
