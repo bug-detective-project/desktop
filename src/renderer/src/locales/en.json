@@ -146,7 +146,15 @@
     "trackNext": "Next: {{key}} · {{progress}} done",
     "trackNextFullstack": "Next: {{track}} · {{key}} · {{progress}} done",
     "trackDone": "Track done · {{done}}/{{total}}",
-    "downloadProjectFirst": "Download the project first."
+    "downloadProjectFirst": "Download the project first.",
+    "installModal": {
+      "title": "Downloading the game environment",
+      "running": "Downloading and installing. The first time this can take several minutes.",
+      "done": "Everything is ready.",
+      "copy": "Copy log",
+      "copied": "Log copied.",
+      "close": "Close"
+    }
   },
   "onboarding": {
     "welcome": {

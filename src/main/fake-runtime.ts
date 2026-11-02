@@ -34,6 +34,10 @@ interface Scenario {
   devServerFails: boolean;
   /** How long importing a stage takes, so the "unlocking" state can be seen. */
   unlockDelayMs: number;
+  /** How long downloading the environment takes, so the install modal can be seen running. */
+  installDelayMs: number;
+  /** Downloading the environment fails with this message (after writing its log). */
+  installFails: string | null;
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -51,6 +55,8 @@ const DEFAULT_SCENARIO: Scenario = {
   cleanupFails: [],
   devServerFails: false,
   unlockDelayMs: 0,
+  installDelayMs: 0,
+  installFails: null,
 };
 
 const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
@@ -222,6 +228,10 @@ export class FakeRuntime implements GameRuntime {
 
   async installEnvironment(onLine: LineHandler) {
     onLine('» docker build bugdetective-workspace (fake)');
+    await new Promise((resolve) => setTimeout(resolve, this.scenario.installDelayMs));
+    if (this.scenario.installFails) {
+      throw new Error(this.scenario.installFails);
+    }
     onLine('» docker build bugdetective-qa (fake)');
     this.scenario.environmentReady = true;
   }

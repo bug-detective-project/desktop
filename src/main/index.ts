@@ -121,9 +121,11 @@ async function openUrl(url: string): Promise<void> {
 }
 
 function hardenSessions(): void {
-  // No permission (camera, notifications, ...) is ever needed.
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  // No permission (camera, notifications, ...) is ever needed, except writing to the clipboard
+  // ("Copy log"); reading it stays denied.
+  const allowed = (permission: string) => permission === 'clipboard-sanitized-write';
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => callback(allowed(permission)));
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => allowed(permission));
 
   app.on('web-contents-created', (_event, contents) => {
     contents.on('will-attach-webview', (event) => event.preventDefault());

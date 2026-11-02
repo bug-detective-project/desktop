@@ -1,4 +1,5 @@
 /** Small building blocks shared by the screens. See docs/design-system.md for the rules they follow. */
+import { useEffect, useRef } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Column, Track } from '@shared/types.ts';
@@ -191,10 +192,18 @@ export function Tabs<T extends string>({
   );
 }
 
-export function LogView({ lines }: { lines: string[] }) {
+/** The output of a task, most recent last. `follow` keeps the newest line in view while it grows. */
+export function LogView({ lines, className = 'max-h-56', follow = false }: { lines: string[]; className?: string; follow?: boolean }) {
+  const ref = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (follow && ref.current) {
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
+  }, [follow, lines]);
   return (
     <pre
-      className="max-h-56 overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-xs leading-relaxed text-foreground"
+      ref={ref}
+      className={`${className} overflow-auto rounded-lg border border-border/50 bg-muted/60 p-2.5 font-mono text-xs leading-relaxed text-foreground`}
       data-testid="log-view"
     >
       {lines.slice(-200).join('\n') || '…'}
@@ -202,23 +211,26 @@ export function LogView({ lines }: { lines: string[] }) {
   );
 }
 
-/** A dialog. Without onClose it cannot be dismissed (used while a task must finish). */
+/** A dialog. Without onClose it cannot be dismissed (used while a task must finish). "large" fills most of the window, its content stretching to the bottom. */
 export function Modal({
   title,
   icon,
   children,
   onClose,
+  size = 'normal',
   ...props
 }: {
   title: string;
   icon?: ReactNode;
   children: ReactNode;
   onClose?: () => void;
+  size?: 'normal' | 'large';
   'data-testid'?: string;
 }) {
+  const box = size === 'large' ? 'flex h-[80vh] w-[80vw] max-w-[1100px] flex-col' : 'w-full max-w-lg';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" role="dialog" aria-modal aria-label={title} {...props}>
-      <div className="w-full max-w-lg rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl">
+      <div className={`${box} rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl`} role="document">
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
             {icon}

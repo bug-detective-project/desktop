@@ -551,7 +551,7 @@ test('cards have a Move button in To Do and In Progress, and a Review button in 
   }
 });
 
-test('the work desk shows the downloads first, with the install log, then the queued assignment', async () => {
+test('the work desk shows the downloads first, then the queued assignment', async () => {
   const { page, close } = await launch({ environmentReady: false });
   try {
     await page.getByTestId('start-playing').click();
@@ -566,6 +566,8 @@ test('the work desk shows the downloads first, with the install log, then the qu
     await expect(card.getByRole('heading')).toHaveClass(/text-destructive/);
 
     await page.getByTestId('install-environment').click();
+    // The download runs in a modal (install-modal.spec.ts), closed with "Close" when it ends.
+    await page.getByTestId('install-modal-close').click();
     await expect(page.getByTestId('environment-panel')).toHaveCount(0);
     await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
     await expect(card.getByTestId('env-workspaceImage')).toContainText('Ready · 1.1 GB');

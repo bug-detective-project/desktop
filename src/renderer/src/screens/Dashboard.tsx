@@ -6,8 +6,10 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { api } from '../api.ts'
+import { api, errorInfo } from '../api.ts'
 import { Icon } from '../components/icons.tsx'
+import { InstallModal } from '../components/InstallModal.tsx'
+import type { InstallPhase } from '../components/InstallModal.tsx'
 import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
@@ -136,6 +138,8 @@ interface Actions {
   openReview: (ticket: number) => void
   nextAssignment: (track: TrackChoice) => void
   run: (id: string, action: () => Promise<unknown>) => void
+  /** Downloads the game environment in the install modal. */
+  install: () => void
   busy: string | null
 }
 
@@ -250,7 +254,7 @@ function CurrentTask({
           className="mt-2 w-full"
           busy={installing}
           disabled={snapshot.busy !== null && !installing}
-          onClick={() => actions.run('install', () => api.installEnvironment())}
+          onClick={actions.install}
           data-testid="install-environment"
         >
           {!installing && (
@@ -261,7 +265,6 @@ function CurrentTask({
           )}
           {installing ? t('dashboard.envStatus.installing') : t('environment.install')}
         </Button>
-        {installing && snapshot.log.length > 0 && <LogView lines={snapshot.log} />}
       </>,
       'environment-panel',
     )
@@ -925,6 +928,22 @@ export function Dashboard({
       .finally(() => setBusy(null))
   }
 
+  // The download of the environment and its log, shown in the install modal until "Close".
+  const [install, setInstall] = useState<{ phase: InstallPhase; lines: string[]; error: string | null } | null>(null)
+  const installEnvironment = () => {
+    setInstall({ phase: 'running', lines: [], error: null })
+    api
+      .installEnvironment()
+      .then(
+        async () => setInstall({ phase: 'done', lines: (await api.snapshot()).log, error: null }),
+        async (error: unknown) => {
+          const { code, message } = errorInfo(error)
+          setInstall({ phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }) })
+        },
+      )
+      .catch(toast.error)
+  }
+
   const actions: Actions = {
     openBoard: onOpenBoard,
     openTicket: onOpenTicket,
@@ -932,6 +951,7 @@ export function Dashboard({
     nextAssignment: (track) =>
       void api.nextAssignment(track).then(onOpenBoard).catch(toast.error),
     run,
+    install: installEnvironment,
     busy,
   }
 
@@ -945,6 +965,15 @@ export function Dashboard({
       className="mx-auto h-full min-h-[560px] max-w-10xl p-6"
       data-testid="dashboard"
     >
+      {install && (
+        <InstallModal
+          phase={install.phase}
+          // While it runs, the live log of the install (the log of an earlier task never shows).
+          lines={install.phase === 'running' ? (snapshot.busy === 'installing' ? snapshot.log : []) : install.lines}
+          error={install.error}
+          onClose={() => setInstall(null)}
+        />
+      )}
       {snapshot.state.projectSwitch && <PendingSwitch snapshot={snapshot} />}
       {snapshot.projectNeedsUpdate && (
         <div className="mb-4">
