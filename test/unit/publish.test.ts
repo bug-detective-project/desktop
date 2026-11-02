@@ -135,6 +135,19 @@ describe('publishProject', () => {
     await expect(publishProject({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand })).rejects.toThrow(/review/);
   });
 
+  it('copies the project difficulty into the manifest, and refuses an unknown one', async () => {
+    const write = async (difficulty: string) => {
+      const file = join(repo.qaDir, 'package.json');
+      const json = JSON.parse(await readFile(file, 'utf8'));
+      json.bugDetective.project.difficulty = difficulty;
+      await writeFile(file, JSON.stringify(json));
+    };
+    await write('intermediate');
+    expect((await buildManifest({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand })).project.difficulty).toBe('intermediate');
+    await write('hard');
+    await expect(buildManifest({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand })).rejects.toThrow(/difficulty/);
+  });
+
   it('writes nothing in a dry run', async () => {
     const head = repo.git(repo.qaDir, 'rev-parse', 'HEAD');
     const { manifest } = await publishProject({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand, dryRun: true });

@@ -8,7 +8,7 @@
  * update leaves the previous content in place.
  */
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readZip, writeZip } from './archive.ts';
 import type { ArchiveFile } from './archive.ts';
@@ -37,6 +37,10 @@ export class CachedContentSource implements ContentSource {
 
   describe(): string {
     return `${this.remote.describe()}, cached in ${this.root}`;
+  }
+
+  async forget(): Promise<void> {
+    await rm(this.root, { recursive: true, force: true });
   }
 
   private codePath(commit: string): string {

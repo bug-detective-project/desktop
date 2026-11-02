@@ -3,8 +3,11 @@
  *   manifest.json        format, app version, schema version and SHA-256 of every other entry
  *   state.json           the game state
  *   workspace.bundle     `git bundle` of the workspace repository (player/* branches, stage tags)
- *   packages/stage-N.zip the downloaded stage packages
- *   reviews/ticket-N/…   the review data of each ticket that passed QA (approved snapshot, reference, comparison)
+ *   packages/stage-N.zip the downloaded ticket packages of the active project
+ *   reviews/ticket-N/…   the PRs of the active project (review.json and snapshot.diff, no tree copies)
+ *   projects/<id>/packages/stage-N.zip, projects/<id>/reviews/ticket-N/…
+ *                        the same for every other project of the game (no repository: only the
+ *                        active project's code is in Docker)
  */
 import { z } from 'zod';
 import { SCHEMA_VERSION } from '../../shared/types.ts';
@@ -18,12 +21,16 @@ export const MAX_SAVE_BYTES = 512 * 1024 * 1024;
 
 export const saveManifestSchema = z.object({
   format: z.literal('bug-detective-save'),
-  formatVersion: z.literal(1),
+  formatVersion: z.number().int(),
   appVersion: z.string().max(50),
   schemaVersion: z.number().int().min(1),
   createdAt: z.string(),
   files: z.record(
-    z.string().regex(/^(state\.json|workspace\.bundle|packages\/stage-\d{1,2}\.zip|reviews\/ticket-\d{1,2}\/(snapshot\.zip|reference\.zip|review\.json))$/),
+    z
+      .string()
+      .regex(
+        /^(state\.json|workspace\.bundle|(projects\/[a-z][a-z0-9-]{0,39}\/)?(packages\/stage-\d{1,2}\.zip|reviews\/ticket-\d{1,2}\/(snapshot\.diff|review\.json)))$/,
+      ),
     z.string().regex(/^[0-9a-f]{64}$/),
   ),
 });
@@ -32,12 +39,22 @@ export type SaveManifest = z.infer<typeof saveManifestSchema>;
 
 export class InvalidSaveError extends Error {}
 
+/** The packages and PRs of one project (reviews keyed reviews/ticket-N/<file>). */
+export interface ProjectFiles {
+  packages: Map<number, Uint8Array>;
+  reviews: Map<string, Uint8Array>;
+}
+
+export const SAVE_FORMAT_VERSION = 2;
+
 export interface SaveContents {
   state: GameState;
   bundle: Uint8Array | null;
   packages: Map<number, Uint8Array>;
-  /** Review data keyed reviews/ticket-N/<file> (older saves have none). */
+  /** Review data keyed reviews/ticket-N/<file>. */
   reviews?: Map<string, Uint8Array>;
+  /** The packages and PRs of every other project of the game, by id. */
+  others?: Map<string, ProjectFiles>;
 }
 
 /** Builds a save; one larger than readSave accepts would export fine and never restore, so it throws. */
@@ -54,9 +71,17 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
   for (const [path, data] of [...(contents.reviews ?? [])].sort(([a], [b]) => (a < b ? -1 : 1))) {
     files.push({ path, data, executable: false });
   }
+  for (const [project, other] of [...(contents.others ?? [])].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    for (const [stage, zip] of [...other.packages].sort(([a], [b]) => a - b)) {
+      files.push({ path: `projects/${project}/packages/stage-${stage}.zip`, data: zip, executable: false });
+    }
+    for (const [path, data] of [...other.reviews].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      files.push({ path: `projects/${project}/${path}`, data, executable: false });
+    }
+  }
   const manifest: SaveManifest = {
     format: 'bug-detective-save',
-    formatVersion: 1,
+    formatVersion: SAVE_FORMAT_VERSION,
     appVersion,
     schemaVersion: SCHEMA_VERSION,
     createdAt: now,
@@ -72,6 +97,7 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
 export interface ValidatedSave extends SaveContents {
   manifest: SaveManifest;
   reviews: Map<string, Uint8Array>;
+  others: Map<string, ProjectFiles>;
 }
 
 /** Validates a .bdsave completely (manifest, checksums, state schema) before anything is restored. */
@@ -104,6 +130,13 @@ export function readSave(bytes: Uint8Array): ValidatedSave {
     throw new InvalidSaveError(`The save manifest is invalid: ${parsed.error.issues[0]?.message}`);
   }
   const manifest = parsed.data;
+  if (manifest.formatVersion !== SAVE_FORMAT_VERSION) {
+    throw new InvalidSaveError(
+      manifest.formatVersion < SAVE_FORMAT_VERSION
+        ? 'This save was made by an older, unsupported version of Bug Detective'
+        : 'This save was created by a newer version of Bug Detective',
+    );
+  }
   if (manifest.schemaVersion > SCHEMA_VERSION) {
     throw new InvalidSaveError('This save was created by a newer version of Bug Detective');
   }
@@ -151,5 +184,22 @@ export function readSave(bytes: Uint8Array): ValidatedSave {
   for (const path of Object.keys(manifest.files).filter((name) => name.startsWith('reviews/'))) {
     reviews.set(path, byPath.get(path)!.data);
   }
-  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews };
+  const others = new Map<string, ProjectFiles>();
+  for (const path of Object.keys(manifest.files)) {
+    const match = /^projects\/([^/]+)\/(.+)$/.exec(path);
+    if (!match) continue;
+    const other = others.get(match[1]) ?? { packages: new Map(), reviews: new Map() };
+    const stage = /^packages\/stage-(\d+)\.zip$/.exec(match[2]);
+    if (stage) other.packages.set(Number(stage[1]), byPath.get(path)!.data);
+    else other.reviews.set(match[2], byPath.get(path)!.data);
+    others.set(match[1], other);
+  }
+  for (const [project, progress] of Object.entries(state.otherProjects)) {
+    for (const ticket of progress.tickets) {
+      if (!others.get(project)?.packages.has(ticket.ticket)) {
+        throw new InvalidSaveError(`The save is missing the package of ${project}, ticket ${ticket.ticket}`);
+      }
+    }
+  }
+  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews, others };
 }

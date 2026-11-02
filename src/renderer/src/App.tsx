@@ -12,6 +12,7 @@ import { Board } from './screens/Board.tsx';
 import { Checklist, DockerBanner } from './screens/Checklist.tsx';
 import { CodeReview } from './screens/CodeReview.tsx';
 import { Dashboard } from './screens/Dashboard.tsx';
+import { Projects } from './screens/Projects.tsx';
 import { Settings } from './screens/Settings.tsx';
 import { TicketPanel } from './screens/TicketPanel.tsx';
 
@@ -117,6 +118,7 @@ export function App() {
           />
         )}
         {view === 'board' && <Board snapshot={snapshot} onOpenTicket={setOpenTicket} onOpenReview={openReview} />}
+        {view === 'projects' && <Projects snapshot={snapshot} />}
         {view === 'settings' && <Settings snapshot={snapshot} />}
         {view === 'review' && reviewTicket !== null && (
           <CodeReview snapshot={snapshot} ticketNumber={reviewTicket} onBack={() => setView('board')} />

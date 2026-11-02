@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { publishProject } from '../src/main/services/content/publish.ts';
 import { runCommand } from '../src/main/services/process.ts';
-import { parseLocalProjects, parseProjectsCatalog } from '../src/main/services/projects.ts';
+import { parseLocalProjects } from '../src/main/services/projects.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const catalogFile = join(root, 'content', 'projects.json');
@@ -36,8 +36,7 @@ function qaFolder(): string {
     return resolve(values.qa);
   }
   const localFile = join(root, 'projects.local.json');
-  const catalog = parseProjectsCatalog(JSON.parse(readFileSync(catalogFile, 'utf8')));
-  const dirs = existsSync(localFile) ? parseLocalProjects(JSON.parse(readFileSync(localFile, 'utf8')), catalog) : {};
+  const dirs = existsSync(localFile) ? parseLocalProjects(JSON.parse(readFileSync(localFile, 'utf8'))) : {};
   const dir = dirs[values.project!];
   if (!dir) {
     console.error(`projects.local.json has no qa folder for ${values.project}; add it, or pass --qa <folder>.`);

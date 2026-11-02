@@ -945,6 +945,7 @@ export function Dashboard({
       className="mx-auto h-full min-h-[560px] max-w-10xl p-6"
       data-testid="dashboard"
     >
+      {snapshot.state.projectSwitch && <PendingSwitch snapshot={snapshot} />}
       <div className="relative grid h-full grid-cols-[320px_400px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <aside
           className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-border bg-muted/40"
@@ -1068,6 +1069,43 @@ export function Dashboard({
           />
         )}
       </div>
+    </div>
+  )
+}
+
+/** A project switch whose Docker cleanup did not finish: what is left, and a retry. Nothing else can start meanwhile. */
+function PendingSwitch({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const left = snapshot.projectSwitchLeft ?? []
+  return (
+    <div
+      className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4"
+      data-testid="pending-switch"
+    >
+      <div>
+        <p className="text-base font-semibold text-foreground">{t('switch.pendingTitle')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('switch.pendingBody')}</p>
+        {left.length > 0 && (
+          <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+            {left.map((item) => (
+              <li key={`${item.kind}:${item.name}`}>
+                {item.kind}: <code>{item.name}</code>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant="primary"
+        disabled={snapshot.busy !== null}
+        onClick={() => void api.finishProjectSwitch().catch(toast.error)}
+        data-testid="finish-switch"
+      >
+        <Icon name="refresh" className="size-3.5" />
+        {t('switch.retry')}
+      </Button>
     </div>
   )
 }

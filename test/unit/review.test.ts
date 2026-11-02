@@ -1,11 +1,10 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
 import { createSave, readSave } from '../../src/main/services/backup.ts';
-import { textFile } from '../../src/main/services/content/archive.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
@@ -167,17 +166,22 @@ const stored = (ticket: number, snapshotText = 'mine\n'): StoredReview => ({
     commits: { approved: sha('a'), reference: sha('b'), snapshot: sha('c') },
     comparison: { solutions: MODIFIED, solutionsIgnoringWhitespace: MODIFIED, baseline: '', baselineIgnoringWhitespace: '' },
   },
-  snapshot: [textFile('src/a.ts', snapshotText)],
-  reference: [textFile('src/a.ts', 'reference\n')],
+  snapshotDiff: `diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-stage\n+${snapshotText}`,
 });
 
 describe('review store', () => {
+  it('stores the approved solution as a diff, not as copies of the tree', async () => {
+    const store = new ReviewStore(join(dir, 'reviews'));
+    await store.save(stored(1));
+    expect((await readdir(store.dir(1))).filter((name) => !name.startsWith('.')).sort()).toEqual(['review.json', 'snapshot.diff']);
+  });
+
   it('keeps the approved snapshot immutable', async () => {
     const store = new ReviewStore(join(dir, 'reviews'));
     await store.save(stored(1));
     await store.save(stored(1)); // the same data again: a rebuild after a restore
     await expect(store.save(stored(1, 'edited after approval\n'))).rejects.toThrow(/cannot change/);
-    expect((await store.load(1))!.snapshot[0].data).toEqual(textFile('x', 'mine\n').data);
+    expect((await store.load(1))!.snapshotDiff).toContain('+mine');
     await store.save(stored(1, 'a new pass while still In QA\n'), { replace: true });
   });
 
@@ -187,7 +191,7 @@ describe('review store', () => {
     await store.save(stored(2));
     const state = { ...rules.createInitialState(ctx), tickets: [] };
     const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now));
-    expect([...save.reviews.keys()]).toHaveLength(6);
+    expect([...save.reviews.keys()]).toHaveLength(4);
 
     const restored = new ReviewStore(join(dir, 'restored'));
     await restored.importSave(save.reviews);

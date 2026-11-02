@@ -17,6 +17,7 @@ import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
 import { readZip } from '../../src/main/services/content/archive.ts';
 import { unlocked } from '../helpers/tickets.ts';
+import { createProjectRepo } from '../helpers/project-repo.ts';
 
 // The real SupportDesk qa folder (a worktree of its qa branch) and its ticket branches.
 const root = resolve(import.meta.dirname, '..', '..');
@@ -31,7 +32,7 @@ afterEach(async () => {
 });
 
 function createGame(
-  options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean; devSkipOnboarding?: boolean; autoOnboarding?: boolean } = {},
+  options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean; devSkipOnboarding?: boolean; devShowProjects?: boolean; autoOnboarding?: boolean } = {},
 ) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
   const game = new Game({
@@ -44,6 +45,7 @@ function createGame(
     versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
     devSolveBug: options.devSolveBug,
     devSkipOnboarding: options.devSkipOnboarding,
+    devShowProjects: options.devShowProjects,
     autoOnboarding: options.autoOnboarding,
   });
   return { game, runtime };
@@ -179,13 +181,22 @@ describe('Game', () => {
       current: () => localSource().current(),
       fetchTicket: (id: string) => Promise.reject(new TicketNotPublishedError(id, { front: 1, back: 0 })),
     };
-    (game as unknown as { options: { content: ContentSource } }).options.content = shrunk;
+    (game as unknown as { source: ContentSource }).source = shrunk;
     const importStage = vi.spyOn(runtime, 'importStage');
     await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'noMoreTickets' });
     expect(game.current.tracks).toEqual({ front: 1, back: 0 });
     expect(game.current.tickets).toEqual(before);
     expect(game.current.inbox.filter((message) => message.kind === 'completion')).toHaveLength(1);
     expect(importStage).not.toHaveBeenCalled();
+  });
+
+  it('shows the Projects screen from the start only when development asks for it', async () => {
+    const shown = createGame({ devShowProjects: true }).game;
+    await shown.init();
+    expect(shown.snapshot().projectsUnlocked).toBe(true);
+    const hidden = createGame().game;
+    await hidden.init();
+    expect(hidden.snapshot().projectsUnlocked).toBe(false);
   });
 
   it('shows the queue of each track in the snapshot', async () => {
@@ -672,5 +683,118 @@ describe('Game', () => {
     await stopped.game.init();
     await expect(stopped.game.removeDockerData()).rejects.toThrow();
     await expect(stopped.game.cleanDockerLeftovers()).rejects.toThrow();
+  });
+});
+
+describe('Game with several projects', () => {
+  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] }))) {
+    const repos = {
+      first: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 0 }, 'First'),
+      second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
+    };
+    const catalog = [
+      { id: 'first', repository: 'owner/first', starter: true, version: '0.0.0' },
+      { id: 'second', repository: 'owner/second', starter: false, version: '0.0.0' },
+    ];
+    const make = () =>
+      new Game({
+        store: new StateStore(dir),
+        packages: new PackageStore(join(dir, 'projects', 'first', 'packages')),
+        reviews: new ReviewStore(join(dir, 'projects', 'first', 'reviews')),
+        content: new LocalContentSource({ qaDir: repos.first.qaDir, runner: runCommand }),
+        projects: {
+          catalog,
+          content: (id) => new LocalContentSource({ qaDir: repos[id as 'first' | 'second'].qaDir, runner: runCommand }),
+          packages: (id) => new PackageStore(join(dir, 'projects', id, 'packages')),
+          reviews: (id) => new ReviewStore(join(dir, 'projects', id, 'reviews')),
+        },
+        runtime,
+        appVersion: '0.1.0',
+        versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
+      });
+    return { make, runtime };
+  }
+
+  async function finishFirstTicket(game: Game) {
+    await game.nextAssignment('front');
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(1);
+  }
+
+  it('shows the Projects screen after a track is done, and switches with Docker cleaned', async () => {
+    const { make, runtime } = await twoProjects();
+    const game = make();
+    await game.init();
+    expect(game.snapshot().projectsUnlocked).toBe(false);
+    await finishFirstTicket(game);
+    expect(game.snapshot().projectsUnlocked).toBe(true);
+    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([['first', true], ['second', false]]);
+
+    const removeProjects = vi.spyOn(runtime, 'removeProjects');
+    await game.switchProject('second');
+    expect(removeProjects).toHaveBeenCalledWith(['first']);
+    expect(game.current).toMatchObject({ project: 'second', projectSwitch: null, tickets: [] });
+    expect(game.current.otherProjects.first.tickets).toHaveLength(1);
+    expect(game.snapshot().queues?.back.next?.id).toBe('back-1');
+    expect(game.snapshot().projectStory?.en.project.name).toBe('Second');
+  });
+
+  it('brings the progress back when the player returns to a project', async () => {
+    const { make } = await twoProjects();
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    await game.switchProject('second');
+    await game.switchProject('first');
+    expect(game.current.project).toBe('first');
+    expect(game.current.tickets.map((ticket) => ticket.id)).toEqual(['front-1']);
+    expect(Object.keys(game.current.otherProjects)).toEqual(['second']);
+  });
+
+  it('refuses to switch with a ticket open', async () => {
+    const { make } = await twoProjects();
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'ticketNotDone' });
+    expect(game.current.project).toBeNull();
+  });
+
+  it('keeps an unfinished switch, blocks the game, and finishes it on the next start', async () => {
+    const { make, runtime } = await twoProjects();
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'volume', name: 'bugdetective-workspace' }]);
+    await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'switchIncomplete' });
+    expect(game.current.projectSwitch).toMatchObject({ from: 'first', to: 'second' });
+    expect(game.snapshot().projectSwitchLeft).toEqual([{ kind: 'volume', name: 'bugdetective-workspace' }]);
+    await expect(game.nextAssignment('front')).rejects.toMatchObject({ code: 'switchIncomplete' });
+    await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'switchIncomplete' });
+
+    vi.mocked(runtime.removeProjects).mockResolvedValue([]);
+    const next = make();
+    await next.init();
+    expect(next.current).toMatchObject({ project: 'second', projectSwitch: null });
+  });
+
+  it('removes the other projects too when the player cleans Docker leftovers', async () => {
+    const { make, runtime } = await twoProjects();
+    const game = make();
+    await game.init();
+    const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([]);
+    await game.cleanDockerLeftovers();
+    expect(removeProjects).toHaveBeenCalledWith(['second']);
+  });
+
+  it('removes what other projects left in Docker before installing the environment', async () => {
+    const { make, runtime } = await twoProjects();
+    const game = make();
+    await game.init();
+    const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
+    await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'otherProjectsLeft' });
+    expect(removeProjects).toHaveBeenCalledWith(['second']);
   });
 });

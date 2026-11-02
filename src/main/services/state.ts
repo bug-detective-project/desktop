@@ -28,89 +28,102 @@ const testRecord = z.object({
   error: z.string().optional(),
 });
 
+const ticketSchema = z.object({
+  ticket: z.number().int().min(1),
+  id: z.string().regex(/^(front|back)-[1-9][0-9]?$/),
+  track: z.enum(TRACKS),
+  manifestVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  status: column,
+  unlockedAt: z.string(),
+  stageCommit: z.string().nullable(),
+  attempts: z.array(
+    z.object({
+      id: z.string(),
+      number: z.number().int(),
+      startedAt: z.string(),
+      finishedAt: z.string(),
+      branch: z.string().nullable(),
+      branchWarning: z.boolean(),
+      timeoutSeconds: z.number(),
+      result: z.object({
+        ticket: z.number().int(),
+        gate: z.union([z.literal(1), z.literal(2)]),
+        status: z.enum(['passed', 'failed', 'timeout']),
+        message: z.string(),
+        tests: z.array(testRecord),
+        durationMs: z.number(),
+      }),
+    }),
+  ),
+  comments: z.array(
+    z.object({
+      id: z.string(),
+      at: z.string(),
+      kind: z.enum(['gate1Failed', 'gate2Failed', 'timeout', 'passed', 'interrupted', 'error', 'branchWarning']),
+      attemptId: z.string().optional(),
+      failing: z.array(z.object({ name: z.string(), error: z.string().optional() })).optional(),
+      unfinished: z.array(z.string()).optional(),
+      timeoutSeconds: z.number().optional(),
+      detail: z.string().optional(),
+      branch: z.string().nullable().optional(),
+    }),
+  ),
+  hintsRevealed: z.number().int().min(0),
+  solutionRevealed: z.boolean(),
+  reviewAcceptedAt: z.string().nullable(),
+  qaStartedAt: z.string().nullable(),
+  playerDiff: z.string().nullable(),
+  conversation: z.array(
+    z.object({
+      at: z.string(),
+      from: z.enum(['player', 'senior']),
+      kind: z.enum(['question', 'hint', 'solutionRequest', 'solution']),
+      hintIndex: z.number().int().optional(),
+    }),
+  ),
+});
+
+const activitySchema = z.object({
+  ticket: z.number().int(),
+  from: column.nullable(),
+  to: column,
+  at: z.string(),
+  actor: z.enum(['player', 'system']),
+  reason: z
+    .enum(['unlocked', 'started', 'submitted', 'qaPassed', 'qaFailed', 'qaTimeout', 'qaInterrupted', 'qaError', 'reviewAccepted'])
+    .optional(),
+});
+
+const inboxSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['welcome', 'assignment', 'completion', 'trackCompletion']),
+  track: z.enum(TRACK_CHOICES).optional(),
+  ticket: z.number().int().optional(),
+  at: z.string(),
+  read: z.boolean(),
+});
+
+const projectProgressSchema = z.object({
+  createdAt: z.string(),
+  tracks: z.object({ front: z.number().int().min(0), back: z.number().int().min(0) }).nullable(),
+  tickets: z.array(ticketSchema),
+  activity: z.array(activitySchema),
+  inbox: z.array(inboxSchema),
+});
+
 export const gameStateSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
+  project: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/).nullable(),
+  otherProjects: z.record(z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), projectProgressSchema),
+  projectSwitch: z
+    .object({ from: z.string(), to: z.string(), phase: z.literal('cleaning'), startedAt: z.string() })
+    .nullable(),
   createdAt: z.string(),
   currentTicket: z.number().int().nullable(),
   tracks: z.object({ front: z.number().int().min(0), back: z.number().int().min(0) }).nullable(),
-  tickets: z.array(
-    z.object({
-      ticket: z.number().int().min(1),
-      id: z.string().regex(/^(front|back)-[1-9][0-9]?$/),
-      track: z.enum(TRACKS),
-      manifestVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
-      status: column,
-      unlockedAt: z.string(),
-      stageCommit: z.string().nullable(),
-      attempts: z.array(
-        z.object({
-          id: z.string(),
-          number: z.number().int(),
-          startedAt: z.string(),
-          finishedAt: z.string(),
-          branch: z.string().nullable(),
-          branchWarning: z.boolean(),
-          timeoutSeconds: z.number(),
-          result: z.object({
-            ticket: z.number().int(),
-            gate: z.union([z.literal(1), z.literal(2)]),
-            status: z.enum(['passed', 'failed', 'timeout']),
-            message: z.string(),
-            tests: z.array(testRecord),
-            durationMs: z.number(),
-          }),
-        }),
-      ),
-      comments: z.array(
-        z.object({
-          id: z.string(),
-          at: z.string(),
-          kind: z.enum(['gate1Failed', 'gate2Failed', 'timeout', 'passed', 'interrupted', 'error', 'branchWarning']),
-          attemptId: z.string().optional(),
-          failing: z.array(z.object({ name: z.string(), error: z.string().optional() })).optional(),
-          unfinished: z.array(z.string()).optional(),
-          timeoutSeconds: z.number().optional(),
-          detail: z.string().optional(),
-          branch: z.string().nullable().optional(),
-        }),
-      ),
-      hintsRevealed: z.number().int().min(0),
-      solutionRevealed: z.boolean(),
-      reviewAcceptedAt: z.string().nullable(),
-      qaStartedAt: z.string().nullable(),
-      playerDiff: z.string().nullable(),
-      conversation: z.array(
-        z.object({
-          at: z.string(),
-          from: z.enum(['player', 'senior']),
-          kind: z.enum(['question', 'hint', 'solutionRequest', 'solution']),
-          hintIndex: z.number().int().optional(),
-        }),
-      ),
-    }),
-  ),
-  activity: z.array(
-    z.object({
-      ticket: z.number().int(),
-      from: column.nullable(),
-      to: column,
-      at: z.string(),
-      actor: z.enum(['player', 'system']),
-      reason: z
-        .enum(['unlocked', 'started', 'submitted', 'qaPassed', 'qaFailed', 'qaTimeout', 'qaInterrupted', 'qaError', 'reviewAccepted'])
-        .optional(),
-    }),
-  ),
-  inbox: z.array(
-    z.object({
-      id: z.string(),
-      kind: z.enum(['welcome', 'assignment', 'completion', 'trackCompletion']),
-      track: z.enum(TRACK_CHOICES).optional(),
-      ticket: z.number().int().optional(),
-      at: z.string(),
-      read: z.boolean(),
-    }),
-  ),
+  tickets: z.array(ticketSchema),
+  activity: z.array(activitySchema),
+  inbox: z.array(inboxSchema),
   settings: z.object({
     language: z.enum(LANGUAGES),
     // The minimum was 30 s before it became 1 minute: older states and saves load with 1 minute.

@@ -35,7 +35,12 @@ export const manifestSchema = z
   .object({
     format: z.literal('bug-detective-project'),
     formatVersion: z.literal(1),
-    project: z.object({ id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), name: z.string().min(1).max(100) }),
+    project: z.object({
+      id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+      name: z.string().min(1).max(100),
+      /** Shown on the Projects screen (package.json bugDetective.project.difficulty). */
+      difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+    }),
     version: z.string().regex(/^\d+\.\d+\.\d+$/),
     createdAt: z.string(),
     tickets: z.object({

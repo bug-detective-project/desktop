@@ -163,10 +163,32 @@ export interface ReviewSession {
   wipCommit: string | null;
 }
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
+
+/** What a game keeps of a project that is not the active one: its progress and its PRs' history. */
+export interface ProjectProgress {
+  createdAt: string;
+  tracks: TrackCounts | null;
+  tickets: TicketState[];
+  activity: ActivityEntry[];
+  inbox: InboxMessage[];
+}
+
+/** A project switch in progress: written before Docker is touched, so a crash resumes it. */
+export interface ProjectSwitch {
+  from: string;
+  to: string;
+  phase: 'cleaning';
+  startedAt: string;
+}
 
 export interface GameState {
   schemaVersion: typeof SCHEMA_VERSION;
+  /** The active project's id, or null for the starter project (before the first switch). */
+  project: string | null;
+  /** The progress of every other project played in this game, by id. */
+  otherProjects: Record<string, ProjectProgress>;
+  projectSwitch: ProjectSwitch | null;
   createdAt: string;
   /** The active ticket (the last unlocked one), or null before the first assignment. */
   currentTicket: number | null;

@@ -37,7 +37,7 @@ describe('export and restore manifest', () => {
     expect(restored.state).toEqual(state);
     expect(Buffer.from(restored.bundle!).toString()).toBe('# v2 git bundle\n');
     expect(sha256Hex(restored.packages.get(1)!)).toBe(sha256Hex(packageZip));
-    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 1, appVersion: '0.1.0', schemaVersion: 5 });
+    expect(restored.manifest).toMatchObject({ format: 'bug-detective-save', formatVersion: 2, appVersion: '0.1.0', schemaVersion: 6 });
     expect(Object.keys(restored.manifest.files).sort()).toEqual(['packages/stage-1.zip', 'state.json', 'workspace.bundle']);
   });
 
@@ -56,9 +56,9 @@ describe('export and restore manifest', () => {
         ),
       );
     expect(() => readSave(edit({ format: 'something-else' }))).toThrow(/manifest is invalid/);
-    expect(() => readSave(edit({ formatVersion: 2 }))).toThrow(/manifest is invalid/);
+    expect(() => readSave(edit({ formatVersion: 1 }))).toThrow(/older, unsupported|manifest is invalid/);
     expect(() => readSave(edit({ schemaVersion: 99 }))).toThrow(/newer version/);
-    expect(() => readSave(edit({ schemaVersion: 4 }))).toThrow(/older, unsupported/);
+    expect(() => readSave(edit({ schemaVersion: 5 }))).toThrow(/older, unsupported/);
   });
 
   it('rejects damaged or unexpected entries', () => {
@@ -95,3 +95,37 @@ describe('save size when extracted', () => {
     expect(() => readSave(zip)).toThrow(/too large when extracted/);
   });
 });
+
+describe('saves with several projects', () => {
+  it('carries the packages and PRs of the other projects, keyed by project', () => {
+    const away = rules.beginSwitch(progressDone(), 'first', 'second', ctx);
+    const state = rules.finishSwitch(away);
+    const reviewFiles = new Map([['reviews/ticket-1/review.json', new Uint8Array(Buffer.from('{}'))], ['reviews/ticket-1/snapshot.diff', new Uint8Array(Buffer.from('diff'))]]);
+    const save = createSave(
+      { state, bundle, packages: new Map(), others: new Map([['first', { packages: new Map([[1, packageZip]]), reviews: reviewFiles }]]) },
+      '0.1.0',
+      ctx.now,
+    );
+    expect(readZip(save).map((file) => file.path).filter((path) => path.startsWith('projects/')).sort()).toEqual([
+      'projects/first/packages/stage-1.zip',
+      'projects/first/reviews/ticket-1/review.json',
+      'projects/first/reviews/ticket-1/snapshot.diff',
+    ]);
+    const restored = readSave(save);
+    expect(sha256Hex(restored.others.get('first')!.packages.get(1)!)).toBe(sha256Hex(packageZip));
+    expect([...restored.others.get('first')!.reviews.keys()].sort()).toEqual(['reviews/ticket-1/review.json', 'reviews/ticket-1/snapshot.diff']);
+  });
+
+  it('refuses a save whose other project misses the package of a ticket', () => {
+    const state = rules.finishSwitch(rules.beginSwitch(progressDone(), 'first', 'second', ctx));
+    expect(() => readSave(createSave({ state, bundle, packages: new Map() }, '0.1.0', ctx.now))).toThrow(/first.*ticket 1/);
+  });
+});
+
+function progressDone() {
+  let state = progress();
+  state = rules.playerMove(state, 1, 'inQa', ctx);
+  const result = { ticket: 1, gate: 2 as const, status: 'passed' as const, message: '', tests: [], durationMs: 1 };
+  state = rules.recordQaResult(state, 1, { startedAt: ctx.now, branch: 'player/ticket-1', branchWarning: false, timeoutSeconds: 180, result }, ctx);
+  return rules.acceptReview(state, 1, ctx);
+}

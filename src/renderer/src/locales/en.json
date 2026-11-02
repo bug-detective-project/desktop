@@ -5,7 +5,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "board": "Board",
-    "settings": "Settings"
+    "settings": "Settings",
+    "projects": "Projects"
   },
   "header": {
     "toggleTheme": "Switch between the light and dark theme",
@@ -483,7 +484,8 @@
         "restoring": "restoring",
         "cleaningDocker": "Docker is being cleaned up",
         "removingDocker": "everything is being removed from Docker",
-        "solvingBug": "the bug is being solved (development)"
+        "solvingBug": "the bug is being solved (development)",
+        "switchingProject": "the project is being switched"
       }
     },
     "dangerZone": "Danger zone",
@@ -559,6 +561,42 @@
     "reviewFailed": "The review could not be opened, and your code was restored: {{message}}",
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
     "solveBugNotAllowed": "Only the ticket in progress can be solved.",
-    "incompletePublication": "The project's publication is incomplete. Try again later."
+    "incompletePublication": "The project's publication is incomplete. Try again later.",
+    "switchIncomplete": "The project switch is not finished: {{message}}",
+    "otherProjectsLeft": "Docker still has another project: {{message}}",
+    "unknownProject": "That project is not available.",
+    "reviewUnavailable": "This PR was made before you switched projects, so it can only be reviewed in the app.",
+    "sameProject": "This is already your project.",
+    "switchInProgress": "Finish the current project switch first.",
+    "contentNeedsInternet": "Connect to the internet to download the project."
+  },
+  "projects": {
+    "title": "Projects",
+    "intro": "Pick your next project. Only one project stays on your computer: switching removes the current one from Docker and downloads the next. Your progress and PRs are kept.",
+    "active": "In progress",
+    "stack": "Technologies",
+    "difficulty": "Difficulty",
+    "tickets": "Tickets",
+    "noDetails": "Connect to the internet to see the details.",
+    "difficulties": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "play": "Play this project",
+    "resume": "Back to this project",
+    "finishTicketFirst": "Finish the open ticket first.",
+    "busy": "Wait for the current task to finish.",
+    "confirmTitle": "Switch to {{name}}?",
+    "confirmRemoved": "The current project leaves your computer: its code in Docker, its images and its dependencies are removed.",
+    "confirmKept": "Your progress, completed tickets and PRs are kept, and you can come back later (it is downloaded again). Export a backup first if you want a copy of your code.",
+    "exportFirst": "Export backup first",
+    "confirm": "Switch project",
+    "switched": "{{name}} is your project now."
+  },
+  "switch": {
+    "pendingTitle": "The project switch is not finished",
+    "pendingBody": "Docker still has resources of the previous project. Nothing else can start until they are removed.",
+    "retry": "Finish the switch"
   }
 }

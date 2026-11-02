@@ -14,7 +14,7 @@ import type { Language, QaResult } from '../../shared/types.ts';
 import { isQaContainer } from './cleanup.ts';
 import { readTar } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
-import { LABEL, mountArg } from './docker.ts';
+import { labelArgs, mountArg } from './docker.ts';
 import type { Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 import { resourceNames } from './workspace.ts';
@@ -90,6 +90,8 @@ export interface QaRunnerOptions {
   image: string;
   dockerHostPath: (path: string) => string;
   names?: ResourceNames;
+  /** The game project being tested (labels the QA containers and the input volume). */
+  project?: string | null;
 }
 
 export class QaRunner {
@@ -97,12 +99,14 @@ export class QaRunner {
   private readonly image: string;
   private readonly dockerHostPath: (path: string) => string;
   private readonly names: ResourceNames;
+  private readonly project: string | null;
 
   constructor(options: QaRunnerOptions) {
     this.docker = options.docker;
     this.image = options.image;
     this.dockerHostPath = options.dockerHostPath;
     this.names = options.names ?? resourceNames();
+    this.project = options.project ?? null;
   }
 
   /**
@@ -115,8 +119,7 @@ export class QaRunner {
       'run',
       '--name',
       name,
-      '--label',
-      `${LABEL}=qa`,
+      ...labelArgs('qa', this.project),
       '--init',
       '--network',
       options.network ? 'bridge' : 'none',
@@ -137,7 +140,7 @@ export class QaRunner {
     const name = `${this.names.prefix}-qa-copy-${randomUUID().slice(0, 8)}`;
     try {
       return await this.docker.run(
-        ['run', '--name', name, '--label', `${LABEL}=qa`, '--network', 'none', '--user', 'root', '--entrypoint', command[0], ...mounts, this.image, ...command.slice(1)],
+        ['run', '--name', name, ...labelArgs('qa', this.project), '--network', 'none', '--user', 'root', '--entrypoint', command[0], ...mounts, this.image, ...command.slice(1)],
         { timeoutMs },
       );
     } finally {
@@ -147,7 +150,7 @@ export class QaRunner {
 
   /** Copies the workspace into the QA input volume: the files this QA run tests. */
   private async copyWorkspace(): Promise<void> {
-    await this.docker.createVolume(this.names.qaInputVolume, 'qa-input');
+    await this.docker.createVolume(this.names.qaInputVolume, 'qa-input', this.project);
     const copied = await this.helper(
       [
         '--mount',

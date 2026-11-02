@@ -230,3 +230,55 @@ describe('career tracks', () => {
     expect(rules.canTakeTicket(finish(one, 1))).toBe(true);
   });
 });
+
+describe('switching projects', () => {
+  const counts = { front: 1, back: 0 };
+  const finish = (state: GameState, ticket: number) => {
+    let next = rules.playerMove(state, ticket, 'inProgress', ctx);
+    next = rules.playerMove(next, ticket, 'inQa', ctx);
+    next = rules.recordQaResult(next, ticket, { ...outcome('passed'), result: { ...result('passed'), ticket } }, ctx);
+    return rules.acceptReview(next, ticket, ctx);
+  };
+  const done = () => finish(rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'x', counts), ctx), 1);
+
+  it('unlocks the Projects screen once a project is done, even after switching away', () => {
+    expect(rules.projectsUnlocked(rules.createInitialState(ctx))).toBe(false);
+    const state = done();
+    expect(rules.projectsUnlocked(state)).toBe(true);
+    expect(rules.projectsUnlocked(rules.beginSwitch(state, 'first', 'second', ctx))).toBe(true);
+  });
+
+  it('keeps the progress of the project left, and starts the new one from zero', () => {
+    const state = done();
+    const switched = rules.beginSwitch(state, 'first', 'second', ctx);
+    expect(switched.project).toBe('second');
+    expect(switched.projectSwitch).toMatchObject({ from: 'first', to: 'second', phase: 'cleaning' });
+    expect(switched.tickets).toEqual([]);
+    expect(switched.currentTicket).toBeNull();
+    expect(switched.tracks).toBeNull();
+    // A new project starts with its own welcome message.
+    expect(switched.inbox.map((message) => message.kind)).toEqual(['welcome']);
+    expect(switched.otherProjects.first.tickets).toEqual(state.tickets);
+    expect(switched.otherProjects.first.inbox).toEqual(state.inbox);
+    expect(rules.finishSwitch(switched).projectSwitch).toBeNull();
+  });
+
+  it('brings back the progress of a project played before', () => {
+    const state = done();
+    const away = rules.finishSwitch(rules.beginSwitch(state, 'first', 'second', ctx));
+    const back = rules.finishSwitch(rules.beginSwitch(away, 'second', 'first', ctx));
+    expect(back.project).toBe('first');
+    expect(back.tickets).toEqual(state.tickets);
+    expect(back.currentTicket).toBe(1);
+    expect(back.tracks).toEqual(counts);
+    expect(Object.keys(back.otherProjects)).toEqual(['second']);
+  });
+
+  it('refuses to switch with a ticket open, a review checked out, or another switch going on', () => {
+    const open = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'x', counts), ctx);
+    expect(() => rules.beginSwitch(open, 'first', 'second', ctx)).toThrow(expect.objectContaining({ code: 'ticketNotDone' }));
+    const switching = rules.beginSwitch(done(), 'first', 'second', ctx);
+    expect(() => rules.beginSwitch(switching, 'second', 'third', ctx)).toThrow(expect.objectContaining({ code: 'switchInProgress' }));
+    expect(() => rules.beginSwitch(done(), 'first', 'first', ctx)).toThrow(expect.objectContaining({ code: 'sameProject' }));
+  });
+});

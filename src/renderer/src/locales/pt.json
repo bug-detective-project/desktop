@@ -5,7 +5,8 @@
   "nav": {
     "dashboard": "Painel",
     "board": "Quadro",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "projects": "Projetos"
   },
   "header": {
     "toggleTheme": "Alternar entre o tema claro e o escuro",
@@ -483,7 +484,8 @@
         "restoring": "restaurando",
         "cleaningDocker": "o Docker está sendo limpo",
         "removingDocker": "tudo está sendo removido do Docker",
-        "solvingBug": "o bug está sendo resolvido (desenvolvimento)"
+        "solvingBug": "o bug está sendo resolvido (desenvolvimento)",
+        "switchingProject": "o projeto está sendo trocado"
       }
     },
     "dangerZone": "Zona de perigo",
@@ -559,6 +561,42 @@
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
     "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
-    "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde."
+    "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
+    "switchIncomplete": "A troca de projeto não terminou: {{message}}",
+    "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",
+    "unknownProject": "Esse projeto não está disponível.",
+    "reviewUnavailable": "Este PR foi feito antes da troca de projeto, então só pode ser revisto no app.",
+    "sameProject": "Este já é o seu projeto.",
+    "switchInProgress": "Termine a troca de projeto atual primeiro.",
+    "contentNeedsInternet": "Conecte-se à internet para baixar o projeto."
+  },
+  "projects": {
+    "title": "Projetos",
+    "intro": "Escolha o seu próximo projeto. Só um projeto fica no seu computador: trocar remove o atual do Docker e baixa o próximo. O seu progresso e os seus PRs ficam guardados.",
+    "active": "Em andamento",
+    "stack": "Tecnologias",
+    "difficulty": "Dificuldade",
+    "tickets": "Tickets",
+    "noDetails": "Conecte-se à internet para ver os detalhes.",
+    "difficulties": {
+      "beginner": "Iniciante",
+      "intermediate": "Intermediário",
+      "advanced": "Avançado"
+    },
+    "play": "Jogar este projeto",
+    "resume": "Voltar a este projeto",
+    "finishTicketFirst": "Termine o ticket aberto primeiro.",
+    "busy": "Espere a tarefa atual terminar.",
+    "confirmTitle": "Trocar para {{name}}?",
+    "confirmRemoved": "O projeto atual sai do seu computador: o código dele no Docker, as imagens e as dependências são removidos.",
+    "confirmKept": "O seu progresso, os tickets concluídos e os PRs ficam guardados, e você pode voltar depois (ele é baixado de novo). Exporte um backup antes se quiser uma cópia do seu código.",
+    "exportFirst": "Exportar backup antes",
+    "confirm": "Trocar de projeto",
+    "switched": "{{name}} é o seu projeto agora."
+  },
+  "switch": {
+    "pendingTitle": "A troca de projeto não terminou",
+    "pendingBody": "O Docker ainda tem recursos do projeto anterior. Nada mais pode começar até eles serem removidos.",
+    "retry": "Terminar a troca"
   }
 }

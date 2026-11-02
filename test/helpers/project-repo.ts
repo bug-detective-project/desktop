@@ -70,9 +70,9 @@ export function ticketIds(counts: TicketCounts): string[] {
   ];
 }
 
-export async function createProjectRepo(dir: string, counts: TicketCounts, name = 'Demo'): Promise<ProjectRepo> {
-  const projectDir = join(dir, 'demo');
-  const qaDir = join(dir, 'demo-qa');
+export async function createProjectRepo(dir: string, counts: TicketCounts, name = 'Demo', id = name.toLowerCase()): Promise<ProjectRepo> {
+  const projectDir = join(dir, id);
+  const qaDir = join(dir, `${id}-qa`);
   const git = (cwd: string, ...args: string[]) =>
     execFileSync('git', ['-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
@@ -91,7 +91,7 @@ export async function createProjectRepo(dir: string, counts: TicketCounts, name 
   git(qaDir, 'checkout', '-q', '--orphan', 'qa');
   git(qaDir, 'rm', '-r', '-q', '-f', '.');
   await writeFiles(qaDir, {
-    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id: 'demo', name } } }, null, 2)}\n`,
+    'package.json': `${JSON.stringify({ name: 'demo-qa', bugDetective: { project: { id, name } } }, null, 2)}\n`,
     'story.en.json': projectStory(name, ticketIds(counts)),
     'story.pt.json': projectStory(name, ticketIds(counts)),
   });

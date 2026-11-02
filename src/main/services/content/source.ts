@@ -32,6 +32,8 @@ export interface ContentSource {
   current(): Promise<ProjectContent | null>;
   /** Fetches and verifies a ticket by id (front-1, …). Throws ContentVerificationError on any mismatch. */
   fetchTicket(id: string, signal?: AbortSignal): Promise<FetchedTicket>;
+  /** Deletes the downloaded content (the project left the computer); a local folder has none. */
+  forget?(): Promise<void>;
 }
 
 /** The published manifest names a commit that the repository does not have (yet). */

@@ -71,7 +71,7 @@ To develop with that local content, copy `desktop/projects.local.example.json` t
 { "supportdesk": "../supportdesk-qa" }
 ```
 
-Without it, `pnpm run dev` downloads every project from GitHub like the installed app. The automated tests read `../supportdesk-qa` directly and need the worktree.
+A project that only `projects.local.json` names (not in `content/projects.json`) is added to the list in development, so a local sample project can fill the Projects screen; the installed app never reads this file. Without it, `pnpm run dev` downloads every project from GitHub like the installed app. The automated tests read `../supportdesk-qa` directly and need the worktree.
 
 The tools read the ticket branches from the clone as they are: the local branch when there is one, otherwise `origin/<id>`, which `git clone` already fetched. **Never create, rename or rebuild the ticket branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `scripts/build-tickets.sh` in `supportdesk-qa/`). If a tool says a ticket branch is missing, run `git -C ../supportdesk fetch origin`. If ticket branches were created by hand, reset them to the published ones:
 
@@ -110,6 +110,7 @@ Development builds (`pnpm run dev`, or `out/` started without packaging) load `d
 
 | Variable | Effect |
 | --- | --- |
+| `BUGDETECTIVE_DEV_SHOW_PROJECTS=true` | Shows the **Projects** item in the header from the start, instead of after a project is done, to look at the screen and switch projects while developing. The packaged app never shows it early. |
 | `BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true` | Shows **Solve bug** on the board card in progress. A click puts the ticket's `reference.patch` into your code: every file the patch touches goes back to the stage version (your edits to those files are lost), then the patch is applied. Other files, the index and commits stay. Move the card to In QA afterwards as usual. The packaged app never shows it. |
 | `BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON=true` | Shows **Skip onboarding** on Rafaela's welcome card and on every step of the onboarding. Skipping counts as finished: it no longer opens on its own. The packaged app never shows it. |
 
@@ -252,7 +253,8 @@ The version number comes from `package.json`. A rebuild with the same version st
 | --- | --- |
 | State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, validated in `services/state.ts`; a file of another schema version is kept aside as `state.corrupt-<time>.json` and a new game starts, with no migrations) |
 | Ticket packages | `%APPDATA%\Bug Detective\projects\<projectId>\packages\stage-N.zip` and `stage-N\`, by queue position (outside the Docker volume) |
-| Review data | `%APPDATA%\Bug Detective\projects\<projectId>\reviews\ticket-N\` (`snapshot.zip`, `reference.zip`, `review.json`) for every ticket that passed QA; included in exports |
+| Review data | `%APPDATA%\Bug Detective\projects\<projectId>\reviews\ticket-N\` (`review.json` and `snapshot.diff`, the approved snapshot as a diff from the ticket's commit) for every ticket that passed QA, kept for every project; included in exports |
+| Projects | The **Projects** screen (shown once a project is done) switches the active project. Only one project is in Docker: its containers, volumes and QA image carry `bugdetective.project=<id>`, and the app removes other projects' resources on start, before every install and in **Clean up Docker leftovers**. A switch is recorded in the state and resumed after a crash (**Finish the switch** on the Dashboard). Saves (format 2) hold every project's packages and PRs. |
 | Project content | Installed app: `%APPDATA%\Bug Detective\projects\<projectId>\content\` (`qa.zip`, `code\<commit>.zip` for every ticket, `cache.json`). Filled when the app starts online with nothing downloaded and by **Download and install**; picking a ticket looks for a newer publication first and falls back to the cache offline. The first download needs the internet. |
 | Review configuration | `review.json` at the root of the project's `qa` branch, optional: `{ "exclude": ["<glob>", …], "includeTests": true }`. Built-in excludes always apply on top (dependencies, lockfiles, `*.db`, `*.sqlite*`, `dist/`, `build/`, `coverage/`, `.env*`, logs). |
 | Projects | `content/projects.json` lists every game project: `{ "projects": [{ "id", "repository": "owner/name", "starter", "version" }] }`. Exactly one is the starter, which the app plays until project switching exists. `publish:project` keeps it up to date. Validated at start: an invalid file stops the app with an error dialog. |

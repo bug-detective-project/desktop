@@ -8,6 +8,7 @@ import type { Language, QaResult } from '../shared/types.ts';
 import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison, WorkspaceStatus } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
 import { planCleanup } from './services/cleanup.ts';
+import type { CleanupTarget } from './services/cleanup.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
@@ -38,6 +39,10 @@ export interface GameRuntime {
 
   /** The QA tool of the project being played (its qa branch without the tickets), or null before it is downloaded. */
   setQaTool(files: ArchiveFile[] | null): void;
+  /** The project whose Docker resources are created from now on (they carry its label). */
+  setProject(project: string): void;
+  /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
+  removeProjects(projects: readonly string[]): Promise<CleanupTarget[]>;
   environment(): Promise<EnvironmentReport>;
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
@@ -74,6 +79,8 @@ export interface GameRuntime {
   solveBug(stage: number, patch: string): Promise<void>;
   /** The stage commit with the reference patch applied. */
   referenceFiles(stage: number, patch: string): Promise<ArchiveFile[]>;
+  /** git diff --binary between two commits of the workspace repository. */
+  commitDiff(from: string, to: string): Promise<string>;
   /** Creates or recreates the approved-snapshot tag and the review branch. */
   buildReview(build: ReviewBuild): Promise<ReviewCommits>;
   reviewRefs(ticket: number): Promise<{ branch: string | null; tag: string | null }>;
@@ -128,6 +135,7 @@ export class DockerRuntime implements GameRuntime {
   private readonly qaBuildRoot: string;
   private readonly qaRepository: string;
   private qaTool: ArchiveFile[] | null = null;
+  private project: string | null = null;
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -157,6 +165,37 @@ export class DockerRuntime implements GameRuntime {
     this.qaTool = files;
   }
 
+  setProject(project: string): void {
+    this.project = project;
+  }
+
+  async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
+    const docker = await this.docker();
+    const left = async (): Promise<CleanupTarget[]> => {
+      const targets: CleanupTarget[] = [];
+      for (const project of projects) {
+        const found = await docker.ofProject(project);
+        targets.push(
+          ...found.containers.map((name) => ({ kind: 'container' as const, name })),
+          ...found.volumes.map((name) => ({ kind: 'volume' as const, name })),
+          ...found.images.map(({ ref, id }) => ({ kind: 'image' as const, name: ref.endsWith(':<none>') ? id : ref })),
+        );
+      }
+      return targets;
+    };
+    // Containers first (they hold the volumes and the images); a failed removal is retried by the next call.
+    for (const target of await left()) {
+      try {
+        if (target.kind === 'container') await docker.removeContainer(target.name);
+        else if (target.kind === 'volume') await docker.removeVolume(target.name);
+        else await docker.removeImage(target.name, { force: true });
+      } catch {
+        // Reported below, by what is still there.
+      }
+    }
+    return left();
+  }
+
   /** The QA image of the current QA tool, or null before the project's content is downloaded. */
   private async qaTag(): Promise<string | null> {
     return this.qaTool ? qaImageTag((await this.imageTags()).qaBase, this.qaTool, this.qaRepository) : null;
@@ -178,6 +217,7 @@ export class DockerRuntime implements GameRuntime {
       image: (await this.imageTags()).workspace,
       isPortFree: (port) => this.platform.isPortFree(port),
       names: this.names,
+      project: this.project,
     });
   }
 
@@ -194,6 +234,7 @@ export class DockerRuntime implements GameRuntime {
       image: await this.requireQaTag(),
       dockerHostPath: (path) => this.platform.dockerHostPath(path),
       names: this.names,
+      project: this.project,
     });
   }
 
@@ -255,7 +296,7 @@ export class DockerRuntime implements GameRuntime {
     if (!(await docker.imageExists(qa))) {
       const context = await writeQaContext(join(this.contextRoot, 'qa'), tags.qaBase, this.qaTool!, this.qaBuildRoot);
       onLine(`» docker build ${qa}`);
-      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line));
+      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line), undefined, this.project);
     }
     // The workspace container moves to the new image first: the image of an older version is then
     // free and goes away with the other leftovers (an image a container still uses stays).
@@ -405,6 +446,10 @@ export class DockerRuntime implements GameRuntime {
 
   async solveBug(stage: number, patch: string) {
     await (await this.runningWorkspace()).solveBug(stage, patch);
+  }
+
+  async commitDiff(from: string, to: string) {
+    return (await this.runningWorkspace()).git(['diff', '--binary', '--full-index', from, to]);
   }
 
   async referenceFiles(stage: number, patch: string) {

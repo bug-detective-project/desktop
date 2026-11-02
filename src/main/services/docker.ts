@@ -8,6 +8,13 @@ import { CommandError, runChecked } from './process.ts';
 import type { CommandRunner, RunOptions, RunResult } from './process.ts';
 
 export const LABEL = 'bugdetective.role';
+/** The game project a resource belongs to (its code, dependencies and QA image). Only one project stays in Docker. */
+export const PROJECT_LABEL = 'bugdetective.project';
+
+/** `--label` arguments for a resource: its role, and its project when it belongs to one. */
+export function labelArgs(role: string, project?: string | null): string[] {
+  return ['--label', `${LABEL}=${role}`, ...(project ? ['--label', `${PROJECT_LABEL}=${project}`] : [])];
+}
 
 export type { EngineState } from '../../shared/api.ts';
 
@@ -96,8 +103,8 @@ export class Docker {
     return (await this.run(['image', 'inspect', '--format', '{{.Id}}', tag], { timeoutMs: 30_000 })).code === 0;
   }
 
-  async build(contextDir: string, tag: string, role: string, onLine?: RunOptions['onLine'], signal?: AbortSignal) {
-    await this.checked(['build', '--progress', 'plain', '--label', `${LABEL}=${role}`, '--tag', tag, contextDir], {
+  async build(contextDir: string, tag: string, role: string, onLine?: RunOptions['onLine'], signal?: AbortSignal, project?: string | null) {
+    await this.checked(['build', '--progress', 'plain', ...labelArgs(role, project), '--tag', tag, contextDir], {
       onLine,
       signal,
     });
@@ -107,9 +114,9 @@ export class Docker {
     return (await this.run(['volume', 'inspect', name], { timeoutMs: 30_000 })).code === 0;
   }
 
-  async createVolume(name: string, role: string): Promise<void> {
+  async createVolume(name: string, role: string, project?: string | null): Promise<void> {
     if (!(await this.volumeExists(name))) {
-      await this.checked(['volume', 'create', '--label', `${LABEL}=${role}`, name]);
+      await this.checked(['volume', 'create', ...labelArgs(role, project), name]);
     }
   }
 
@@ -159,6 +166,25 @@ export class Docker {
   /** Every container, volume and image carrying the app's label, whatever its role. */
   async labelled(): Promise<LabelledResources> {
     const filter = ['--filter', `label=${LABEL}`];
+    const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
+    const [containers, volumes, images] = await Promise.all([
+      this.checked(['container', 'ls', '--all', ...filter, '--format', '{{.Names}}'], { timeoutMs: 30_000 }),
+      this.checked(['volume', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
+      this.checked(['image', 'ls', ...filter, '--format', '{{.Repository}}:{{.Tag}}|{{.ID}}'], { timeoutMs: 30_000 }),
+    ]);
+    return {
+      containers: lines(containers),
+      volumes: lines(volumes),
+      images: lines(images).map((line) => {
+        const [ref = '', id = ''] = line.split('|');
+        return { ref, id };
+      }),
+    };
+  }
+
+  /** Every container, volume and image of one game project. */
+  async ofProject(project: string): Promise<LabelledResources> {
+    const filter = ['--filter', `label=${PROJECT_LABEL}=${project}`];
     const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
     const [containers, volumes, images] = await Promise.all([
       this.checked(['container', 'ls', '--all', ...filter, '--format', '{{.Names}}'], { timeoutMs: 30_000 }),

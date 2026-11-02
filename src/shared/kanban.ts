@@ -6,6 +6,8 @@
 import { DEFAULT_QA_TIMEOUT_SECONDS, SCHEMA_VERSION, TRACKS } from './types.ts';
 import type {
   ActivityEntry,
+  InboxMessage,
+  ProjectProgress,
   Track,
   TrackChoice,
   TrackCounts,
@@ -28,7 +30,9 @@ export type RuleCode =
   | 'wrongColumn'
   | 'noMoreHints'
   | 'hintsRemaining'
-  | 'solutionAlreadyRevealed';
+  | 'solutionAlreadyRevealed'
+  | 'switchInProgress'
+  | 'sameProject';
 
 export class GameRuleError extends Error {
   readonly code: RuleCode;
@@ -58,6 +62,9 @@ export function isPlayerMoveAllowed(from: Column, to: Column): boolean {
 export function createInitialState(ctx: RuleContext, language: Language = 'en'): GameState {
   return {
     schemaVersion: SCHEMA_VERSION,
+    project: null,
+    otherProjects: {},
+    projectSwitch: null,
     createdAt: ctx.now,
     currentTicket: null,
     tracks: null,
@@ -389,4 +396,57 @@ export function finishOnboarding(state: GameState): GameState {
 
 export function markInboxRead(state: GameState, id: string): GameState {
   return { ...state, inbox: state.inbox.map((message) => (message.id === id ? { ...message, read: true } : message)) };
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+
+/** The Projects screen shows once any project of the game is done (it got its completion message). */
+export function projectsUnlocked(state: GameState): boolean {
+  const done = (inbox: InboxMessage[]) => inbox.some((message) => message.kind === 'completion');
+  return done(state.inbox) || Object.values(state.otherProjects).some((progress) => done(progress.inbox));
+}
+
+/**
+ * Starts a switch from the active project to another one: the active project's progress is kept
+ * in otherProjects, the other one's comes back (or starts from zero), and projectSwitch records
+ * that Docker still has to be cleaned. Only with no ticket open and no review checked out.
+ */
+export function beginSwitch(state: GameState, from: string, to: string, ctx: RuleContext): GameState {
+  if (state.projectSwitch) {
+    throw new GameRuleError('switchInProgress', `A switch to ${state.projectSwitch.to} is not finished`);
+  }
+  if (from === to) {
+    throw new GameRuleError('sameProject', `${to} is already the active project`);
+  }
+  if (!canTakeTicket(state) || state.reviewSession) {
+    throw new GameRuleError('ticketNotDone', 'Finish the open ticket and close its review first');
+  }
+  const kept: ProjectProgress = { createdAt: state.createdAt, tracks: state.tracks, tickets: state.tickets, activity: state.activity, inbox: state.inbox };
+  const { [to]: back, ...others } = state.otherProjects;
+  const progress: ProjectProgress = back ?? {
+    createdAt: ctx.now,
+    tracks: null,
+    tickets: [],
+    activity: [],
+    inbox: [{ id: ctx.id(), kind: 'welcome', at: ctx.now, read: false }],
+  };
+  return {
+    ...state,
+    project: to,
+    otherProjects: { ...others, [from]: kept },
+    projectSwitch: { from, to, phase: 'cleaning', startedAt: ctx.now },
+    createdAt: progress.createdAt,
+    tracks: progress.tracks,
+    tickets: progress.tickets,
+    activity: progress.activity,
+    inbox: progress.inbox,
+    currentTicket: progress.tickets.at(-1)?.ticket ?? null,
+    reviewSession: null,
+  };
+}
+
+/** Docker has nothing left of the other projects: the switch is done. */
+export function finishSwitch(state: GameState): GameState {
+  return { ...state, projectSwitch: null };
 }

@@ -14,9 +14,8 @@ import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
-import { GitHubContentSource } from './services/content/github.ts';
 import { LocalContentSource } from './services/content/local.ts';
-import { chooseContentSource, parseLocalProjects, parseProjectsCatalog, starterProject } from './services/projects.ts';
+import { contentSourceFor, parseLocalProjects, parseProjectsCatalog, starterProject, withLocalProjects } from './services/projects.ts';
 import projectsJson from '../../content/projects.json' with { type: 'json' };
 import type { ContentSource } from './services/content/source.ts';
 import { PackageStore } from './services/content/store.ts';
@@ -45,6 +44,8 @@ if (!app.isPackaged && !isE2E && existsSync(envFile)) {
 const devSolveBug = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
 // "Skip onboarding" in Rafaela's onboarding: BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON=true, never in the installed app.
 const devSkipOnboarding = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
+// The Projects screen from the start (it normally waits for a done project): BUGDETECTIVE_DEV_SHOW_PROJECTS=true, never in the installed app.
+const devShowProjects = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SHOW_PROJECTS ?? '');
 // The e2e tests keep the onboarding from opening on its own unless BUGDETECTIVE_E2E_SHOW_ONBOARDING=true.
 const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E_SHOW_ONBOARDING ?? '');
 
@@ -53,8 +54,8 @@ const contentConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('github'), repository: z.string(), baseUrl: z.string().optional() }),
 ]);
 
-/** The projects the app uses (content/projects.json, bundled into the app). */
-const catalog = parseProjectsCatalog(projectsJson);
+/** The projects the app uses (content/projects.json, bundled into the app, plus local-only ones in development). */
+const catalog = withLocalProjects(parseProjectsCatalog(projectsJson), localProjectDirs(), app.isPackaged);
 /** The project being played: the starter one, until switching projects exists. */
 const project = starterProject(catalog);
 
@@ -71,25 +72,25 @@ function localProjectDirs(): Record<string, string> {
   if (app.isPackaged || !existsSync(file)) {
     return {};
   }
-  return parseLocalProjects(JSON.parse(readFileSync(file, 'utf8')), catalog);
+  return parseLocalProjects(JSON.parse(readFileSync(file, 'utf8')));
 }
 
 /**
- * The project's content comes from its repository (content/projects.json), or from a local qa
- * folder in development (projects.local.json). %APPDATA%\Bug Detective\content-source.json
- * overrides both.
+ * Each project's content comes from its repository (content/projects.json), cached per project, or
+ * from a local qa folder in development (projects.local.json). For the starter project,
+ * %APPDATA%\Bug Detective\content-source.json overrides both (the e2e tests use it).
  */
-function contentSource(): ContentSource {
+function contentSource(id: string): ContentSource {
+  const entry = catalog.projects.find((item) => item.id === id)!;
   const configFile = join(app.getPath('userData'), 'content-source.json');
-  const choice = chooseContentSource(project, { packaged: app.isPackaged, localDirs: localProjectDirs(), baseDir: appRoot });
-  let config: z.infer<typeof contentConfigSchema> =
-    choice.kind === 'local' ? { kind: 'local', qaDir: choice.qaDir } : { kind: 'github', repository: choice.repository };
-  if (existsSync(configFile)) {
-    config = contentConfigSchema.parse(JSON.parse(readFileSync(configFile, 'utf8')));
+  if (entry.starter && existsSync(configFile)) {
+    const config = contentConfigSchema.parse(JSON.parse(readFileSync(configFile, 'utf8')));
+    if (config.kind === 'local') {
+      return new LocalContentSource({ qaDir: config.qaDir, runner: runCommand });
+    }
+    return contentSourceFor({ ...entry, repository: config.repository }, { packaged: true, localDirs: {}, baseDir: appRoot, userData: app.getPath('userData'), baseUrl: config.baseUrl }, console.log);
   }
-  return config.kind === 'local'
-    ? new LocalContentSource({ qaDir: config.qaDir, runner: runCommand })
-    : new GitHubContentSource({ repository: config.repository, project: project.id, minVersion: project.version, baseUrl: config.baseUrl });
+  return contentSourceFor(entry, { packaged: app.isPackaged, localDirs: localProjectDirs(), baseDir: appRoot, userData: app.getPath('userData') }, console.log);
 }
 
 const platform: Platform | null = isE2E ? null : currentPlatform();
@@ -185,12 +186,19 @@ async function main(): Promise<void> {
     // Downloaded packages and reviews belong to the project they came from.
     packages: new PackageStore(join(userData, 'projects', projectId(), 'packages')),
     reviews: new ReviewStore(join(userData, 'projects', projectId(), 'reviews')),
-    content: contentSource(),
+    content: contentSource(projectId()),
+    projects: {
+      catalog: catalog.projects,
+      content: contentSource,
+      packages: (id) => new PackageStore(join(userData, 'projects', id, 'packages')),
+      reviews: (id) => new ReviewStore(join(userData, 'projects', id, 'reviews')),
+    },
     runtime: runtime(),
     appVersion: app.getVersion(),
     versions: { electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome },
     devSolveBug,
     devSkipOnboarding,
+    devShowProjects,
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
   });

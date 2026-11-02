@@ -5,6 +5,7 @@ import {
   parseLocalProjects,
   parseProjectsCatalog,
   repositoryFromRemote,
+  withLocalProjects,
   starterProject,
   updateCatalog,
 } from '../../src/main/services/projects.ts';
@@ -42,12 +43,22 @@ describe('projects.local.json', () => {
   const catalog = parseProjectsCatalog({ projects: [supportdesk, inventory] });
 
   it('maps listed projects to local qa folders', () => {
-    expect(parseLocalProjects({ supportdesk: '../supportdesk-qa' }, catalog)).toEqual({ supportdesk: '../supportdesk-qa' });
+    expect(parseLocalProjects({ supportdesk: '../supportdesk-qa' })).toEqual({ supportdesk: '../supportdesk-qa' });
   });
 
-  it('refuses a project that is not in projects.json, or an empty folder', () => {
-    expect(() => parseLocalProjects({ other: '../other-qa' }, catalog)).toThrow(/other/);
-    expect(() => parseLocalProjects({ supportdesk: '' }, catalog)).toThrow(/projects\.local\.json/);
+  it('refuses an empty folder or an invalid project id', () => {
+    expect(() => parseLocalProjects({ supportdesk: '' })).toThrow(/projects\.local\.json/);
+    expect(() => parseLocalProjects({ 'Not An Id': '../x' })).toThrow(/projects\.local\.json/);
+  });
+
+  it('adds a project that only projects.local.json names, in development only', () => {
+    const local = parseLocalProjects({ supportdesk: '../supportdesk-qa', sample: '../sample-qa' });
+    expect(withLocalProjects(catalog, local, false).projects.map((project) => [project.id, project.starter])).toEqual([
+      ['supportdesk', true],
+      ['inventory', false],
+      ['sample', false],
+    ]);
+    expect(withLocalProjects(catalog, local, true)).toEqual(catalog);
   });
 });
 
@@ -109,5 +120,22 @@ describe('repository from the git remote', () => {
 
   it('refuses a remote that is not on GitHub', () => {
     expect(() => repositoryFromRemote('/home/me/supportdesk')).toThrow(/GitHub/);
+  });
+});
+
+describe('the content source the app builds for a project', () => {
+  it('caches a GitHub project in its own content folder', async () => {
+    const { contentSourceFor } = await import('../../src/main/services/projects.ts');
+    const { CachedContentSource } = await import('../../src/main/services/content/cache.ts');
+    const source = contentSourceFor(supportdesk, { packaged: true, localDirs: {}, baseDir: '/app', userData: '/data' }, () => {});
+    expect(source).toBeInstanceOf(CachedContentSource);
+    expect(source.describe()).toContain('/data/projects/supportdesk/content');
+  });
+
+  it('reads a local qa folder in development', async () => {
+    const { contentSourceFor } = await import('../../src/main/services/projects.ts');
+    const source = contentSourceFor(supportdesk, { packaged: false, localDirs: { supportdesk: '../supportdesk-qa' }, baseDir: '/work/desktop', userData: '/data' }, () => {});
+    expect(source.kind).toBe('local');
+    expect(source.describe()).toBe('/work/supportdesk-qa');
   });
 });

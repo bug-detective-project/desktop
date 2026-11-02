@@ -13,11 +13,12 @@ import { Icon } from './icons.tsx';
 import { Tooltip } from './ui.tsx';
 import type { IconName } from './icons.tsx';
 
-export type View = 'dashboard' | 'board' | 'settings' | 'review';
+export type View = 'dashboard' | 'board' | 'projects' | 'settings' | 'review';
 
 const NAV: { id: Exclude<View, 'review' | 'settings'>; icon: IconName }[] = [
   { id: 'dashboard', icon: 'mail' },
   { id: 'board', icon: 'board' },
+  { id: 'projects', icon: 'briefcase' },
 ];
 
 /**
@@ -59,7 +60,8 @@ export function AppHeader({
             </div>
           </div>
           <nav className="flex items-center gap-1" aria-label="Main">
-            {NAV.map((item) => {
+            {/* Projects shows once a project of this game is done, and stays from then on. */}
+            {NAV.filter((item) => item.id !== 'projects' || snapshot.projectsUnlocked).map((item) => {
               const active = view === item.id || (view === 'review' && item.id === 'board');
               return (
                 <button

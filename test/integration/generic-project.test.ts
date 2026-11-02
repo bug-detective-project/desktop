@@ -187,7 +187,8 @@ mkdir -p app/__pycache__ && printf 'bytecode' > app/__pycache__/tasks.cpython-31
 
     // Snapshot and comparison follow the project's configuration plus the built-in defaults.
     const stored = (await new ReviewStore(join(gameDir, 'reviews')).load(1))!;
-    expect(stored.snapshot.map((file) => file.path).sort()).toEqual(['README.md', 'app/format.py', 'app/helpers.py', 'app/tasks.py']);
+    expect((await sh('git ls-tree -r --name-only qa-approved/ticket-1')).trim().split('\n').sort()).toEqual(['README.md', 'app/format.py', 'app/helpers.py', 'app/tasks.py']);
+    expect(stored.snapshotDiff).toContain('app/helpers.py');
     const files = visibleFiles(parseDiff(stored.meta.comparison.solutionsIgnoringWhitespace)).map((file) => `${file.status} ${file.path}`);
     expect(files.sort()).toEqual(['added tests/test_tasks.py', 'deleted app/helpers.py', 'modified app/tasks.py']);
 

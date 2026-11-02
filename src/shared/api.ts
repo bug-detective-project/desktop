@@ -52,6 +52,7 @@ export type BusyTask =
   | 'cleaningDocker'
   | 'removingDocker'
   | 'solvingBug'
+  | 'switchingProject'
   | null;
 
 /** Opening VS Code waits for every task except QA (it tests its own copy of the code, so the player may look meanwhile). */
@@ -119,12 +120,36 @@ export interface TrackQueue {
   total: number;
 }
 
+/** A project on the Projects screen. details is null until its content is downloaded. */
+export interface ProjectCard {
+  id: string;
+  active: boolean;
+  /** At least one ticket of it was unlocked in this game. */
+  played: boolean;
+  details: {
+    name: Record<Language, string>;
+    about: Record<Language, string>;
+    stack: Record<Language, string>;
+    difficulty: ProjectDifficulty | null;
+    counts: Record<Track, number>;
+  } | null;
+  progress: Record<Track, { done: number; total: number }> | null;
+}
+
+export type ProjectDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
 export interface Snapshot {
   state: GameState;
   /** The number the next unlocked ticket gets, or null when none can be taken now (one open, or none left). */
   nextTicket: number | null;
   /** Each track's queue, or null until the project's content is downloaded. */
   queues: Record<TrackChoice, TrackQueue> | null;
+  /** The Projects screen is available: some project of this game is done. */
+  projectsUnlocked: boolean;
+  /** Every project of content/projects.json, or null in a single-project game. */
+  projects: ProjectCard[] | null;
+  /** While a project switch is pending: what Docker still holds of other projects. */
+  projectSwitchLeft: { kind: 'container' | 'volume' | 'image'; name: string }[] | null;
   titles: Record<number, Record<Language, string>>;
   hintsTotal: Record<number, number>;
   busy: BusyTask;
@@ -186,6 +211,12 @@ export interface BugDetectiveApi {
   diskUsage(): Promise<DiskUsageItem[]>;
 
   nextAssignment(track: TrackChoice): Promise<void>;
+  /** Removes the active project from Docker and makes another one active (needs internet and Docker). */
+  switchProject(project: string): Promise<void>;
+  /** Retries the Docker cleanup of a pending project switch. */
+  finishProjectSwitch(): Promise<void>;
+  /** Downloads what the Projects screen shows of the other projects. */
+  loadProjects(): Promise<void>;
   move(ticket: number, to: Column): Promise<void>;
   askSenior(ticket: number): Promise<void>;
   revealSolution(ticket: number): Promise<void>;

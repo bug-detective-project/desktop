@@ -9,6 +9,7 @@ import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from './services/content/archive.ts';
 import type { ArchiveFile } from './services/content/archive.ts';
+import type { CleanupTarget } from './services/cleanup.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
@@ -149,6 +150,8 @@ function baselineDiff(): string {
   ].join('\n');
 }
 
+const FAKE_SNAPSHOT = 'fake-snapshot:';
+
 export class FakeRuntime implements GameRuntime {
   private readonly scenario: Scenario;
   private qaIndex = 0;
@@ -193,6 +196,18 @@ export class FakeRuntime implements GameRuntime {
 
   /** The fake runtime never builds images, so the QA tool only has to be accepted. */
   setQaTool(_files: ArchiveFile[] | null): void {}
+
+  /** Projects whose resources a test left behind, removed by removeProjects. */
+  projectResources: Record<string, string[]> = {};
+
+  setProject(_project: string): void {}
+
+  async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
+    for (const project of projects) {
+      delete this.projectResources[project];
+    }
+    return [];
+  }
 
   async environment(): Promise<EnvironmentReport> {
     const ready = this.scenario.environmentReady;
@@ -345,7 +360,16 @@ export class FakeRuntime implements GameRuntime {
     this.solved.push({ stage, patch });
   }
 
-  async referenceFiles(stage: number) {
+  /** The fake "diff" to an approved commit is the snapshot it was built from, which referenceFiles applies back. */
+  async commitDiff(_from: string, to: string): Promise<string> {
+    const build = this.builds.find((item) => this.reviews.get(item.ticket)?.approved === to);
+    return `${FAKE_SNAPSHOT}${JSON.stringify((build?.snapshot ?? []).map((file) => ({ path: file.path, text: Buffer.from(file.data).toString('utf8') })))}`;
+  }
+
+  async referenceFiles(stage: number, patch = '') {
+    if (patch.startsWith(FAKE_SNAPSHOT)) {
+      return (JSON.parse(patch.slice(FAKE_SNAPSHOT.length)) as { path: string; text: string }[]).map((file) => textFile(file.path, file.text));
+    }
     return [textFile('client/src/App.tsx', `export {} // reference ${stage}\n`)];
   }
 

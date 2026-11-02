@@ -3,8 +3,13 @@
  * project's public repository; projects.local.json (development only, never packaged or committed)
  * may point a project at a local qa folder. publish:project keeps projects.json up to date.
  */
-import { isAbsolute, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { runCommand } from './process.ts';
+import { CachedContentSource } from './content/cache.ts';
+import { GitHubContentSource } from './content/github.ts';
+import { LocalContentSource } from './content/local.ts';
+import type { ContentSource } from './content/source.ts';
 
 const PROJECT_ID = /^[a-z][a-z0-9-]{0,39}$/;
 const REPOSITORY = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
@@ -54,18 +59,28 @@ export function starterProject(catalog: ProjectsCatalog): CatalogProject {
   return catalog.projects.find((project) => project.starter)!;
 }
 
-/** projects.local.json: { "<project id>": "<qa folder>" }, only for projects of projects.json. */
-export function parseLocalProjects(raw: unknown, catalog: ProjectsCatalog): Record<string, string> {
-  const result = z.record(z.string(), z.string().min(1)).safeParse(raw);
+/**
+ * projects.local.json: { "<project id>": "<qa folder>" }. A listed project reads that folder in
+ * development; a project that only this file names is added to the list in development (a local
+ * sample project, for example), never in the installed app.
+ */
+export function parseLocalProjects(raw: unknown): Record<string, string> {
+  const result = z.record(z.string().regex(PROJECT_ID, 'project ids are lowercase, like supportdesk'), z.string().min(1)).safeParse(raw);
   if (!result.success) {
     throw new Error(`Invalid projects.local.json: ${result.error.issues[0]?.message ?? 'unknown error'}`);
   }
-  for (const id of Object.keys(result.data)) {
-    if (!catalog.projects.some((project) => project.id === id)) {
-      throw new Error(`projects.local.json names ${id}, which is not in content/projects.json`);
-    }
-  }
   return result.data;
+}
+
+/** The catalog plus, in development, the projects only projects.local.json names (never the starter). */
+export function withLocalProjects(catalog: ProjectsCatalog, localDirs: Record<string, string>, packaged: boolean): ProjectsCatalog {
+  if (packaged) {
+    return catalog;
+  }
+  const extra = Object.keys(localDirs)
+    .filter((id) => !catalog.projects.some((project) => project.id === id))
+    .map((id) => ({ id, repository: `local/${id}`, starter: false, version: '0.0.0' }));
+  return { projects: [...catalog.projects, ...extra] };
 }
 
 export type ContentChoice =
@@ -106,4 +121,22 @@ export function repositoryFromRemote(url: string): string {
     throw new Error(`The project's origin remote is not a GitHub repository: ${url.trim()}`);
   }
   return match[1];
+}
+
+/**
+ * The content source of a project: a local qa folder in development when projects.local.json sets
+ * one, otherwise its GitHub repository, cached in <userData>/projects/<id>/content/ so the project
+ * plays offline after its first download.
+ */
+export function contentSourceFor(
+  project: CatalogProject,
+  options: { packaged: boolean; localDirs: Record<string, string>; baseDir: string; userData: string; baseUrl?: string },
+  log: (line: string) => void,
+): ContentSource {
+  const choice = chooseContentSource(project, options);
+  if (choice.kind === 'local') {
+    return new LocalContentSource({ qaDir: choice.qaDir, runner: runCommand });
+  }
+  const remote = new GitHubContentSource({ repository: choice.repository, project: choice.project, minVersion: choice.minVersion, baseUrl: options.baseUrl });
+  return new CachedContentSource(join(options.userData, 'projects', project.id, 'content'), remote, log);
 }

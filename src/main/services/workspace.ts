@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { MAX_SAVE_BYTES } from './backup.ts';
 import { readTar, writeTar } from './content/archive.ts';
 import type { ArchiveFile } from './content/archive.ts';
-import { LABEL, mountArg } from './docker.ts';
+import { labelArgs, mountArg } from './docker.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 
@@ -172,7 +172,8 @@ cat > "$patch"
 cd ${WORKSPACE_DIR}
 rm -f "$idx"
 GIT_INDEX_FILE="$idx" git read-tree "refs/tags/stage-$stage^{commit}"
-GIT_INDEX_FILE="$idx" git apply --cached --whitespace=nowarn "$patch"
+# An empty patch (an approved snapshot equal to the stage) leaves the stage tree as it is.
+if [ -s "$patch" ]; then GIT_INDEX_FILE="$idx" git apply --cached --whitespace=nowarn "$patch"; fi
 tree=$(GIT_INDEX_FILE="$idx" git write-tree)
 rm -f "$idx" "$patch"
 git archive --format=tar "$tree"`,
@@ -394,6 +395,8 @@ export interface WorkspaceOptions {
   image: string;
   isPortFree: (port: number) => Promise<boolean>;
   names?: ResourceNames;
+  /** The game project whose code the workspace holds (labels its container and volumes). */
+  project?: string | null;
 }
 
 export class Workspace {
@@ -401,6 +404,7 @@ export class Workspace {
   private readonly image: string;
   private readonly isPortFree: (port: number) => Promise<boolean>;
   private readonly names: ResourceNames;
+  private readonly project: string | null;
   private runtimeKey: string | null = null;
 
   constructor(options: WorkspaceOptions) {
@@ -408,6 +412,7 @@ export class Workspace {
     this.image = options.image;
     this.isPortFree = options.isPortFree;
     this.names = options.names ?? resourceNames();
+    this.project = options.project ?? null;
   }
 
   get containerName(): string {
@@ -450,8 +455,7 @@ export class Workspace {
         '--init',
         '--name',
         this.names.container,
-        '--label',
-        `${LABEL}=workspace`,
+        ...labelArgs('workspace', this.project),
         '--mount',
         mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACE_DIR }),
         '--mount',
@@ -477,9 +481,10 @@ export class Workspace {
 
   /** Creates the volumes and starts the workspace container. The volume (the player's work) is never removed here. */
   async ensureRunning(): Promise<ContainerInfo> {
-    await this.docker.createVolume(this.names.volume, 'workspace');
+    await this.docker.createVolume(this.names.volume, 'workspace', this.project);
+    // VS Code's server does not depend on the project, so it is kept across projects.
     await this.docker.createVolume(this.names.vscodeVolume, 'vscode-server');
-    await this.docker.createVolume(this.names.cacheVolume, 'qa-cache');
+    await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
     let info = await this.info();
     if (info && info.image !== this.image) {
       // A newer app version ships a newer image: recreate the container, keep the volumes.

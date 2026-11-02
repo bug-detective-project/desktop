@@ -120,11 +120,13 @@ sed -i 's/$/  /' client/src/searchParams.ts`);
     expect(await ws.git(['status', '--porcelain'])).toBe(status);
     // The snapshot holds the files QA tested (the uncommitted fix), not HEAD, and no excluded file.
     const stored = (await new ReviewStore(join(gameDir, 'reviews')).load(1))!;
-    const paths = stored.snapshot.map((file) => file.path);
+    const paths = (await ws.git(['ls-tree', '-r', '--name-only', 'qa-approved/ticket-1'])).trim().split('\n');
     expect(paths).toContain('client/src/utils/text.ts');
     expect(paths.some((path) => /node_modules|package-lock\.json|\.db$/.test(path))).toBe(false);
-    const details = stored.snapshot.find((file) => file.path === 'client/src/pages/TicketDetails.tsx')!;
-    expect(Buffer.from(details.data).toString('utf8')).toBe(await sh('cat client/src/pages/TicketDetails.tsx'));
+    expect(await ws.git(['show', 'qa-approved/ticket-1:client/src/pages/TicketDetails.tsx'])).toBe(await sh('cat client/src/pages/TicketDetails.tsx'));
+    // Only a diff is stored, and the ticket's commit plus that diff is exactly the approved snapshot.
+    expect(stored.snapshotDiff).toContain('client/src/utils/text.ts');
+    expect(await ws.git(['diff', '--binary', '--full-index', 'refs/tags/stage-1', 'qa-approved/ticket-1'])).toBe(stored.snapshotDiff);
     // Tag and branch: never on the player branch.
     const { commits } = stored.meta;
     expect((await ws.git(['rev-parse', 'qa-approved/ticket-1'])).trim()).toBe(commits.approved);
@@ -280,7 +282,7 @@ sed -i 's/  return response.json();/  return (await response.json()).filter((emp
       expect(await ws.currentBranch()).toBe(`review/ticket-${ticket}`);
       await fresh.closeReview();
     }
-    expect(readZip(await readFile(save)).some((file) => file.path === 'reviews/ticket-2/snapshot.zip')).toBe(true);
+    expect(readZip(await readFile(save)).some((file) => file.path === 'reviews/ticket-2/snapshot.diff')).toBe(true);
     game = fresh;
   });
 

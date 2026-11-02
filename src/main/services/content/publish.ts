@@ -53,8 +53,10 @@ function gitIn(runner: CommandRunner, git: string, dir: string): Git {
   };
 }
 
-async function readProject(qaDir: string): Promise<{ id: string; name: string }> {
-  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown } } };
+const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
+
+async function readProject(qaDir: string): Promise<{ id: string; name: string; difficulty?: (typeof DIFFICULTIES)[number] }> {
+  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown } } };
   try {
     json = JSON.parse(await readFile(join(qaDir, 'package.json'), 'utf8'));
   } catch {
@@ -64,7 +66,11 @@ async function readProject(qaDir: string): Promise<{ id: string; name: string }>
   if (typeof project?.id !== 'string' || typeof project.name !== 'string') {
     throw new Error(`${qaDir}/package.json has no bugDetective.project { id, name }`);
   }
-  return { id: project.id, name: project.name };
+  const { difficulty } = project;
+  if (difficulty !== undefined && !DIFFICULTIES.includes(difficulty as (typeof DIFFICULTIES)[number])) {
+    throw new Error(`${qaDir}/package.json: bugDetective.project.difficulty must be one of ${DIFFICULTIES.join(', ')}`);
+  }
+  return { id: project.id, name: project.name, ...(difficulty !== undefined && { difficulty: difficulty as (typeof DIFFICULTIES)[number] }) };
 }
 
 /** The committed files of tickets/ (untracked files never reach the qa branch, so they never count). */

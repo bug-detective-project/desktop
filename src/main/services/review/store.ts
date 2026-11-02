@@ -1,9 +1,11 @@
 /**
  * Review data of every ticket that passed QA, kept in the app data folder so the in-app comparison
  * works without Docker and the review branch can be rebuilt after a restore:
- *   reviews/ticket-N/snapshot.zip   the approved snapshot (the files QA tested, after the excludes)
- *   reviews/ticket-N/reference.zip  the reference (stage commit + reference patch)
+ *   reviews/ticket-N/snapshot.diff  the approved snapshot as a diff from the ticket's commit
+ *                                   (git diff --binary: the files QA tested, after the excludes)
  *   reviews/ticket-N/review.json    commits, creation date and language, and the comparison diffs
+ * No copy of the tree is kept: the reference is the ticket's commit plus its reference.patch, and
+ * the snapshot is the ticket's commit plus snapshot.diff.
  */
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -12,8 +14,6 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { ReviewComparison } from '../../../shared/api.ts';
 import { LANGUAGES } from '../../../shared/types.ts';
-import { readZip, writeZip } from '../content/archive.ts';
-import type { ArchiveFile } from '../content/archive.ts';
 import { renameWithRetry } from '../content/store.ts';
 
 const commit = z.string().regex(/^[0-9a-f]{40,64}$/);
@@ -36,12 +36,12 @@ export type ReviewMeta = z.infer<typeof reviewMetaSchema>;
 
 export interface StoredReview {
   meta: ReviewMeta;
-  snapshot: ArchiveFile[];
-  reference: ArchiveFile[];
+  /** The approved snapshot as a diff from the ticket's commit. */
+  snapshotDiff: string;
 }
 
 /** The files of one ticket's review data, as stored and as carried in a save (reviews/ticket-N/<name>). */
-export const REVIEW_FILES = ['snapshot.zip', 'reference.zip', 'review.json'] as const;
+export const REVIEW_FILES = ['snapshot.diff', 'review.json'] as const;
 
 export class ReviewStore {
   readonly root: string;
@@ -66,13 +66,12 @@ export class ReviewStore {
   async save(review: StoredReview, options: { replace?: boolean } = {}): Promise<void> {
     const { ticket } = review.meta;
     const files = {
-      'snapshot.zip': writeZip(review.snapshot),
-      'reference.zip': writeZip(review.reference),
+      'snapshot.diff': Buffer.from(review.snapshotDiff),
       'review.json': Buffer.from(`${JSON.stringify(reviewMetaSchema.parse(review.meta), null, 2)}\n`),
     };
     if (this.has(ticket) && !options.replace) {
-      const current = await readFile(join(this.dir(ticket), 'snapshot.zip'));
-      if (!current.equals(Buffer.from(files['snapshot.zip']))) {
+      const current = await readFile(join(this.dir(ticket), 'snapshot.diff'));
+      if (!current.equals(files['snapshot.diff'])) {
         throw new Error(`The approved snapshot of ticket ${ticket} already exists and cannot change`);
       }
     }
@@ -102,8 +101,6 @@ export class ReviewStore {
     if (meta.ticket !== ticket) {
       throw new Error(`Review data for ticket ${meta.ticket} found under ticket ${ticket}`);
     }
-    readZip(files['snapshot.zip']);
-    readZip(files['reference.zip']);
     await this.write(ticket, files);
   }
 
@@ -134,8 +131,7 @@ export class ReviewStore {
     if (!meta) {
       return null;
     }
-    const zip = async (name: string) => readZip(await readFile(join(this.dir(ticket), name)));
-    return { meta, snapshot: await zip('snapshot.zip'), reference: await zip('reference.zip') };
+    return { meta, snapshotDiff: await readFile(join(this.dir(ticket), 'snapshot.diff'), 'utf8') };
   }
 
   async comparison(ticket: number): Promise<ReviewComparison | null> {

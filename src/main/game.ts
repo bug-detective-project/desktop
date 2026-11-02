@@ -15,6 +15,7 @@ import type {
   ReviewNotice,
   SaveSummary,
   Snapshot,
+  ProjectCard,
   TicketContent,
   TrackQueue,
   WorkspaceStatus,
@@ -34,6 +35,8 @@ import { projectContentOf, qaToolFiles } from './services/content/project-files.
 import type { ProjectFiles } from './services/content/project-files.ts';
 import { IncompletePublicationError, TicketNotPublishedError, countsOf } from './services/content/source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './services/content/source.ts';
+import type { CleanupTarget } from './services/cleanup.ts';
+import type { CatalogProject } from './services/projects.ts';
 import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
@@ -79,11 +82,23 @@ export interface GameOptions {
   devSolveBug?: boolean;
   /** Development only: the onboarding can be skipped (never set by the packaged app). */
   devSkipOnboarding?: boolean;
+  /** Development only: the Projects screen shows from the start (never set by the packaged app). */
+  devShowProjects?: boolean;
   /** False keeps the onboarding from opening on its own (the e2e tests, unless they test it). */
   autoOnboarding?: boolean;
+  /** Every game project and how to reach each one's content and data (without it, the game has one project). */
+  projects?: GameProjects;
   /** Called after every change, with the new snapshot. */
   onChange?: (snapshot: Snapshot) => void;
   clock?: () => Date;
+}
+
+/** The projects of content/projects.json, with each one's content source and data folders. */
+export interface GameProjects {
+  catalog: readonly CatalogProject[];
+  content(id: string): ContentSource;
+  packages(id: string): PackageStore;
+  reviews(id: string): ReviewStore;
 }
 
 const LOG_LINES = 300;
@@ -116,8 +131,68 @@ export class Game {
   /** The first download of the project's content, started at init when nothing was downloaded. */
   private contentDownload: Promise<void> = Promise.resolve();
 
+  /** The active project's content source and data folders (they change with a project switch). */
+  private source: ContentSource;
+  private packages: PackageStore;
+  private reviews: ReviewStore;
+  /** What a downloaded project shows on the Projects screen, by id. */
+  private projectInfo = new Map<string, ProjectContent>();
+  /** What Docker still holds of other projects, after the last cleanup. */
+  private leftovers: CleanupTarget[] = [];
+
   constructor(options: GameOptions) {
     this.options = options;
+    this.source = options.content;
+    this.packages = options.packages;
+    this.reviews = options.reviews;
+  }
+
+  /** The active project's id: the state's, or the starter project before the first switch. */
+  private activeProject(): string | null {
+    return this.state.project ?? this.options.projects?.catalog.find((item) => item.starter)?.id ?? null;
+  }
+
+  private otherProjectIds(): string[] {
+    const active = this.activeProject();
+    return (this.options.projects?.catalog ?? []).map((item) => item.id).filter((id) => id !== active);
+  }
+
+  /** Points the content source, the data folders and new Docker resources at a project. */
+  private useProject(id: string): void {
+    const projects = this.options.projects;
+    if (!projects) {
+      return;
+    }
+    this.source = projects.content(id);
+    this.packages = projects.packages(id);
+    this.reviews = projects.reviews(id);
+    this.options.runtime.setProject(id);
+    this.content = null;
+    this.projectFiles = null;
+  }
+
+  /**
+   * Removes every Docker resource of the other projects. When nothing is left and a switch was
+   * waiting for it, the switch is done. Returns what is left.
+   */
+  private async cleanOtherProjects(): Promise<CleanupTarget[]> {
+    if (!this.options.projects) {
+      return [];
+    }
+    this.leftovers = await this.options.runtime.removeProjects(this.otherProjectIds());
+    const pending = this.state.projectSwitch;
+    if (pending && this.leftovers.length === 0) {
+      await this.options.projects.content(pending.from).forget?.();
+      await this.commit((state) => rules.finishSwitch(state));
+    }
+    this.emit();
+    return this.leftovers;
+  }
+
+  private requireNoSwitch(): void {
+    if (this.state.projectSwitch) {
+      throw new GameError('switchIncomplete', `The switch to ${this.state.projectSwitch.to} is not finished`);
+    }
   }
 
   private ctx(): RuleContext {
@@ -133,13 +208,21 @@ export class Game {
       await this.options.store.save(recovered);
     }
     this.recoverReview = recovered.reviewSession !== null;
+    const active = this.activeProject();
+    if (active) {
+      this.useProject(active);
+    }
     await this.loadTicketMeta();
-    const content = await this.options.content.current().catch(() => null);
+    // Only the active project may stay in Docker: finish a pending switch, remove what others left.
+    if (this.options.projects) {
+      await this.cleanOtherProjects().catch(() => {});
+    }
+    const content = await this.source.current().catch(() => null);
     if (content) {
       this.useContent(content);
     } else {
       // Small (the qa branch and the code of each ticket): the story is there before the setup.
-      this.contentDownload = this.options.content.prepare().then(
+      this.contentDownload = this.source.prepare().then(
         (downloaded) => this.useContent(downloaded),
         () => {},
       );
@@ -210,6 +293,9 @@ export class Game {
       state: this.state,
       nextTicket: this.nextTicket(),
       queues: this.queues(),
+      projectsUnlocked: rules.projectsUnlocked(this.state) || (this.options.devShowProjects ?? false),
+      projects: this.projectCards(),
+      projectSwitchLeft: this.state.projectSwitch ? this.leftovers : null,
       titles: this.titles,
       hintsTotal: this.hintsTotal,
       busy: this.busy,
@@ -218,7 +304,7 @@ export class Game {
       environment: this.environment,
       log: this.log,
       reviewNotice: this.reviewNotice,
-      contentSource: `${this.options.content.kind}: ${this.options.content.describe()}`,
+      contentSource: `${this.source.kind}: ${this.source.describe()}`,
       projectStory: this.projectFiles?.story ?? null,
       appVersion: this.options.appVersion,
       versions: this.options.versions,
@@ -283,11 +369,11 @@ export class Game {
     for (const ticket of this.state.tickets) {
       const titles = {} as Record<Language, string>;
       for (const language of LANGUAGES) {
-        const markdown = (await this.options.packages.readText(ticket.ticket, `ticket.${language}.md`)) ?? '';
+        const markdown = (await this.packages.readText(ticket.ticket, `ticket.${language}.md`)) ?? '';
         titles[language] = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim() ?? `Ticket ${ticket.ticket}`;
       }
       this.titles[ticket.ticket] = titles;
-      const hints = await this.options.packages.readText(ticket.ticket, 'hints.en.json');
+      const hints = await this.packages.readText(ticket.ticket, 'hints.en.json');
       this.hintsTotal[ticket.ticket] = hints ? (JSON.parse(hints) as { hints: string[] }).hints.length : HINTS_PER_TICKET;
     }
   }
@@ -359,17 +445,114 @@ export class Game {
   }
 
   async installEnvironment(): Promise<EnvironmentReport> {
+    this.requireNoSwitch();
     await this.requireDocker();
     await this.exclusive('installing', async () => {
-      this.appendLog(`» Downloading the project from ${this.options.content.describe()}`);
+      const left = await this.cleanOtherProjects();
+      if (left.length > 0) {
+        throw new GameError('otherProjectsLeft', `Docker still has resources of another project: ${left.map((item) => item.name).join(', ')}`);
+      }
+      this.appendLog(`» Downloading the project from ${this.source.describe()}`);
       try {
-        this.useContent(await this.options.content.prepare());
+        this.useContent(await this.source.prepare());
       } catch (error) {
         throw contentError(error);
       }
       await this.options.runtime.installEnvironment((line) => this.appendLog(line));
     });
     return this.refreshEnvironment();
+  }
+
+  // -------------------------------------------------------------------------
+  // Projects
+
+  /**
+   * Switches to another project: its content is downloaded first (nothing changes without the
+   * internet), then the switch is recorded, the old project leaves Docker, and the new one becomes
+   * active. A cleanup that leaves something behind keeps the switch pending (switchIncomplete):
+   * finishProjectSwitch, or the next start, completes it.
+   */
+  async switchProject(to: string): Promise<void> {
+    const projects = this.options.projects;
+    if (!projects || !projects.catalog.some((item) => item.id === to)) {
+      throw new GameError('unknownProject', `${to} is not in content/projects.json`);
+    }
+    const from = this.activeProject()!;
+    this.apply((state, ctx) => {
+      rules.beginSwitch(state, from, to, ctx);
+      return state;
+    });
+    await this.requireDocker();
+    await this.exclusive('switchingProject', async () => {
+      this.appendLog(`» Downloading ${to}`);
+      let content: ProjectContent;
+      try {
+        content = await projects.content(to).prepare();
+      } catch (error) {
+        throw contentError(error);
+      }
+      await this.commit((state, ctx) => rules.beginSwitch(state, from, to, ctx));
+      this.useProject(to);
+      this.useContent(content);
+      this.titles = {};
+      this.hintsTotal = {};
+      await this.loadTicketMeta();
+      this.appendLog(`» Removing ${from} from Docker`);
+      const left = await this.cleanOtherProjects();
+      if (left.length > 0) {
+        throw new GameError('switchIncomplete', `Docker still has: ${left.map((item) => item.name).join(', ')}`);
+      }
+      this.appendLog(`» ${to} is the active project`);
+    });
+    await this.refreshEnvironment().catch(() => {});
+  }
+
+  /** Retries the cleanup of a pending switch (the Dashboard's "Finish the switch"). */
+  async finishProjectSwitch(): Promise<void> {
+    await this.requireDocker();
+    await this.exclusive('switchingProject', async () => {
+      const left = await this.cleanOtherProjects();
+      if (left.length > 0) {
+        throw new GameError('switchIncomplete', `Docker still has: ${left.map((item) => item.name).join(', ')}`);
+      }
+    });
+  }
+
+  /** Downloads what the Projects screen shows of every other project (online only; failures are skipped). */
+  async loadProjects(): Promise<void> {
+    for (const id of this.otherProjectIds()) {
+      const content = await this.options.projects!.content(id).prepare().catch(() => null);
+      if (content) {
+        this.projectInfo.set(id, content);
+      }
+    }
+    this.emit();
+  }
+
+  private projectCards(): Snapshot['projects'] {
+    const projects = this.options.projects;
+    if (!projects) {
+      return null;
+    }
+    const active = this.activeProject();
+    return projects.catalog.map((item): ProjectCard => {
+      const content = item.id === active ? this.content : (this.projectInfo.get(item.id) ?? null);
+      let details: ProjectCard['details'] = null;
+      if (content) {
+        const { story } = projectContentOf(content.qaFiles);
+        const pick = (field: 'name' | 'about' | 'stack') => ({ en: story.en.project[field], pt: story.pt.project[field] });
+        details = { name: pick('name'), about: pick('about'), stack: pick('stack'), difficulty: content.manifest.project.difficulty ?? null, counts: countsOf(content.manifest) };
+      }
+      const progress = item.id === active ? { tickets: this.state.tickets, tracks: this.state.tracks } : (this.state.otherProjects[item.id] ?? null);
+      const done = (track: Track) => progress?.tickets.filter((ticket) => ticket.track === track && ticket.status === 'done').length ?? 0;
+      return {
+        id: item.id,
+        active: item.id === active,
+        played: progress !== null && progress.tickets.length > 0,
+        details,
+        progress: progress?.tracks ? { front: { done: done('front'), total: progress.tracks.front }, back: { done: done('back'), total: progress.tracks.back } } : null,
+      };
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -381,6 +564,7 @@ export class Game {
    * simply be retried.
    */
   async nextAssignment(choice: TrackChoice = 'front'): Promise<void> {
+    this.requireNoSwitch();
     if (!rules.canTakeTicket(this.state)) {
       throw new GameError('ticketNotDone');
     }
@@ -389,7 +573,7 @@ export class Game {
       await this.beforePlayerCode();
       if (!this.content) {
         try {
-          this.useContent(await this.options.content.prepare());
+          this.useContent(await this.source.prepare());
         } catch (error) {
           throw contentError(error);
         }
@@ -399,14 +583,14 @@ export class Game {
         throw new GameError('noMoreTickets');
       }
       const ticket = this.state.tickets.length + 1;
-      this.appendLog(`» Fetching ${id} from ${this.options.content.describe()}`);
+      this.appendLog(`» Fetching ${id} from ${this.source.describe()}`);
       let fetched: FetchedTicket;
       try {
-        fetched = await this.options.content.fetchTicket(id);
+        fetched = await this.source.fetchTicket(id);
       } catch (error) {
         if (error instanceof TicketNotPublishedError) {
           // A newer publication has fewer tickets in that track: its queue ends, nothing else changes.
-          const content = await this.options.content.current().catch(() => null);
+          const content = await this.source.current().catch(() => null);
           if (content) {
             this.useContent(content);
           }
@@ -416,8 +600,8 @@ export class Game {
         throw contentError(error);
       }
       this.appendLog(`» Verified ${fetched.entry.id} (${fetched.codeFiles.length} files and the ticket package, SHA-256)`);
-      await this.options.packages.save(ticket, writeZip(fetched.packageFiles));
-      const content = await this.options.content.current().catch(() => null);
+      await this.packages.save(ticket, writeZip(fetched.packageFiles));
+      const content = await this.source.current().catch(() => null);
       if (content) {
         this.useContent(content);
       }
@@ -509,7 +693,8 @@ export class Game {
   }
 
   private async runQa(ticket: number, startedAt: string): Promise<void> {
-    const { runtime, packages } = this.options;
+    const { runtime } = this.options;
+    const { packages } = this;
     const timeoutSeconds = this.state.settings.qaTimeoutSeconds;
     try {
       const branch = await runtime.currentBranch();
@@ -568,8 +753,13 @@ export class Game {
 
   /** A fresh game that keeps the preferences; downloaded packages and reviews are removed. */
   private async startOver(): Promise<void> {
-    await this.options.packages.clear();
-    await this.options.reviews.clear();
+    const projects = this.options.projects;
+    for (const id of projects ? projects.catalog.map((item) => item.id) : []) {
+      await projects!.packages(id).clear();
+      await projects!.reviews(id).clear();
+    }
+    await this.packages.clear();
+    await this.reviews.clear();
     this.titles = {};
     this.hintsTotal = {};
     // Nothing of the old game is recovered or reported in the new one.
@@ -580,6 +770,16 @@ export class Game {
       const fresh = rules.createInitialState(ctx, language);
       return { ...fresh, settings: { ...fresh.settings, theme, qaTimeoutSeconds } };
     });
+    // A new game starts with the starter project, and only it may stay in Docker.
+    const starter = this.activeProject();
+    if (starter && this.options.projects) {
+      this.useProject(starter);
+      const content = await this.source.current().catch(() => null);
+      if (content) {
+        this.useContent(content);
+      }
+      await this.cleanOtherProjects().catch(() => {});
+    }
   }
 
   /** "Clean up leftovers": QA leftovers and images of older versions. The player's work stays. */
@@ -587,6 +787,11 @@ export class Game {
     return this.exclusive('cleaningDocker', async () => {
       await this.requireDocker();
       const result = await this.options.runtime.cleanDocker('leftovers');
+      // Other projects never stay in Docker either; what cannot be removed is reported as failed.
+      const left = await this.cleanOtherProjects();
+      for (const item of left) {
+        result.failed.push({ kind: item.kind, name: item.name, reason: 'belongs to another project' });
+      }
       await this.refreshEnvironment().catch(() => {});
       return result;
     });
@@ -635,7 +840,7 @@ export class Game {
     if (!current) {
       throw new GameError('noSuchTicket');
     }
-    const read = (file: string) => this.options.packages.readText(ticket, file);
+    const read = (file: string) => this.packages.readText(ticket, file);
     const hintsJson = await read(`hints.${language}.json`);
     const allHints = hintsJson ? (JSON.parse(hintsJson) as { hints: string[] }).hints : [];
     const inReview = current.status === 'codeReview' || current.status === 'done';
@@ -695,7 +900,7 @@ export class Game {
     await this.requireDocker();
     await this.exclusive('solvingBug', async () => {
       await this.beforePlayerCode();
-      const patch = await this.options.packages.readText(ticket, 'reference.patch');
+      const patch = await this.packages.readText(ticket, 'reference.patch');
       if (!patch) {
         throw new GameError('solveBugNotAllowed', `Ticket ${ticket} has no reference patch`);
       }
@@ -727,7 +932,8 @@ export class Game {
    * player's diff against the stage.
    */
   private async captureApproval(ticket: number): Promise<string> {
-    const { runtime, packages, reviews } = this.options;
+    const { runtime } = this.options;
+    const { packages, reviews } = this;
     this.appendLog('» Saving the approved solution for the code review');
     const excluded = excludeMatcher(this.review);
     const snapshot = (await runtime.testedFiles()).filter((file) => !excluded(file.path));
@@ -735,8 +941,10 @@ export class Game {
     const meta = { ticket, approvedAt: this.ctx().now, language: this.state.settings.language };
     const commits = await this.buildReviewBranch(meta, snapshot, reference);
     const comparison = await runtime.reviewComparison(ticket, commits, this.excludes);
+    // Only the diff is kept: the ticket's commit plus this diff gives the snapshot back.
+    const snapshotDiff = await runtime.commitDiff(`refs/tags/stage-${ticket}`, commits.approved);
     // The ticket is still In QA: an earlier pass that failed to record may be replaced.
-    await reviews.save({ meta: { ...meta, commits, comparison }, snapshot, reference }, { replace: true });
+    await reviews.save({ meta: { ...meta, commits, comparison }, snapshotDiff }, { replace: true });
     return comparison.baseline;
   }
 
@@ -755,7 +963,7 @@ export class Game {
 
   /** Recreates the tag and the review branch from the stored data when they are missing or moved. */
   private async ensureReviewBranch(ticket: number): Promise<void> {
-    const stored = await this.options.reviews.load(ticket);
+    const stored = await this.reviews.load(ticket);
     if (!stored) {
       throw new GameError('noReview');
     }
@@ -764,15 +972,24 @@ export class Game {
       return;
     }
     this.appendLog('» Rebuilding the review from the saved solution');
-    const commits = await this.buildReviewBranch(stored.meta, stored.snapshot, stored.reference);
+    // Both trees come back from the ticket's commit, which only the repository of this project has.
+    let snapshot: ArchiveFile[];
+    let reference: ArchiveFile[];
+    try {
+      snapshot = await this.options.runtime.referenceFiles(ticket, stored.snapshotDiff);
+      reference = await this.options.runtime.referenceFiles(ticket, (await this.packages.readText(ticket, 'reference.patch')) ?? '');
+    } catch (error) {
+      throw new GameError('reviewUnavailable', `The code of ticket ${ticket} is not in this workspace: ${(error as Error).message}`);
+    }
+    const commits = await this.buildReviewBranch(stored.meta, snapshot, reference);
     if (JSON.stringify(commits) !== JSON.stringify(stored.meta.commits)) {
-      await this.options.reviews.save({ ...stored, meta: { ...stored.meta, commits } });
+      await this.reviews.save({ ...stored, meta: { ...stored.meta, commits } });
     }
   }
 
   private requireReviewable(ticket: number): void {
     const current = rules.findTicket(this.state, ticket);
-    if (!current || (current.status !== 'codeReview' && current.status !== 'done') || !this.options.reviews.has(ticket)) {
+    if (!current || (current.status !== 'codeReview' && current.status !== 'done') || !this.reviews.has(ticket)) {
       throw new GameError('noReview');
     }
   }
@@ -780,7 +997,7 @@ export class Game {
   /** The stored comparison; needs no Docker. */
   async reviewComparison(ticket: number): Promise<ReviewComparison> {
     this.requireReviewable(ticket);
-    return (await this.options.reviews.comparison(ticket))!;
+    return (await this.reviews.comparison(ticket))!;
   }
 
   private async saveSession(session: ReviewSession | null): Promise<void> {
@@ -903,15 +1120,25 @@ export class Game {
       await this.beforePlayerCode();
       const packages = new Map<number, Uint8Array>();
       for (const ticket of this.state.tickets) {
-        packages.set(ticket.ticket, await this.options.packages.readZip(ticket.ticket));
+        packages.set(ticket.ticket, await this.packages.readZip(ticket.ticket));
       }
-      const reviews = await this.options.reviews.exportFiles();
+      const reviews = await this.reviews.exportFiles();
+      // The other projects have no code in Docker: their packages and PRs are all there is.
+      const others = new Map<string, { packages: Map<number, Uint8Array>; reviews: Map<string, Uint8Array> }>();
+      for (const [id, progress] of Object.entries(this.state.otherProjects)) {
+        const store = this.options.projects!.packages(id);
+        const zips = new Map<number, Uint8Array>();
+        for (const ticket of progress.tickets) {
+          zips.set(ticket.ticket, await store.readZip(ticket.ticket));
+        }
+        others.set(id, { packages: zips, reviews: await this.options.projects!.reviews(id).exportFiles() });
+      }
       const bundle = await this.options.runtime.bundle();
       const at = this.ctx().now;
       // The save carries its own export record, so a restored game starts as backed up.
       const lastExport = { at, path: file };
       const state = { ...this.state, lastExport };
-      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews }, this.options.appVersion, at));
+      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at));
       await this.commit((current) => ({ ...current, lastExport }));
     });
   }
@@ -962,18 +1189,39 @@ export class Game {
       await this.beforePlayerCode();
       this.pendingSave = null;
       const current = save.state.currentTicket;
+      // The save's active project becomes this game's: its stores, and the labels of its volume.
+      const active = save.state.project ?? this.options.projects?.catalog.find((item) => item.starter)?.id;
+      if (active) {
+        this.useProject(active);
+      }
       this.appendLog('» Recreating the workspace volume from the save');
       await this.options.runtime.restoreWorkspace(save.bundle, current === null ? null : playerBranch(current), save.state.createdAt);
-      await this.options.packages.clear();
+      await this.packages.clear();
       for (const [stage, zip] of save.packages) {
-        await this.options.packages.save(stage, zip);
+        await this.packages.save(stage, zip);
       }
-      await this.options.reviews.importSave(save.reviews);
+      await this.reviews.importSave(save.reviews);
+      for (const [id, other] of save.others) {
+        if (!this.options.projects?.catalog.some((item) => item.id === id)) {
+          continue;
+        }
+        const store = this.options.projects.packages(id);
+        await store.clear();
+        for (const [stage, zip] of other.packages) {
+          await store.save(stage, zip);
+        }
+        await this.options.projects.reviews(id).importSave(other.reviews);
+      }
       // A save taken during QA restores as interrupted, like after a crash. Exports always return
       // from a review first, so a restored workspace never has one checked out.
       await this.commit((_state, ctx) => ({ ...rules.recoverInterruptedQa(save.state, ctx), reviewSession: null }));
       this.titles = {};
       await this.loadTicketMeta();
+      const content = await this.source.current().catch(() => null);
+      if (content) {
+        this.useContent(content);
+      }
+      await this.cleanOtherProjects().catch(() => {});
     });
     await this.refreshEnvironment().catch(() => {});
   }
