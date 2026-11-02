@@ -6,7 +6,7 @@
  * downloaded one. In development, desktop/catalog.local.json may point at another branch or a
  * file and override a project's qa ref or folder; the tests use BUGDETECTIVE_CATALOG_FILE.
  */
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import { parseCatalog } from '@bug-detective/catalog/contract';
@@ -46,6 +46,32 @@ export function parseLocalCatalog(raw: unknown): LocalCatalog {
     throw new Error(`Invalid catalog.local.json: ${issue?.path.join('.') || 'file'}: ${issue?.message ?? 'unknown error'}`);
   }
   return result.data;
+}
+
+/** desktop/catalog.local.json as the Development settings read it: a missing or invalid file reads as the defaults (the error says why). */
+export async function readLocalCatalogFile(path: string): Promise<{ settings: LocalCatalog; error: string | null }> {
+  let text: string;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch {
+    return { settings: {}, error: null };
+  }
+  try {
+    return { settings: parseLocalCatalog(JSON.parse(text)), error: null };
+  } catch (error) {
+    const message = (error as Error).message;
+    return { settings: {}, error: message.startsWith('Invalid catalog.local.json') ? message : `Invalid catalog.local.json: ${message}` };
+  }
+}
+
+/** Writes the Development settings; the defaults (official catalog, no override) delete the file. Invalid settings throw and keep the file. */
+export async function writeLocalCatalogFile(path: string, settings: LocalCatalog): Promise<void> {
+  const parsed = parseLocalCatalog(settings);
+  if (!parsed.catalog && Object.keys(parsed.projects ?? {}).length === 0) {
+    await rm(path, { force: true });
+    return;
+  }
+  await writeFileAtomic(path, `${JSON.stringify(parsed, null, 2)}\n`);
 }
 
 /** Where the catalog comes from. The installed app always reads the official one. */
@@ -130,7 +156,7 @@ async function fetchTextWithTimeout(url: string): Promise<string> {
 }
 
 export class CatalogService {
-  private readonly options: CatalogServiceOptions;
+  private options: CatalogServiceOptions;
   private readonly fetchText: (url: string) => Promise<string>;
 
   constructor(options: CatalogServiceOptions) {
@@ -140,6 +166,11 @@ export class CatalogService {
 
   describe(): string {
     return describeSource(this.options.choice);
+  }
+
+  /** Development settings applied without a restart: another source and other overrides. */
+  reconfigure(choice: CatalogSourceChoice, overrides: Record<string, ProjectOverride>): void {
+    this.options = { ...this.options, choice, overrides };
   }
 
   /** Downloads (or reads) the catalog and replaces the cache when it is valid; otherwise keeps the cache and logs why. */
