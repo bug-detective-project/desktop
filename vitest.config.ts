@@ -5,6 +5,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // pnpm run test:coverage: the unit tests and the stories, over the app's code.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**'],
+      exclude: ['src/**/*.stories.tsx', 'src/renderer/src/storybook/**', 'src/**/*.d.ts'],
+      reporter: ['text-summary', 'json-summary', 'html'],
+    },
     projects: [
       {
         test: {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Platform, WslStatus } from '../../src/main/platform/types.ts';
 import { Docker, parseDockerSize } from '../../src/main/services/docker.ts';
 import { Prerequisites } from '../../src/main/services/prerequisites.ts';
@@ -98,5 +98,84 @@ describe('docker disk usage', () => {
     expect(await docker.imageSize('bugdetective-qa:1')).toBe(3_010_000_000);
     expect(await docker.imageSize('missing:1')).toBeNull();
     expect(await docker.volumeSizes(['bugdetective-workspace', 'bugdetective-qa-cache'])).toEqual({ 'bugdetective-workspace': 1_120_000_000 });
+  });
+});
+
+describe('Docker state and the other checks when something is missing', () => {
+  const stopped: Answer = (command, args) => (command === 'docker' ? ok('', 1) : healthy(command, args));
+  const platform = (answer: Answer, overrides: Partial<Platform> = {}): Platform => ({ ...fakePlatform(answer), ...overrides });
+
+  it('tells Docker not installed, stopped, starting and running apart', async () => {
+    const state = (answer: Answer, overrides: Partial<Platform>) => {
+      const prerequisites = new Prerequisites(platform(answer, overrides));
+      return prerequisites.locate().then((environment) => prerequisites.dockerState(environment));
+    };
+    expect(await state(healthy, { locateDocker: async () => ({ cli: null, desktopApp: null }) })).toBe('notInstalled');
+    expect(await state(healthy, { locateDocker: async () => ({ cli: null, desktopApp: 'Docker Desktop.exe' }) })).toBe('notRunning');
+    expect(await state(stopped, { isDockerDesktopRunning: async () => true })).toBe('starting');
+    expect(await state(stopped, { isDockerDesktopRunning: async () => false })).toBe('notRunning');
+    // Docker Engine on Linux: the CLI is there, the daemon does not answer.
+    expect(await state(stopped, { locateDocker: async () => ({ cli: 'docker', desktopApp: null }) })).toBe('notRunning');
+    expect(await state(healthy, {})).toBe('running');
+  });
+
+  it('reports a starting Docker as pending and a stopped one as missing, with the reason', async () => {
+    const starting = await new Prerequisites(platform(stopped, { isDockerDesktopRunning: async () => true })).check();
+    expect(starting.checks[0]).toEqual({ id: 'docker', status: 'pending', reason: 'starting' });
+    const notRunning = await new Prerequisites(platform(stopped, { isDockerDesktopRunning: async () => false })).check();
+    expect(notRunning.checks[0]).toEqual({ id: 'docker', status: 'missing', reason: 'notRunning' });
+    expect(notRunning.allOk).toBe(false);
+  });
+
+  it('reports WSL missing, WSL 1 only, and VS Code without its CLI', async () => {
+    const noWsl = await new Prerequisites(fakePlatform(healthy, { installed: false, version2: false, detail: 'wsl.exe not found' })).check();
+    expect(noWsl.checks[1]).toMatchObject({ id: 'wsl', status: 'missing', reason: 'notFound', detail: 'wsl.exe not found' });
+    const wsl1 = await new Prerequisites(fakePlatform(healthy, { installed: true, version2: false, detail: 'Ubuntu (WSL 1)' })).check();
+    expect(wsl1.checks[1]).toMatchObject({ id: 'wsl', status: 'missing', reason: 'wsl1Only' });
+    const noCode = await new Prerequisites(platform(healthy, { locateVSCode: async () => null })).check();
+    expect(noCode.checks.slice(2)).toEqual([
+      { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
+      { id: 'devcontainers', status: 'missing', reason: 'extensionMissing' },
+    ]);
+  });
+});
+
+describe('starting Docker Desktop', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('cannot start what is not installed, and does nothing when the engine already runs', async () => {
+    const notInstalled = new Prerequisites({ ...fakePlatform(healthy), locateDocker: async () => ({ cli: null, desktopApp: null }) });
+    expect(await notInstalled.startDocker(await notInstalled.locate())).toBe('notInstalled');
+    const start = vi.fn(async () => {});
+    const running = new Prerequisites({ ...fakePlatform(healthy), startDockerDesktop: start });
+    expect(await running.startDocker(await running.locate())).toBe('running');
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('starts Docker Desktop and polls until the engine answers, reporting each state', async () => {
+    vi.useFakeTimers();
+    let up = false;
+    const answer: Answer = (command, args) => (command === 'docker' && !up ? ok('', 1) : healthy(command, args));
+    const start = vi.fn(async () => {});
+    const prerequisites = new Prerequisites({ ...fakePlatform(answer), startDockerDesktop: start });
+    const polls: string[] = [];
+    const result = prerequisites.startDocker(await prerequisites.locate(), 60_000, (state) => {
+      polls.push(state);
+      if (polls.length === 2) up = true;
+    });
+    await vi.advanceTimersByTimeAsync(3000 * 3);
+    expect(await result).toBe('running');
+    expect(start).toHaveBeenCalledWith('Docker Desktop.exe');
+    expect(polls).toEqual(['starting', 'starting', 'running']);
+  });
+
+  it('gives up after the timeout with the last state', async () => {
+    vi.useFakeTimers();
+    const prerequisites = new Prerequisites({ ...fakePlatform((command, args) => (command === 'docker' ? ok('', 1) : healthy(command, args))), isDockerDesktopRunning: async () => false });
+    const result = prerequisites.startDocker(await prerequisites.locate(), 10_000);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await result).toBe('notRunning');
   });
 });

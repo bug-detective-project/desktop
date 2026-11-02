@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project stories",
+    "test:coverage": "vitest run --project unit --project stories --coverage",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",
     "test:e2e:headless:linux": "pnpm run build && env -u WAYLAND_DISPLAY xvfb-run -a --server-args=\"-screen 0 1600x1000x24\" playwright test",
