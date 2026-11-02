@@ -24,8 +24,10 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await expectFlagsLoaded(page.getByTestId('settings-pane-preferences'), ['en', 'pt']);
     await page.getByTestId('language-pt').click();
     await expect(settings.getByRole('heading', { level: 1 })).toHaveText('Configurações');
+    await expect(page.getByTestId('settings-tab-about')).toHaveText('Sobre');
     await page.getByTestId('language-en').click();
     await expect(settings.getByRole('heading', { level: 1 })).toHaveText('Settings');
+    await expect(page.getByTestId('settings-tab-about')).toHaveText('About');
     await page.getByTestId('theme-dark').click();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.getByTestId('theme-light').click();
