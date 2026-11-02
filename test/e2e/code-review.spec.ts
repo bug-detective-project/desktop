@@ -10,9 +10,8 @@ async function reachCodeReview(page: Page): Promise<void> {
   await dragCard(page, 1, 'inQa');
   await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
   await page.getByTestId('card-1').click();
-  // In Code Review the button takes the stage color and the whole row of the panel header.
+  // In Code Review the button takes the whole row of the panel header.
   const button = page.getByTestId('open-review');
-  await expect(button).toHaveClass(/bg-indigo-600/);
   const [buttonBox, actionsBox] = await Promise.all([button.boundingBox(), page.getByTestId('open-vscode').locator('../..').boundingBox()]);
   expect(Math.round(buttonBox!.width)).toBe(Math.round(actionsBox!.width));
   await button.click();

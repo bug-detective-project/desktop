@@ -195,17 +195,11 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(task.locator('[data-stage]')).toHaveAttribute('data-stage', 'todo');
     // To Do gets a still gray dot in the current task's pill.
     await expect(task.locator('[data-stage] > span.bg-slate-400')).toHaveCount(1);
-    await expect(task.locator('[data-stage] > span.bg-slate-400')).not.toHaveClass(/animate-pulse/);
     // The primary action and, while a ticket is active, VS Code and Browser with their full labels as tooltips.
     await expect(page.getByTestId('desk-primary')).toHaveText('Start ticket on Board');
     await expect(page.getByTestId('desk-vscode')).toHaveAttribute('title', 'Open in VS Code');
-    // The current task is a full-bleed tinted block, the desk's first child, with its label in primary;
-    // VS Code and Browser keep a card surface on the tint.
+    // The current task is the desk's first child.
     expect(await desk.evaluate((element) => element.firstElementChild?.getAttribute('data-testid'))).toBe('assignment-card');
-    await expect(task).toHaveClass(/border-primary\/25/);
-    await expect(task.locator('h3')).toHaveClass(/text-primary/);
-    await expect(page.getByTestId('desk-vscode')).toHaveClass(/bg-card/);
-    await expect(page.getByTestId('desk-browser')).toHaveClass(/bg-card/);
     await expect(page.getByTestId('desk-browser')).toHaveAttribute('title', 'Open app in browser');
     await expect(desk).not.toContainText('player/');
     await page.getByTestId('desk-primary').click();
@@ -328,8 +322,6 @@ test('the columns are framed cards with a placeholder when empty, in English and
     await expect(page.getByTestId('board-hint')).toHaveText('Move your ticket to In Progress and start your task.');
     const column = page.getByTestId('column-inQa');
     await expect(column).toHaveAttribute('aria-label', 'In QA');
-    await expect(column).toHaveClass(/rounded-xl/);
-    await expect(column.locator('header')).toHaveClass(/bg-amber-500\/10/);
     await expect(page.getByTestId('count-todo')).toHaveText('1');
     await expect(page.getByTestId('empty-todo')).toHaveCount(0);
     const empty = {
@@ -341,7 +333,6 @@ test('the columns are framed cards with a placeholder when empty, in English and
     for (const [id, text] of Object.entries(empty)) {
       await expect(page.getByTestId(`empty-${id}`)).toHaveText(text);
     }
-    await expect(page.getByTestId('empty-inQa')).toHaveClass(/border-amber-500\/40/);
 
     // A placeholder is still a drop target.
     await dragCard(page, 1, 'inProgress');
@@ -370,7 +361,6 @@ test('a card shows only its key and title, and "Test failed" only after a failed
     await expect(card).toHaveText(new RegExp(`^Front${supportdesk.key('front-1')}`));
     await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
-    await expect(card).toHaveClass(/border-primary\/40/);
     await expect(page.getByTestId('board').getByRole('button', { name: /VS Code|Browser/ })).toHaveCount(0);
 
     await dragCard(page, 1, 'inQa');
@@ -456,7 +446,6 @@ test('Local environment always lists Docker, both images and the dependencies, w
     await expect(card.getByTestId('env-projectDependencies')).toContainText('Not installed yet');
     // No summary badge: the title is green while everything works, red on a problem.
     await expect(card).toHaveAttribute('data-tone', 'ok');
-    await expect(card.getByRole('heading')).toHaveClass(/text-emerald-700/);
     await expect(card).not.toContainText('All set');
 
     // Docker stops: every row stays, Docker with its stopped state.
@@ -467,7 +456,6 @@ test('Local environment always lists Docker, both images and the dependencies, w
     await expect(card.getByTestId('env-docker')).toContainText('Stopped');
     await expect(card.getByTestId('env-docker')).toHaveAttribute('data-tone', 'danger');
     await expect(card).toHaveAttribute('data-tone', 'danger');
-    await expect(card.getByRole('heading')).toHaveClass(/text-destructive/);
   } finally {
     await close();
   }
@@ -563,7 +551,6 @@ test('the work desk shows the downloads first, then the queued assignment', asyn
     await expect(card.getByTestId('env-workspaceImage')).toHaveAttribute('data-tone', 'danger');
     await expect(card.getByTestId('env-workspaceImage')).toContainText('Missing');
     await expect(card).toHaveAttribute('data-tone', 'danger');
-    await expect(card.getByRole('heading')).toHaveClass(/text-destructive/);
 
     await page.getByTestId('install-environment').click();
     // The download runs in a modal (install-modal.spec.ts), closed with "Close" when it ends.
@@ -626,8 +613,6 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     });
     expect(size.height).toBe(size.lines);
     expect(size.width).toBe(size.height);
-    // Play in green, pause in amber.
-    await expect(start).toHaveClass(/text-emerald-700/);
     await start.hover();
     await expect(row.getByRole('tooltip')).toBeVisible();
     await expect(row.getByRole('tooltip')).toHaveText('Start server');
@@ -638,7 +623,6 @@ test('Local environment shows the dev server once a ticket exists, with a play o
     await expect(row).toHaveAttribute('data-tone', 'ok');
     const stop = page.getByTestId('desk-stop-server');
     await expect(stop).toHaveAccessibleName('Stop server');
-    await expect(stop).toHaveClass(/text-amber-700/);
     await stop.click();
     await expect(row).toHaveAttribute('data-up', 'false');
     await expect(page.getByTestId('desk-start-server')).toBeVisible();

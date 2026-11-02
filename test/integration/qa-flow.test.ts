@@ -255,9 +255,8 @@ describe('QA with real Docker', () => {
       { user: 'node', workdir: WORKSPACE_DIR },
     );
     await game.move(2, 'inQa');
-    await new Promise((resolve) => setTimeout(resolve, 4000));
-    const running = (await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`));
-    expect(running).toHaveLength(1);
+    // Waits for the QA container (the 30 s pause keeps it running), not for a fixed time.
+    await expect.poll(async () => (await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`)), { timeout: 20_000, interval: 250 }).toHaveLength(1);
 
     // A new app instance on the same data folder, as after a crash.
     const restarted = createGame(gameDir);
