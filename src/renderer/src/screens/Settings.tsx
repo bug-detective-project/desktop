@@ -14,6 +14,7 @@ import type { IconName } from '../components/icons.tsx';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { Badge, Button, Modal, Notice } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
+import { Segmented } from '../components/Segmented.tsx';
 
 type Tab = 'preferences' | 'environment' | 'backup' | 'about' | 'development';
 const TABS: { id: Tab; icon: IconName }[] = [
@@ -201,45 +202,6 @@ function QaTimeout({ seconds }: { seconds: number }) {
           {t('settings.qaTimeoutInvalid')}
         </p>
       )}
-    </div>
-  );
-}
-
-/** A switch-like group of options (language, theme): `<testId>-select` on the group, `<testId>-<value>` on each option. */
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-  testId,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; icon: ReactNode; text: string }[];
-  onChange: (value: T) => void;
-  testId: string;
-}) {
-  return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1" role="radiogroup" aria-label={label} data-testid={`${testId}-select`}>
-      {options.map((option) => {
-        const selected = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => onChange(option.value)}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-base whitespace-nowrap transition-all ${
-              selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
-            }`}
-            data-testid={`${testId}-${option.value}`}
-          >
-            {option.icon}
-            {option.text}
-          </button>
-        );
-      })}
     </div>
   );
 }

@@ -643,7 +643,17 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Banco de dados",
-    "practice": "Você vai praticar"
+    "practice": "Você vai praticar",
+    "search": {
+      "label": "Buscar projetos",
+      "placeholder": "Buscar por nome, stack ou habilidade",
+      "all": "Todos",
+      "count_one": "{{count}} projeto",
+      "count_other": "{{count}} projetos",
+      "emptyTitle": "Nenhum projeto corresponde aos filtros",
+      "emptyBody": "Tente outro termo ou dificuldade.",
+      "clear": "Limpar filtros"
+    }
   },
   "switch": {
     "pendingTitle": "A troca de projeto não terminou",

@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProjectCard, Snapshot } from '@shared/api.ts';
 import { api } from '../api.ts';
 import { Icon } from '../components/icons.tsx';
 import { Button, Modal, Notice } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
+import { Segmented } from '../components/Segmented.tsx';
 import { ProjectFlipCard } from './ProjectFlipCard.tsx';
+import { filterProjects } from './projectFilter.ts';
+import type { LevelFilter } from './projectFilter.ts';
+
+/** The dot before each difficulty option: the same colors as the cards' meter. */
+const LEVEL_DOTS = { beginner: 'bg-emerald-500', intermediate: 'bg-amber-500', advanced: 'bg-destructive' } as const;
 
 /**
  * Every project of the game, each a card that flips to its brief (ProjectFlipCard): what it is,
@@ -18,6 +25,22 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
   const language = snapshot.state.settings.language;
   const [confirm, setConfirm] = useState<ProjectCard | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Search and difficulty: they only hide cards, and reset when the player leaves the screen.
+  const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [level, setLevel] = useState<LevelFilter>('all');
+  const searchField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(query), 150);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const visible = filterProjects(snapshot.projects ?? [], { query: debounced, level }, language);
+  const clearFilters = () => {
+    setQuery('');
+    setDebounced('');
+    setLevel('all');
+    searchField.current?.focus();
+  };
 
   // Details of projects never downloaded come from a light download of their qa branch.
   useEffect(() => {
@@ -40,11 +63,61 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
     <main className="mx-auto w-full max-w-10xl px-6 py-8" data-testid="projects">
       <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('projects.title')}</h1>
       <p className="mt-1 text-base text-muted-foreground">{t('projects.intro')}</p>
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        {(snapshot.projects ?? []).map((card) => (
-          <ProjectFlipCard key={card.id} card={card} language={language} blocked={blocked} onPlay={setConfirm} />
-        ))}
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3" role="search">
+        <label className="relative min-w-0 max-w-[420px] flex-[1_1_320px]">
+          <span className="sr-only">{t('projects.search.label')}</span>
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            ref={searchField}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setQuery('');
+                setDebounced('');
+              }
+            }}
+            placeholder={t('projects.search.placeholder')}
+            className="h-10 w-full rounded-lg border border-input bg-card pr-3 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            data-testid="project-search"
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{t('projects.difficulty')}</span>
+          <Segmented<LevelFilter>
+            label={t('projects.difficulty')}
+            value={level}
+            options={(['all', 'beginner', 'intermediate', 'advanced'] as const).map((value) => ({
+              value,
+              icon: value === 'all' ? null : <span className={`size-2 rounded-full ${LEVEL_DOTS[value]}`} aria-hidden />,
+              text: value === 'all' ? t('projects.search.all') : t(`projects.difficulties.${value}`),
+            }))}
+            onChange={setLevel}
+            testId="project-level"
+          />
+        </div>
+        <p className="ml-auto text-sm whitespace-nowrap text-muted-foreground" role="status" data-testid="project-count">
+          {t('projects.search.count', { count: visible.length })}
+        </p>
       </div>
+      {visible.length > 0 ? (
+        <div className="mt-6 grid grid-cols-[repeat(auto-fill,450px)] gap-4">
+          {visible.map((card) => (
+            <ProjectFlipCard key={card.id} card={card} language={language} blocked={blocked} onPlay={setConfirm} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-12 text-center" data-testid="projects-empty">
+          <Search className="size-6 text-muted-foreground" aria-hidden />
+          <p className="font-semibold text-foreground">{t('projects.search.emptyTitle')}</p>
+          <p className="text-sm text-muted-foreground">{t('projects.search.emptyBody')}</p>
+          <Button size="sm" className="mt-2" onClick={clearFilters}>
+            <Icon name="rotateCcw" />
+            {t('projects.search.clear')}
+          </Button>
+        </div>
+      )}
 
       {confirm && (
         <Modal title={t('projects.confirmTitle', { name: confirm.details?.name[language] ?? confirm.id })} onClose={() => setConfirm(null)} data-testid="switch-dialog">

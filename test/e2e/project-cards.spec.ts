@@ -53,6 +53,7 @@ test('a project card flips to its brief and back from its buttons, moving the fo
   try {
     const card = page.getByTestId('project-easy');
     await expect(card).toHaveCSS('height', '380px');
+    await expect(card).toHaveCSS('width', '450px');
     const front = page.getByTestId('project-easy-front');
     const back = page.getByTestId('project-easy-back');
     await expect(back).toHaveAttribute('aria-hidden', 'true');

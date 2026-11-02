@@ -643,7 +643,17 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Database",
-    "practice": "You'll practice"
+    "practice": "You'll practice",
+    "search": {
+      "label": "Search projects",
+      "placeholder": "Search by name, stack or skill",
+      "all": "All",
+      "count_one": "{{count}} project",
+      "count_other": "{{count}} projects",
+      "emptyTitle": "No projects match these filters",
+      "emptyBody": "Try another search term or difficulty.",
+      "clear": "Clear filters"
+    }
   },
   "switch": {
     "pendingTitle": "The project switch is not finished",
