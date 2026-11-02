@@ -105,11 +105,13 @@ function PaneHeader({ title, help, aside }: { title: string; help: string; aside
 }
 
 /** One preference: its title and help on the left, the control on the right. */
-function Row({ title, help, children }: { title: string; help: string; children: ReactNode }) {
+/** `level` 2 in a pane without a section heading above its rows (Preferences), 3 under one. */
+function Row({ title, help, children, level = 3 }: { title: string; help: string; children: ReactNode; level?: 2 | 3 }) {
+  const Heading = level === 2 ? 'h2' : 'h3';
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-8">
       <div className="min-w-0">
-        <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+        <Heading className="text-lg font-semibold tracking-tight text-foreground">{title}</Heading>
         <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">{help}</p>
       </div>
       <div className="shrink-0">{children}</div>
@@ -211,7 +213,7 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
   const { settings } = snapshot.state;
   return (
     <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-preferences">
-      <Row title={t('settings.language')} help={t('settings.languageHelp')}>
+      <Row level={2} title={t('settings.language')} help={t('settings.languageHelp')}>
         <Segmented
           label={t('settings.language')}
           value={settings.language}
@@ -220,7 +222,7 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
           testId="language"
         />
       </Row>
-      <Row title={t('settings.theme')} help={t('settings.themeHelp')}>
+      <Row level={2} title={t('settings.theme')} help={t('settings.themeHelp')}>
         <Segmented
           label={t('settings.theme')}
           value={settings.theme}
@@ -229,7 +231,7 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
           testId="theme"
         />
       </Row>
-      <Row title={t('settings.qaTimeout')} help={t('settings.qaTimeoutHelp')}>
+      <Row level={2} title={t('settings.qaTimeout')} help={t('settings.qaTimeoutHelp')}>
         <QaTimeout seconds={settings.qaTimeoutSeconds} />
       </Row>
     </div>

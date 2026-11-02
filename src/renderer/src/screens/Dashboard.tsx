@@ -102,7 +102,7 @@ function SectionLabel({
   return (
     <div className="flex min-w-0 items-center justify-between gap-2">
       <h3
-        className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'primary' ? 'text-primary' : 'text-foreground'}`}
+        className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'primary' ? 'text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary' : 'text-foreground'}`}
       >
         <Icon
           name={icon}
@@ -194,8 +194,9 @@ function WorkspaceButtons({
 }
 
 /** A sentence of the desk that says what to do next. */
+// On the Current task tint, muted-foreground is below 4.5:1: the foreground at 80% is not.
 function DeskSentence({ children }: { children: ReactNode }) {
-  return <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
+  return <p className="text-sm leading-relaxed text-foreground/80">{children}</p>
 }
 
 /**
@@ -307,7 +308,7 @@ function CurrentTask({
       />,
       <>
         <div className="min-w-0 space-y-2">
-          <span className="block font-mono text-sm font-medium text-primary">{key}</span>
+          <span className="block font-mono text-sm font-medium text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary">{key}</span>
           <p className="text-base leading-snug font-semibold text-foreground">{text}</p>
         </div>
         <Button
@@ -689,7 +690,7 @@ function MessageView({
               >
                 <div className="min-w-0 flex-1">
                   <p className="mb-0.5 text-xs font-semibold tracking-wider text-primary uppercase">{t('dashboard.nextLabel')}</p>
-                  <h4 className="text-base font-bold text-foreground">{t('dashboard.nextTitle')}</h4>
+                  <h2 className="text-base font-bold text-foreground">{t('dashboard.nextTitle')}</h2>
                   <p className="mt-0.5 text-base text-muted-foreground">{t('dashboard.nextBody')}</p>
                 </div>
                 <NextAssignmentMenu

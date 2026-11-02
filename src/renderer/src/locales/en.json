@@ -431,8 +431,8 @@
     "qaTimeoutHelp": "How long an automated QA run may take before it stops.",
     "qaTimeoutUnit": "minutes",
     "qaTimeoutInvalid": "Enter between 1 and 30 minutes.",
-    "qaTimeoutLess": "1 minute less",
-    "qaTimeoutMore": "1 minute more",
+    "qaTimeoutLess": "-1m: 1 minute less",
+    "qaTimeoutMore": "+1m: 1 minute more",
     "environment": "Toolchain health",
     "environmentHelp": "The tools Bug Detective needs to run SupportDesk in a dev container.",
     "toolStatus": {

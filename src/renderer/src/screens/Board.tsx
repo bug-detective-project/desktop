@@ -62,23 +62,17 @@ function TicketCard({
 }) {
   const { t } = useTranslation();
   return (
+    // Not a button itself: it holds buttons. A click anywhere opens the ticket; from the keyboard,
+    // the title is the button (its click reaches the card).
     <div
-      role="button"
-      tabIndex={0}
       draggable={draggable}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
       data-testid={`card-${ticket.ticket}`}
       data-status={ticket.status}
       data-attempts={ticket.attempts.length}
-      className={`block rounded-lg border bg-background p-3.5 text-left transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
+      className={`block rounded-lg border bg-background p-3.5 text-left transition-colors hover:border-primary/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50 ${
         active ? 'border-primary/40' : 'border-border'
       } ${movable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
@@ -88,7 +82,7 @@ function TicketCard({
           <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
         </div>
         {action && (
-          // The card opens on click and Enter; the button keeps both to itself.
+          // A click on the card opens the ticket; this button keeps its own click to itself.
           <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
             <Button size="xs" busy={action.busy} onClick={action.onClick} data-testid={action.testId}>
               {t(action.label)}
@@ -104,14 +98,16 @@ function TicketCard({
           </span>
         )}
       </div>
-      <p className="mt-1 line-clamp-2 font-medium text-foreground">{title}</p>
+      <button type="button" className="mt-1 line-clamp-2 w-full cursor-[inherit] text-left font-medium text-foreground focus-visible:outline-none" aria-label={`${ticketKey}: ${title}`} data-testid="card-open">
+        {title}
+      </button>
       {lastQaFailed(ticket) && (
         <div className="mt-2.5" data-testid="card-qa-failed">
           <Badge tone="danger">{t('qa.badge.failed')}</Badge>
         </div>
       )}
       {onSolveBug && (
-        // The card opens on click and Enter; the button keeps both to itself.
+        // A click on the card opens the ticket; this button keeps its own click to itself.
         <div className="mt-2.5" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
           <Button size="xs" busy={solving} onClick={onSolveBug} data-testid="solve-bug">
             {t('board.solveBug')}
