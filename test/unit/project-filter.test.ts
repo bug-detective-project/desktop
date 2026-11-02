@@ -75,4 +75,11 @@ describe('filterProjects', () => {
     expect(ids(filterProjects(cards, { query: 'gone', level: 'all' }, 'en'))).toEqual(['gone']);
     expect(ids(filterProjects(cards, { query: '', level: 'beginner' }, 'en'))).not.toContain('gone');
   });
+
+  it('every tag must match, together with the text being typed', () => {
+    expect(ids(filterProjects(cards, { query: '', tags: ['react', 'sqlite'], level: 'all' }, 'en'))).toEqual(['SupportDesk']);
+    expect(ids(filterProjects(cards, { query: '', tags: ['react', 'fastapi'], level: 'all' }, 'en'))).toEqual([]);
+    expect(ids(filterProjects(cards, { query: 'stock', tags: ['python'], level: 'all' }, 'en'))).toEqual(['Inventário']);
+    expect(ids(filterProjects(cards, { query: '', tags: ['python'], level: 'beginner' }, 'en'))).toEqual([]);
+  });
 });

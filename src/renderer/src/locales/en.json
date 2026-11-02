@@ -648,11 +648,14 @@
       "label": "Search projects",
       "placeholder": "Search by name, stack or skill",
       "all": "All",
+      "count_zero": "{{count}} projects",
       "count_one": "{{count}} project",
       "count_other": "{{count}} projects",
       "emptyTitle": "No projects match these filters",
       "emptyBody": "Try another search term or difficulty.",
-      "clear": "Clear filters"
+      "clear": "Clear filters",
+      "tags": "Search terms",
+      "removeTag": "Remove the filter {{tag}}"
     }
   },
   "switch": {

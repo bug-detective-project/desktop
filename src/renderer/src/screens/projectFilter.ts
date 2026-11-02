@@ -19,10 +19,21 @@ function searchableText(card: ProjectCard, language: Language): string {
     .join('\n');
 }
 
-/** The projects that match the search (a substring, ignoring case and accents) and the difficulty. */
-export function filterProjects(cards: readonly ProjectCard[], filters: { query: string; level: LevelFilter }, language: Language): ProjectCard[] {
-  const query = fold(filters.query.trim());
-  return cards.filter(
-    (card) => (filters.level === 'all' || card.details?.difficulty === filters.level) && (query === '' || fold(searchableText(card, language)).includes(query)),
-  );
+/**
+ * The projects that match the difficulty and every search term: the saved tags ("vue", "node") and
+ * the text being typed, each a substring ignoring case and accents.
+ */
+export function filterProjects(
+  cards: readonly ProjectCard[],
+  filters: { query: string; tags?: readonly string[]; level: LevelFilter },
+  language: Language,
+): ProjectCard[] {
+  const terms = [...(filters.tags ?? []), filters.query].map((term) => fold(term.trim())).filter(Boolean);
+  return cards.filter((card) => {
+    if (filters.level !== 'all' && card.details?.difficulty !== filters.level) {
+      return false;
+    }
+    const text = fold(searchableText(card, language));
+    return terms.every((term) => text.includes(term));
+  });
 }

@@ -648,11 +648,14 @@
       "label": "Buscar projetos",
       "placeholder": "Buscar por nome, stack ou habilidade",
       "all": "Todos",
+      "count_zero": "{{count}} projetos",
       "count_one": "{{count}} projeto",
       "count_other": "{{count}} projetos",
       "emptyTitle": "Nenhum projeto corresponde aos filtros",
       "emptyBody": "Tente outro termo ou dificuldade.",
-      "clear": "Limpar filtros"
+      "clear": "Limpar filtros",
+      "tags": "Termos da busca",
+      "removeTag": "Remover o filtro {{tag}}"
     }
   },
   "switch": {

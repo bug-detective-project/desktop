@@ -140,7 +140,47 @@ test('in Portuguese the texts and the plural count follow the language', async (
     await expect(page.getByTestId('project-count')).toHaveText('1 projeto');
     await search.fill('zzz');
     await expect(page.getByTestId('projects-empty')).toContainText('Nenhum projeto corresponde aos filtros');
+    // Portuguese plural rules put 0 with 1; the count still reads "0 projetos".
+    await expect(page.getByTestId('project-count')).toHaveText('0 projetos');
     await expect(page.getByTestId('projects-empty').getByRole('button')).toHaveText('Limpar filtros');
+  } finally {
+    await close();
+  }
+});
+
+test('Enter turns the search into a tag, and the tags combine: every one must match', async () => {
+  const { page, close } = await openProjects();
+  try {
+    const search = page.getByRole('searchbox');
+    await search.fill('elm');
+    await search.press('Enter');
+    await expect(search).toHaveValue('');
+    const tags = page.getByTestId('project-tags');
+    await expect(tags.getByRole('listitem')).toHaveText(['elm']);
+    await expect.poll(() => shown(page)).toEqual(['easy']);
+    // A second tag narrows the list: elm + pair (both on Notes Board), then elm + ledger (none).
+    await search.fill('pair');
+    await search.press('Enter');
+    await expect(tags.getByRole('listitem')).toHaveText(['elm', 'pair']);
+    await expect.poll(() => shown(page)).toEqual(['easy']);
+    await search.fill('ledger');
+    await search.press('Enter');
+    await expect(page.getByTestId('projects-empty')).toBeVisible();
+    // The same tag twice, or an empty one, is ignored.
+    await search.fill(' Ledger ');
+    await search.press('Enter');
+    await search.press('Enter');
+    await expect(tags.getByRole('listitem')).toHaveCount(3);
+    // Each tag has its own remove button; Backspace in the empty field removes the last one.
+    await tags.getByRole('button', { name: 'Remove the filter ledger' }).click();
+    await expect.poll(() => shown(page)).toEqual(['easy']);
+    await search.press('Backspace');
+    await expect(tags.getByRole('listitem')).toHaveText(['elm']);
+    // Clear filters removes the tags too.
+    await search.fill('zzz');
+    await page.getByTestId('projects-empty').getByRole('button', { name: 'Clear filters' }).click();
+    await expect(tags).toHaveCount(0);
+    await expect.poll(() => shown(page)).toHaveLength(4);
   } finally {
     await close();
   }

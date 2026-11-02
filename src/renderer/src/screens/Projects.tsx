@@ -29,16 +29,27 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [level, setLevel] = useState<LevelFilter>('all');
+  // Enter saves the search as a tag; the tags combine, every one must match ("vue" + "node").
+  const [tags, setTags] = useState<string[]>([]);
+  const addTag = () => {
+    const tag = query.trim();
+    if (tag && !tags.some((saved) => saved.toLocaleLowerCase() === tag.toLocaleLowerCase())) {
+      setTags([...tags, tag]);
+    }
+    setQuery('');
+    setDebounced('');
+  };
   const searchField = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(query), 150);
     return () => clearTimeout(timer);
   }, [query]);
-  const visible = filterProjects(snapshot.projects ?? [], { query: debounced, level }, language);
+  const visible = filterProjects(snapshot.projects ?? [], { query: debounced, tags, level }, language);
   const clearFilters = () => {
     setQuery('');
     setDebounced('');
     setLevel('all');
+    setTags([]);
     searchField.current?.focus();
   };
 
@@ -76,6 +87,11 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
               if (event.key === 'Escape') {
                 setQuery('');
                 setDebounced('');
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                addTag();
+              } else if (event.key === 'Backspace' && query === '' && tags.length > 0) {
+                setTags(tags.slice(0, -1));
               }
             }}
             placeholder={t('projects.search.placeholder')}
@@ -101,6 +117,23 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
           {t('projects.search.count', { count: visible.length })}
         </p>
       </div>
+      {tags.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-2" aria-label={t('projects.search.tags')} data-testid="project-tags">
+          {tags.map((tag) => (
+            <li key={tag} className="flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 py-0.5 pr-1 pl-3 text-sm font-medium text-primary">
+              {tag}
+              <button
+                type="button"
+                onClick={() => setTags(tags.filter((saved) => saved !== tag))}
+                aria-label={t('projects.search.removeTag', { tag })}
+                className="rounded-full p-0.5 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
+                <Icon name="x" className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {visible.length > 0 ? (
         <div className="mt-6 grid grid-cols-[repeat(auto-fill,450px)] gap-4">
           {visible.map((card) => (
