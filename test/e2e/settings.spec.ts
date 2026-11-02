@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { dragCard, expectFlagsLoaded, launch, startFirstTicket } from './fixtures.ts';
+import { supportdesk } from './content.ts';
 
 test('settings: preferences, developer tools, backup and about tabs', async () => {
   const { app, page, close } = await launch();
@@ -65,7 +66,7 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await page.getByTestId('settings-tab-backup').click();
     await expect(page.getByTestId('backup-outdated')).toHaveText('Backup outdated');
     await expect(page.getByTestId('last-export')).toContainText('Never exported');
-    await expect(page.getByTestId('campaign-progress')).toHaveText('0 tickets completed · SD-214 (To Do)');
+    await expect(page.getByTestId('campaign-progress')).toHaveText(`0 tickets completed · ${supportdesk.key('front-1')} (To Do)`);
     const file = join(saves, 'bug-detective-2026-10-27.bdsave');
     await app.evaluate(({ dialog }, path) => {
       dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as never;

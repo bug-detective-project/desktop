@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { dragCard, launch, startFirstTicket } from './fixtures.ts';
+import { supportdesk } from './content.ts';
 
 test('the ticket panel shows the ticket, QA comments, history and the senior-dev conversation', async () => {
   const { page, close } = await launch({ qa: ['gate2'] });
@@ -10,7 +11,7 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await startFirstTicket(page);
     await page.getByTestId('card-1').click();
     const panel = page.getByTestId('ticket-panel');
-    await expect(panel.getByTestId('ticket-title')).toContainText('SD-214');
+    await expect(panel.getByTestId('ticket-title')).toContainText(supportdesk.key('front-1'));
     await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
     // The Track row shows the card's tag, with the card's wording.
     await expect(panel.getByTestId('ticket-track')).toHaveAttribute('data-track', 'front');
@@ -89,12 +90,12 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
     try {
       await second.page.getByTestId('nav-board').click();
       await second.page.getByTestId('card-1').click();
-      await expect(second.page.getByTestId('ticket-markdown')).toContainText('Passos para reproduzir');
+      await expect(second.page.getByTestId('ticket-markdown')).toContainText(supportdesk.ticketSection('front-1', 'pt'));
       await expect(second.page.getByTestId('ticket-track')).toHaveText('Front-end');
-      await expect(second.page.getByTestId('ticket-title')).toContainText('Anterior e Próximo');
+      await expect(second.page.getByTestId('ticket-title')).toContainText(supportdesk.title('front-1', 'pt').split(': ')[1]);
       await second.page.getByTestId('close-panel').click();
       await second.page.getByTestId('nav-dashboard').click();
-      await expect(second.page.getByTestId('inbox')).toContainText('Novo ticket: SD-214');
+      await expect(second.page.getByTestId('inbox')).toContainText(supportdesk.assignment('front-1', 'pt'));
     } finally {
       await second.close();
     }

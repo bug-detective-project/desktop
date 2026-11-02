@@ -73,7 +73,8 @@ export async function resolveSupportdesk(options: { local: string; cache: string
 
 export default async function globalSetup(): Promise<void> {
   const choice = await resolveSupportdesk({
-    local: resolve(root, '..', 'supportdesk-qa'),
+    // BUGDETECTIVE_E2E_PINNED_SUPPORTDESK=1 plays the pinned publication even with the local folder there.
+    local: process.env.BUGDETECTIVE_E2E_PINNED_SUPPORTDESK === '1' ? join(root, 'test', '.cache', 'no-local-supportdesk') : resolve(root, '..', 'supportdesk-qa'),
     cache: join(root, 'test', '.cache'),
     ref: SUPPORTDESK_QA_REF,
     clone: async (url, dir) => {

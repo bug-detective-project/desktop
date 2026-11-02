@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { dragCard, expectFlagsLoaded, launch, simulate, startFirstTicket, takeNextTicket } from './fixtures.ts';
+import { supportdesk } from './content.ts';
 
 /** Drops a card on a column it cannot go to and expects the explanation (drags occasionally get lost, so retry). */
 async function dropExplains(page: Page, card: Locator, column: string, message: string) {
@@ -86,9 +87,9 @@ test('Get Next Assignment asks for the track and shows each track, its next tick
     await expect(page.getByTestId('next-assignment')).toBeEnabled();
     await page.getByTestId('next-assignment').click();
     await expect(page.getByTestId('next-assignment-front')).toContainText('Front');
-    await expect(page.getByTestId('next-assignment-front')).toContainText('Next: SD-214 · 0/4 done');
-    await expect(page.getByTestId('next-assignment-back')).toContainText('Next: SD-252 · 0/4 done');
-    await expect(page.getByTestId('next-assignment-fullstack')).toContainText('Next: Front · SD-214 · 0/8 done');
+    await expect(page.getByTestId('next-assignment-front')).toContainText(`Next: ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front} done`);
+    await expect(page.getByTestId('next-assignment-back')).toContainText(`Next: ${supportdesk.key('back-1')} · 0/${supportdesk.counts.back} done`);
+    await expect(page.getByTestId('next-assignment-fullstack')).toContainText(`Next: Front · ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front + supportdesk.counts.back} done`);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('next-assignment-tracks')).toHaveCount(0);
     await page.getByTestId('next-assignment').click();
@@ -167,7 +168,7 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     );
     expect(order).toEqual(['assignment-card', 'environment-card', 'project-drawer-toggle']);
     // Below Local environment: the client.
-    await expect(page.getByTestId('desk-client')).toHaveText(/Client\s*Harborline Outfitters/);
+    await expect(page.getByTestId('desk-client')).toHaveText(new RegExp(`Client\\s*${supportdesk.story.en.client.name}`));
     const below = await page.evaluate(() => {
       const top = (id: string) => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
       return top('desk-client') > top('environment-card');
@@ -185,9 +186,9 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(task).toHaveAttribute('data-state', 'active');
     // Only while the next assignment waits: an active ticket has its action on the desk alone.
     await expect(page.getByTestId('email-next')).toHaveCount(0);
-    await expect(task).toContainText('SD-214');
+    await expect(task).toContainText(supportdesk.key('front-1'));
     // The client is its own desk section, not a line of the task.
-    await expect(task).not.toContainText('Harborline');
+    await expect(task).not.toContainText(supportdesk.story.en.client.name);
     // The stage pill sits on the "Current task" line, on the right.
     const labelLine = task.locator('[data-stage]').locator('xpath=ancestor::div[1]');
     await expect(labelLine).toContainText('Current task');
@@ -277,7 +278,7 @@ test('Project & contacts opens in a drawer: closed by default, closes with the b
     await expect(page.getByTestId('project-drawer-close')).toBeFocused();
     await expect(page.getByTestId('project-context')).toContainText('Lanternfish Labs');
     await expect(page.getByTestId('project-context')).toContainText('Your team');
-    await expect(page.getByTestId('project-context')).toContainText('Harborline Outfitters');
+    await expect(page.getByTestId('project-context')).toContainText(supportdesk.story.en.client.name);
     await expect(page.getByTestId('project-context')).toContainText('Client');
     // The hint mentor comes first in Contacts, with the mentor badge.
     await expect(page.getByTestId('contacts-card').locator('li').first()).toContainText('Priya Raman');
@@ -366,7 +367,7 @@ test('a card shows only its key and title, and "Test failed" only after a failed
   try {
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
-    await expect(card).toHaveText(/^FrontSD-214/);
+    await expect(card).toHaveText(new RegExp(`^Front${supportdesk.key('front-1')}`));
     await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await expect(card).toHaveClass(/border-primary\/40/);
@@ -586,11 +587,11 @@ test('an older e-mail of a done ticket says so and links to it on the Board', as
     await page.getByTestId('desk-primary').click();
     await page.getByTestId('accept-review').click();
     await page.getByTestId('nav-dashboard').click();
-    await page.getByTestId('inbox-message').filter({ hasText: 'New ticket: SD-214' }).getByRole('button').click();
-    await expect(page.getByTestId('previous-directive')).toContainText('SD-214');
+    await page.getByTestId('inbox-message').filter({ hasText: supportdesk.assignment('front-1', 'en') }).getByRole('button').click();
+    await expect(page.getByTestId('previous-directive')).toContainText(supportdesk.key('front-1'));
     await page.getByTestId('view-done-ticket').click();
     await expect(page.getByTestId('board')).toBeVisible();
-    await expect(page.getByTestId('ticket-panel')).toContainText('SD-214');
+    await expect(page.getByTestId('ticket-panel')).toContainText(supportdesk.key('front-1'));
   } finally {
     await close();
   }

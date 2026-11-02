@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { dragCard, launch, startFirstTicket } from './fixtures.ts';
+import { supportdesk } from './content.ts';
 
 /** Unlocks ticket 1, passes QA and opens its Code Review page. */
 async function reachCodeReview(page: Page): Promise<void> {
@@ -122,7 +123,7 @@ test('Open Review in VS Code shows the banner until the player goes back to thei
     await page.getByTestId('review-markdown').hover();
     await expect(steps).toBeHidden(); // the focused button does not keep the steps open
     const banner = page.getByTestId('review-banner');
-    await expect(banner).toContainText('Viewing the review of ticket SD-214 in VS Code. Your code will be restored automatically.');
+    await expect(banner).toContainText(`Viewing the review of ticket ${supportdesk.key('front-1')} in VS Code. Your code will be restored automatically.`);
     await expect(page.locator('body')).not.toContainText(/review\/|player\/|review-edits\//);
     await page.getByTestId('back-to-my-code').click();
     await expect(banner).toHaveCount(0);
@@ -170,7 +171,7 @@ test('the review texts are in Portuguese', async () => {
     await expect(page.getByTestId('vscode-steps')).toContainText('clique no commit do topo, "Your approved solution"');
     await expect(page.getByTestId('vscode-steps')).toContainText('"Reference"');
     await page.getByTestId('open-review-vscode').click();
-    await expect(page.getByTestId('review-banner')).toContainText('Você está vendo o review do ticket SD-214 no VS Code. Seu código será restaurado automaticamente.');
+    await expect(page.getByTestId('review-banner')).toContainText(`Você está vendo o review do ticket ${supportdesk.key('front-1')} no VS Code. Seu código será restaurado automaticamente.`);
   } finally {
     await close();
   }

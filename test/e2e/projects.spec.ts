@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dragCard, launch, startFirstTicket, supportdeskQa, takeNextTicket } from './fixtures.ts';
+import { supportdesk } from './content.ts';
 
 /** Plays an unlocked ticket to Done with the fake QA passing. */
 async function finish(page: Page, ticket: number) {
@@ -23,7 +24,7 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     await startFirstTicket(page);
     await expect(page.getByTestId('nav-projects')).toHaveCount(0);
     await finish(page, 1);
-    for (const ticket of [2, 3, 4]) {
+    for (let ticket = 2; ticket <= supportdesk.counts.front; ticket++) {
       await page.getByTestId('nav-dashboard').click();
       await takeNextTicket(page, 'front');
       await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'todo');
@@ -33,10 +34,10 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     await expect(page.getByTestId('nav-projects')).toBeVisible();
     await page.getByTestId('nav-projects').click();
     const card = page.getByTestId('project-supportdesk');
-    await expect(card).toContainText('SupportDesk');
+    await expect(card).toContainText(supportdesk.story.en.project.name);
     await expect(card.getByTestId('project-active')).toHaveText('In progress');
-    await expect(card.getByTestId('project-difficulty')).toHaveText('Beginner');
-    await expect(card.getByTestId('project-tickets')).toHaveText('Front 4/4 · Back 0/4');
+    await expect(card.getByTestId('project-difficulty')).toHaveText(`${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`);
+    await expect(card.getByTestId('project-tickets')).toHaveText(`Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`);
     // The active project has no switch button.
     await expect(card.getByRole('button')).toHaveCount(0);
   } finally {
@@ -44,13 +45,13 @@ test('Projects shows up once a track is done, with each project, its difficulty 
   }
 });
 
-const supportdesk = { id: 'supportdesk', qaDir: supportdeskQa, starter: true };
+const supportdeskEntry = { id: 'supportdesk', qaDir: supportdeskQa, starter: true };
 // A second project that is never downloaded in these tests (its folder does not exist).
 const inventory = { id: 'inventory', qaDir: '/nonexistent/inventory-qa' };
 const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
 
 test('a project that needs a newer app says so, and cannot be chosen', async () => {
-  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdesk, { ...inventory, minAppVersion: '99.0.0' }] });
+  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdeskEntry, { ...inventory, minAppVersion: '99.0.0' }] });
   try {
     await page.getByTestId('start-playing').click();
     await page.getByTestId('nav-projects').click();
@@ -64,7 +65,7 @@ test('a project that needs a newer app says so, and cannot be chosen', async () 
 });
 
 test('a hidden project does not show on the Projects screen', async () => {
-  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdesk, { ...inventory, hidden: true }] });
+  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdeskEntry, { ...inventory, hidden: true }] });
   try {
     await page.getByTestId('start-playing').click();
     await page.getByTestId('nav-projects').click();
@@ -76,7 +77,7 @@ test('a hidden project does not show on the Projects screen', async () => {
 });
 
 test('a new game whose first project needs a newer app cannot start', async () => {
-  const { page, close } = await launch({}, { catalog: [{ ...supportdesk, minAppVersion: '99.0.0' }] });
+  const { page, close } = await launch({}, { catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
   try {
     await expect(page.getByTestId('starter-needs-update')).toHaveText('Update Bug Detective to start playing. The first project needs a newer version of the app.');
     await expect(page.getByTestId('start-playing')).toBeDisabled();
@@ -94,7 +95,7 @@ test('a game in progress whose project now needs a newer app shows a notice and 
     } finally {
       await first.close();
     }
-    const second = await launch({}, { userData, catalog: [{ ...supportdesk, minAppVersion: '99.0.0' }] });
+    const second = await launch({}, { userData, catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
     try {
       await second.page.getByTestId('nav-dashboard').click();
       await expect(second.page.getByTestId('project-needs-update')).toContainText('Update Bug Detective: this project needs a newer version of the app.');
