@@ -9,7 +9,7 @@ import { ContentVerificationError, IncompletePublicationError, TicketNotPublishe
 import type { ArchiveFile, ProjectManifest } from '@bug-detective/catalog/contract';
 import { DownloadError, GitHubContentSource, validateBaseUrl } from '../../src/main/services/content/github.ts';
 import { LocalContentSource, gitArchive } from '../../src/main/services/content/local.ts';
-import { publishProject } from '../../src/main/services/content/publish.ts';
+import { publishLocally } from '../helpers/publication.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
@@ -23,7 +23,7 @@ let manifest: ProjectManifest;
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'bd-content-'));
   repo = await createProjectRepo(root, { front: 2, back: 1 });
-  ({ manifest } = await publishProject({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand }));
+  ({ manifest } = await publishLocally(repo, '1.0.0'));
 });
 
 afterAll(async () => {
@@ -98,6 +98,11 @@ describe('GitHubContentSource (mock server)', () => {
         response.writeHead(302, { location: `/codeload/${qa[1]}/qa.zip` }).end();
         return;
       }
+      const tag = /^\/owner\/([a-z-]+)\/archive\/refs\/tags\/qa-v1\.0\.0\.zip$/.exec(request.url!);
+      if (tag && variants[tag[1]]) {
+        response.writeHead(200).end(zipOf(variants[tag[1]].qa(), `${tag[1]}-qa-v1.0.0`));
+        return;
+      }
       const codeloadQa = /^\/codeload\/([a-z-]+)\/qa\.zip$/.exec(request.url!);
       if (codeloadQa) {
         response.writeHead(200).end(zipOf(variants[codeloadQa[1]].qa(), `${codeloadQa[1]}-qa`));
@@ -121,6 +126,15 @@ describe('GitHubContentSource (mock server)', () => {
   });
 
   const source = (repository = 'owner/demo', project = 'demo') => new GitHubContentSource({ repository, project, baseUrl, retries: 2 });
+
+  it('downloads another qa ref, a branch or else a tag of that name', async () => {
+    requests.length = 0;
+    const tagged = new GitHubContentSource({ repository: 'owner/demo', project: 'demo', qaRef: 'qa-v1.0.0', baseUrl, retries: 0 });
+    const ticket = await tagged.fetchTicket('front-1');
+    expect(ticket.manifestVersion).toBe('1.0.0');
+    expect(requests.slice(0, 2)).toEqual(['/owner/demo/archive/refs/heads/qa-v1.0.0.zip', '/owner/demo/archive/refs/tags/qa-v1.0.0.zip']);
+    expect(tagged.describe()).toContain('qa-v1.0.0');
+  });
 
   it('downloads the qa branch and the ticket commit, following redirects', async () => {
     requests.length = 0;

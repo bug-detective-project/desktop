@@ -7,6 +7,7 @@ import { Game } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
+import type { ResolvedProject } from '../../src/main/services/catalog.ts';
 import { IncompletePublicationError, TicketNotPublishedError, readZip } from '@bug-detective/catalog/contract';
 import type { ContentSource } from '../../src/main/services/content/source.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
@@ -685,16 +686,36 @@ describe('Game', () => {
   });
 });
 
+/** A projects catalog whose list a test can change; counts its refreshes. */
+function fakeCatalog(initial: ResolvedProject[]) {
+  let list = initial;
+  return {
+    refreshes: 0,
+    failRefresh: false,
+    async current() {
+      return list;
+    },
+    async refresh() {
+      this.refreshes += 1;
+      if (this.failRefresh) throw new Error('offline');
+      return true;
+    },
+    set(next: ResolvedProject[]) {
+      list = next;
+    },
+  };
+}
+
 describe('Game with several projects', () => {
   async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] }))) {
     const repos = {
       first: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 0 }, 'First'),
       second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
     };
-    const catalog = [
-      { id: 'first', repository: 'owner/first', starter: true, version: '0.0.0' },
-      { id: 'second', repository: 'owner/second', starter: false, version: '0.0.0' },
-    ];
+    const catalog = fakeCatalog([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
     const make = () =>
       new Game({
         store: new StateStore(dir),
@@ -703,7 +724,7 @@ describe('Game with several projects', () => {
         content: new LocalContentSource({ qaDir: repos.first.qaDir, runner: runCommand }),
         projects: {
           catalog,
-          content: (id) => new LocalContentSource({ qaDir: repos[id as 'first' | 'second'].qaDir, runner: runCommand }),
+          content: (project) => new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }),
           packages: (id) => new PackageStore(join(dir, 'projects', id, 'packages')),
           reviews: (id) => new ReviewStore(join(dir, 'projects', id, 'reviews')),
         },
@@ -711,7 +732,7 @@ describe('Game with several projects', () => {
         appVersion: '0.1.0',
         versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
       });
-    return { make, runtime };
+    return { make, runtime, catalog };
   }
 
   async function finishFirstTicket(game: Game) {
@@ -758,7 +779,7 @@ describe('Game with several projects', () => {
     await game.init();
     await game.nextAssignment('front');
     await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'ticketNotDone' });
-    expect(game.current.project).toBeNull();
+    expect(game.current.project).toBe('first');
   });
 
   it('keeps an unfinished switch, blocks the game, and finishes it on the next start', async () => {
@@ -795,5 +816,53 @@ describe('Game with several projects', () => {
     const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
     await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'otherProjectsLeft' });
     expect(removeProjects).toHaveBeenCalledWith(['second']);
+  });
+
+  it('starts a new game in the starter of the catalog in use', async () => {
+    const { make, catalog } = await twoProjects();
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: false, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: true, official: true },
+    ]);
+    const game = make();
+    await game.init();
+    expect(game.current.project).toBe('second');
+    expect(game.snapshot().projectStory?.en.project.name).toBe('Second');
+  });
+
+  it('keeps a game in its project when the catalog later names another starter', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: false, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: true, official: true },
+    ]);
+    const next = make();
+    await next.init();
+    expect(next.current.project).toBe('first');
+    expect(next.current.tickets.map((ticket) => ticket.id)).toEqual(['front-1']);
+  });
+
+  it('refreshes the catalog when the Projects screen opens and when a ticket is taken, even offline', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await game.loadProjects();
+    expect(catalog.refreshes).toBe(1);
+    catalog.failRefresh = true;
+    await game.nextAssignment('front');
+    expect(catalog.refreshes).toBe(2);
+    expect(game.current.tickets.map((ticket) => ticket.id)).toEqual(['front-1']);
+  });
+
+  it('shows a project the catalog adds after a refresh', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }]);
+    await game.loadProjects();
+    expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first']);
   });
 });

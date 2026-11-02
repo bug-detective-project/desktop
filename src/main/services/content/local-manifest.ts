@@ -1,18 +1,15 @@
 /**
- * Builds a project's manifest from its qa folder (a worktree of the qa branch) and the ticket
- * branches of the same repository, and publishes it: manifest.json, one tag per new ticket commit
- * and a commit on qa. Used by tools/publish-project.ts and, in memory, by the local content source.
- * Never pushes: publishing ends with the push command for the author to run.
+ * Builds a project's manifest in memory from its qa folder (a worktree of the qa branch) and the
+ * ticket branches of the same repository, so the local content source (development and tests)
+ * always plays the current content without publishing it. Publishing is the catalog's bd CLI.
  */
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, compareVersions, parseManifest, projectContentOf, sha256Hex, treeDigest } from '@bug-detective/catalog/contract';
+import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, treeDigest } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectManifest, TicketEntry } from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
-import { repositoryFromRemote, updateCatalog } from '../projects.ts';
-import type { CatalogProject } from '../projects.ts';
 
 /** Files and folders every tickets/<id>/ must have. */
 export const REQUIRED_TICKET_FILES = [
@@ -189,70 +186,4 @@ export async function buildManifest(options: BuildManifestOptions): Promise<Proj
     },
     entries,
   });
-}
-
-export interface PublishOptions {
-  qaDir: string;
-  version: string;
-  runner: CommandRunner;
-  git?: string;
-  dryRun?: boolean;
-  log?: (line: string) => void;
-  /** desktop/content/projects.json: after publishing, the project's entry gets the new version (added when new). */
-  catalogFile?: string;
-}
-
-/** Writes manifest.json, creates the missing tags and commits on qa. Returns the push command to run. */
-export async function publishProject(options: PublishOptions): Promise<{ manifest: ProjectManifest; pushCommand: string }> {
-  const { qaDir, version, runner, git: gitCommand = 'git', log = () => {} } = options;
-  const git = gitIn(runner, gitCommand, qaDir);
-  const manifestPath = join(qaDir, 'manifest.json');
-
-  const published = await readFile(manifestPath, 'utf8').then(
-    (text) => (JSON.parse(text) as { version?: string }).version,
-    () => undefined,
-  );
-  if (!SEMVER.test(version)) {
-    throw new Error(`Invalid version ${version}: use X.Y.Z`);
-  }
-  if (published && SEMVER.test(published) && compareVersions(version, published) <= 0) {
-    throw new Error(`The version must be newer than the published ${published} (got ${version})`);
-  }
-  if (await git.text('tag', '-l', `*-v${version}`)) {
-    throw new Error(`Tags for version ${version} already exist`);
-  }
-
-  // The players download the committed tickets/, so the manifest must describe exactly those files.
-  const dirty = await git.text('status', '--porcelain', '--untracked-files=no', '--', 'tickets');
-  if (dirty) {
-    throw new Error(`Commit the ticket files first; these are not committed:\n${dirty}`);
-  }
-  const manifest = await buildManifest({ qaDir, version, runner, git: gitCommand });
-  const branches = manifest.entries.map((entry) => entry.branch).join(' ');
-  // Only this project's ticket tags: a clone may carry other tags that must not be published.
-  const tags = [...new Set(manifest.entries.map((entry) => entry.tag))].join(' ');
-  const pushCommand = `git push origin main qa ${branches} --force-with-lease && git push origin ${tags}`;
-  if (options.dryRun) {
-    return { manifest, pushCommand };
-  }
-
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  for (const entry of manifest.entries) {
-    if (!(await git.text('tag', '-l', entry.tag))) {
-      await git.text('tag', entry.tag, entry.commit);
-      log(`${entry.id}: tagged ${entry.commit.slice(0, 12)} as ${entry.tag}`);
-    }
-  }
-  await git.text('add', 'manifest.json');
-  // Only the manifest: anything else the author has staged stays staged.
-  await git.text('commit', '-q', '-m', `Publish ${manifest.project.name} ${version}`, '--', 'manifest.json');
-  log(`manifest.json committed on qa (sha256 ${sha256Hex(await readFile(manifestPath)).slice(0, 12)})`);
-  if (options.catalogFile) {
-    const repository = repositoryFromRemote(await git.text('remote', 'get-url', 'origin'));
-    const catalog = JSON.parse(await readFile(options.catalogFile, 'utf8')) as { projects: CatalogProject[] };
-    const updated = updateCatalog(catalog, { id: manifest.project.id, repository, version });
-    await writeFile(options.catalogFile, `${JSON.stringify(updated, null, 2)}\n`);
-    log(`${options.catalogFile}: ${manifest.project.id} ${version} (${repository})`);
-  }
-  return { manifest, pushCommand };
 }

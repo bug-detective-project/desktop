@@ -9,7 +9,7 @@ import { writeZip } from '@bug-detective/catalog/contract';
 import { CachedContentSource, FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import { gitArchive } from '../../src/main/services/content/git.ts';
 import { GitHubContentSource } from '../../src/main/services/content/github.ts';
-import { publishProject } from '../../src/main/services/content/publish.ts';
+import { publishLocally } from '../helpers/publication.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
 import type { ProjectRepo } from '../helpers/project-repo.ts';
@@ -26,7 +26,7 @@ let missingCommits: Set<string>;
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bd-cache-'));
   repo = await createProjectRepo(dir, { front: 2, back: 0 });
-  await publishProject({ qaDir: repo.qaDir, version: '1.0.0', runner: runCommand });
+  await publishLocally(repo, '1.0.0');
   requests = [];
   offline = false;
   missingCommits = new Set();
@@ -68,7 +68,7 @@ async function republish() {
   await writeFile(join(repo.projectDir, 'app.txt'), 'bug front-2, again\n');
   repo.git(repo.projectDir, 'commit', '-q', '-am', 'Demo release front-2');
   repo.git(repo.projectDir, 'checkout', '-q', 'main');
-  await publishProject({ qaDir: repo.qaDir, version: '1.1.0', runner: runCommand });
+  await publishLocally(repo, '1.1.0');
 }
 
 describe('CachedContentSource', () => {

@@ -33,7 +33,7 @@ import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './services/content/source.ts';
 import type { CleanupTarget } from './services/cleanup.ts';
-import type { CatalogProject } from './services/projects.ts';
+import type { ResolvedProject } from './services/catalog.ts';
 import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
@@ -88,10 +88,11 @@ export interface GameOptions {
   clock?: () => Date;
 }
 
-/** The projects of content/projects.json, with each one's content source and data folders. */
+/** The projects catalog (see services/catalog.ts), with each project's content source and data folders. */
 export interface GameProjects {
-  catalog: readonly CatalogProject[];
-  content(id: string): ContentSource;
+  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean> };
+  /** The content source of a project; minVersion is the oldest manifest version it may accept. */
+  content(project: ResolvedProject, minVersion: string | null): ContentSource;
   packages(id: string): PackageStore;
   reviews(id: string): ReviewStore;
 }
@@ -132,6 +133,8 @@ export class Game {
   private reviews: ReviewStore;
   /** What a downloaded project shows on the Projects screen, by id. */
   private projectInfo = new Map<string, ProjectContent>();
+  /** The projects catalog in use (refreshed when a ticket is taken and when Projects opens). */
+  private catalog: ResolvedProject[] = [];
   /** What Docker still holds of other projects, after the last cleanup. */
   private leftovers: CleanupTarget[] = [];
 
@@ -142,14 +145,56 @@ export class Game {
     this.reviews = options.reviews;
   }
 
-  /** The active project's id: the state's, or the starter project before the first switch. */
+  /** The active project's id: the state's, or the catalog's starter before a game is pinned to it. */
   private activeProject(): string | null {
-    return this.state.project ?? this.options.projects?.catalog.find((item) => item.starter)?.id ?? null;
+    return this.state.project ?? this.starterId();
+  }
+
+  private starterId(): string | null {
+    return this.catalog.find((item) => item.starter)?.id ?? null;
   }
 
   private otherProjectIds(): string[] {
     const active = this.activeProject();
-    return (this.options.projects?.catalog ?? []).map((item) => item.id).filter((id) => id !== active);
+    return this.catalog.map((item) => item.id).filter((id) => id !== active);
+  }
+
+  /** A project of the catalog in use. */
+  private projectEntry(id: string): ResolvedProject {
+    const entry = this.catalog.find((item) => item.id === id);
+    if (!entry) {
+      throw new GameError('unknownProject', `${id} is not in the projects catalog`);
+    }
+    return entry;
+  }
+
+  private contentOf(id: string): ContentSource {
+    return this.options.projects!.content(this.projectEntry(id), null);
+  }
+
+  /** Reads the catalog in use (the cache or the bundled fallback). */
+  private async loadCatalog(): Promise<void> {
+    if (this.options.projects) {
+      this.catalog = await this.options.projects.catalog.current();
+    }
+  }
+
+  /** Downloads the catalog again (failures keep the cache), then uses it. */
+  async refreshCatalog(): Promise<void> {
+    if (!this.options.projects) {
+      return;
+    }
+    await this.options.projects.catalog.refresh().catch(() => false);
+    await this.loadCatalog().catch(() => {});
+    this.emit();
+  }
+
+  /** A game belongs to one project from its start: a catalog that later names another starter does not move it. */
+  private async pinProject(): Promise<void> {
+    const starter = this.starterId();
+    if (this.options.projects && this.state.project === null && starter) {
+      await this.commit((state) => ({ ...state, project: starter }));
+    }
   }
 
   /** Points the content source, the data folders and new Docker resources at a project. */
@@ -158,7 +203,7 @@ export class Game {
     if (!projects) {
       return;
     }
-    this.source = projects.content(id);
+    this.source = this.contentOf(id);
     this.packages = projects.packages(id);
     this.reviews = projects.reviews(id);
     this.options.runtime.setProject(id);
@@ -177,7 +222,7 @@ export class Game {
     this.leftovers = await this.options.runtime.removeProjects(this.otherProjectIds());
     const pending = this.state.projectSwitch;
     if (pending && this.leftovers.length === 0) {
-      await this.options.projects.content(pending.from).forget?.();
+      await this.contentOf(pending.from).forget?.();
       await this.commit((state) => rules.finishSwitch(state));
     }
     this.emit();
@@ -203,6 +248,8 @@ export class Game {
       await this.options.store.save(recovered);
     }
     this.recoverReview = recovered.reviewSession !== null;
+    await this.loadCatalog();
+    await this.pinProject();
     const active = this.activeProject();
     if (active) {
       this.useProject(active);
@@ -469,8 +516,8 @@ export class Game {
    */
   async switchProject(to: string): Promise<void> {
     const projects = this.options.projects;
-    if (!projects || !projects.catalog.some((item) => item.id === to)) {
-      throw new GameError('unknownProject', `${to} is not in content/projects.json`);
+    if (!projects || !this.catalog.some((item) => item.id === to)) {
+      throw new GameError('unknownProject', `${to} is not in the projects catalog`);
     }
     const from = this.activeProject()!;
     this.apply((state, ctx) => {
@@ -482,7 +529,7 @@ export class Game {
       this.appendLog(`» Downloading ${to}`);
       let content: ProjectContent;
       try {
-        content = await projects.content(to).prepare();
+        content = await this.contentOf(to).prepare();
       } catch (error) {
         throw contentError(error);
       }
@@ -515,8 +562,11 @@ export class Game {
 
   /** Downloads what the Projects screen shows of every other project (online only; failures are skipped). */
   async loadProjects(): Promise<void> {
+    await this.refreshCatalog();
     for (const id of this.otherProjectIds()) {
-      const content = await this.options.projects!.content(id).prepare().catch(() => null);
+      const content = await this.contentOf(id)
+        .prepare()
+        .catch(() => null);
       if (content) {
         this.projectInfo.set(id, content);
       }
@@ -530,7 +580,7 @@ export class Game {
       return null;
     }
     const active = this.activeProject();
-    return projects.catalog.map((item): ProjectCard => {
+    return this.catalog.map((item): ProjectCard => {
       const content = item.id === active ? this.content : (this.projectInfo.get(item.id) ?? null);
       let details: ProjectCard['details'] = null;
       if (content) {
@@ -564,6 +614,8 @@ export class Game {
       throw new GameError('ticketNotDone');
     }
     await this.requireDocker();
+    // A newer catalog applies from here on; the ticket never waits for it.
+    void this.refreshCatalog();
     await this.exclusive('unlocking', async () => {
       await this.beforePlayerCode();
       if (!this.content) {
@@ -749,7 +801,7 @@ export class Game {
   /** A fresh game that keeps the preferences; downloaded packages and reviews are removed. */
   private async startOver(): Promise<void> {
     const projects = this.options.projects;
-    for (const id of projects ? projects.catalog.map((item) => item.id) : []) {
+    for (const id of projects ? this.catalog.map((item) => item.id) : []) {
       await projects!.packages(id).clear();
       await projects!.reviews(id).clear();
     }
@@ -765,7 +817,9 @@ export class Game {
       const fresh = rules.createInitialState(ctx, language);
       return { ...fresh, settings: { ...fresh.settings, theme, qaTimeoutSeconds } };
     });
-    // A new game starts with the starter project, and only it may stay in Docker.
+    // A new game starts with the catalog's starter project, and only it may stay in Docker.
+    await this.loadCatalog().catch(() => {});
+    await this.pinProject();
     const starter = this.activeProject();
     if (starter && this.options.projects) {
       this.useProject(starter);
@@ -1185,7 +1239,7 @@ export class Game {
       this.pendingSave = null;
       const current = save.state.currentTicket;
       // The save's active project becomes this game's: its stores, and the labels of its volume.
-      const active = save.state.project ?? this.options.projects?.catalog.find((item) => item.starter)?.id;
+      const active = save.state.project ?? this.starterId();
       if (active) {
         this.useProject(active);
       }
@@ -1197,7 +1251,7 @@ export class Game {
       }
       await this.reviews.importSave(save.reviews);
       for (const [id, other] of save.others) {
-        if (!this.options.projects?.catalog.some((item) => item.id === id)) {
+        if (!this.options.projects || !this.catalog.some((item) => item.id === id)) {
           continue;
         }
         const store = this.options.projects.packages(id);

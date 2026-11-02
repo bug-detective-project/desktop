@@ -20,7 +20,6 @@
   "scripts": {
     "electron:install": "install-electron --no",
     "prepare:resources": "node tools/prepare-resources.ts",
-    "publish:project": "node tools/publish-project.ts",
     "predev": "pnpm run prepare:resources",
     "dev": "electron-vite dev",
     "build": "pnpm run prepare:resources && electron-vite build && node tools/write-notices.ts",

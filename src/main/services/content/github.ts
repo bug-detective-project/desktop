@@ -11,9 +11,11 @@ import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
 export interface GitHubSourceOptions {
   /** "owner/name" of the project's public repository (main, qa and the ticket branches). */
   repository: string;
-  /** The project id the manifest must declare (its id in content/projects.json). */
+  /** The project id the manifest must declare (its id in the projects catalog). */
   project: string;
-  /** The version content/projects.json records: an older manifest is a publication not pushed yet, or a stale cache. */
+  /** The branch or tag the content comes from (default qa). */
+  qaRef?: string;
+  /** The oldest manifest version to accept: an older one is a publication not pushed yet, or a stale cache. */
   minVersion?: string;
   /** https://github.com, or a local mock server in tests. */
   baseUrl?: string;
@@ -53,6 +55,7 @@ export class GitHubContentSource implements ContentSource {
   private readonly base: string;
   private readonly repository: string;
   private readonly project: string;
+  private readonly qaRef: string;
   private readonly minVersion: string | undefined;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
@@ -69,6 +72,7 @@ export class GitHubContentSource implements ContentSource {
     this.base = validateBaseUrl(options.baseUrl ?? 'https://github.com').href.replace(/\/$/, '');
     this.repository = options.repository;
     this.project = options.project;
+    this.qaRef = options.qaRef ?? 'qa';
     this.minVersion = options.minVersion;
     this.fetchImpl = options.fetch ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 120_000;
@@ -77,11 +81,27 @@ export class GitHubContentSource implements ContentSource {
   }
 
   describe(): string {
-    return `${this.base}/${this.repository} (qa)`;
+    return `${this.base}/${this.repository} (${this.qaRef})`;
   }
 
   branchArchiveUrl(branch: string): string {
     return `${this.base}/${this.repository}/archive/refs/heads/${encodeURIComponent(branch)}.zip`;
+  }
+
+  tagArchiveUrl(tag: string): string {
+    return `${this.base}/${this.repository}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
+  }
+
+  /** The archive of the qa ref: a branch of that name, or else a tag. */
+  private async qaArchive(signal?: AbortSignal): Promise<Uint8Array> {
+    try {
+      return await this.download(this.branchArchiveUrl(this.qaRef), signal);
+    } catch (error) {
+      if (error instanceof DownloadError && error.status === 404) {
+        return this.download(this.tagArchiveUrl(this.qaRef), signal);
+      }
+      throw error;
+    }
   }
 
   commitArchiveUrl(commit: string): string {
@@ -132,7 +152,7 @@ export class GitHubContentSource implements ContentSource {
 
   /** The qa branch: the manifest and every ticket package, verified, plus the project files. */
   async fetchQa(signal?: AbortSignal): Promise<ProjectContent> {
-    const qaFiles = readZip(await this.download(this.branchArchiveUrl('qa'), signal), { stripTopDirectory: true });
+    const qaFiles = readZip(await this.qaArchive(signal), { stripTopDirectory: true });
     const manifestFile = qaFiles.find((file) => file.path === 'manifest.json');
     if (!manifestFile) {
       throw new ContentVerificationError(`${this.repository}: the qa branch has no manifest.json`);

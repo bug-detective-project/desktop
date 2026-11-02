@@ -6,11 +6,16 @@
  * and writes build/docker/images.json: the workspace image tag and qaBase, the hash of qa/ that
  * the QA image tag combines with the QA tool. No game project is needed to build the app.
  *
+ * It also downloads the official projects catalog to build/catalog.fallback.json (packaged as
+ * resources/catalog.fallback.json): the app uses it only before its first download of the catalog
+ * succeeds. Without the internet this step fails.
+ *
  *   node tools/prepare-resources.ts
  */
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
-import { sha256Hex } from '@bug-detective/catalog/contract';
+import { parseCatalog, sha256Hex } from '@bug-detective/catalog/contract';
+import { OFFICIAL_CATALOG_URL } from '../src/main/services/catalog.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const out = join(root, 'build', 'docker');
@@ -41,3 +46,13 @@ const images = {
 await writeFile(join(out, 'images.json'), `${JSON.stringify(images, null, 2)}\n`);
 console.log(`Docker contexts written to ${out}`);
 console.log(images);
+
+const response = await fetch(OFFICIAL_CATALOG_URL, { signal: AbortSignal.timeout(30_000) }).catch((error: Error) => {
+  throw new Error(`Could not download the projects catalog for the bundled fallback (${OFFICIAL_CATALOG_URL}): ${error.message}`);
+});
+if (!response.ok) {
+  throw new Error(`Could not download the projects catalog for the bundled fallback: ${OFFICIAL_CATALOG_URL} answered ${response.status}`);
+}
+const catalog: unknown = await response.json();
+parseCatalog(catalog);
+await writeFile(join(root, 'build', 'catalog.fallback.json'), `${JSON.stringify(catalog, null, 2)}\n`);

@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
-import { z } from 'zod';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
 import { attachDevToolsShortcuts, loadReactDevTools } from './devtools.ts';
@@ -14,13 +13,11 @@ import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
-import { LocalContentSource } from './services/content/local.ts';
-import { contentSourceFor, parseLocalProjects, parseProjectsCatalog, starterProject, withLocalProjects } from './services/projects.ts';
-import projectsJson from '../../content/projects.json' with { type: 'json' };
-import type { ContentSource } from './services/content/source.ts';
+import { CatalogService, chooseCatalogSource, parseLocalCatalog } from './services/catalog.ts';
+import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
+import { contentSourceFor } from './services/projects.ts';
 import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
-import { runCommand } from './services/process.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
 
@@ -49,48 +46,30 @@ const devShowProjects = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDET
 // The e2e tests keep the onboarding from opening on its own unless BUGDETECTIVE_E2E_SHOW_ONBOARDING=true.
 const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E_SHOW_ONBOARDING ?? '');
 
-const contentConfigSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('local'), qaDir: z.string() }),
-  z.object({ kind: z.literal('github'), repository: z.string(), baseUrl: z.string().optional() }),
-]);
-
-/** The projects the app uses (content/projects.json, bundled into the app, plus local-only ones in development). */
-const catalog = withLocalProjects(parseProjectsCatalog(projectsJson), localProjectDirs(), app.isPackaged);
-/** The project being played: the starter one, until switching projects exists. */
-const project = starterProject(catalog);
-
-function projectId(): string {
-  return project.id;
-}
-
 /**
- * Development only: desktop/projects.local.json may point projects at local qa folders
- * ({ "supportdesk": "../supportdesk-qa" }); without it, development downloads from GitHub too.
+ * Development only: desktop/catalog.local.json may point at another projects catalog (a branch of
+ * the catalog repository, or a file) and override a project's qa ref or folder. The tests use
+ * BUGDETECTIVE_CATALOG_FILE instead. The installed app always reads the official catalog.
  */
-function localProjectDirs(): Record<string, string> {
-  const file = join(appRoot, 'projects.local.json');
+function localCatalog(): LocalCatalog | null {
+  const file = join(appRoot, 'catalog.local.json');
   if (app.isPackaged || !existsSync(file)) {
-    return {};
+    return null;
   }
-  return parseLocalProjects(JSON.parse(readFileSync(file, 'utf8')));
+  return parseLocalCatalog(JSON.parse(readFileSync(file, 'utf8')));
 }
 
-/**
- * Each project's content comes from its repository (content/projects.json), cached per project, or
- * from a local qa folder in development (projects.local.json). For the starter project,
- * %APPDATA%\Bug Detective\content-source.json overrides both (the e2e tests use it).
- */
-function contentSource(id: string): ContentSource {
-  const entry = catalog.projects.find((item) => item.id === id)!;
-  const configFile = join(app.getPath('userData'), 'content-source.json');
-  if (entry.starter && existsSync(configFile)) {
-    const config = contentConfigSchema.parse(JSON.parse(readFileSync(configFile, 'utf8')));
-    if (config.kind === 'local') {
-      return new LocalContentSource({ qaDir: config.qaDir, runner: runCommand });
-    }
-    return contentSourceFor({ ...entry, repository: config.repository }, { packaged: true, localDirs: {}, baseDir: appRoot, userData: app.getPath('userData'), baseUrl: config.baseUrl }, console.log);
-  }
-  return contentSourceFor(entry, { packaged: app.isPackaged, localDirs: localProjectDirs(), baseDir: appRoot, userData: app.getPath('userData') }, console.log);
+/** The projects catalog: downloaded at run time, cached in the data folder, with the copy bundled at build time as a fallback. */
+function catalogService(userData: string): CatalogService {
+  const local = localCatalog();
+  return new CatalogService({
+    choice: chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: local, baseDir: appRoot }),
+    overrides: local?.projects ?? {},
+    baseDir: appRoot,
+    cacheFile: join(userData, 'catalog.json'),
+    fallbackFile: app.isPackaged ? join(process.resourcesPath, 'catalog.fallback.json') : join(appRoot, 'build', 'catalog.fallback.json'),
+    log: console.log,
+  });
 }
 
 const platform: Platform | null = isE2E ? null : currentPlatform();
@@ -181,14 +160,18 @@ async function main(): Promise<void> {
 
   const userData = app.getPath('userData');
   let window: BrowserWindow | null = null;
+  const catalog = catalogService(userData);
+  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion }, console.log);
+  // The starter until the game names its own project (Game.init points everything at that one).
+  const starter = (await catalog.current()).find((item) => item.starter)!;
   const game = new Game({
     store: new StateStore(userData),
     // Downloaded packages and reviews belong to the project they came from.
-    packages: new PackageStore(join(userData, 'projects', projectId(), 'packages')),
-    reviews: new ReviewStore(join(userData, 'projects', projectId(), 'reviews')),
-    content: contentSource(projectId()),
+    packages: new PackageStore(join(userData, 'projects', starter.id, 'packages')),
+    reviews: new ReviewStore(join(userData, 'projects', starter.id, 'reviews')),
+    content: contentSource(starter, null),
     projects: {
-      catalog: catalog.projects,
+      catalog,
       content: contentSource,
       packages: (id) => new PackageStore(join(userData, 'projects', id, 'packages')),
       reviews: (id) => new ReviewStore(join(userData, 'projects', id, 'reviews')),
@@ -204,6 +187,8 @@ async function main(): Promise<void> {
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';
   await game.init(language);
+  // A newer catalog (new or hidden projects) applies without a new build of the app.
+  void game.refreshCatalog();
 
   registerIpc(game, devRendererUrl ? new URL(devRendererUrl).origin : null, openUrl);
   if (devTools) {
@@ -228,7 +213,7 @@ async function main(): Promise<void> {
   void game.cleanupLeftovers();
 }
 
-// A failed start (a game saved by a newer version, an invalid content-source.json, ...) must not
+// A failed start (a game saved by a newer version, an invalid catalog.local.json, ...) must not
 // leave the process running without a window: say why, then quit.
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

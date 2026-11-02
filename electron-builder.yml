@@ -18,6 +18,9 @@ files:
 extraResources:
   - from: build/docker
     to: docker
+  # The projects catalog as it was at build time, used only before the first download succeeds.
+  - from: build/catalog.fallback.json
+    to: catalog.fallback.json
   # Run by the uninstaller (resources/installer.nsh) to remove the app's Docker data.
   - from: resources/remove-docker-data.ps1
     to: remove-docker-data.ps1

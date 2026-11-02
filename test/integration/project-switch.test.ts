@@ -12,9 +12,10 @@ import { Game } from '../../src/main/game.ts';
 import { currentPlatform } from '../../src/main/platform/index.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
 import type { QaRequest } from '../../src/main/runtime.ts';
+import type { ResolvedProject } from '../../src/main/services/catalog.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { qaToolFiles } from '@bug-detective/catalog/contract';
-import { readQaFiles } from '../../src/main/services/content/publish.ts';
+import { readQaFiles } from '../../src/main/services/content/local-manifest.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
@@ -57,10 +58,11 @@ let runtime: SwitchRuntime;
 const repos: Record<string, ProjectRepo> = {};
 
 function game(): Game {
-  const catalog = [
-    { id: 'switch-a', repository: 'owner/switch-a', starter: true, version: '0.0.0' },
-    { id: 'switch-b', repository: 'owner/switch-b', starter: false, version: '0.0.0' },
+  const projects: ResolvedProject[] = [
+    { id: 'switch-a', repository: 'owner/switch-a', qaRef: 'qa', starter: true, official: true },
+    { id: 'switch-b', repository: 'owner/switch-b', qaRef: 'qa', starter: false, official: true },
   ];
+  const catalog = { current: async () => projects, refresh: async () => true };
   return new Game({
     store: new StateStore(join(dir, 'game')),
     packages: new PackageStore(join(dir, 'game', 'projects', 'switch-a', 'packages')),
@@ -68,7 +70,7 @@ function game(): Game {
     content: new LocalContentSource({ qaDir: repos['switch-a'].qaDir, runner: runCommand }),
     projects: {
       catalog,
-      content: (id) => new LocalContentSource({ qaDir: repos[id].qaDir, runner: runCommand }),
+      content: (project) => new LocalContentSource({ qaDir: repos[project.id].qaDir, runner: runCommand }),
       packages: (id) => new PackageStore(join(dir, 'game', 'projects', id, 'packages')),
       reviews: (id) => new ReviewStore(join(dir, 'game', 'projects', id, 'reviews')),
     },

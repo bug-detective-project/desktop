@@ -25,7 +25,7 @@ import { StateStore } from '../../src/main/services/state.ts';
 import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { projectStory, ticketFiles, writeFiles } from '../helpers/project-repo.ts';
-import { readQaFiles } from '../../src/main/services/content/publish.ts';
+import { readQaFiles } from '../../src/main/services/content/local-manifest.ts';
 import type { QaResult } from '../../src/shared/types.ts';
 import { parseDiff, visibleFiles } from '../../src/renderer/src/components/diff.ts';
 
