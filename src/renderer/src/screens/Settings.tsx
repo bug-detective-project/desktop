@@ -993,7 +993,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
         <p className="mt-1 text-base text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="mb-8 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
+      <div className="mb-8 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
         {TABS.filter(({ id }) => id !== 'development' || snapshot.devCatalog !== null).map(({ id, icon }) => {
           const active = tab === id;
           return (

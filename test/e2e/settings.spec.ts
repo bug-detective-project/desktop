@@ -19,6 +19,9 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await page.getByTestId('nav-settings').click();
     await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
     const settings = page.getByTestId('settings');
+    // The tab bar takes the whole width of the screen's content, like the pane below it.
+    const [bar, pane] = await Promise.all([settings.getByRole('tablist').boundingBox(), page.getByTestId('settings-pane-preferences').boundingBox()]);
+    expect(Math.round(bar!.width)).toBe(Math.round(pane!.width));
 
     // Preferences: language and theme apply at once. Each language option shows its flag.
     await expectFlagsLoaded(page.getByTestId('settings-pane-preferences'), ['en', 'pt']);
