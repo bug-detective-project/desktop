@@ -5,6 +5,9 @@ import { _electron as electron } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
+/** The SupportDesk qa folder next to the desktop folder, the content of the e2e tests. */
+export const supportdeskQa = resolve(import.meta.dirname, '..', '..', '..', 'supportdesk-qa');
+
 export interface Launched {
   app: ElectronApplication;
   page: Page;
@@ -23,9 +26,8 @@ export async function launch(
 ): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
-  const qaDir = resolve(import.meta.dirname, '..', '..', '..', 'supportdesk-qa');
   const catalogFile = join(userData, 'test-catalog.json');
-  await writeFile(catalogFile, JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir, starter: true }] }));
+  await writeFile(catalogFile, JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }));
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
   const app = await electron.launch({

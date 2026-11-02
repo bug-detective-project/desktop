@@ -11,7 +11,7 @@ import { Icon } from '../components/icons.tsx'
 import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
-import { Badge, Button, LogView, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
+import { Badge, Button, LogView, Notice, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
 import type { Story } from '../content.ts'
 import { story } from '../content.ts'
 import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx'
@@ -946,6 +946,11 @@ export function Dashboard({
       data-testid="dashboard"
     >
       {snapshot.state.projectSwitch && <PendingSwitch snapshot={snapshot} />}
+      {snapshot.projectNeedsUpdate && (
+        <div className="mb-4">
+          <Notice data-testid="project-needs-update">{t('dashboard.projectNeedsUpdate')}</Notice>
+        </div>
+      )}
       <div className="relative grid h-full grid-cols-[320px_400px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <aside
           className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-border bg-muted/40"

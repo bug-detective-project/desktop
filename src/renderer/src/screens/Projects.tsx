@@ -80,9 +80,20 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
             ) : (
               <p className="text-base text-muted-foreground">{t('projects.noDetails')}</p>
             )}
+            {card.unavailable === 'appTooOld' && (
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400" data-testid="project-needs-update">
+                {t('projects.needsUpdate')}
+              </p>
+            )}
             {!card.active && (
               <div className="mt-auto pt-2">
-                <Button variant="primary" disabled={blocked !== null} title={blocked ?? undefined} onClick={() => setConfirm(card)} data-testid={`switch-${card.id}`}>
+                <Button
+                  variant="primary"
+                  disabled={blocked !== null || card.unavailable !== null}
+                  title={card.unavailable ? t('projects.needsUpdate') : (blocked ?? undefined)}
+                  onClick={() => setConfirm(card)}
+                  data-testid={`switch-${card.id}`}
+                >
                   <Icon name="arrowRight" />
                   {card.played ? t('projects.resume') : t('projects.play')}
                 </Button>

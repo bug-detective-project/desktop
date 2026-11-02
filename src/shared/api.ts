@@ -134,6 +134,8 @@ export interface ProjectCard {
     counts: Record<Track, number>;
   } | null;
   progress: Record<Track, { done: number; total: number }> | null;
+  /** appTooOld: the project needs a newer Bug Detective (its minAppVersion, or a newer content format). */
+  unavailable: 'appTooOld' | null;
 }
 
 export type ProjectDifficulty = 'beginner' | 'intermediate' | 'advanced';
@@ -148,6 +150,10 @@ export interface Snapshot {
   projectsUnlocked: boolean;
   /** Every project of content/projects.json, or null in a single-project game. */
   projects: ProjectCard[] | null;
+  /** The active project needs a newer Bug Detective: the game goes on with the downloaded content. */
+  projectNeedsUpdate: boolean;
+  /** A new game cannot start: the catalog's starter project needs a newer Bug Detective. */
+  starterNeedsUpdate: boolean;
   /** While a project switch is pending: what Docker still holds of other projects. */
   projectSwitchLeft: { kind: 'container' | 'volume' | 'image'; name: string }[] | null;
   titles: Record<number, Record<Language, string>>;

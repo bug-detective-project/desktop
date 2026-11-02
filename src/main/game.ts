@@ -27,7 +27,7 @@ import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SEC
 import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { createSave, readSave } from './services/backup.ts';
-import { IncompletePublicationError, TicketNotPublishedError, compareVersions, countsOf, fileText, parseReviewConfig, projectContentOf, qaToolFiles, writeZip } from '@bug-detective/catalog/contract';
+import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, fileText, parseReviewConfig, projectContentOf, qaToolFiles, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig } from '@bug-detective/catalog/contract';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
@@ -59,6 +59,9 @@ export function contentError(error: unknown): unknown {
   }
   if (error instanceof FirstDownloadError) {
     return new GameError('contentNeedsInternet', error.message);
+  }
+  if (error instanceof UnsupportedFormatError) {
+    return new GameError('appTooOld', error.message);
   }
   return error;
 }
@@ -135,6 +138,8 @@ export class Game {
   private projectInfo = new Map<string, ProjectContent>();
   /** The projects catalog in use (refreshed when a ticket is taken and when Projects opens). */
   private catalog: ResolvedProject[] = [];
+  /** Projects whose content format is newer than this app understands, by id. */
+  private newerFormat = new Set<string>();
   /** What Docker still holds of other projects, after the last cleanup. */
   private leftovers: CleanupTarget[] = [];
 
@@ -179,6 +184,21 @@ export class Game {
     return entry;
   }
 
+  /** The project needs a newer app: its catalog entry says so, or its content uses a newer format. */
+  private needsUpdate(id: string): boolean {
+    const entry = this.sourceOf(id);
+    return this.newerFormat.has(id) || (entry !== null && !appSupports(entry, this.options.appVersion));
+  }
+
+  /** Remembers a project whose content needs a newer app, then rethrows. */
+  private noteFormat(id: string, error: unknown): never {
+    if (error instanceof UnsupportedFormatError) {
+      this.newerFormat.add(id);
+      this.emit();
+    }
+    throw error;
+  }
+
   /** A project's content source, with its version floor when its source is the official one. */
   private contentOf(id: string): ContentSource {
     const entry = this.projectEntry(id);
@@ -217,6 +237,11 @@ export class Game {
     await this.options.projects.catalog.refresh().catch(() => false);
     await this.loadCatalog().catch(() => {});
     this.emit();
+  }
+
+  private activeProjectNeedsUpdate(): boolean {
+    const active = this.activeProject();
+    return this.options.projects !== undefined && active !== null && this.needsUpdate(active);
   }
 
   /** A game belongs to one project from its start: a catalog that later names another starter does not move it. */
@@ -371,6 +396,9 @@ export class Game {
       queues: this.queues(),
       projectsUnlocked: rules.projectsUnlocked(this.state) || (this.options.devShowProjects ?? false),
       projects: this.projectCards(),
+      projectNeedsUpdate: this.activeProjectNeedsUpdate(),
+      // Nothing played yet: the game cannot start at all.
+      starterNeedsUpdate: this.state.tickets.length === 0 && Object.keys(this.state.otherProjects).length === 0 && this.activeProjectNeedsUpdate(),
       projectSwitchLeft: this.state.projectSwitch ? this.leftovers : null,
       titles: this.titles,
       hintsTotal: this.hintsTotal,
@@ -553,6 +581,9 @@ export class Game {
     if (!projects || !this.catalog.some((item) => item.id === to)) {
       throw new GameError('unknownProject', `${to} is not in the projects catalog`);
     }
+    if (this.needsUpdate(to)) {
+      throw new GameError('appTooOld', `${to} needs a newer version of Bug Detective`);
+    }
     const from = this.activeProject()!;
     this.apply((state, ctx) => {
       rules.beginSwitch(state, from, to, ctx);
@@ -563,7 +594,9 @@ export class Game {
       this.appendLog(`» Downloading ${to}`);
       let content: ProjectContent;
       try {
-        content = await this.contentOf(to).prepare();
+        content = await this.contentOf(to)
+          .prepare()
+          .catch((error: unknown) => this.noteFormat(to, error));
       } catch (error) {
         throw contentError(error);
       }
@@ -600,7 +633,10 @@ export class Game {
     for (const id of this.otherProjectIds()) {
       const content = await this.contentOf(id)
         .prepare()
-        .catch(() => null);
+        .catch((error: unknown) => {
+          if (error instanceof UnsupportedFormatError) this.newerFormat.add(id);
+          return null;
+        });
       if (content) {
         this.projectInfo.set(id, content);
       }
@@ -614,7 +650,14 @@ export class Game {
       return null;
     }
     const active = this.activeProject();
-    return this.catalog.map((item): ProjectCard => {
+    // The catalog's projects, without hidden ones nobody played here, then played projects that left the catalog.
+    const played = (id: string) => id === active || this.state.otherProjects[id] !== undefined || this.state.projectSources[id] !== undefined;
+    const ids = [
+      ...this.catalog.filter((item) => !item.hidden || played(item.id)).map((item) => item.id),
+      ...[...Object.keys(this.state.otherProjects), active ?? ''].filter((id) => id && !this.catalog.some((item) => item.id === id)),
+    ];
+    return [...new Set(ids)].map((id): ProjectCard => {
+      const item = { id };
       const content = item.id === active ? this.content : (this.projectInfo.get(item.id) ?? null);
       let details: ProjectCard['details'] = null;
       if (content) {
@@ -630,6 +673,7 @@ export class Game {
         played: progress !== null && progress.tickets.length > 0,
         details,
         progress: progress?.tracks ? { front: { done: done('front'), total: progress.tracks.front }, back: { done: done('back'), total: progress.tracks.back } } : null,
+        unavailable: this.needsUpdate(item.id) ? 'appTooOld' : null,
       };
     });
   }

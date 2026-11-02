@@ -29,6 +29,7 @@
     "contentFailed": "Could not load the ticket."
   },
   "checklist": {
+    "starterNeedsUpdate": "Update Bug Detective to start playing. The first project needs a newer version of the app.",
     "title": "Before you start",
     "intro": "Bug Detective runs SupportDesk in Docker and opens it in your own VS Code. Let's check that everything is installed.",
     "allOk": "Everything is ready.",
@@ -75,6 +76,7 @@
     "install": "Download and install"
   },
   "dashboard": {
+    "projectNeedsUpdate": "Update Bug Detective: this project needs a newer version of the app. You can keep playing with what is already downloaded.",
     "inbox": "Inbox",
     "inboxCount": "{{count}} total",
     "unread": "unread",
@@ -566,12 +568,14 @@
     "switchIncomplete": "The project switch is not finished: {{message}}",
     "otherProjectsLeft": "Docker still has another project: {{message}}",
     "unknownProject": "That project is not available.",
+    "appTooOld": "This project needs a newer version of Bug Detective. Update the app to play it.",
     "reviewUnavailable": "This PR was made before you switched projects, so it can only be reviewed in the app.",
     "sameProject": "This is already your project.",
     "switchInProgress": "Finish the current project switch first.",
     "contentNeedsInternet": "Connect to the internet to download the project."
   },
   "projects": {
+    "needsUpdate": "Update Bug Detective to play this project.",
     "title": "Projects",
     "intro": "Pick your next project. Only one project stays on your computer: switching removes the current one from Docker and downloads the next. Your progress and PRs are kept.",
     "active": "In progress",

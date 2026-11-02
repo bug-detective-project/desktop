@@ -29,6 +29,7 @@
     "contentFailed": "Não foi possível carregar o ticket."
   },
   "checklist": {
+    "starterNeedsUpdate": "Atualize o Bug Detective para começar a jogar. O primeiro projeto precisa de uma versão mais nova do app.",
     "title": "Antes de começar",
     "intro": "O Bug Detective roda o SupportDesk no Docker e o abre no seu próprio VS Code. Vamos verificar se está tudo instalado.",
     "allOk": "Está tudo pronto.",
@@ -75,6 +76,7 @@
     "install": "Baixar e instalar"
   },
   "dashboard": {
+    "projectNeedsUpdate": "Atualize o Bug Detective: este projeto precisa de uma versão mais nova do app. Você pode continuar jogando com o que já foi baixado.",
     "inbox": "Caixa de entrada",
     "inboxCount": "{{count}} no total",
     "unread": "não lida",
@@ -566,12 +568,14 @@
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
     "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",
     "unknownProject": "Esse projeto não está disponível.",
+    "appTooOld": "Este projeto precisa de uma versão mais nova do Bug Detective. Atualize o app para jogar.",
     "reviewUnavailable": "Este PR foi feito antes da troca de projeto, então só pode ser revisto no app.",
     "sameProject": "Este já é o seu projeto.",
     "switchInProgress": "Termine a troca de projeto atual primeiro.",
     "contentNeedsInternet": "Conecte-se à internet para baixar o projeto."
   },
   "projects": {
+    "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",
     "title": "Projetos",
     "intro": "Escolha o seu próximo projeto. Só um projeto fica no seu computador: trocar remove o atual do Docker e baixa o próximo. O seu progresso e os seus PRs ficam guardados.",
     "active": "Em andamento",

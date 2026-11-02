@@ -4,7 +4,7 @@ import type { CheckResult, ExternalLink, Snapshot } from '@shared/api.ts';
 import logo from '../assets/logo.png';
 import { api } from '../api.ts';
 import { Icon } from '../components/icons.tsx';
-import { Button, Card, StatusIcon } from '../components/ui.tsx';
+import { Button, Card, Notice, StatusIcon } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
 const LINKS: Record<CheckResult['id'], ExternalLink> = {
@@ -86,6 +86,11 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
           );
         })}
       </Card>
+      {snapshot.starterNeedsUpdate && (
+        <Notice tone="danger" data-testid="starter-needs-update">
+          {t('checklist.starterNeedsUpdate')}
+        </Notice>
+      )}
       <div className="flex items-center justify-between">
         <Button busy={busy === 'check'} onClick={() => run('check', () => api.checkPrerequisites())} data-testid="check-again">
           {t('common.checkAgain')}
@@ -94,7 +99,7 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
           {report?.allOk && <span className="flex items-center gap-1.5 text-base font-medium text-emerald-600 dark:text-emerald-400">
               <Icon name="checkCircle" /> {t('checklist.allOk')}
             </span>}
-          <Button variant="primary" disabled={!report?.allOk} onClick={onContinue} data-testid="start-playing">
+          <Button variant="primary" disabled={!report?.allOk || snapshot.starterNeedsUpdate} onClick={onContinue} data-testid="start-playing">
             {t('checklist.continue')}
             <Icon name="arrowRight" />
           </Button>

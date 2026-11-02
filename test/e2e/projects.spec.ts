@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { dragCard, launch, startFirstTicket, takeNextTicket } from './fixtures.ts';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { dragCard, launch, startFirstTicket, supportdeskQa, takeNextTicket } from './fixtures.ts';
 
 /** Plays an unlocked ticket to Done with the fake QA passing. */
 async function finish(page: Page, ticket: number) {
@@ -40,3 +43,68 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     await close();
   }
 });
+
+const supportdesk = { id: 'supportdesk', qaDir: supportdeskQa, starter: true };
+// A second project that is never downloaded in these tests (its folder does not exist).
+const inventory = { id: 'inventory', qaDir: '/nonexistent/inventory-qa' };
+const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
+
+test('a project that needs a newer app says so, and cannot be chosen', async () => {
+  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdesk, { ...inventory, minAppVersion: '99.0.0' }] });
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('nav-projects').click();
+    const card = page.getByTestId('project-inventory');
+    await expect(card.getByTestId('project-needs-update')).toHaveText('Update Bug Detective to play this project.');
+    await expect(card.getByTestId('switch-inventory')).toBeDisabled();
+    await expect(page.getByTestId('project-supportdesk').getByTestId('project-needs-update')).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});
+
+test('a hidden project does not show on the Projects screen', async () => {
+  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdesk, { ...inventory, hidden: true }] });
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('nav-projects').click();
+    await expect(page.getByTestId('project-supportdesk')).toBeVisible();
+    await expect(page.getByTestId('project-inventory')).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});
+
+test('a new game whose first project needs a newer app cannot start', async () => {
+  const { page, close } = await launch({}, { catalog: [{ ...supportdesk, minAppVersion: '99.0.0' }] });
+  try {
+    await expect(page.getByTestId('starter-needs-update')).toHaveText('Update Bug Detective to start playing. The first project needs a newer version of the app.');
+    await expect(page.getByTestId('start-playing')).toBeDisabled();
+  } finally {
+    await close();
+  }
+});
+
+test('a game in progress whose project now needs a newer app shows a notice and goes on', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+  try {
+    const first = await launch({}, { userData });
+    try {
+      await startFirstTicket(first.page);
+    } finally {
+      await first.close();
+    }
+    const second = await launch({}, { userData, catalog: [{ ...supportdesk, minAppVersion: '99.0.0' }] });
+    try {
+      await second.page.getByTestId('nav-dashboard').click();
+      await expect(second.page.getByTestId('project-needs-update')).toContainText('Update Bug Detective: this project needs a newer version of the app.');
+      await second.page.getByTestId('nav-board').click();
+      await expect(second.page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo');
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await rm(userData, { recursive: true, force: true });
+  }
+});
+

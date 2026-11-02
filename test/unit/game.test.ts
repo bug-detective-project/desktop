@@ -9,7 +9,7 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import type { ResolvedProject } from '../../src/main/services/catalog.ts';
 import type { ContentSource, ProjectContent } from '../../src/main/services/content/source.ts';
-import { IncompletePublicationError, TicketNotPublishedError, readZip } from '@bug-detective/catalog/contract';
+import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, readZip } from '@bug-detective/catalog/contract';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
@@ -729,6 +729,7 @@ describe('Game with several projects', () => {
     };
     const sources: { id: string; repository: string; minVersion: string | null }[] = [];
     const versions: Record<string, string> = {};
+    const broken: Record<string, Error> = {};
     const catalog = fakeCatalog([
       { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
       { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
@@ -743,6 +744,10 @@ describe('Game with several projects', () => {
           catalog,
           content: (project, minVersion) => {
             sources.push({ id: project.id, repository: project.repository, minVersion });
+            if (broken[project.id]) {
+              const error = broken[project.id];
+              return { kind: 'github', describe: () => project.id, prepare: () => Promise.reject(error), current: async () => null, fetchTicket: () => Promise.reject(error) };
+            }
             return withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
           },
           packages: (id) => new PackageStore(join(dir, 'projects', id, 'packages')),
@@ -752,7 +757,7 @@ describe('Game with several projects', () => {
         appVersion: '0.1.0',
         versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
       });
-    return { make, runtime, catalog, sources, versions };
+    return { make, runtime, catalog, sources, versions, broken };
   }
 
   async function finishFirstTicket(game: Game) {
@@ -981,6 +986,73 @@ describe('Game with several projects', () => {
     const { token } = await game.inspectSave(file, 'progress.bdsave');
     await game.restoreProgress(token);
     expect(game.current.projectSources.first.minVersion).toBe('1.2.0');
+  });
+
+  it('marks a project that needs a newer app, and refuses to switch to it', async () => {
+    const { make, catalog } = await twoProjects();
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, minAppVersion: '99.0.0' }]);
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    expect(game.snapshot().projects?.map((card) => [card.id, card.unavailable])).toEqual([['first', null], ['second', 'appTooOld']]);
+    await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'appTooOld' });
+    expect(game.current.project).toBe('first');
+  });
+
+  it('marks a project whose content format is newer than this app understands', async () => {
+    const { make, broken } = await twoProjects();
+    broken.second = new UnsupportedFormatError(2);
+    const game = make();
+    await game.init();
+    await game.loadProjects();
+    expect(game.snapshot().projects?.find((card) => card.id === 'second')?.unavailable).toBe('appTooOld');
+  });
+
+  it('hides a hidden project, unless the player already played it', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true }]);
+    await game.loadProjects();
+    expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first']);
+
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    await game.loadProjects();
+    await finishFirstTicket(game);
+    await game.switchProject('second');
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true }]);
+    await game.loadProjects();
+    expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first', 'second']);
+  });
+
+  it('keeps a played project on the Projects screen after it leaves the catalog', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await finishFirstTicket(game);
+    await game.switchProject('second');
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }]);
+    await game.loadProjects();
+    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([['first', false], ['second', true]]);
+  });
+
+  it('tells a new game that its starter project needs a newer app', async () => {
+    const { make, catalog } = await twoProjects();
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    const game = make();
+    await game.init();
+    expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: true, projectNeedsUpdate: true });
+  });
+
+  it('tells a game in progress that its project now needs a newer app', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    await game.nextAssignment('front');
+    expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: false, projectNeedsUpdate: false });
+    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    await game.refreshCatalog();
+    expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: false, projectNeedsUpdate: true });
   });
 
   it('shows a project the catalog adds after a refresh', async () => {
