@@ -612,7 +612,11 @@
     "sameProject": "This is already your project.",
     "switchInProgress": "Finish the current project switch first.",
     "contentNeedsInternet": "Connect to the internet to download the project.",
-    "invalidCatalogSettings": "These settings were not saved: {{message}}"
+    "invalidCatalogSettings": "These settings were not saved: {{message}}",
+    "invalidInput": "The app received an invalid request: {{message}}",
+    "noMoreTickets": "There are no more tickets in this track.",
+    "noSuchTicket": "That ticket does not exist.",
+    "notAllowed": "This action is not allowed here."
   },
   "projects": {
     "needsUpdate": "Update Bug Detective to play this project.",

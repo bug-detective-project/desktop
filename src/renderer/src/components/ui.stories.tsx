@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect, within } from 'storybook/test';
 import { Icon } from './icons.tsx';
 import { Badge, Button, Card, LogView, Modal, Notice, SectionTitle, Spinner, StagePill, StatusIcon, Tabs, Tooltip, TrackBadge } from './ui.tsx';
 
@@ -105,6 +106,15 @@ export const DialogNormal: Story = {
       <p>The progress in this file replaces the current one.</p>
     </Modal>
   ),
+};
+
+/** The close button is named in the app's language. */
+export const DialogInPortuguese: Story = {
+  ...DialogNormal,
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement.ownerDocument.body).getByRole('button', { name: 'Fechar' })).toBeVisible();
+  },
 };
 
 export const DialogWithoutClose: Story = {

@@ -230,6 +230,7 @@ export function Modal({
   size?: 'normal' | 'large';
   'data-testid'?: string;
 }) {
+  const { t } = useTranslation();
   const box = size === 'large' ? 'flex h-[80vh] w-[80vw] max-w-[1100px] flex-col' : 'w-full max-w-lg';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" role="dialog" aria-modal aria-label={title} {...props}>
@@ -240,7 +241,7 @@ export function Modal({
             {title}
           </h2>
           {onClose && (
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t('common.close')}>
               <Icon name="x" />
             </button>
           )}

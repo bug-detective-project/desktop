@@ -612,7 +612,11 @@
     "sameProject": "Este já é o seu projeto.",
     "switchInProgress": "Termine a troca de projeto atual primeiro.",
     "contentNeedsInternet": "Conecte-se à internet para baixar o projeto.",
-    "invalidCatalogSettings": "Estas configurações não foram salvas: {{message}}"
+    "invalidCatalogSettings": "Estas configurações não foram salvas: {{message}}",
+    "invalidInput": "O app recebeu um pedido inválido: {{message}}",
+    "noMoreTickets": "Não há mais tickets nesta trilha.",
+    "noSuchTicket": "Esse ticket não existe.",
+    "notAllowed": "Esta ação não é permitida aqui."
   },
   "projects": {
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",

@@ -10,6 +10,7 @@ import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
 import type { DevCatalogOptions } from './game.ts';
 import { channelName, registerIpc } from './ipc.ts';
+import { startupErrorText } from './startup-error.ts';
 import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
@@ -242,12 +243,12 @@ async function main(): Promise<void> {
 // A failed start (a game saved by a newer version, an invalid catalog.local.json, ...) must not
 // leave the process running without a window: say why, then quit.
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
+  const { title, body } = startupErrorText(app.getLocale(), error);
   if (isE2E) {
     // Nobody is there to close a dialog: the e2e tests read the reason from stderr.
-    console.error(`Bug Detective could not start: ${message}`);
+    console.error(`${title}: ${body}`);
   } else {
-    dialog.showErrorBox('Bug Detective could not start', message);
+    dialog.showErrorBox(title, body);
   }
   app.quit();
 });
