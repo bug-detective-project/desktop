@@ -18,7 +18,7 @@ export async function gitArchive(runner: CommandRunner, git: string, repoPath: s
 /**
  * The ref of a ticket branch: the local `<id>`, or `origin/<id>` in a fresh clone (where git
  * creates only the default branch locally). The ticket branches are published content: they are
- * built by the qa branch's scripts/build-tickets.sh, never by hand.
+ * built by `npx bd build` in the qa worktree (the catalog's CLI), never by hand.
  */
 export async function resolveBranchRef(runner: CommandRunner, git: string, repoPath: string, branch: string): Promise<string> {
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
@@ -30,7 +30,7 @@ export async function resolveBranchRef(runner: CommandRunner, git: string, repoP
     }
   }
   throw new Error(
-    `${repoPath} has no ${branch} branch (neither local nor origin/${branch}). Run "git -C ${repoPath} fetch origin"; build the ticket branches with scripts/build-tickets.sh.`,
+    `${repoPath} has no ${branch} branch (neither local nor origin/${branch}). Run "git -C ${repoPath} fetch origin"; ticket branches are built by "npx bd build" in the qa worktree.`,
   );
 }
 
