@@ -407,7 +407,8 @@
       "preferences": "Preferences",
       "environment": "Developer tools & status",
       "backup": "Progress & backup",
-      "about": "About Bug Detective"
+      "about": "About Bug Detective",
+      "development": "Development"
     },
     "language": "Language",
     "languageHelp": "Changes the app and the directives you receive from management.",
@@ -548,6 +549,34 @@
       },
       "gameKept": "Your progress was kept: the volume with your code could not be removed.",
       "gameReset": "A new game has started."
+    },
+    "dev": {
+      "title": "Development",
+      "help": "Where this copy of the app reads its projects from. Saved in {{file}}; editing that file by hand is the same.",
+      "testFile": "BUGDETECTIVE_CATALOG_FILE is set, so it decides the catalog and these settings cannot be applied.",
+      "error": "The settings file could not be used: {{message}}. Apply to replace it.",
+      "source": "Projects catalog",
+      "sourceHelp": "The list of projects the app offers.",
+      "sources": {
+        "official": "Official",
+        "github": "GitHub",
+        "file": "Local file"
+      },
+      "repository": "Repository",
+      "branch": "Branch",
+      "choose": "Choose…",
+      "projects": "Projects",
+      "projectsHelp": "Where each project of the catalog in use gets its tickets and story.",
+      "projectSources": {
+        "published": "Published ({{ref}})",
+        "ref": "Other qa ref",
+        "folder": "Local folder"
+      },
+      "inUse": "Catalog in use:",
+      "apply": "Apply",
+      "reset": "Restore defaults",
+      "applied": "Development settings applied.",
+      "nextTicket": "Changes apply from the next ticket. The open ticket keeps the version it was unlocked with."
     }
   },
   "errors": {

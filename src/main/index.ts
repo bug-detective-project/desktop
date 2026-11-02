@@ -50,13 +50,19 @@ const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E
 /**
  * Development only: desktop/catalog.local.json may point at another projects catalog (a branch of
  * the catalog repository, or a file) and override a project's qa ref or folder. The tests use
- * BUGDETECTIVE_CATALOG_FILE instead. The installed app always reads the official catalog.
+ * BUGDETECTIVE_CATALOG_FILE instead. The installed app always reads the official catalog. An
+ * invalid file reads as the defaults, and Settings → Development shows why.
  */
 function localCatalog(file: string): LocalCatalog | null {
   if (app.isPackaged || !existsSync(file)) {
     return null;
   }
-  return parseLocalCatalog(JSON.parse(readFileSync(file, 'utf8')));
+  try {
+    return parseLocalCatalog(JSON.parse(readFileSync(file, 'utf8')));
+  } catch (error) {
+    console.log(`» ${file} ignored: ${(error as Error).message}`);
+    return null;
+  }
 }
 
 /** Where Settings → Development keeps catalog.local.json; the e2e tests use their data folder, never the developer's file. */

@@ -19,15 +19,20 @@ export interface Launched {
  * come from the scenario, content comes from the local SupportDesk qa folder (../supportdesk-qa,
  * listed in a projects catalog file passed with BUGDETECTIVE_CATALOG_FILE, so the tests never
  * download). `catalog` replaces that catalog's projects; `catalogText` writes the file as is.
+ * `catalogFile: false` leaves the variable out, so the Development settings apply; `localCatalog`
+ * (an object, or text written as is) is the catalog.local.json the app starts with.
  */
 export async function launch(
   scenario: object = {},
-  options: { userData?: string; env?: Record<string, string>; catalog?: object[]; catalogText?: string } = {},
+  options: { userData?: string; env?: Record<string, string>; catalog?: object[]; catalogText?: string; catalogFile?: boolean; localCatalog?: object | string } = {},
 ): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
   const catalogFile = join(userData, 'test-catalog.json');
   await writeFile(catalogFile, options.catalogText ?? JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }));
+  if (options.localCatalog !== undefined) {
+    await writeFile(join(userData, 'catalog.local.json'), typeof options.localCatalog === 'string' ? options.localCatalog : JSON.stringify(options.localCatalog));
+  }
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
   const app = await electron.launch({
@@ -37,7 +42,7 @@ export async function launch(
       BUGDETECTIVE_E2E: '1',
       BUGDETECTIVE_USER_DATA: userData,
       BUGDETECTIVE_E2E_SCENARIO: JSON.stringify(scenario),
-      BUGDETECTIVE_CATALOG_FILE: catalogFile,
+      ...(options.catalogFile !== false && { BUGDETECTIVE_CATALOG_FILE: catalogFile }),
       ...options.env,
     },
   });

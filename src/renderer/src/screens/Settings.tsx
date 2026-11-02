@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CheckResult, DiskUsageItem, DockerCleanup, ExternalLink, SaveSummary, Snapshot } from '@shared/api.ts';
+import type { CheckResult, DevCatalogView, DiskUsageItem, DockerCleanup, ExternalLink, LocalCatalog, SaveSummary, Snapshot } from '@shared/api.ts';
 import { parseMinutes, toMinutes } from '@shared/duration.ts';
 import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, backupStatus } from '@shared/types.ts';
 import type { Language, Theme } from '@shared/types.ts';
@@ -15,12 +15,14 @@ import { ticketTitle } from '../components/ticketTitle.ts';
 import { Badge, Button, Modal, Notice } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 
-type Tab = 'preferences' | 'environment' | 'backup' | 'about';
+type Tab = 'preferences' | 'environment' | 'backup' | 'about' | 'development';
 const TABS: { id: Tab; icon: IconName }[] = [
   { id: 'preferences', icon: 'settings' },
   { id: 'environment', icon: 'server' },
   { id: 'backup', icon: 'hardDrive' },
   { id: 'about', icon: 'info' },
+  // Development only: shown when the snapshot carries the development settings.
+  { id: 'development', icon: 'code' },
 ];
 
 const THEME_ICONS: Record<Theme, IconName> = { system: 'laptop', light: 'sun', dark: 'moon' };
@@ -806,6 +808,170 @@ function About({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
+const textInput =
+  'w-full min-w-0 rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-sm text-foreground focus:ring-2 focus:ring-ring focus:outline-hidden disabled:opacity-60';
+
+type SourceKind = 'official' | 'github' | 'file';
+type ProjectSource = 'published' | 'ref' | 'folder';
+interface ProjectForm {
+  kind: ProjectSource;
+  ref: string;
+  folder: string;
+}
+
+/** The form of the development settings, from catalog.local.json. */
+function formOf(view: DevCatalogView) {
+  const { catalog, projects = {} } = view.settings;
+  const kind: SourceKind = !catalog ? 'official' : 'github' in catalog ? 'github' : 'file';
+  return {
+    kind,
+    repository: catalog && 'github' in catalog ? catalog.github : '',
+    branch: catalog && 'github' in catalog ? (catalog.branch ?? 'main') : 'main',
+    file: catalog && 'file' in catalog ? catalog.file : '',
+    projects: Object.fromEntries(
+      view.projects.map(({ id }): [string, ProjectForm] => {
+        const override = projects[id];
+        if (override && 'qaDir' in override) return [id, { kind: 'folder', ref: '', folder: override.qaDir }];
+        if (override) return [id, { kind: 'ref', ref: override.qaRef, folder: '' }];
+        return [id, { kind: 'published', ref: '', folder: '' }];
+      }),
+    ),
+  };
+}
+
+/** catalog.local.json from the form; overrides of projects outside the catalog in use stay as they were. */
+function settingsOf(view: DevCatalogView, form: ReturnType<typeof formOf>): LocalCatalog {
+  const listed = new Set(view.projects.map((item) => item.id));
+  const projects: NonNullable<LocalCatalog['projects']> = Object.fromEntries(Object.entries(view.settings.projects ?? {}).filter(([id]) => !listed.has(id)));
+  for (const [id, project] of Object.entries(form.projects)) {
+    if (project.kind === 'ref') projects[id] = { qaRef: project.ref.trim() };
+    if (project.kind === 'folder') projects[id] = { qaDir: project.folder.trim() };
+  }
+  const catalog =
+    form.kind === 'github' ? { github: form.repository.trim(), branch: form.branch.trim() || 'main' } : form.kind === 'file' ? { file: form.file.trim() } : undefined;
+  return { ...(catalog && { catalog }), ...(Object.keys(projects).length > 0 && { projects }) };
+}
+
+/** A path field with "Choose…", which opens the system dialog. */
+function PathField({ value, onChange, kind, testId, disabled }: { value: string; onChange: (value: string) => void; kind: 'file' | 'folder'; testId: string; disabled: boolean }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const choose = async () => {
+    try {
+      const path = await api.chooseDevPath(kind);
+      if (path) onChange(path);
+    } catch (error) {
+      toast.error(error);
+    }
+  };
+  return (
+    <div className="flex w-full items-center gap-2">
+      <input className={textInput} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} spellCheck={false} data-testid={testId} />
+      <Button size="sm" onClick={() => void choose()} disabled={disabled} data-testid={`${testId}-choose`}>
+        {t('settings.dev.choose')}
+      </Button>
+    </div>
+  );
+}
+
+function Development({ view }: { view: DevCatalogView }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const action = useAction();
+  const [form, setForm] = useState(() => formOf(view));
+  const locked = view.testFile;
+  const apply = (settings: LocalCatalog) =>
+    action.run('apply', async () => {
+      await api.applyDevCatalog(settings);
+      toast.info(t('settings.dev.applied'));
+    });
+  const setProject = (id: string, change: Partial<ProjectForm>) => setForm((current) => ({ ...current, projects: { ...current.projects, [id]: { ...current.projects[id], ...change } } }));
+
+  return (
+    <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-development">
+      <div className="space-y-4">
+        <PaneHeader title={t('settings.dev.title')} help={t('settings.dev.help', { file: view.file })} />
+        {locked && <Notice data-testid="dev-catalog-test-file">{t('settings.dev.testFile')}</Notice>}
+        {view.error && (
+          <Notice tone="danger" data-testid="dev-catalog-error">
+            {t('settings.dev.error', { message: view.error })}
+          </Notice>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <Row title={t('settings.dev.source')} help={t('settings.dev.sourceHelp')}>
+          <Segmented<SourceKind>
+            label={t('settings.dev.source')}
+            value={form.kind}
+            options={(['official', 'github', 'file'] as const).map((kind) => ({ value: kind, icon: null, text: t(`settings.dev.sources.${kind}`) }))}
+            onChange={(kind) => setForm((current) => ({ ...current, kind }))}
+            testId="dev-catalog-source"
+          />
+        </Row>
+        {form.kind === 'github' && (
+          <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+            <label className="space-y-1 text-sm font-medium text-muted-foreground">
+              {t('settings.dev.repository')}
+              <input className={textInput} value={form.repository} placeholder="owner/catalog" onChange={(event) => setForm((current) => ({ ...current, repository: event.target.value }))} disabled={locked} spellCheck={false} data-testid="dev-catalog-github-repository" />
+            </label>
+            <label className="space-y-1 text-sm font-medium text-muted-foreground">
+              {t('settings.dev.branch')}
+              <input className={textInput} value={form.branch} onChange={(event) => setForm((current) => ({ ...current, branch: event.target.value }))} disabled={locked} spellCheck={false} data-testid="dev-catalog-github-branch" />
+            </label>
+          </div>
+        )}
+        {form.kind === 'file' && <PathField value={form.file} onChange={(file) => setForm((current) => ({ ...current, file }))} kind="file" testId="dev-catalog-file" disabled={locked} />}
+      </div>
+
+      <div className="space-y-5">
+        <PaneHeader title={t('settings.dev.projects')} help={t('settings.dev.projectsHelp')} />
+        {view.projects.map((project) => {
+          const value = form.projects[project.id] ?? { kind: 'published', ref: '', folder: '' };
+          return (
+            <div key={project.id} className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid={`dev-project-${project.id}`}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <h3 className="font-mono text-base font-semibold text-foreground">{project.id}</h3>
+                  <p className="text-sm break-all text-muted-foreground" data-testid={`dev-project-${project.id}-source`}>
+                    {project.source}
+                  </p>
+                </div>
+                <Segmented<ProjectSource>
+                  label={project.id}
+                  value={value.kind}
+                  options={(['published', 'ref', 'folder'] as const).map((kind) => ({ value: kind, icon: null, text: t(`settings.dev.projectSources.${kind}`, { ref: project.qaRef }) }))}
+                  onChange={(kind) => setProject(project.id, { kind })}
+                  testId={`dev-project-${project.id}`}
+                />
+              </div>
+              {value.kind === 'ref' && (
+                <input className={textInput} value={value.ref} placeholder="qa-next" onChange={(event) => setProject(project.id, { ref: event.target.value })} disabled={locked} spellCheck={false} data-testid={`dev-project-${project.id}-ref`} />
+              )}
+              {value.kind === 'folder' && <PathField value={value.folder} onChange={(folder) => setProject(project.id, { folder })} kind="folder" testId={`dev-project-${project.id}-folder-path`} disabled={locked} />}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <p className="min-w-0 text-base text-muted-foreground" data-testid="dev-catalog-in-use">
+          {t('settings.dev.inUse')} <span className="font-mono text-sm break-all text-foreground">{view.inUse}</span>
+        </p>
+        <div className="flex shrink-0 gap-2">
+          <Button onClick={() => void apply({})} disabled={locked || action.busy !== null} data-testid="dev-catalog-reset">
+            {t('settings.dev.reset')}
+          </Button>
+          <Button variant="primary" onClick={() => void apply(settingsOf(view, form))} busy={action.busy === 'apply'} disabled={locked || action.busy !== null} data-testid="dev-catalog-apply">
+            {t('settings.dev.apply')}
+          </Button>
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground">{t('settings.dev.nextTicket')}</p>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 export function Settings({ snapshot }: { snapshot: Snapshot }) {
@@ -824,7 +990,7 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
       </div>
 
       <div className="mb-8 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
-        {TABS.map(({ id, icon }) => {
+        {TABS.filter(({ id }) => id !== 'development' || snapshot.devCatalog !== null).map(({ id, icon }) => {
           const active = tab === id;
           return (
             <button
@@ -857,6 +1023,8 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
       {tab === 'environment' && <Environment snapshot={snapshot} />}
       {tab === 'backup' && <Backup snapshot={snapshot} now={now} />}
       {tab === 'about' && <About snapshot={snapshot} />}
+      {/* Remounts with the settings just applied (or the file read again). */}
+      {tab === 'development' && snapshot.devCatalog && <Development key={JSON.stringify([snapshot.devCatalog.settings, snapshot.devCatalog.projects])} view={snapshot.devCatalog} />}
       {snapshot.busy === 'restoring' && <Restoring log={snapshot.log} />}
     </div>
   );
