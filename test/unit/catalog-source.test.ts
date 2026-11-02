@@ -107,6 +107,13 @@ describe('CatalogService', () => {
     expect(projects[1]).toMatchObject({ id: 'tasklist', official: false });
   });
 
+  it('reads a file catalog on the first start, before any refresh, instead of the bundled fallback', async () => {
+    const file = join(dir, 'projects.json');
+    await writeFile(file, JSON.stringify({ projects: [{ id: 'supportdesk', qaDir: 'supportdesk-qa', starter: true }] }));
+    const projects = await service(async () => { throw new Error('no network for a file'); }, { choice: { kind: 'file', path: file } }).current();
+    expect(projects[0]).toMatchObject({ id: 'supportdesk', qaDir: join(dir, 'supportdesk-qa'), official: false });
+  });
+
   it('downloads another branch of a catalog repository, never official', async () => {
     const urls: string[] = [];
     const catalog = service(async (url) => { urls.push(url); return catalogJson(project('supportdesk', { starter: true })); }, { choice: { kind: 'github', repository: 'me/catalog', branch: 'testar-x' } });

@@ -18,16 +18,16 @@ export interface Launched {
  * Launches the built app (pnpm run build) with the fake runtime: prerequisites and QA outcomes
  * come from the scenario, content comes from the local SupportDesk qa folder (../supportdesk-qa,
  * listed in a projects catalog file passed with BUGDETECTIVE_CATALOG_FILE, so the tests never
- * download). `catalog` replaces that catalog's projects.
+ * download). `catalog` replaces that catalog's projects; `catalogText` writes the file as is.
  */
 export async function launch(
   scenario: object = {},
-  options: { userData?: string; env?: Record<string, string>; catalog?: object[] } = {},
+  options: { userData?: string; env?: Record<string, string>; catalog?: object[]; catalogText?: string } = {},
 ): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
   const catalogFile = join(userData, 'test-catalog.json');
-  await writeFile(catalogFile, JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }));
+  await writeFile(catalogFile, options.catalogText ?? JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }));
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
   const app = await electron.launch({

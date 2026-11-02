@@ -163,8 +163,14 @@ export class CatalogService {
     }
   }
 
-  /** The catalog in use: the cache of this source, otherwise the bundled fallback. */
+  /**
+   * The catalog in use: the cache of this source, otherwise the bundled fallback. A file catalog
+   * is read again first: it is local, and on the first start nothing has refreshed it yet.
+   */
   async current(): Promise<ResolvedProject[]> {
+    if (this.options.choice.kind === 'file') {
+      await this.refresh();
+    }
     const cached = await readFile(this.options.cacheFile, 'utf8').then(
       (text) => JSON.parse(text) as CacheFile,
       () => null,
