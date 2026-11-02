@@ -1,0 +1,16 @@
+{
+  "name": "notes-qa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bugDetective": {
+    "project": {
+      "id": "notes",
+      "name": "Notes",
+      "difficulty": "beginner"
+    }
+  },
+  "scripts": {
+    "qa": "node run.ts"
+  }
+}

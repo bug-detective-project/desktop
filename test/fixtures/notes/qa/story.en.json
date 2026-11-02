@@ -1,0 +1,46 @@
+{
+  "client": {
+    "name": "Notes Inc.",
+    "about": "A small company that keeps notes.",
+    "contacts": "Ana",
+    "reporters": [
+      {
+        "name": "Ana",
+        "role": "Lead"
+      }
+    ]
+  },
+  "project": {
+    "name": "Notes",
+    "about": "A note-taking app.",
+    "stack": "Node.js"
+  },
+  "messages": {
+    "welcome": {
+      "subject": "Welcome to Notes",
+      "body": "Welcome to Notes."
+    },
+    "assignments": {
+      "front-1": {
+        "subject": "Ticket front-1",
+        "body": "Ticket front-1."
+      },
+      "front-2": {
+        "subject": "Ticket front-2",
+        "body": "Ticket front-2."
+      },
+      "back-1": {
+        "subject": "Ticket back-1",
+        "body": "Ticket back-1."
+      }
+    },
+    "completion": {
+      "subject": "All done",
+      "body": "All done."
+    },
+    "trackCompletion": {
+      "subject": "Track {{track}} done",
+      "body": "Track {{track}} done."
+    }
+  }
+}

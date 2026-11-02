@@ -1,0 +1,4 @@
+{
+  "exclude": ["server/data/**"],
+  "includeTests": true
+}

@@ -1,0 +1,11 @@
+{
+  "name": "notes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/dev.js",
+    "db:reset": "node server/db-reset.js",
+    "test": "node --test"
+  }
+}
