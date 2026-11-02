@@ -45,7 +45,7 @@ test/unit|integration|e2e|manual
 
 ### Getting the SupportDesk repository
 
-> **You never need to create a branch in a project listed in `content/projects.json` to run the app.** Every project is already published on GitHub (`main`, `qa`, the ticket branches and their tags), and the app downloads everything from there at run time. To run the tests or edit content, all you do is clone the repository and check out its existing `qa` branch with the two commands below. The ticket branches are created only by `scripts/build-tickets.sh` when content authors change them.
+> **You never need to create a branch in a project listed in `content/projects.json` to run the app.** Every project is already published on GitHub (`main`, `qa`, the ticket branches and their tags), and the app downloads everything from there at run time. To run the tests or edit content, all you do is clone the repository and check out its existing `qa` branch with the two commands below. The ticket branches are created only by `npx bd build` when content authors change them.
 
 SupportDesk is one public repository, `bug-detective-project/supportdesk`, with three kinds of branches:
 
@@ -73,7 +73,7 @@ To develop with that local content, copy `desktop/projects.local.example.json` t
 
 A project that only `projects.local.json` names (not in `content/projects.json`) is added to the list in development, so a local sample project can fill the Projects screen; the installed app never reads this file. Without it, `pnpm run dev` downloads every project from GitHub like the installed app. The automated tests read `../supportdesk-qa` directly and need the worktree.
 
-The tools read the ticket branches from the clone as they are: the local branch when there is one, otherwise `origin/<id>`, which `git clone` already fetched. **Never create, rename or rebuild the ticket branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `scripts/build-tickets.sh` in `supportdesk-qa/`). If a tool says a ticket branch is missing, run `git -C ../supportdesk fetch origin`. If ticket branches were created by hand, reset them to the published ones:
+The tools read the ticket branches from the clone as they are: the local branch when there is one, otherwise `origin/<id>`, which `git clone` already fetched. **Never create, rename or rebuild the ticket branches yourself:** they are the published ticket code, each a single commit, and only the content authors rebuild them (with `npx bd build` in `supportdesk-qa/`). If a tool says a ticket branch is missing, run `git -C ../supportdesk fetch origin`. If ticket branches were created by hand, reset them to the published ones:
 
 ```sh
 cd ../supportdesk
@@ -266,14 +266,9 @@ The version number comes from `package.json`. A rebuild with the same version st
 
 Each game project is one public repository in the `bug-detective-project` organization, with `main` (the app), `qa` (the QA suite and the content) and one branch per ticket. **The `qa` branch is the publication:** its `manifest.json` lists every ticket with its branch, its commit, its tag and the SHA-256 digests of its code and package. There are no GitHub Releases. The desktop app finds each project's repository in `content/projects.json`.
 
-Tickets are named `<track>-<order>`, with the tracks `front` and `back` (`front-1`, `front-2`, …, `back-1`, …). The same name is the ticket's branch, its folder `tickets/<id>/` on `qa`, and its `id` in the manifest. The number of tickets comes from those folders; nothing in the app or the scripts assumes a count. The player picks the track of each ticket in **Get next assignment ▾** (front, back, or fullstack, which alternates), so tickets are played in any order; `build-tickets.sh` makes each ticket's `gate1/` cover every other ticket.
+Tickets are named `<track>-<order>`, with the tracks `front` and `back` (`front-1`, `front-2`, …, `back-1`, …). The same name is the ticket's branch, its folder `tickets/<id>/` on `qa`, and its `id` in the manifest. The number of tickets comes from those folders; nothing in the app or the scripts assumes a count. The player picks the track of each ticket in **Get next assignment ▾** (front, back, or fullstack, which alternates), so tickets are played in any order; `bd build` makes each ticket's `gate1/` cover every other ticket.
 
-Nothing is published automatically. To publish:
-
-1. In the `qa` worktree (`../supportdesk-qa`): `scripts/build-tickets.sh` rebuilds every ticket branch from `main`, then `scripts/verify-tickets.sh` checks that each one fails Gate 2 with its bug and passes both gates after its `reference.patch`.
-2. In `desktop/`: `pnpm run publish:project --project supportdesk --version 2.0.1` (the qa folder comes from `projects.local.json`; `--qa ../supportdesk-qa` works too; add `--dry-run` to only validate and print the manifest). It checks every ticket folder (all files present, including `reference.patch`; names `front-<n>`/`back-<n>` without gaps), refuses a version that is not newer than the published one, writes `manifest.json`, tags every ticket commit that has no tag yet (`<id>-v<version>`), commits on `qa`, records the version in `content/projects.json` (adding the project, with the repository of its `origin` remote, when it is new), and prints the push command. **It never pushes.**
-3. Run the printed command in `../supportdesk`: `git push origin main qa <ticket branches> --force-with-lease && git push origin <new tags>`.
-4. Commit `content/projects.json` in `desktop/`. Until a desktop build has the new version, its app still accepts the older publication; once it has it, an older `qa` (not pushed yet, or a stale cache) is refused.
+Projects publish with `bd`, the CLI of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) (see its README): on a work branch of `qa`, `npx bd build`, `npx bd verify` and `npx bd publish --version X.Y.Z`, then a pull request into the protected `qa`, whose `project / validate` check runs `bd validate` and `bd verify`; the merge publishes and is tagged `qa-vX.Y.Z`. `pnpm run publish:project` still exists here until the app reads the catalog, but it is no longer the way to publish. Optionally, set the project's `version` in `content/projects.json` after the merge: the app already accepts newer versions, and that only raises the floor.
 
 The app downloads `archive/refs/heads/qa.zip` (the manifest and every ticket package) and then `archive/<commit>.zip` for the ticket being unlocked. It checks the manifest's project and counts, the package digest and the code digest before using anything. The tag keeps each published commit reachable after a ticket branch is force-pushed; a commit GitHub no longer has is reported as an incomplete publication.
 
