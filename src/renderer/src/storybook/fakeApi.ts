@@ -2,10 +2,12 @@
  * window.bugDetective for the stories: every method exists. A method a story sets in
  * parameters.api answers as the story wants; any other one is recorded and resolves with a
  * default (snapshot() with the story's snapshot, onSnapshot() with an unsubscribe), so a story never
- * breaks on an API call it did not plan for.
+ * breaks on an API call it did not plan for. The reads the screens make on their own (ticket
+ * content, review comparison, workspace, prerequisites, environment, disk usage) answer with the
+ * stories' data.
  */
 import type { BugDetectiveApi, Snapshot } from '@shared/api.ts';
-import { snapshotFixture } from './fixtures.ts';
+import { reviewComparisonFixture, snapshotFixture, ticketContentFixture } from './fixtures.ts';
 
 export type ApiOverrides = Partial<BugDetectiveApi>;
 export interface ApiCall {
@@ -27,8 +29,18 @@ export const fakeApi = new Proxy({} as BugDetectiveApi, {
       if (override) {
         return override(...args);
       }
-      if (method === 'snapshot') {
-        return Promise.resolve(current.snapshot ?? snapshotFixture());
+      const snapshot = current.snapshot ?? snapshotFixture();
+      const reads: Record<string, () => unknown> = {
+        snapshot: () => snapshot,
+        ticketContent: () => ticketContentFixture(),
+        reviewComparison: () => reviewComparisonFixture(),
+        workspaceStatus: () => ({ ports: { client: 5173, api: 3001 }, devServerUp: false, branch: 'player/ticket-1' }),
+        checkPrerequisites: () => snapshot.prerequisites,
+        refreshEnvironment: () => snapshot.environment,
+        diskUsage: () => [],
+      };
+      if (reads[method]) {
+        return Promise.resolve(reads[method]());
       }
       if (method === 'onSnapshot') {
         return () => {};
