@@ -20,6 +20,7 @@ import type {
   TrackQueue,
   WorkspaceStatus,
 } from '../shared/api.ts';
+import type { DevCatalogView, LocalCatalog } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
@@ -86,14 +87,28 @@ export interface GameOptions {
   autoOnboarding?: boolean;
   /** Every game project and how to reach each one's content and data (without it, the game has one project). */
   projects?: GameProjects;
+  /** Development only: Settings → Development reads and writes catalog.local.json (never set by the packaged app). */
+  devCatalog?: DevCatalogOptions;
   /** Called after every change, with the new snapshot. */
   onChange?: (snapshot: Snapshot) => void;
   clock?: () => Date;
 }
 
+/** catalog.local.json for Settings → Development (see services/catalog.ts). */
+export interface DevCatalogOptions {
+  file: string;
+  /** BUGDETECTIVE_CATALOG_FILE is set: it wins over the file. */
+  testFile: boolean;
+  read(): Promise<{ settings: LocalCatalog; error: string | null }>;
+  /** Throws for invalid settings, keeping the file. */
+  write(settings: LocalCatalog): Promise<void>;
+  /** Points the catalog at the settings' source and overrides. */
+  reconfigure(settings: LocalCatalog): void;
+}
+
 /** The projects catalog (see services/catalog.ts), with each project's content source and data folders. */
 export interface GameProjects {
-  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean> };
+  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean>; describe?(): string };
   /** The content source of a project; minVersion is the oldest manifest version it may accept. */
   content(project: ResolvedProject, minVersion: string | null): ContentSource;
   packages(id: string): PackageStore;
@@ -144,6 +159,8 @@ export class Game {
   private newerFormat = new Set<string>();
   /** What Docker still holds of other projects, after the last cleanup. */
   private leftovers: CleanupTarget[] = [];
+  /** Development only: catalog.local.json as last read or written. */
+  private devSettings: { settings: LocalCatalog; error: string | null } = { settings: {}, error: null };
 
   constructor(options: GameOptions) {
     this.options = options;
@@ -244,6 +261,44 @@ export class Game {
     this.emit();
   }
 
+  private devCatalogView(): DevCatalogView | null {
+    const dev = this.options.devCatalog;
+    if (!dev) {
+      return null;
+    }
+    return {
+      file: dev.file,
+      ...this.devSettings,
+      testFile: dev.testFile,
+      inUse: this.options.projects?.catalog.describe?.() ?? 'official',
+      projects: this.catalog.map((item) => ({ id: item.id, qaRef: item.qaRef, source: item.qaDir !== undefined ? `local: ${item.qaDir}` : `github: ${item.repository} (${item.qaRef})` })),
+    };
+  }
+
+  /**
+   * Development only: writes catalog.local.json, points the catalog at it and reloads it. The
+   * active project follows from the next ticket (followCatalog); the open ticket keeps its code.
+   */
+  async applyDevCatalog(settings: LocalCatalog): Promise<void> {
+    const dev = this.options.devCatalog;
+    if (!dev) {
+      throw new GameError('notAllowed', 'The development settings exist only in development');
+    }
+    this.requireNoSwitch();
+    await this.exclusive('applyingCatalog', async () => {
+      try {
+        await dev.write(settings);
+      } catch (error) {
+        this.devSettings = { ...this.devSettings, error: (error as Error).message };
+        throw new GameError('invalidCatalogSettings', (error as Error).message);
+      }
+      this.devSettings = await dev.read();
+      dev.reconfigure(this.devSettings.settings);
+    });
+    // After the exclusive task: the active project follows the new catalog only when nothing runs.
+    await this.refreshCatalog();
+  }
+
   private activeProjectNeedsUpdate(): boolean {
     const active = this.activeProject();
     return this.options.projects !== undefined && active !== null && this.needsUpdate(active);
@@ -332,6 +387,9 @@ export class Game {
       await this.options.store.save(recovered);
     }
     this.recoverReview = recovered.reviewSession !== null;
+    if (this.options.devCatalog) {
+      this.devSettings = await this.options.devCatalog.read();
+    }
     await this.loadCatalog();
     await this.pinProject();
     const active = this.activeProject();
@@ -449,6 +507,7 @@ export class Game {
       devSolveBug: this.options.devSolveBug ?? false,
       onboardingDue: (this.options.autoOnboarding ?? true) && rules.onboardingDue(this.state),
       devSkipOnboarding: this.options.devSkipOnboarding ?? false,
+      devCatalog: this.devCatalogView(),
     };
   }
 

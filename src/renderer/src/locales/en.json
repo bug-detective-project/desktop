@@ -488,7 +488,8 @@
         "cleaningDocker": "Docker is being cleaned up",
         "removingDocker": "everything is being removed from Docker",
         "solvingBug": "the bug is being solved (development)",
-        "switchingProject": "the project is being switched"
+        "switchingProject": "the project is being switched",
+        "applyingCatalog": "the development settings are being applied"
       }
     },
     "dangerZone": "Danger zone",
@@ -572,7 +573,8 @@
     "reviewUnavailable": "This PR was made before you switched projects, so it can only be reviewed in the app.",
     "sameProject": "This is already your project.",
     "switchInProgress": "Finish the current project switch first.",
-    "contentNeedsInternet": "Connect to the internet to download the project."
+    "contentNeedsInternet": "Connect to the internet to download the project.",
+    "invalidCatalogSettings": "These settings were not saved: {{message}}"
   },
   "projects": {
     "needsUpdate": "Update Bug Detective to play this project.",

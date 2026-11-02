@@ -39,6 +39,26 @@ export interface DiskUsageItem {
   bytes: number | null;
 }
 
+/** desktop/catalog.local.json (development only): another projects catalog, and per-project overrides. */
+export interface LocalCatalog {
+  catalog?: { github: string; branch?: string } | { file: string };
+  projects?: Record<string, { qaDir: string } | { qaRef: string }>;
+}
+
+/** Settings → Development (development only): the settings file and the catalog it gives. */
+export interface DevCatalogView {
+  file: string;
+  settings: LocalCatalog;
+  /** Why the file could not be read or written; the settings shown are then the defaults. */
+  error: string | null;
+  /** BUGDETECTIVE_CATALOG_FILE is set and wins over the file: the settings cannot be applied. */
+  testFile: boolean;
+  /** The catalog source in use: official, github owner/repo@branch or file <path>. */
+  inUse: string;
+  /** The projects of the catalog in use and where each one's content comes from. */
+  projects: { id: string; qaRef: string; source: string }[];
+}
+
 export type BusyTask =
   | 'unlocking'
   | 'starting'
@@ -53,6 +73,7 @@ export type BusyTask =
   | 'removingDocker'
   | 'solvingBug'
   | 'switchingProject'
+  | 'applyingCatalog'
   | null;
 
 /** Opening VS Code waits for every task except QA (it tests its own copy of the code, so the player may look meanwhile). */
@@ -176,6 +197,8 @@ export interface Snapshot {
   onboardingDue: boolean;
   /** Development only: the onboarding shows "Skip onboarding" (BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON). */
   devSkipOnboarding: boolean;
+  /** Development only: Settings → Development; null in the installed app. */
+  devCatalog: DevCatalogView | null;
 }
 
 export interface TicketContent {
@@ -262,6 +285,10 @@ export interface BugDetectiveApi {
   cleanDockerLeftovers(): Promise<DockerCleanup>;
   /** Removes everything the app created in Docker, the player's code included, and starts a new game. */
   removeDockerData(): Promise<DockerCleanup>;
+  /** Development only: writes catalog.local.json and reloads the projects catalog (from the next ticket). */
+  applyDevCatalog(settings: LocalCatalog): Promise<void>;
+  /** Development only: picks a catalog file or a project's qa folder; null when cancelled. */
+  chooseDevPath(kind: 'file' | 'folder'): Promise<string | null>;
 }
 
 export interface SaveSummary {

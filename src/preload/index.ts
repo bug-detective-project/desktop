@@ -68,6 +68,8 @@ const api: BugDetectiveApi = {
   newGame: () => call('newGame'),
   cleanDockerLeftovers: () => call('cleanDockerLeftovers'),
   removeDockerData: () => call('removeDockerData'),
+  applyDevCatalog: (settings) => call('applyDevCatalog', settings),
+  chooseDevPath: (kind) => call('chooseDevPath', kind),
 };
 
 contextBridge.exposeInMainWorld('bugDetective', api);

@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { parseCatalog } from '@bug-detective/catalog/contract';
 import type { Catalog, CatalogProject } from '@bug-detective/catalog/contract';
 import { writeFileAtomic } from './content/store.ts';
+import type { LocalCatalog } from '../../shared/api.ts';
 
 export const OFFICIAL_CATALOG_URL = 'https://raw.githubusercontent.com/bug-detective-project/catalog/main/projects.json';
 const FETCH_TIMEOUT_MS = 30_000;
@@ -35,7 +36,7 @@ export const localCatalogSchema = z
   })
   .strict();
 
-export type LocalCatalog = z.infer<typeof localCatalogSchema>;
+export type { LocalCatalog } from '../../shared/api.ts';
 export type ProjectOverride = z.infer<typeof overrideSchema>;
 
 /** desktop/catalog.local.json (development only). */
@@ -90,7 +91,7 @@ export function chooseCatalogSource(options: {
   }
   const source = options.localCatalog?.catalog;
   if (source && 'github' in source) {
-    return { kind: 'github', repository: source.github, branch: source.branch };
+    return { kind: 'github', repository: source.github, branch: source.branch ?? 'main' };
   }
   if (source) {
     return { kind: 'file', path: resolve(options.baseDir, source.file) };

@@ -8,12 +8,13 @@ import type { Snapshot } from '../shared/api.ts';
 import { attachDevToolsShortcuts, loadReactDevTools } from './devtools.ts';
 import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
+import type { DevCatalogOptions } from './game.ts';
 import { channelName, registerIpc } from './ipc.ts';
 import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
-import { CatalogService, chooseCatalogSource, parseLocalCatalog } from './services/catalog.ts';
+import { CatalogService, chooseCatalogSource, parseLocalCatalog, readLocalCatalogFile, writeLocalCatalogFile } from './services/catalog.ts';
 import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
 import { contentSourceFor } from './services/projects.ts';
 import { PackageStore } from './services/content/store.ts';
@@ -51,17 +52,21 @@ const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E
  * the catalog repository, or a file) and override a project's qa ref or folder. The tests use
  * BUGDETECTIVE_CATALOG_FILE instead. The installed app always reads the official catalog.
  */
-function localCatalog(): LocalCatalog | null {
-  const file = join(appRoot, 'catalog.local.json');
+function localCatalog(file: string): LocalCatalog | null {
   if (app.isPackaged || !existsSync(file)) {
     return null;
   }
   return parseLocalCatalog(JSON.parse(readFileSync(file, 'utf8')));
 }
 
+/** Where Settings → Development keeps catalog.local.json; the e2e tests use their data folder, never the developer's file. */
+function localCatalogFile(userData: string): string {
+  return join(isE2E ? userData : appRoot, 'catalog.local.json');
+}
+
 /** The projects catalog: downloaded at run time, cached in the data folder, with the copy bundled at build time as a fallback. */
 function catalogService(userData: string): CatalogService {
-  const local = localCatalog();
+  const local = localCatalog(localCatalogFile(userData));
   return new CatalogService({
     choice: chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: local, baseDir: appRoot }),
     overrides: local?.projects ?? {},
@@ -70,6 +75,18 @@ function catalogService(userData: string): CatalogService {
     fallbackFile: app.isPackaged ? join(process.resourcesPath, 'catalog.fallback.json') : join(appRoot, 'build', 'catalog.fallback.json'),
     log: console.log,
   });
+}
+
+/** Settings → Development: reads and writes catalog.local.json and points the catalog at it without a restart. */
+function devCatalogOptions(file: string, catalog: CatalogService): DevCatalogOptions {
+  return {
+    file,
+    testFile: Boolean(process.env.BUGDETECTIVE_CATALOG_FILE),
+    read: () => readLocalCatalogFile(file),
+    write: (settings) => writeLocalCatalogFile(file, settings),
+    reconfigure: (settings) =>
+      catalog.reconfigure(chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: settings, baseDir: appRoot }), settings.projects ?? {}),
+  };
 }
 
 const platform: Platform | null = isE2E ? null : currentPlatform();
@@ -182,6 +199,7 @@ async function main(): Promise<void> {
     devSolveBug,
     devSkipOnboarding,
     devShowProjects,
+    devCatalog: app.isPackaged ? undefined : devCatalogOptions(localCatalogFile(userData), catalog),
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
   });

@@ -12,6 +12,7 @@ import { COLUMNS, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THE
 import type { Game } from './game.ts';
 import { GameError } from './game.ts';
 import { SAVE_EXTENSION } from './services/backup.ts';
+import { localCatalogSchema } from './services/catalog.ts';
 import { DockerUnavailableError } from './services/docker.ts';
 
 // A queue position; the game checks it against the project's ticket total.
@@ -65,6 +66,8 @@ const schemas = {
   newGame: none,
   cleanDockerLeftovers: none,
   removeDockerData: none,
+  applyDevCatalog: z.tuple([localCatalogSchema]),
+  chooseDevPath: z.tuple([z.enum(['file', 'folder'])]),
 } as const;
 
 export type Channel = keyof typeof schemas;
@@ -166,6 +169,19 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     newGame: () => game.newGame(),
     cleanDockerLeftovers: () => game.cleanDockerLeftovers(),
     removeDockerData: () => game.removeDockerData(),
+    applyDevCatalog: (settings) => game.applyDevCatalog(settings),
+    chooseDevPath: async (kind) => {
+      if (!game.snapshot().devCatalog) {
+        throw new GameError('notAllowed');
+      }
+      const window = BrowserWindow.getFocusedWindow();
+      const options =
+        kind === 'file'
+          ? { title: 'Projects catalog', properties: ['openFile' as const], filters: [{ name: 'Projects catalog', extensions: ['json'] }] }
+          : { title: 'Project qa folder', properties: ['openDirectory' as const] };
+      const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
   };
 
   for (const channel of CHANNELS) {

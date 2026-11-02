@@ -4,10 +4,11 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
+import type { DevCatalogOptions, GameOptions } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
-import type { ResolvedProject } from '../../src/main/services/catalog.ts';
+import type { LocalCatalog, ResolvedProject } from '../../src/main/services/catalog.ts';
 import type { ContentSource, ProjectContent } from '../../src/main/services/content/source.ts';
 import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, readZip } from '@bug-detective/catalog/contract';
 import { PackageStore } from '../../src/main/services/content/store.ts';
@@ -742,7 +743,7 @@ describe('Game with several projects', () => {
       { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
       { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
     ]);
-    const make = () =>
+    const make = (extra: Partial<GameOptions> = {}) =>
       new Game({
         store: new StateStore(dir),
         packages: new PackageStore(join(dir, 'projects', 'first', 'packages')),
@@ -752,15 +753,15 @@ describe('Game with several projects', () => {
           catalog,
           content: (project, minVersion) => {
             sources.push({ id: project.id, repository: project.repository, minVersion });
-            if (broken[project.id]) {
-              const error = broken[project.id];
+            if (broken[project.id] || project.qaDir === '/missing') {
+              const error = broken[project.id] ?? new Error('/missing is not a qa folder');
               return { kind: 'github', describe: () => project.id, prepare: () => Promise.reject(error), current: async () => null, fetchTicket: () => Promise.reject(error) };
             }
             const source = withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
             return {
               ...source,
               fetchTicket: async (id, signal) => {
-                fetched.push(project.repository);
+                fetched.push(project.qaRef === 'qa' ? project.repository : `${project.repository}@${project.qaRef}`);
                 await gate;
                 return source.fetchTicket(id, signal);
               },
@@ -772,6 +773,7 @@ describe('Game with several projects', () => {
         runtime,
         appVersion: '0.1.0',
         versions: { electron: 'test', node: process.versions.node, chrome: 'test' },
+        ...extra,
       });
     return { make, runtime, catalog, sources, versions, broken, fetched, hold };
   }
@@ -894,6 +896,139 @@ describe('Game with several projects', () => {
     await game.acceptReview(1);
     await game.nextAssignment('front');
     expect(fetched).toEqual(['owner/first', 'owner/moved']);
+  });
+
+  /** Development settings kept in memory; applying them rebuilds the catalog from its qaRef and qaDir overrides. */
+  function fakeDevCatalog(catalog: ReturnType<typeof fakeCatalog>, initial: LocalCatalog = {}) {
+    const base: ResolvedProject[] = [
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ];
+    let stored = initial;
+    const dev = {
+      written: [] as LocalCatalog[],
+      reconfigured: [] as LocalCatalog[],
+      failWrite: null as string | null,
+      options: {
+        file: '/desktop/catalog.local.json',
+        testFile: false,
+        read: async () => ({ settings: stored, error: null }),
+        write: async (settings: LocalCatalog) => {
+          if (dev.failWrite) throw new Error(dev.failWrite);
+          dev.written.push(settings);
+          stored = settings;
+        },
+        reconfigure: (settings: LocalCatalog) => {
+          dev.reconfigured.push(settings);
+          catalog.set(
+            base.map((item) => {
+              const override = settings.projects?.[item.id];
+              if (!override) return item;
+              return 'qaDir' in override ? { ...item, qaDir: override.qaDir, official: false } : { ...item, qaRef: override.qaRef, official: false };
+            }),
+          );
+        },
+      } satisfies DevCatalogOptions,
+    };
+    return dev;
+  }
+
+  it('shows no development settings in the installed app', async () => {
+    const { make } = await twoProjects();
+    const game = make();
+    await game.init();
+    expect(game.snapshot().devCatalog).toBeNull();
+  });
+
+  it('shows the development settings and the catalog in use', async () => {
+    const { make, catalog } = await twoProjects();
+    const dev = fakeDevCatalog(catalog, { projects: { second: { qaRef: 'qa-next' } } });
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    expect(game.snapshot().devCatalog).toEqual({
+      file: '/desktop/catalog.local.json',
+      settings: { projects: { second: { qaRef: 'qa-next' } } },
+      error: null,
+      testFile: false,
+      inUse: expect.any(String),
+      projects: [
+        { id: 'first', qaRef: 'qa', source: 'github: owner/first (qa)' },
+        { id: 'second', qaRef: 'qa', source: 'github: owner/second (qa)' },
+      ],
+    });
+  });
+
+  it('applying writes the settings, reloads the catalog and takes the next ticket from the new source', async () => {
+    const { make, catalog, fetched } = await twoProjects();
+    const dev = fakeDevCatalog(catalog);
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    const settings = { projects: { first: { qaRef: 'qa-next' } } };
+    await game.applyDevCatalog(settings);
+    expect(dev.written).toEqual([settings]);
+    expect(dev.reconfigured).toEqual([settings]);
+    expect(game.snapshot().devCatalog?.settings).toEqual(settings);
+    expect(game.snapshot().devCatalog?.projects[0]).toEqual({ id: 'first', qaRef: 'qa-next', source: 'github: owner/first (qa-next)' });
+    await game.nextAssignment('front');
+    expect(fetched).toEqual(['owner/first@qa-next']);
+  });
+
+  it('applying keeps what the open ticket unlocked', async () => {
+    const { make, catalog } = await twoProjects();
+    const dev = fakeDevCatalog(catalog);
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    await game.nextAssignment('front');
+    const tickets = structuredClone(game.current.tickets);
+    await game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } });
+    expect(game.current.tickets).toEqual(tickets);
+    expect((await game.ticketContent(1, 'en')).ticketMarkdown).not.toBe('');
+  });
+
+  it('refuses to apply the development settings in the installed app, while busy or during a project switch', async () => {
+    const { make, catalog, fetched, hold, runtime } = await twoProjects();
+    await expect(make().applyDevCatalog({})).rejects.toMatchObject({ code: 'notAllowed' });
+    const dev = fakeDevCatalog(catalog);
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    const open = hold();
+    const unlocking = game.nextAssignment('front');
+    await vi.waitFor(() => expect(fetched).toHaveLength(1));
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'busy' });
+    open();
+    await unlocking;
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(1);
+    vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'volume', name: 'bugdetective-workspace' }]);
+    await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'switchIncomplete' });
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'switchIncomplete' });
+    expect(dev.written).toEqual([]);
+  });
+
+  it('reports development settings that cannot be written and applies nothing', async () => {
+    const { make, catalog } = await twoProjects();
+    const dev = fakeDevCatalog(catalog);
+    dev.failWrite = 'Invalid catalog.local.json: projects.a: Invalid input';
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'invalidCatalogSettings' });
+    expect(dev.reconfigured).toEqual([]);
+    expect(game.snapshot().devCatalog?.error).toMatch(/Invalid catalog\.local\.json/);
+  });
+
+  it('a local folder that is not a qa folder fails the next ticket, and applying the published source fixes it without a restart', async () => {
+    const { make, catalog, fetched } = await twoProjects();
+    const dev = fakeDevCatalog(catalog);
+    const game = make({ devCatalog: dev.options });
+    await game.init();
+    await game.applyDevCatalog({ projects: { first: { qaDir: '/missing' } } });
+    await expect(game.nextAssignment('front')).rejects.toThrow(/missing/);
+    await game.applyDevCatalog({});
+    await game.nextAssignment('front');
+    expect(fetched.at(-1)).toBe('owner/first');
+    expect(game.current.tickets).toHaveLength(1);
   });
 
   it('starts a new game in the starter of the catalog in use', async () => {

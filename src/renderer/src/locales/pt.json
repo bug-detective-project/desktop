@@ -488,7 +488,8 @@
         "cleaningDocker": "o Docker está sendo limpo",
         "removingDocker": "tudo está sendo removido do Docker",
         "solvingBug": "o bug está sendo resolvido (desenvolvimento)",
-        "switchingProject": "o projeto está sendo trocado"
+        "switchingProject": "o projeto está sendo trocado",
+        "applyingCatalog": "as configurações de desenvolvimento estão sendo aplicadas"
       }
     },
     "dangerZone": "Zona de perigo",
@@ -572,7 +573,8 @@
     "reviewUnavailable": "Este PR foi feito antes da troca de projeto, então só pode ser revisto no app.",
     "sameProject": "Este já é o seu projeto.",
     "switchInProgress": "Termine a troca de projeto atual primeiro.",
-    "contentNeedsInternet": "Conecte-se à internet para baixar o projeto."
+    "contentNeedsInternet": "Conecte-se à internet para baixar o projeto.",
+    "invalidCatalogSettings": "Estas configurações não foram salvas: {{message}}"
   },
   "projects": {
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",
