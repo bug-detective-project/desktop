@@ -209,7 +209,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('nav-settings').click();
   await page.getByTestId('settings-tab-backup').click();
   await page.getByTestId('export-progress').click();
-  await expect(page.getByTestId('toast-info')).toContainText('Progress saved', { timeout: 120_000 });
+  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress saved' })).toBeVisible({ timeout: 120_000 });
   const head = docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
   docker('rm', '--force', CONTAINER);
   docker('volume', 'rm', 'bugdetective-workspace');
@@ -218,7 +218,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('restore-progress').click();
   await expect(page.getByTestId('restore-warning')).toBeVisible();
   await page.getByTestId('confirm-restore').click();
-  await expect(page.getByTestId('toast-info').last()).toContainText('Progress restored', { timeout: 5 * 60_000 });
+  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress restored' })).toBeVisible({ timeout: 5 * 60_000 });
   expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
   expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
     /player\/ticket-1[\s\S]*player\/ticket-4/,
