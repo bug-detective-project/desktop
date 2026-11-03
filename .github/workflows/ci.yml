@@ -1,10 +1,12 @@
 name: ci
 
-# Every push and pull request runs the fast layer (typecheck, lint, unit tests, stories).
-# Pull requests into main also run the heavy layer: the integration tests on real Docker and the
-# e2e tests on Electron under Xvfb. Every action is pinned by commit hash (tools/check-action-pins.mjs).
+# Pull requests into main run the fast layer (typecheck, lint, unit tests, stories) and the heavy
+# layer (integration tests on real Docker, e2e tests on Electron under Xvfb); pushes to main run the
+# fast layer again. Work branches run only through their pull request, so one push never starts two
+# runs. Every action is pinned by commit hash (tools/check-action-pins.mjs).
 on:
   push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:

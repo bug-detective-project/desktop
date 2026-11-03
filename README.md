@@ -194,8 +194,8 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Job | When | What |
 | --- | --- | --- |
-| `fast` | every push, every pull request | `check:action-pins`, typecheck, lint, unit tests, stories (Chromium) |
-| `heavy` | pull requests into `main` (and by hand) | integration tests on the runner's Docker, e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
+| `fast` | every pull request into `main`, every push to `main` | `check:action-pins`, typecheck, lint, unit tests and stories (Chromium) with the coverage floor |
+| `heavy` | pull requests into `main` (and by hand) | unit tests, stories and integration tests on the runner's Docker with the full coverage floor, then the e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
 
 Every action in the workflows is pinned by commit hash (`uses: owner/repo@<40 hex> # vX.Y.Z`); `pnpm run check:action-pins` (`tools/check-action-pins.mjs`) fails otherwise, and Dependabot (`.github/dependabot.yml`) opens a pull request when an action has a new version. To pin a new action: `git ls-remote --tags https://github.com/<owner>/<repo> 'refs/tags/<tag>^{}'`.
 
