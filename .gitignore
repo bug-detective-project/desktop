@@ -20,3 +20,5 @@ catalog.local.json
 # Storybook build and coverage reports.
 storybook-static/
 coverage/
+# Logs of the pull request gate (tools/open-pr.sh).
+pr-gate/

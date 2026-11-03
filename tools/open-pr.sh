@@ -6,12 +6,13 @@
 #
 #   desktop/tools/open-pr.sh --title "<type>(<scope>): <subject>" --body-file <file>
 #
-# Logs stay in test-results/pr-gate/. Set BUGDETECTIVE_INSTALLED_EXE on the Windows side
+# Logs stay in pr-gate/ (git-ignored; never under test-results/, which Playwright empties when a
+# suite starts). Set BUGDETECTIVE_INSTALLED_EXE on the Windows side
 # (BD_WIN_ENV="BUGDETECTIVE_INSTALLED_EXE=...") to include the installed-app spec.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
-logs="$here/test-results/pr-gate"
+logs="$here/pr-gate"
 mkdir -p "$logs"
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -29,10 +30,11 @@ run_gate() {
   local name=$1
   shift
   echo "== $name ($(date -u +%H:%M:%S))"
+  mkdir -p "$logs"
   if "$here/tools/win.sh" "$@" > "$logs/$name.log" 2>&1; then
-    echo "   passed; log: test-results/pr-gate/$name.log"
+    echo "   passed; log: pr-gate/$name.log"
   else
-    echo "   FAILED; log: test-results/pr-gate/$name.log" >&2
+    echo "   FAILED; log: pr-gate/$name.log" >&2
     tail -n 40 "$logs/$name.log" >&2
     exit 1
   fi
