@@ -56,6 +56,8 @@ jobs:
         run: |
           ref=$(node --input-type=module -e "const m = await import('./test/e2e/supportdesk-version.ts'); console.log(m.SUPPORTDESK_QA_REF)")
           git clone --quiet --branch "$ref" https://github.com/bug-detective-project/supportdesk.git ../supportdesk-qa
+      - name: Chromium for the stories (vitest browser mode)
+        run: pnpm exec playwright install --with-deps chromium
       - name: Electron binary and the libraries it needs under Xvfb
         run: |
           pnpm run electron:install

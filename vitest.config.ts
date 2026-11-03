@@ -36,6 +36,8 @@ export default defineConfig({
           name: 'unit',
           include: ['test/unit/**/*.test.ts'],
           environment: 'node',
+          // Some tests build git repositories and play whole tickets: slow on a loaded CI runner.
+          testTimeout: 30_000,
         },
       },
       {

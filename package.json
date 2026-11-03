@@ -27,6 +27,7 @@
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project stories",
     "test:coverage": "vitest run --project unit --project stories --coverage",
+    "pretest:coverage:full": "pnpm run prepare:resources",
     "test:coverage:full": "vitest run --project unit --project stories --project integration --coverage",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",
