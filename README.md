@@ -188,6 +188,27 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |
 | `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
 
+### Coverage
+
+Measured on 2026-11-02 with `pnpm run test:coverage` (unit tests and stories, 412 + 90 tests); run it
+again for the current numbers (HTML report in `coverage/index.html`).
+
+| Area | Lines | Branches |
+| --- | --- | --- |
+| **Total** | **67.7%** | **63.9%** |
+| `src/shared` (game rules, types) | 97.0% | 92.1% |
+| `src/main/platform` | 81.0% | 81.0% |
+| `src/main/services` | 72.7% | 68.4% |
+| `src/main` (game, IPC, runtime, entry point) | 65.9% | 59.8% |
+| `src/renderer` (components and screens) | 62.9% | 59.4% |
+| `src/preload` | 0% | 0% |
+
+What this number leaves out is covered by the other suites: the Docker layer by the integration
+tests (with them, `runtime.ts` 80%, `services/workspace.ts` 85%, `services/qa.ts` 92%,
+`services/docker.ts` 95% of lines), and the main process's entry point (`index.ts`) and the preload
+by the e2e tests, which run the built app in Electron and are not measured. The suggested floor, not
+enforced yet, is 65% of lines and 60% of branches.
+
 ## Lint and git hooks
 
 ESLint 10 with typescript-eslint, plus the React Hooks and React Refresh rules for the renderer. The toolchain lives in `tools/lint/` with its own `package.json`, because typescript-eslint needs the TypeScript JavaScript API and TypeScript 7 (the app's compiler) no longer ships it: the lint package pins TypeScript 6.0 for the parser only. It is a package of the pnpm workspace (`pnpm-workspace.yaml`), so `pnpm install` in `desktop/` installs it too, and `eslint.config.js` re-exports `tools/lint/config.js`.
@@ -261,7 +282,7 @@ The version number comes from `package.json`. A rebuild with the same version st
 | State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, validated in `services/state.ts`; a file of another schema version is kept aside as `state.corrupt-<time>.json` and a new game starts, with no migrations) |
 | Ticket packages | `%APPDATA%\Bug Detective\projects\<projectId>\packages\stage-N.zip` and `stage-N\`, by queue position (outside the Docker volume) |
 | Review data | `%APPDATA%\Bug Detective\projects\<projectId>\reviews\ticket-N\` (`review.json` and `snapshot.diff`, the approved snapshot as a diff from the ticket's commit) for every ticket that passed QA, kept for every project; included in exports |
-| Projects | The **Projects** screen (shown once a project is done) switches the active project. Only one project is in Docker: its containers, volumes and QA image carry `bugdetective.project=<id>`, and the app removes other projects' resources on start, before every install and in **Clean up Docker leftovers**. A switch is recorded in the state and resumed after a crash (**Finish the switch** on the Dashboard). Saves (format 2) hold every project's packages and PRs. |
+| Projects screen | The **Projects** screen (shown once a project is done) switches the active project. Only one project is in Docker: its containers, volumes and QA image carry `bugdetective.project=<id>`, and the app removes other projects' resources on start, before every install and in **Clean up Docker leftovers**. A switch is recorded in the state and resumed after a crash (**Finish the switch** on the Dashboard). Saves (format 3) hold every project's packages and PRs, and each played project's source and version floor. |
 | Project content | Installed app: `%APPDATA%\Bug Detective\projects\<projectId>\content\` (`qa.zip`, `code\<commit>.zip` for every ticket, `cache.json`). Filled when the app starts online with nothing downloaded and by **Download and install**; picking a ticket looks for a newer publication first and falls back to the cache offline. The first download needs the internet. |
 | Review configuration | `review.json` at the root of the project's `qa` branch, optional: `{ "exclude": ["<glob>", …], "includeTests": true }`. Built-in excludes always apply on top (dependencies, lockfiles, `*.db`, `*.sqlite*`, `dist/`, `build/`, `coverage/`, `.env*`, logs). |
 | Projects | The projects catalog: `projects.json` on the main branch of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) (`id`, `repository`, `qaRef`, `starter`, `minAppVersion`, `hidden`). The app downloads it when it starts, when a ticket is taken and when Projects opens, keeps the last valid copy in `%APPDATA%\Bug Detective\catalog.json`, and before its first download uses the copy bundled at build time (`resources\catalog.fallback.json`, downloaded by `pnpm run prepare:resources`). A new game starts with the catalog's starter and stays in its project. A project that needs a newer app (its `minAppVersion`, or a newer content `formatVersion`) shows "Update Bug Detective"; a hidden project shows only to players who played it. |
@@ -276,6 +297,8 @@ Each game project is one public repository in the `bug-detective-project` organi
 Tickets are named `<track>-<order>`, with the tracks `front` and `back` (`front-1`, `front-2`, …, `back-1`, …). The same name is the ticket's branch, its folder `tickets/<id>/` on `qa`, and its `id` in the manifest. The number of tickets comes from those folders; nothing in the app or the scripts assumes a count. The player picks the track of each ticket in **Get next assignment ▾** (front, back, or fullstack, which alternates), so tickets are played in any order; `bd build` makes each ticket's `gate1/` cover every other ticket.
 
 Projects publish with `bd`, the CLI of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) (see its README): on a work branch of `qa`, `npx bd build`, `npx bd verify` and `npx bd publish --version X.Y.Z`, then a pull request into the protected `qa`, whose `project / validate` check runs `bd validate` and `bd verify`; the merge publishes and is tagged `qa-vX.Y.Z`. Adding, hiding or reordering projects is a pull request to the catalog's `projects.json`; neither needs a new build of the app.
+
+**Adding a new project:** the whole process, from an empty repository to the Projects screen (the `main` and `qa` requirements, the QA CLI contract, the story, the tickets, playing it locally, publishing and listing it in the catalog), is in [docs/adding-a-project.md](docs/adding-a-project.md).
 
 The app downloads `archive/refs/heads/qa.zip` (the manifest and every ticket package) and then `archive/<commit>.zip` for the ticket being unlocked. It checks the manifest's project and counts, the package digest and the code digest before using anything. The tag keeps each published commit reachable after a ticket branch is force-pushed; a commit GitHub no longer has is reported as an incomplete publication.
 
