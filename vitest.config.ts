@@ -16,8 +16,10 @@ export default defineConfig({
         'src/**/*.stories.tsx',
         'src/renderer/src/storybook/**',
         'src/**/*.d.ts',
-        // Not code: the renderer's HTML entry point (the provider cannot parse it and would warn).
+        // Not code: the renderer's HTML entry point and the locale files (the provider cannot
+        // parse them and would warn).
         'src/**/*.html',
+        'src/**/*.json',
         // Only reachable inside Electron: covered by the e2e tests, which do not report coverage.
         'src/main/index.ts',
         'src/main/ipc.ts',
