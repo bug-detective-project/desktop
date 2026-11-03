@@ -1,0 +1,8 @@
+# Keeps the hash-pinned GitHub Actions current (tools/check-action-pins.mjs requires hashes).
+# No npm or docker ecosystems on purpose: dependencies and base images are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
