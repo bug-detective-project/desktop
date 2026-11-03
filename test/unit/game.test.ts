@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
 import type { DevCatalogOptions, GameOptions } from '../../src/main/game.ts';
@@ -17,13 +17,23 @@ import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
 import { unlocked } from '../helpers/tickets.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
 import type { ProjectBrief } from '../helpers/project-repo.ts';
 
-// The real SupportDesk qa folder (a worktree of its qa branch) and its ticket branches.
-const root = resolve(import.meta.dirname, '..', '..');
-const localSource = () => new LocalContentSource({ qaDir: resolve(root, '..', 'supportdesk-qa'), runner: runCommand });
+// The notes example project (test/fixtures/notes) laid out like a published project, once per file:
+// two front tickets and one back ticket, three hints each.
+let notesDir: string;
+let notesQaDir: string;
+beforeAll(async () => {
+  notesDir = await mkdtemp(join(tmpdir(), 'bd-game-notes-'));
+  notesQaDir = (await createNotesProject(notesDir)).qaDir;
+});
+afterAll(async () => {
+  await rm(notesDir, { recursive: true, force: true });
+});
+const localSource = () => new LocalContentSource({ qaDir: notesQaDir, runner: runCommand });
 
 let dir: string;
 beforeEach(async () => {
@@ -61,14 +71,14 @@ describe('Game', () => {
     await game.init();
     await game.nextAssignment();
     expect(game.current.currentTicket).toBe(1);
-    expect(game.current.tracks).toEqual({ front: 4, back: 4 });
+    expect(game.current.tracks).toEqual({ front: 2, back: 1 });
     expect(rules.findTicket(game.current, 1)).toMatchObject({ id: 'front-1', track: 'front', manifestVersion: '0.0.0' });
     expect(status(game)).toBe('todo');
-    expect(game.snapshot().titles[1].en).toMatch(/^SD-214:/);
-    expect(game.snapshot().titles[1].pt).toMatch(/^SD-214:/);
+    expect(game.snapshot().titles[1].en).toBe('An empty title shows nothing');
+    expect(game.snapshot().titles[1].pt).toBe('Um título vazio não mostra nada');
     expect(game.snapshot().hintsTotal[1]).toBe(3);
     const content = await game.ticketContent(1, 'en');
-    expect(content.ticketMarkdown).toContain('Previous');
+    expect(content.ticketMarkdown).toContain('Untitled');
     expect(content.hints).toEqual([]);
     expect(content.solutionMarkdown).toBeNull();
     expect(content.reviewMarkdown).toBeNull();
@@ -96,8 +106,8 @@ describe('Game', () => {
     const { game, runtime } = createGame();
     const setQaTool = vi.spyOn(runtime, 'setQaTool');
     await game.init();
-    expect(game.snapshot().projectStory?.en.project.name).toBe('SupportDesk');
-    expect(game.snapshot().projectStory?.pt.messages.assignments['front-1'].subject).toMatch(/SD-214/);
+    expect(game.snapshot().projectStory?.en.project.name).toBe('Notes');
+    expect(game.snapshot().projectStory?.pt.messages.assignments['front-1'].subject).toMatch(/front-1/);
     const tool = setQaTool.mock.calls.at(-1)![0]!.map((file) => file.path);
     expect(tool).toContain('run.ts');
     expect(tool.some((path) => path.startsWith('tickets/') || path === 'manifest.json' || path.startsWith('story.'))).toBe(false);
@@ -121,7 +131,7 @@ describe('Game', () => {
     expect(game.snapshot().projectStory).toBeNull();
     release(undefined);
     await game.contentLoaded();
-    expect(game.snapshot().projectStory?.en.client.name).toBe('Harborline Outfitters');
+    expect(game.snapshot().projectStory?.en.client.name).toBe('Notes Inc.');
   });
 
   it('downloads the project before installing the environment, and asks for internet the first time', async () => {
@@ -205,11 +215,11 @@ describe('Game', () => {
     const { game } = createGame();
     await game.init();
     const { queues } = game.snapshot();
-    expect(queues?.front).toMatchObject({ next: { id: 'front-1', track: 'front' }, done: 0, total: 4 });
-    expect(queues?.front.next?.title.pt).toMatch(/^SD-214:/);
-    expect(queues?.back).toMatchObject({ next: { id: 'back-1', track: 'back' }, done: 0, total: 4 });
-    expect(queues?.back.next?.title.en).toMatch(/^SD-252:/);
-    expect(queues?.fullstack).toMatchObject({ next: { id: 'front-1' }, done: 0, total: 8 });
+    expect(queues?.front).toMatchObject({ next: { id: 'front-1', track: 'front' }, done: 0, total: 2 });
+    expect(queues?.front.next?.title.pt).toBe('Um título vazio não mostra nada');
+    expect(queues?.back).toMatchObject({ next: { id: 'back-1', track: 'back' }, done: 0, total: 1 });
+    expect(queues?.back.next?.title.en).toBe('Search is case-sensitive');
+    expect(queues?.fullstack).toMatchObject({ next: { id: 'front-1' }, done: 0, total: 3 });
   });
 
   it('unlocks the next ticket of the chosen track', async () => {
@@ -217,7 +227,8 @@ describe('Game', () => {
     await game.init();
     await game.nextAssignment('back');
     expect(rules.findTicket(game.current, 1)).toMatchObject({ id: 'back-1', track: 'back' });
-    expect(game.snapshot().queues?.back.next?.id).toBe('back-2');
+    // The notes project has one back ticket: its queue has nothing left after it.
+    expect(game.snapshot().queues?.back.next).toBeNull();
     // Fullstack alternates: after a back ticket comes a front one.
     expect(game.snapshot().queues?.fullstack.next?.id).toBe('front-1');
     // The open ticket must be Done first.
@@ -250,13 +261,15 @@ describe('Game', () => {
     expect(status(game)).toBe('inProgress');
     expect(rules.findTicket(game.current, 1)!.comments.at(-1)!.kind).toBe('gate2Failed');
 
-    for (let hint = 1; hint <= 3; hint += 1) {
+    const hints = game.snapshot().hintsTotal[1]!;
+    for (let hint = 1; hint <= hints; hint += 1) {
       await game.askSenior(1);
       expect((await game.ticketContent(1, 'pt')).hints).toHaveLength(hint);
     }
+    await expect(game.askSenior(1)).rejects.toMatchObject({ code: 'noMoreHints' });
     await game.revealSolution(1);
     const revealed = await game.ticketContent(1, 'en');
-    expect(revealed.solutionMarkdown).toContain('Root cause');
+    expect(revealed.solutionMarkdown).toContain('client/notes.js');
     expect(revealed.referencePatch).toContain('diff --git');
     expect(revealed.reviewMarkdown).toBeNull();
 
@@ -264,7 +277,7 @@ describe('Game', () => {
     await game.waitForQa();
     expect(status(game)).toBe('codeReview');
     const review = await game.ticketContent(1, 'en');
-    expect(review.reviewMarkdown).toContain('Code review');
+    expect(review.reviewMarkdown).toContain('client/notes.js');
     expect(review.playerDiff).toContain('activeEmployees'); // the approved snapshot against the stage
 
     await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'ticketNotDone' });
