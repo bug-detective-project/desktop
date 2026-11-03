@@ -55,9 +55,21 @@ async function cardStatus(page: Page, ticket: number, status: string, timeout = 
   await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', status, { timeout });
 }
 
+/** Waits until Docker answers and the environment report says ready (after a restart it takes a moment). */
+async function waitForEnvironment(page: Page) {
+  await expect
+    .poll(async () => page.evaluate(async () => (await window.bugDetective.refreshEnvironment()).ready), { timeout: 3 * 60_000, intervals: [2000] })
+    .toBe(true);
+}
+
 async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'codeReview') {
   const started = Date.now();
+  await waitForEnvironment(page);
   await dragCard(page, ticket, 'inQa');
+  // The QA run must really start (a refused move bounces the card back at once).
+  await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
+  await page.waitForTimeout(3000);
+  await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
   await cardStatus(page, ticket, expected);
   log(`ticket ${ticket}: QA → ${expected} in ${((Date.now() - started) / 1000).toFixed(0)} s`);
 }
@@ -129,6 +141,7 @@ test('the full game loop with real Docker and VS Code', async () => {
       log('ticket 1: app closed during QA');
       ({ app, page } = await open(userData));
       await cardStatus(page, 1, 'inProgress', 60_000);
+      await waitForEnvironment(page);
       await page.getByTestId('card-1').click();
       await page.getByTestId('tab-qa').click();
       await expect(page.getByTestId('qa-comment').first()).toHaveAttribute('data-kind', 'interrupted');
