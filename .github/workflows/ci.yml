@@ -67,6 +67,10 @@ jobs:
       - name: Unit tests, stories and integration tests (real Docker), with the full coverage floor
         run: pnpm run test:coverage:full -- --coverage.thresholds.lines=78 --coverage.thresholds.branches=71 --coverage.thresholds.functions=69
       - name: End-to-end tests (Electron with the fake runtime, under Xvfb)
+        # The hosted runner has no setuid chrome-sandbox: Playwright passes --no-sandbox itself, and
+        # this variable covers the one test that spawns Electron directly (startup.spec.ts).
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
         run: pnpm run test:e2e:headless:linux
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
