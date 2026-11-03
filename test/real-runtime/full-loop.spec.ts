@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { dragCard } from '../e2e/fixtures.ts';
+import { dragCard, takeNextTicket } from '../e2e/fixtures.ts';
 import { finishOnboarding } from './onboarding.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -40,7 +40,12 @@ async function installEnvironment(page: Page) {
     await expect(page.getByTestId('environment-panel')).toBeVisible();
     const started = Date.now();
     await page.getByTestId('install-environment').click();
-    await expect(page.getByTestId('environment-panel')).toHaveCount(0, { timeout: 30 * 60_000 });
+    // The download runs in the install modal, which stays open with its log until "Close".
+    const modal = page.getByTestId('install-modal');
+    await expect(modal.getByTestId('install-modal-close')).toBeVisible({ timeout: 30 * 60_000 });
+    await expect(modal.getByTestId('install-modal-error')).toHaveCount(0);
+    await modal.getByTestId('install-modal-close').click();
+    await expect(page.getByTestId('environment-panel')).toHaveCount(0);
     log(`environment installed in ${((Date.now() - started) / 1000).toFixed(0)} s`);
   }
 }
@@ -80,7 +85,8 @@ test('the full game loop with real Docker and VS Code', async () => {
 
   for (let ticket = 1; ticket <= 4; ticket += 1) {
     await page.getByTestId('nav-dashboard').click();
-    await page.getByTestId('next-assignment').click();
+    // The track menu: every SupportDesk front ticket, in order.
+    await takeNextTicket(page, 'front');
     // The app switches to the board once the unlock (and its environment check) has finished.
     await expect(page.getByTestId('board')).toBeVisible({ timeout: 5 * 60_000 });
     await cardStatus(page, ticket, 'todo', 120_000);
@@ -160,7 +166,7 @@ test('the full game loop with real Docker and VS Code', async () => {
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('review-markdown')).toBeVisible();
     await expect(page.getByTestId('reference-diff')).toContainText('client/src');
-    await expect(page.getByTestId('player-diff')).toContainText('client/src');
+    await expect(page.getByTestId('review-comparison')).toContainText('client/src');
     await page.getByTestId('accept-review').click();
     await cardStatus(page, ticket, 'done');
     log(`ticket ${ticket}: review accepted, Done`);
