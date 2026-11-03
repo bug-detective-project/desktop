@@ -178,8 +178,11 @@ test('the full game loop with real Docker and VS Code', async () => {
     await page.getByTestId(`card-${ticket}`).click();
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('review-markdown')).toBeVisible();
-    await expect(page.getByTestId('reference-diff')).toContainText('client/src');
+    // The fix applied above is the reference patch itself: the review says so and shows the
+    // player's changes against the original code; the separate reference section is left out.
+    await expect(page.getByTestId('identical-message')).toContainText('identical to the reference');
     await expect(page.getByTestId('review-comparison')).toContainText('client/src');
+    await expect(page.getByTestId('review-reference')).toHaveCount(0);
     await page.getByTestId('accept-review').click();
     await cardStatus(page, ticket, 'done');
     log(`ticket ${ticket}: review accepted, Done`);
