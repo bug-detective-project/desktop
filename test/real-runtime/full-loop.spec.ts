@@ -190,8 +190,13 @@ test('the full game loop with real Docker and VS Code', async () => {
 
   await page.getByTestId('nav-dashboard').click();
   await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'completion');
-  await expect(page.getByTestId('assignment-card')).toContainText('You finished every ticket.');
-  log('all four tickets done; completion message received');
+  // The front track is complete (the project's completion e-mail); the back track is still offered.
+  await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+  await page.getByTestId('next-assignment').click();
+  await expect(page.getByTestId('next-assignment-front')).toHaveCount(0);
+  await expect(page.getByTestId('next-assignment-back')).toBeVisible();
+  await page.keyboard.press('Escape');
+  log('all four front tickets done; completion message received, back track still offered');
 
   // Export, delete the volume, restore.
   const save = join(userData, 'export test.bdsave');
