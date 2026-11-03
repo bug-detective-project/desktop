@@ -13,6 +13,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
+import { finishOnboarding } from './onboarding.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
@@ -45,6 +46,7 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
     await expect(page.getByTestId(`check-${id}`)).toHaveAttribute('data-status', 'ok', { timeout: 60_000 });
   }
   await page.getByTestId('start-playing').click();
+  await finishOnboarding(page);
 
   const install = async () => {
     await page.getByTestId('nav-dashboard').click();

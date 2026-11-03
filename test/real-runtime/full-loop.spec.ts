@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard } from '../e2e/fixtures.ts';
+import { finishOnboarding } from './onboarding.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
@@ -74,6 +75,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   }
   log('checklist: all four prerequisites ok');
   await page.getByTestId('start-playing').click();
+  await finishOnboarding(page);
   await installEnvironment(page);
 
   for (let ticket = 1; ticket <= 4; ticket += 1) {
