@@ -31,6 +31,7 @@
     "test:coverage:full": "vitest run --project unit --project stories --project integration --coverage",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",
+    "test:real-runtime": "pnpm run build && playwright test --config playwright.real-runtime.config.ts",
     "test:e2e:headless:linux": "pnpm run build && env -u WAYLAND_DISPLAY xvfb-run -a --server-args=\"-screen 0 1600x1000x24\" playwright test",
     "dist:win": "pnpm run build && electron-builder --win nsis --publish never",
     "prepare": "husky",

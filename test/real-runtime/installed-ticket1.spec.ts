@@ -3,7 +3,7 @@
  *
  *   dist\Bug-Detective-Setup-<version>.exe /S
  *   set BUGDETECTIVE_INSTALLED_EXE=%LOCALAPPDATA%\Programs\bug-detective\Bug Detective.exe
- *   pnpm exec playwright test --config playwright.manual.config.ts installed-ticket1
+ *   pnpm run test:real-runtime installed-ticket1
  *
  * No GitHub release is published yet, so the clean profile's content-source.json points at the
  * local SupportDesk copy.

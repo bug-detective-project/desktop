@@ -1,0 +1,46 @@
+name: real-runtime
+
+# The suites that need the real runtime (Docker Desktop, VS Code, the Windows toolchain), on the
+# self-hosted Windows runner: the e2e tests on Windows and test/real-runtime (the whole game loop
+# through the real UI). They run on every push to main and every night.
+#
+# Never add pull_request here: a self-hosted runner on a public repository must not run code
+# from pull requests. Only code already merged into main runs on this machine.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never two at once: the e2e and real-runtime suites share the machine's Docker and VS Code.
+concurrency:
+  group: real-runtime
+  cancel-in-progress: false
+
+jobs:
+  real-runtime:
+    runs-on: [self-hosted, windows, bugdetective]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run electron:install
+      - name: End-to-end tests on Windows (Electron with the fake runtime)
+        run: pnpm run test:e2e
+      - name: Real-runtime suite (Docker Desktop and VS Code)
+        run: pnpm run test:real-runtime
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: real-runtime-results
+          path: test-results/
+          if-no-files-found: ignore

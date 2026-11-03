@@ -33,7 +33,7 @@ content/               company.en.json, company.pt.json (the company, its people
 tools/                 prepare-resources.ts (Docker contexts and the bundled catalog), sync-windows.sh, win.sh
 tools/lint/            the isolated ESLint toolchain (config.js, its own package.json)
 .husky/                git hooks (pre-commit, pre-push)
-test/unit|integration|e2e|manual
+test/unit|integration|e2e|real-runtime
 .storybook/            Storybook (stories in src/renderer/src/**/*.stories.tsx, run as tests too)
 renderer.config.ts     the renderer's Vite plugins and aliases, shared by the app and Storybook
 ```
@@ -186,7 +186,7 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 | `pnpm run test:integration` | Windows or Linux/WSL 2 + Docker | Real Docker and git on the `notes` example project (`test/fixtures/notes`: a Node app without dependencies, three tickets and a minimal QA CLI, laid out like a published project by `test/helpers/notes-project.ts`; its QA image has no Chromium): unlock ticket 1, QA on the buggy stage (Gate 2 fails), infinite-loop timeout, `reference.patch` applied in the workspace container (both gates pass), next stage, export/delete/restore, interrupted QA (`qa-flow`, `bugdetective-test-*` resources); the code review: approved snapshot from an uncommitted fix, review branch and its recreation, checkout and return with uncommitted/untracked/excluded files, edits on the review branch, crash recovery, a Done review, the return before QA, export/restore and a new game (`review-flow`, `bugdetective-review-test-*` resources); the Docker cleanup, leftovers and everything (`docker-cleanup`, `bugdetective-cleanup-test-*` resources and image tags of its own); the dev server: Start and Stop server, a server started from the terminal, no process left behind (`dev-server`, `bugdetective-devserver-test-*` resources). Never touches the player's resources. Run `pnpm run build` first. |
 | `pnpm run test:e2e` | Windows or Linux/WSL 2 (WSLg) | Playwright for Electron with the fake runtime, playing SupportDesk from `../supportdesk-qa` or the pinned publication (`test/e2e/global-setup.ts`; `BUGDETECTIVE_E2E_PINNED_SUPPORTDESK=1` forces the pinned one), and reading the keys, counts and texts it checks from the version in use (`test/e2e/content.ts`); a newer publication is picked up by changing `SUPPORTDESK_QA_REF` (its scenario comes from `launch()`; `simulate()` in `test/e2e/fixtures.ts` changes it while the app runs, e.g. Docker stopping or a dev server started in the terminal): first-run checklist, Rafaela's onboarding (mandatory the first time, starts over after a restart, the "?" replay, the development skip), window size (every screen fits 1280 × 640 and scrolls below it), the Dashboard (work desk states, drawer, Local environment and the dev server row), Docker banner, Kanban drag rules, ticket panel, code review (layout, file list, split diff, whitespace toggle, identical solutions, review banner, button states), language, restart, Settings tabs (versions, disk usage, QA limit, last export, locked actions) |
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |
-| `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
+| `pnpm run test:real-runtime` | Windows or Linux/WSL 2, + Docker + VS Code | `test/real-runtime`: the full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore) and, with `BUGDETECTIVE_INSTALLED_EXE`, ticket 1 on the installed app. Opens VS Code windows. In CI it runs on the self-hosted Windows runner (below). |
 
 ### Continuous integration
 
@@ -196,6 +196,18 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 | --- | --- | --- |
 | `fast` | every pull request into `main`, every push to `main` | `check:action-pins`, typecheck, lint, unit tests and stories (Chromium) with the coverage floor |
 | `heavy` | pull requests into `main` (and by hand) | unit tests, stories and integration tests on the runner's Docker with the full coverage floor, then the e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
+
+`.github/workflows/real-runtime.yml` runs what needs the real runtime on a **self-hosted Windows runner** (label `bugdetective`): `pnpm run test:e2e` with the Windows toolchain and `pnpm run test:real-runtime` (Docker Desktop and VS Code). It runs on every push to `main` and every night at 03:00 UTC, never on pull requests: a self-hosted runner on a public repository must not run code from pull requests, and `main` only changes through reviewed ones. With the machine off, the job waits in the queue and runs when it comes back; two runs never overlap. Results are uploaded as the `real-runtime-results` artifact.
+
+#### Self-hosted runner (Windows)
+
+One-time setup on the Windows machine that has Docker Desktop and VS Code:
+
+1. In the repository: Settings → Actions → Runners → New self-hosted runner → Windows. Follow the shown commands (download, `config.cmd`); when asked for labels, add `bugdetective` to the defaults.
+2. Do **not** install it as a Windows service: Docker Desktop and VS Code are per-user programs, and the tests open VS Code windows, so the runner must run in the user's session. Instead, create a Task Scheduler task "at log on" for your user that runs `run.cmd` from the runner folder (Actions → Start a program; untick "Stop the task if it runs longer than"). Log on, and the runner appears as "Idle" in Settings → Actions → Runners.
+3. The job needs nothing else installed: `actions/setup-node` provides Node.js and `pnpm/action-setup` provides pnpm on the runner.
+
+To run it by hand: Actions → real-runtime → Run workflow.
 
 Every action in the workflows is pinned by commit hash (`uses: owner/repo@<40 hex> # vX.Y.Z`); `pnpm run check:action-pins` (`tools/check-action-pins.mjs`) fails otherwise, and Dependabot (`.github/dependabot.yml`) opens a pull request when an action has a new version. To pin a new action: `git ls-remote --tags https://github.com/<owner>/<repo> 'refs/tags/<tag>^{}'`.
 
