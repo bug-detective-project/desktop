@@ -675,18 +675,26 @@ test('starting or stopping the dev server shows an error toast when it fails, an
   }
 });
 
-test('the work desk shows the ticket download in progress, with its progress bar', async () => {
+test('the ticket download runs in the install modal with its log, and the work desk shows it in progress', async () => {
   const { page, close } = await launch({ unlockDelayMs: 3000 });
   try {
     await page.getByTestId('start-playing').click();
     await takeNextTicket(page);
+    const modal = page.getByTestId('install-modal');
+    await expect(modal).toHaveAttribute('data-kind', 'ticket');
+    await expect(modal).toContainText('Downloading the ticket');
+    await expect(modal.getByTestId('install-modal-status')).toContainText("Downloading the ticket's code");
+    await expect(modal).toContainText('Fetching front-1');
+    // It cannot be closed while it runs.
+    await expect(modal.getByTestId('install-modal-close')).toHaveCount(0);
     const task = page.getByTestId('assignment-card');
     await expect(task).toHaveAttribute('data-state', 'unlocking');
     await expect(task).toContainText('Downloading and setting up the ticket');
     await expect(task.getByRole('progressbar')).toBeVisible();
     await expect(page.getByTestId('next-assignment')).toHaveCount(0);
-    // When the download ends, the app goes to the Board with the new ticket.
+    // When the download ends, the modal closes and the app goes to the Board with the new ticket.
     await expect(page.getByTestId('card-1')).toBeVisible({ timeout: 10_000 });
+    await expect(modal).toHaveCount(0);
   } finally {
     await close();
   }

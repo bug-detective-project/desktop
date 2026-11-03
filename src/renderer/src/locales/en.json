@@ -154,6 +154,11 @@
       "copy": "Copy log",
       "copied": "Log copied.",
       "close": "Close"
+    },
+    "ticketModal": {
+      "title": "Downloading the ticket",
+      "running": "Downloading the ticket's code and its package, and preparing your workspace.",
+      "done": "The ticket is ready."
     }
   },
   "onboarding": {
