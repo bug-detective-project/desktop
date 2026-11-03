@@ -1,6 +1,6 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { launch } from './fixtures.ts';
+import { launch, takeNextTicket } from './fixtures.ts';
 
 async function resize(app: ElectronApplication, page: Page, width: number, height: number): Promise<void> {
   await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h), [width, height]);
@@ -66,6 +66,25 @@ test('a failed download keeps the modal open with the error and the log until "C
     await expect(modal).toHaveCount(0);
     // Nothing was installed: the work desk still offers the download.
     await expect(page.getByTestId('environment-panel')).toHaveAttribute('data-state', 'download');
+  } finally {
+    await close();
+  }
+});
+
+test('a failed ticket download keeps the modal open with the error and the log until "Close", and the desk waits for the next assignment again', async () => {
+  const { page, close } = await launch({ unlockFails: 'network down: GitHub did not answer' });
+  try {
+    await page.getByTestId('start-playing').click();
+    await takeNextTicket(page);
+    const modal = page.getByTestId('install-modal');
+    await expect(modal).toHaveAttribute('data-kind', 'ticket');
+    await expect(modal.getByTestId('install-modal-error')).toContainText('network down');
+    await expect(modal).toContainText('Fetching front-1');
+    await expect(modal.getByTestId('install-modal-copy')).toBeVisible();
+    await modal.getByTestId('install-modal-close').click();
+    await expect(modal).toHaveCount(0);
+    await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+    await expect(page.getByTestId('next-assignment')).toBeVisible();
   } finally {
     await close();
   }

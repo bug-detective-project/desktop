@@ -37,3 +37,6 @@ export const Failed: Story = {
 };
 export const DoneInDark: Story = { args: { phase: 'done' }, globals: { theme: 'dark' } };
 export const FailedInPortuguese: Story = { ...Failed, globals: { locale: 'pt' } };
+export const TicketRunning: Story = { args: { kind: 'ticket', phase: 'running', lines: ['» Fetching front-1 from the local qa folder', '» Verified front-1 (42 files and the ticket package, SHA-256)'] } };
+export const TicketFailed: Story = { args: { kind: 'ticket', phase: 'failed', lines: ['» Fetching front-1 from GitHub'], error: 'No internet connection. Connect and try again.' } };
+export const TicketFailedInPortuguese: Story = { ...TicketFailed, globals: { locale: 'pt' } };

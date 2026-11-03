@@ -34,6 +34,8 @@ interface Scenario {
   devServerFails: boolean;
   /** How long importing a stage takes, so the "unlocking" state can be seen. */
   unlockDelayMs: number;
+  /** Importing a stage fails with this message (after the delay), so a failed ticket download can be seen. */
+  unlockFails: string | null;
   /** How long downloading the environment takes, so the install modal can be seen running. */
   installDelayMs: number;
   /** Downloading the environment fails with this message (after writing its log). */
@@ -55,6 +57,7 @@ const DEFAULT_SCENARIO: Scenario = {
   cleanupFails: [],
   devServerFails: false,
   unlockDelayMs: 0,
+  unlockFails: null,
   installDelayMs: 0,
   installFails: null,
 };
@@ -294,6 +297,9 @@ export class FakeRuntime implements GameRuntime {
 
   async importStage(stage: number, files: ArchiveFile[]) {
     await new Promise((resolve) => setTimeout(resolve, this.scenario.unlockDelayMs));
+    if (this.scenario.unlockFails) {
+      throw new Error(this.scenario.unlockFails);
+    }
     const commit = createHash('sha1').update(`stage-${stage}:${files.length}`).digest('hex');
     this.stages.set(stage, commit);
     return commit;

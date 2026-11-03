@@ -4,13 +4,28 @@ import { Icon } from './icons.tsx';
 import { Button, LogView, Modal, Notice, Spinner } from './ui.tsx';
 
 export type InstallPhase = 'running' | 'done' | 'failed';
+/** What is being downloaded: the game environment (images) or a ticket (its code and package). */
+export type InstallKind = 'environment' | 'ticket';
 
 /**
- * The download of the game environment, with its log. It cannot be dismissed while it runs; when
- * it ends, well or not, it stays open with the whole log (to read or copy) until "Close".
+ * A download with its log: the game environment, or a ticket. It cannot be dismissed while it
+ * runs; when it ends, well or not, it stays open with the whole log (to read or copy) until "Close".
  */
-export function InstallModal({ phase, lines, error, onClose }: { phase: InstallPhase; lines: string[]; error: string | null; onClose: () => void }) {
+export function InstallModal({
+  kind = 'environment',
+  phase,
+  lines,
+  error,
+  onClose,
+}: {
+  kind?: InstallKind;
+  phase: InstallPhase;
+  lines: string[];
+  error: string | null;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
+  const text = kind === 'ticket' ? 'dashboard.ticketModal' : 'dashboard.installModal';
   const toast = useToast();
   const copy = () =>
     navigator.clipboard.writeText(lines.join('\n')).then(
@@ -20,9 +35,10 @@ export function InstallModal({ phase, lines, error, onClose }: { phase: InstallP
   return (
     <Modal
       size="large"
-      title={t('dashboard.installModal.title')}
+      title={t(`${text}.title`)}
       icon={<Icon name="download" className="size-5 text-primary" />}
       data-testid="install-modal"
+      data-kind={kind}
     >
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {phase === 'failed' && (
@@ -32,13 +48,13 @@ export function InstallModal({ phase, lines, error, onClose }: { phase: InstallP
         )}
         {phase === 'done' && (
           <Notice tone="success" data-testid="install-modal-status">
-            {t('dashboard.installModal.done')}
+            {t(`${text}.done`)}
           </Notice>
         )}
         {phase === 'running' && (
           <p className="flex items-center gap-2 text-base font-medium" data-testid="install-modal-status">
             <Spinner />
-            {t('dashboard.installModal.running')}
+            {t(`${text}.running`)}
           </p>
         )}
         <LogView lines={lines} className="min-h-0 flex-1 select-text" follow={phase === 'running'} />

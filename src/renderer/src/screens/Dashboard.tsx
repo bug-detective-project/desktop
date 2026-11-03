@@ -9,11 +9,11 @@ import type { TFunction } from 'i18next'
 import { api, errorInfo } from '../api.ts'
 import { Icon } from '../components/icons.tsx'
 import { InstallModal } from '../components/InstallModal.tsx'
-import type { InstallPhase } from '../components/InstallModal.tsx'
+import type { InstallKind, InstallPhase } from '../components/InstallModal.tsx'
 import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
-import { Badge, Button, LogView, Notice, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
+import { Badge, Button, Notice, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
 import type { Story } from '../content.ts'
 import { story } from '../content.ts'
 import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx'
@@ -285,7 +285,6 @@ function CurrentTask({
         >
           <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
         </div>
-        {snapshot.log.length > 0 && <LogView lines={snapshot.log} />}
       </>,
     )
   }
@@ -929,18 +928,34 @@ export function Dashboard({
       .finally(() => setBusy(null))
   }
 
-  // The download of the environment and its log, shown in the install modal until "Close".
-  const [install, setInstall] = useState<{ phase: InstallPhase; lines: string[]; error: string | null } | null>(null)
+  // The download of the environment, or of a ticket, with its log in the install modal. The
+  // environment's stays open until "Close"; a ticket's closes by itself when it succeeds (the
+  // Board is the next step) and stays open with the error and the log when it fails.
+  const [install, setInstall] = useState<{ kind: InstallKind; phase: InstallPhase; lines: string[]; error: string | null } | null>(null)
+  const failed = async (kind: InstallKind, error: unknown) => {
+    const { code, message } = errorInfo(error)
+    setInstall({ kind, phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }) })
+  }
+  const nextAssignment = (track: TrackChoice) => {
+    setInstall({ kind: 'ticket', phase: 'running', lines: [], error: null })
+    api
+      .nextAssignment(track)
+      .then(
+        () => {
+          setInstall(null)
+          onOpenBoard()
+        },
+        (error: unknown) => failed('ticket', error),
+      )
+      .catch(toast.error)
+  }
   const installEnvironment = () => {
-    setInstall({ phase: 'running', lines: [], error: null })
+    setInstall({ kind: 'environment', phase: 'running', lines: [], error: null })
     api
       .installEnvironment()
       .then(
-        async () => setInstall({ phase: 'done', lines: (await api.snapshot()).log, error: null }),
-        async (error: unknown) => {
-          const { code, message } = errorInfo(error)
-          setInstall({ phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }) })
-        },
+        async () => setInstall({ kind: 'environment', phase: 'done', lines: (await api.snapshot()).log, error: null }),
+        (error: unknown) => failed('environment', error),
       )
       .catch(toast.error)
   }
@@ -949,8 +964,7 @@ export function Dashboard({
     openBoard: onOpenBoard,
     openTicket: onOpenTicket,
     openReview: onOpenReview,
-    nextAssignment: (track) =>
-      void api.nextAssignment(track).then(onOpenBoard).catch(toast.error),
+    nextAssignment,
     run,
     install: installEnvironment,
     busy,
@@ -968,9 +982,10 @@ export function Dashboard({
     >
       {install && (
         <InstallModal
+          kind={install.kind}
           phase={install.phase}
-          // While it runs, the live log of the install (the log of an earlier task never shows).
-          lines={install.phase === 'running' ? (snapshot.busy === 'installing' ? snapshot.log : []) : install.lines}
+          // While it runs, the live log of that task (the log of an earlier task never shows).
+          lines={install.phase === 'running' ? (snapshot.busy === 'installing' || snapshot.busy === 'unlocking' ? snapshot.log : []) : install.lines}
           error={install.error}
           onClose={() => setInstall(null)}
         />
