@@ -255,8 +255,15 @@ describe('QA with real Docker', () => {
       { user: 'node', workdir: WORKSPACE_DIR },
     );
     await game.move(2, 'inQa');
-    // Waits for the QA container (the 30 s pause keeps it running), not for a fixed time.
-    await expect.poll(async () => (await docker.containersWithRole('qa')).filter((name) => name.startsWith(`${PREFIX}-qa-`)), { timeout: 20_000, interval: 250 }).toHaveLength(1);
+    // Waits until the QA run's container runs (the 30 s pause keeps it running), not for a fixed
+    // time. Not the dependencies container (-qa-deps-), which comes first when the cache is empty;
+    // and listed is not enough: Docker cannot remove a container that is still starting.
+    const runningQa = async () => {
+      const names = (await docker.containersWithRole('qa')).filter((name) => new RegExp(`^${PREFIX}-qa-[0-9a-f]{8}$`).test(name));
+      if (names.length !== 1) return false;
+      return (await docker.run(['container', 'inspect', '--format', '{{.State.Running}}', names[0]])).stdout.toString('utf8').trim() === 'true';
+    };
+    await expect.poll(runningQa, { timeout: 30_000, interval: 250 }).toBe(true);
 
     // A new app instance on the same data folder, as after a crash.
     const restarted = createGame(gameDir);
