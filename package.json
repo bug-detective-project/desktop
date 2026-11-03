@@ -27,6 +27,7 @@
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project stories",
     "test:coverage": "vitest run --project unit --project stories --coverage",
+    "test:coverage:full": "vitest run --project unit --project stories --project integration --coverage",
     "test:integration": "vitest run --project integration",
     "test:e2e": "pnpm run build && playwright test",
     "test:e2e:headless:linux": "pnpm run build && env -u WAYLAND_DISPLAY xvfb-run -a --server-args=\"-screen 0 1600x1000x24\" playwright test",
@@ -35,7 +36,8 @@
     "lint": "node tools/lint/node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node tools/lint/node_modules/eslint/bin/eslint.js . --fix",
     "pretest:integration": "pnpm run prepare:resources",
-    "verify:push": "pnpm run typecheck && pnpm test && pnpm run test:stories && pnpm run test:integration",
+    "verify:push": "pnpm run typecheck && pnpm test",
+    "check:action-pins": "node tools/check-action-pins.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

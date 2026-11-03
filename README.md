@@ -188,6 +188,17 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |
 | `pnpm exec playwright test --config playwright.manual.config.ts` | Windows or Linux/WSL 2, + Docker + VS Code | The full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore). Opens VS Code windows. |
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on GitHub Actions:
+
+| Job | When | What |
+| --- | --- | --- |
+| `fast` | every push, every pull request | `check:action-pins`, typecheck, lint, unit tests, stories (Chromium) |
+| `heavy` | pull requests into `main` (and by hand) | integration tests on the runner's Docker, e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
+
+Every action in the workflows is pinned by commit hash (`uses: owner/repo@<40 hex> # vX.Y.Z`); `pnpm run check:action-pins` (`tools/check-action-pins.mjs`) fails otherwise, and Dependabot (`.github/dependabot.yml`) opens a pull request when an action has a new version. To pin a new action: `git ls-remote --tags https://github.com/<owner>/<repo> 'refs/tags/<tag>^{}'`.
+
 ### Coverage
 
 Measured on 2026-11-02 with `pnpm run test:coverage` (unit tests and stories, 412 + 90 tests); run it
@@ -205,9 +216,17 @@ again for the current numbers (HTML report in `coverage/index.html`).
 
 What this number leaves out is covered by the other suites: the Docker layer by the integration
 tests (with them, `runtime.ts` 80%, `services/workspace.ts` 85%, `services/qa.ts` 92%,
-`services/docker.ts` 95% of lines), and the main process's entry point (`index.ts`) and the preload
-by the e2e tests, which run the built app in Electron and are not measured. The suggested floor, not
-enforced yet, is 65% of lines and 60% of branches.
+`services/docker.ts` 95% of lines), and the main process's entry point (`index.ts`), the IPC
+handlers, the preload and `App.tsx` by the e2e tests, which run the built app in Electron and are
+not measured; those files are excluded from the measurement (`vitest.config.ts`).
+
+Two floors are enforced (the run fails below them), each set at the measured value minus two
+points; raise them when coverage rises:
+
+| Command | Runs | Floor (lines / branches / functions) | Where |
+| --- | --- | --- | --- |
+| `pnpm run test:coverage` | unit tests and stories | 70% / 65% / 59% (`coverage.thresholds` in `vitest.config.ts`) | CI job `fast`, local |
+| `pnpm run test:coverage:full` | unit tests, stories and integration tests (Docker) | 78% / 71% / 69% (passed on the command line in `ci.yml`: `--coverage.thresholds.*`; measured 80.9% / 73.0% / 71.2% on 2026-11-03) | CI job `heavy` |
 
 ## Lint and git hooks
 
@@ -223,7 +242,9 @@ Husky installs two hooks in this repository (`prepare` runs `husky`, which point
 | Hook | Runs | Blocks when |
 | --- | --- | --- |
 | `pre-commit` | lint-staged: `eslint --fix` on the staged `.ts/.tsx/.js/.mjs/.cjs` files, fixes re-staged | an error remains after `--fix` (warnings pass) |
-| `pre-push` | `pnpm run verify:push`: typecheck, unit tests, integration tests with real Docker (about 2–3 minutes) | anything fails, including Docker not running |
+| `pre-push` | `pnpm run verify:push`: typecheck and unit tests (under a minute) | anything fails |
+
+The stories, the integration tests and the e2e tests run in CI (see "Continuous integration" above), not in the hook.
 
 The hooks need Node.js 26 on the `PATH` of the shell that runs git. If you commit from an editor whose git does not load nvm, create `~/.config/husky/init.sh` with `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`. To skip the hooks once (not recommended): `git commit --no-verify` / `git push --no-verify`. The VS Code ESLint extension must use the toolchain in `tools/lint`: set `"eslint.nodePath": "tools/lint/node_modules"` in the workspace settings (`"desktop/tools/lint/node_modules"` when the workspace is the parent folder).
 

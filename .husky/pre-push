@@ -1,2 +1,2 @@
-# Typecheck, unit tests and the real-Docker integration test (Docker must be running).
+# Typecheck and unit tests. Stories, integration (real Docker) and e2e run in CI (.github/workflows/ci.yml).
 pnpm run verify:push
