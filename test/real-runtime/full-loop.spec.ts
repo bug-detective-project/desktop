@@ -193,8 +193,10 @@ test('the full game loop with real Docker and VS Code', async () => {
   // The front track is complete (the project's completion e-mail); the back track is still offered.
   await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
   await page.getByTestId('next-assignment').click();
-  await expect(page.getByTestId('next-assignment-front')).toHaveCount(0);
-  await expect(page.getByTestId('next-assignment-back')).toBeVisible();
+  // A finished track stays in the menu, disabled, with its progress; the other one can be chosen.
+  await expect(page.getByTestId('next-assignment-front')).toBeDisabled();
+  await expect(page.getByTestId('next-assignment-front')).toContainText('4');
+  await expect(page.getByTestId('next-assignment-back')).toBeEnabled();
   await page.keyboard.press('Escape');
   log('all four front tickets done; completion message received, back track still offered');
 
