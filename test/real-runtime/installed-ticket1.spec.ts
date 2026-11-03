@@ -13,6 +13,8 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
+import { finishOnboarding } from './onboarding.ts';
+import { takeNextTicket } from '../e2e/fixtures.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
@@ -45,6 +47,7 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
     await expect(page.getByTestId(`check-${id}`)).toHaveAttribute('data-status', 'ok', { timeout: 60_000 });
   }
   await page.getByTestId('start-playing').click();
+  await finishOnboarding(page);
 
   const install = async () => {
     await page.getByTestId('nav-dashboard').click();
@@ -52,11 +55,15 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
     if (!report.ready) {
       await expect(page.getByTestId('environment-panel')).toBeVisible();
       await page.getByTestId('install-environment').click();
-      await expect(page.getByTestId('environment-panel')).toHaveCount(0, { timeout: 30 * 60_000 });
+      const modal = page.getByTestId('install-modal');
+      await expect(modal.getByTestId('install-modal-close')).toBeVisible({ timeout: 30 * 60_000 });
+      await expect(modal.getByTestId('install-modal-error')).toHaveCount(0);
+      await modal.getByTestId('install-modal-close').click();
+      await expect(page.getByTestId('environment-panel')).toHaveCount(0);
     }
   };
   await install();
-  await page.getByTestId('next-assignment').click();
+  await takeNextTicket(page, 'front');
   await expect(page.getByTestId('board')).toBeVisible({ timeout: 5 * 60_000 });
   await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo', { timeout: 120_000 });
   await install();

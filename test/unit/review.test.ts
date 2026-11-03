@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
 import { createSave, readSave } from '../../src/main/services/backup.ts';
@@ -15,8 +15,8 @@ import type { StoredReview } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { parseDiff, splitRows, visibleFiles } from '../../src/renderer/src/components/diff.ts';
+import { createNotesProject } from '../helpers/notes-project.ts';
 
-const root = resolve(import.meta.dirname, '..', '..');
 const ctx = { now: '2026-10-28T12:00:00.000Z', id: () => crypto.randomUUID() };
 const sha = (char: string) => char.repeat(40);
 
@@ -209,8 +209,17 @@ describe('review store', () => {
 // ---------------------------------------------------------------------------
 // The game: capture on QA pass, automatic checkout and return
 
-const localSource = () =>
-  new LocalContentSource({ qaDir: resolve(root, '..', 'supportdesk-qa'), runner: runCommand });
+// The notes example project (test/fixtures/notes) laid out like a published project, once per file.
+let notesDir: string;
+let notesQaDir: string;
+beforeAll(async () => {
+  notesDir = await mkdtemp(join(tmpdir(), 'bd-review-notes-'));
+  notesQaDir = (await createNotesProject(notesDir)).qaDir;
+});
+afterAll(async () => {
+  await rm(notesDir, { recursive: true, force: true });
+});
+const localSource = () => new LocalContentSource({ qaDir: notesQaDir, runner: runCommand });
 
 function createGame(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] }))) {
   const game = new Game({

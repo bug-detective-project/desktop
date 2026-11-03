@@ -13,7 +13,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { dragCard } from '../e2e/fixtures.ts';
+import { dragCard, takeNextTicket } from '../e2e/fixtures.ts';
+import { finishOnboarding } from './onboarding.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
@@ -39,7 +40,12 @@ async function installEnvironment(page: Page) {
     await expect(page.getByTestId('environment-panel')).toBeVisible();
     const started = Date.now();
     await page.getByTestId('install-environment').click();
-    await expect(page.getByTestId('environment-panel')).toHaveCount(0, { timeout: 30 * 60_000 });
+    // The download runs in the install modal, which stays open with its log until "Close".
+    const modal = page.getByTestId('install-modal');
+    await expect(modal.getByTestId('install-modal-close')).toBeVisible({ timeout: 30 * 60_000 });
+    await expect(modal.getByTestId('install-modal-error')).toHaveCount(0);
+    await modal.getByTestId('install-modal-close').click();
+    await expect(page.getByTestId('environment-panel')).toHaveCount(0);
     log(`environment installed in ${((Date.now() - started) / 1000).toFixed(0)} s`);
   }
 }
@@ -49,9 +55,21 @@ async function cardStatus(page: Page, ticket: number, status: string, timeout = 
   await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', status, { timeout });
 }
 
+/** Waits until Docker answers and the environment report says ready (after a restart it takes a moment). */
+async function waitForEnvironment(page: Page) {
+  await expect
+    .poll(async () => page.evaluate(async () => (await window.bugDetective.refreshEnvironment()).ready), { timeout: 3 * 60_000, intervals: [2000] })
+    .toBe(true);
+}
+
 async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'codeReview') {
   const started = Date.now();
+  await waitForEnvironment(page);
   await dragCard(page, ticket, 'inQa');
+  // The QA run must really start (a refused move bounces the card back at once).
+  await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
+  await page.waitForTimeout(3000);
+  await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
   await cardStatus(page, ticket, expected);
   log(`ticket ${ticket}: QA → ${expected} in ${((Date.now() - started) / 1000).toFixed(0)} s`);
 }
@@ -74,11 +92,13 @@ test('the full game loop with real Docker and VS Code', async () => {
   }
   log('checklist: all four prerequisites ok');
   await page.getByTestId('start-playing').click();
+  await finishOnboarding(page);
   await installEnvironment(page);
 
   for (let ticket = 1; ticket <= 4; ticket += 1) {
     await page.getByTestId('nav-dashboard').click();
-    await page.getByTestId('next-assignment').click();
+    // The track menu: every SupportDesk front ticket, in order.
+    await takeNextTicket(page, 'front');
     // The app switches to the board once the unlock (and its environment check) has finished.
     await expect(page.getByTestId('board')).toBeVisible({ timeout: 5 * 60_000 });
     await cardStatus(page, ticket, 'todo', 120_000);
@@ -121,6 +141,7 @@ test('the full game loop with real Docker and VS Code', async () => {
       log('ticket 1: app closed during QA');
       ({ app, page } = await open(userData));
       await cardStatus(page, 1, 'inProgress', 60_000);
+      await waitForEnvironment(page);
       await page.getByTestId('card-1').click();
       await page.getByTestId('tab-qa').click();
       await expect(page.getByTestId('qa-comment').first()).toHaveAttribute('data-kind', 'interrupted');
@@ -157,8 +178,11 @@ test('the full game loop with real Docker and VS Code', async () => {
     await page.getByTestId(`card-${ticket}`).click();
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('review-markdown')).toBeVisible();
-    await expect(page.getByTestId('reference-diff')).toContainText('client/src');
-    await expect(page.getByTestId('player-diff')).toContainText('client/src');
+    // The fix applied above is the reference patch itself: the review says so and shows the
+    // player's changes against the original code; the separate reference section is left out.
+    await expect(page.getByTestId('identical-message')).toContainText('identical to the reference');
+    await expect(page.getByTestId('review-comparison')).toContainText('client/src');
+    await expect(page.getByTestId('review-reference')).toHaveCount(0);
     await page.getByTestId('accept-review').click();
     await cardStatus(page, ticket, 'done');
     log(`ticket ${ticket}: review accepted, Done`);
@@ -166,8 +190,15 @@ test('the full game loop with real Docker and VS Code', async () => {
 
   await page.getByTestId('nav-dashboard').click();
   await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'completion');
-  await expect(page.getByTestId('assignment-card')).toContainText('You finished every ticket.');
-  log('all four tickets done; completion message received');
+  // The front track is complete (the project's completion e-mail); the back track is still offered.
+  await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+  await page.getByTestId('next-assignment').click();
+  // A finished track stays in the menu, disabled, with its progress; the other one can be chosen.
+  await expect(page.getByTestId('next-assignment-front')).toBeDisabled();
+  await expect(page.getByTestId('next-assignment-front')).toContainText('4');
+  await expect(page.getByTestId('next-assignment-back')).toBeEnabled();
+  await page.keyboard.press('Escape');
+  log('all four front tickets done; completion message received, back track still offered');
 
   // Export, delete the volume, restore.
   const save = join(userData, 'export test.bdsave');
@@ -178,7 +209,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('nav-settings').click();
   await page.getByTestId('settings-tab-backup').click();
   await page.getByTestId('export-progress').click();
-  await expect(page.getByTestId('toast-info')).toContainText('Progress saved', { timeout: 120_000 });
+  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress saved' })).toBeVisible({ timeout: 120_000 });
   const head = docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
   docker('rm', '--force', CONTAINER);
   docker('volume', 'rm', 'bugdetective-workspace');
@@ -187,7 +218,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('restore-progress').click();
   await expect(page.getByTestId('restore-warning')).toBeVisible();
   await page.getByTestId('confirm-restore').click();
-  await expect(page.getByTestId('toast-info').last()).toContainText('Progress restored', { timeout: 5 * 60_000 });
+  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress restored' })).toBeVisible({ timeout: 5 * 60_000 });
   expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
   expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
     /player\/ticket-1[\s\S]*player\/ticket-4/,
