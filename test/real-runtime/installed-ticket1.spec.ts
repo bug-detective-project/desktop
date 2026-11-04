@@ -4,8 +4,11 @@
  *   pnpm run dist:win:test (the test build: an installed app has fuses Playwright cannot drive, and
  *   ignores BUGDETECTIVE_USER_DATA)
  *   dist\Bug-Detective-Setup-<version>.exe /S
- *   set BUGDETECTIVE_INSTALLED_EXE=%LOCALAPPDATA%\Programs\bug-detective\Bug Detective.exe
+ *   set BUGDETECTIVE_INSTALLED_EXE=%LOCALAPPDATA%\Programs\Bug Detective\Bug Detective.exe
  *   pnpm run test:real-runtime installed-ticket1
+ *
+ * dist\win-unpacked\Bug Detective.exe is the same payload and plays the same way, with no install:
+ * the installer would replace an installed copy.
  *
  * No GitHub release is published yet, so the clean profile's content-source.json points at the
  * local SupportDesk copy.

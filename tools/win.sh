@@ -6,7 +6,7 @@
 #
 # BUGDETECTIVE_WIN_NODE points at a Windows folder with node.exe (default: the portable Node.js
 # in %USERPROFILE%\bugdetective-dev\tools\node-v<.nvmrc>-win-x64). Extra environment variables
-# for the Windows side can be passed as BD_WIN_ENV="NAME=value NAME2=value".
+# for the Windows side can be passed in BD_WIN_ENV, one NAME=value per line (a value may hold spaces).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -26,9 +26,11 @@ script="run-$$.cmd"
   echo "set \"PATH=$node_dir;%PATH%\""
   # pnpm runs scripts through %ComSpec%, which is not always set when started from WSL.
   echo 'set "ComSpec=%SystemRoot%\System32\cmd.exe"'
-  for assignment in ${BD_WIN_ENV:-}; do
-    echo "set \"$assignment\""
-  done
+  while IFS= read -r assignment; do
+    if [[ -n $assignment ]]; then
+      echo "set \"$assignment\""
+    fi
+  done <<< "${BD_WIN_ENV:-}"
   echo "$*"
 } | sed 's/$/\r/' > "$dev_wsl/$script"
 trap 'rm -f "$dev_wsl/$script"' EXIT

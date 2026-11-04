@@ -247,7 +247,7 @@ What needs the real runtime (Docker Desktop, VS Code, the Windows toolchain) doe
 desktop/tools/open-pr.sh --title "feat(scope): subject" --body-file /path/to/body.md [--skip-real-runtime]
 ```
 
-It needs Docker Desktop running and VS Code installed on Windows (see "Windows development from WSL 2"). To include the installed-app spec, pass the installer's executable: `BD_WIN_ENV="BUGDETECTIVE_INSTALLED_EXE=C:\\Users\\<you>\\AppData\\Local\\Programs\\bug-detective\\Bug Detective.exe"`.
+It needs Docker Desktop running and VS Code installed on Windows (see "Windows development from WSL 2"). To include the installed-app spec, build the test build (`tools/win.sh pnpm run dist:win:test`) and pass its executable: `BD_WIN_ENV='BUGDETECTIVE_INSTALLED_EXE=C:\Users\<you>\bugdetective-dev\desktop\dist\win-unpacked\Bug Detective.exe'`. That folder is the installer's payload, so nothing gets installed; a copy installed from the test build lives in `%LOCALAPPDATA%\Programs\Bug Detective`. `BD_WIN_ENV` takes one `NAME=value` per line.
 
 Every action in the workflows is pinned by commit hash (`uses: owner/repo@<40 hex> # vX.Y.Z`); `pnpm run check:action-pins` (`tools/check-action-pins.mjs`) fails otherwise, and Dependabot (`.github/dependabot.yml`) opens a pull request when an action has a new version. To pin a new action: `git ls-remote --tags https://github.com/<owner>/<repo> 'refs/tags/<tag>^{}'`.
 
@@ -354,7 +354,7 @@ The version number comes from `package.json`. A rebuild with the same version st
 
 | | |
 | --- | --- |
-| State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, validated in `services/state.ts`; a file of another schema version is kept aside as `state.corrupt-<time>.json` and a new game starts, with no migrations) |
+| State | `%APPDATA%\Bug Detective\state.json` (versioned JSON, atomic writes, validated in `services/state.ts` after the migrations of `services/migrations.ts`; a file older than the baseline, schema 8, is kept aside as `state.corrupt-<time>.json` and a new game starts) |
 | Ticket packages | `%APPDATA%\Bug Detective\projects\<projectId>\packages\stage-N.zip` and `stage-N\`, by queue position (outside the Docker volume) |
 | Review data | `%APPDATA%\Bug Detective\projects\<projectId>\reviews\ticket-N\` (`review.json` and `snapshot.diff`, the approved snapshot as a diff from the ticket's commit) for every ticket that passed QA, kept for every project; included in exports |
 | Projects screen | The **Projects** screen (shown once a project is done) switches the active project. Only one project is in Docker: its containers, volumes and QA image carry `bugdetective.project=<id>`, and the app removes other projects' resources on start, before every install and in **Clean up Docker leftovers**. A switch is recorded in the state and resumed after a crash (**Finish the switch** on the Dashboard). Saves (format 3) hold every project's packages and PRs, and each played project's source and version floor. |

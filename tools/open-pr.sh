@@ -14,7 +14,7 @@
 # When the branch already has an open pull request, the script pushes and comments the result on it
 # instead of creating another. Logs stay in pr-gate/ (git-ignored; never under test-results/, which
 # Playwright empties when a suite starts). Set BUGDETECTIVE_INSTALLED_EXE on the Windows side
-# (BD_WIN_ENV="BUGDETECTIVE_INSTALLED_EXE=...") to include the installed-app spec.
+# (BD_WIN_ENV='BUGDETECTIVE_INSTALLED_EXE=...') to include the installed-app spec.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
