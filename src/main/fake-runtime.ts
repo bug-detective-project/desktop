@@ -285,6 +285,14 @@ export class FakeRuntime implements GameRuntime {
   /** Records which game owns the fake workspace, like the real repository config. */
   claimed: string | null = null;
 
+  /** How many times the app shut the runtime down on quit (for the tests). */
+  shutdownCalls = 0;
+
+  async shutdown() {
+    this.shutdownCalls += 1;
+    this.devServerUp = false;
+  }
+
   /** How many times "New game" sanitized the repository (for the tests). */
   sanitizeCalls = 0;
 

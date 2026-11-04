@@ -74,6 +74,8 @@ export interface GameRuntime {
 
   runQa(request: QaRequest): Promise<QaResult>;
   cleanupQaLeftovers(): Promise<void>;
+  /** The app is closing: removes the QA containers and stops the workspace container (20 s at most; nothing when Docker is not running). */
+  shutdown(): Promise<void>;
   /** The files the last QA run tested (its own copy of the workspace). */
   testedFiles(): Promise<ArchiveFile[]>;
 
@@ -531,6 +533,21 @@ export class DockerRuntime implements GameRuntime {
 
   async cleanupQaLeftovers() {
     await (await this.qa()).cleanupLeftovers();
+  }
+
+  async shutdown() {
+    let docker: Docker;
+    try {
+      docker = await this.docker();
+    } catch (error) {
+      if (error instanceof DockerUnavailableError) return;
+      throw error;
+    }
+    const signal = AbortSignal.timeout(20_000);
+    // The QA containers first (a run in progress is killed), then the workspace: its volume stays,
+    // the dev server and VS Code's server stop with it. "No such container" is fine.
+    await (await this.qa().catch(() => null))?.cleanupLeftovers().catch(() => {});
+    await docker.run(['container', 'stop', '--time', '5', this.names.container], { timeoutMs: 15_000, signal });
   }
 
   async bundle() {

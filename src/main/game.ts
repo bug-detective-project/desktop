@@ -129,6 +129,8 @@ export class Game {
   private titles: Snapshot['titles'] = {};
   private hintsTotal: Record<number, number> = {};
   private qaRun: Promise<void> | null = null;
+  /** The app is quitting: a QA run killed by the shutdown is recorded as interrupted, not as an error. */
+  private shuttingDown = false;
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
   private pendingSave: (ValidatedSave & { fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
@@ -948,9 +950,33 @@ export class Game {
       const playerDiff = result.status === 'passed' ? await this.captureApproval(ticket) : null;
       await this.commit((state, ctx) => rules.recordQaResult(state, ticket, { startedAt, branch, branchWarning, timeoutSeconds, result, playerDiff }, ctx));
     } catch (error) {
+      if (this.shuttingDown) {
+        // shutdown() records the run as interrupted (the same path as a crash), once it is over.
+        return;
+      }
       const detail = error instanceof DockerUnavailableError ? 'Docker stopped while QA was running.' : (error as Error).message;
       await this.commit((state, ctx) => rules.recordQaError(state, ticket, detail.slice(0, 4000), ctx));
       await this.refreshDockerState();
+    }
+  }
+
+  /**
+   * The app is closing: the QA containers are removed and the workspace container is stopped (the
+   * volume stays; the next action of the game starts everything again). A QA run in progress is
+   * recorded as interrupted, exactly as after a crash, and the state is saved.
+   */
+  async shutdown(): Promise<void> {
+    if (this.shuttingDown) {
+      return;
+    }
+    this.shuttingDown = true;
+    const stopped = this.options.runtime.shutdown().catch((error: Error) => this.appendLog(`» Shutdown: ${error.message}`));
+    // The QA run ends as soon as its container is gone; never wait for it longer than the stop itself.
+    await Promise.race([this.qaRun ?? Promise.resolve(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
+    await stopped;
+    const recovered = rules.recoverInterruptedQa(this.state, this.ctx());
+    if (recovered !== this.state) {
+      await this.commit(() => recovered);
     }
   }
 

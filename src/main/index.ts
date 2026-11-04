@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
 import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -230,6 +231,24 @@ async function main(): Promise<void> {
     }
   });
   app.on('window-all-closed', () => app.quit());
+  // Closing the app stops QA and the workspace container; the quit waits for it (20 s at most).
+  let shuttingDown = false;
+  app.on('before-quit', (event) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    event.preventDefault();
+    void game
+      .shutdown()
+      .catch(() => {})
+      .finally(async () => {
+        if (isE2E) {
+          // The e2e tests read how the quit went (the fake runtime counts the shutdowns).
+          const fake = (globalThis as { bugDetectiveFake?: { shutdownCalls: number } }).bugDetectiveFake;
+          await writeFile(join(userData, 'shutdown.json'), JSON.stringify({ shutdownCalls: fake?.shutdownCalls ?? null })).catch(() => {});
+        }
+        app.quit();
+      });
+  });
 
   // Detects Docker stopping or starting during a session (shown as a banner in the UI).
   // A check can take longer than the interval (docker version waits up to 15 s): never two at once.
