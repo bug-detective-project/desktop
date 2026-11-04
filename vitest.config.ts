@@ -47,7 +47,7 @@ export default defineConfig({
         define: { __STORY_THEME__: JSON.stringify(theme) },
         test: {
           name: theme === 'light' ? 'stories' : 'stories-dark',
-          browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] },
+          browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' as const }] },
         },
       })),
       {

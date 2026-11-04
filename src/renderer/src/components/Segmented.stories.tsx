@@ -28,7 +28,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const Dark: Story = { globals: { theme: 'dark' } };
 
 /** Tab reaches the selected option; the arrow keys move to the next one and select it. */
 export const KeyboardNavigation: Story = {

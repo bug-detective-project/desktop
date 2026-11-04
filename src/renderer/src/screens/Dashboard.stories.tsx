@@ -22,5 +22,4 @@ export const DockerStopped: Story = { render: show(() => snapshotFixture('queued
 export const DatabaseResetFailed: Story = { render: show(() => snapshotFixture('active', { dbResetFailed: true })) };
 export const WorkspaceLost: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true })) };
 export const WorkspaceRecreating: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true, busy: 'rebuilding', log: ['» Fetching front-1', '» Recreated the code of ticket 1 (front-1)'] })) };
-export const Dark: Story = { render: show(() => snapshotFixture('active')), globals: { theme: 'dark' } };
 export const Portuguese: Story = { render: show(() => snapshotFixture('active')), globals: { locale: 'pt' } };
