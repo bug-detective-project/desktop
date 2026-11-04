@@ -15,8 +15,10 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
  && rm -rf /var/lib/apt/lists/* /root/.npm
 
 COPY cli/ ./
-RUN mkdir -p /cache /ms-playwright \
- && chown -R node:node /opt/qa /cache /ms-playwright
+# /input (the QA input volume) and /source (the workspace volume) are mounted by the app's helper
+# containers, which run as node: a fresh input volume takes node as its owner on the first mount.
+RUN mkdir -p /cache /ms-playwright /input /source \
+ && chown -R node:node /opt/qa /cache /ms-playwright /input /source
 
 USER node
 ENTRYPOINT ["node", "/opt/qa/run.ts"]

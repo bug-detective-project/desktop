@@ -48,7 +48,7 @@ const ticketSchema = z.object({
       result: z.object({
         ticket: z.number().int(),
         gate: z.union([z.literal(1), z.literal(2)]),
-        status: z.enum(['passed', 'failed', 'timeout']),
+        status: z.enum(['passed', 'failed', 'timeout', 'outOfMemory']),
         message: z.string(),
         tests: z.array(testRecord),
         durationMs: z.number(),
@@ -59,7 +59,7 @@ const ticketSchema = z.object({
     z.object({
       id: z.string(),
       at: z.string(),
-      kind: z.enum(['gate1Failed', 'gate2Failed', 'timeout', 'passed', 'interrupted', 'error', 'branchWarning']),
+      kind: z.enum(['gate1Failed', 'gate2Failed', 'timeout', 'outOfMemory', 'passed', 'interrupted', 'error', 'branchWarning']),
       attemptId: z.string().optional(),
       failing: z.array(z.object({ name: z.string(), error: z.string().optional() })).optional(),
       unfinished: z.array(z.string()).optional(),

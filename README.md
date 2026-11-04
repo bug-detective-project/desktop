@@ -348,6 +348,7 @@ The app downloads `archive/refs/heads/qa.zip` (the manifest and every ticket pac
 - A strict CSP (`default-src 'none'`, scripts, styles and fonts from `'self'` only); no remote content, navigation and new windows blocked, permission requests denied.
 - External commands run with `spawn` and argument arrays only. The few shell scripts run inside containers are constants; data reaches them only as positional arguments.
 - `shell.openExternal` only for the four help pages in `EXTERNAL_LINKS` and the workspace app on `http://127.0.0.1:<published port>/`.
+- Every container runs with `--cap-drop ALL --security-opt no-new-privileges`, a memory limit and a pids limit (`services/limits.ts`: 3 GB and 1024 for the workspace, 2 GB and 512 for QA and its helpers, which run as `node`). A QA run killed by the memory limit is a failed attempt with its own comment.
 
 ## License
 

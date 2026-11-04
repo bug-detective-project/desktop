@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { outerTimeoutResult, parseQaResult, QaInfrastructureError } from '../../src/main/services/qa.ts';
+import { outOfMemoryResult, outerTimeoutResult, parseQaResult, QaInfrastructureError } from '../../src/main/services/qa.ts';
 import { commentForResult } from '../../src/shared/kanban.ts';
 import { qaMessage, trimError } from '../../src/shared/qaMessages.ts';
 import type { QaComment } from '../../src/shared/types.ts';
@@ -37,6 +37,14 @@ describe('parseQaResult', () => {
 
   it('builds a timeout result when the container had to be stopped', () => {
     expect(outerTimeoutResult(3, 180, 270000)).toMatchObject({ ticket: 3, status: 'timeout', tests: [] });
+  });
+
+  it('builds an out-of-memory result, which counts as a failed attempt with its own comment', () => {
+    const result = outOfMemoryResult(2, 12000);
+    expect(result).toMatchObject({ ticket: 2, status: 'outOfMemory', tests: [] });
+    const comment = commentForResult(result, 'a9', 180, ctx);
+    expect(comment.kind).toBe('outOfMemory');
+    expect(qaMessage(comment)).toMatchObject({ key: 'outOfMemory', gate: null, failing: [] });
   });
 });
 

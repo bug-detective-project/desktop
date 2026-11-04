@@ -8,6 +8,7 @@ const TONE = {
   gate1Failed: 'danger',
   gate2Failed: 'danger',
   timeout: 'danger',
+  outOfMemory: 'danger',
   passed: 'ok',
   interrupted: 'warn',
   error: 'warn',
