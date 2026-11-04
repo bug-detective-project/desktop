@@ -17,8 +17,9 @@ install-windows.sh
 # Development only: another projects catalog and per-project qa folders or refs (see README.md, "Game projects").
 catalog.local.json
 
-# Storybook build and coverage reports.
+# Storybook build and coverage reports; the blob reports the CI jobs merge (test:ci:*).
 storybook-static/
 coverage/
+.vitest-reports/
 # Logs of the pull request gate (tools/open-pr.sh).
 pr-gate/

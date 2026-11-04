@@ -194,8 +194,11 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 
 | Job | When | What |
 | --- | --- | --- |
-| `fast` | every pull request into `main`, every push to `main` | `check:action-pins`, typecheck, lint, unit tests and stories (Chromium) with the coverage floor |
-| `heavy` | pull requests into `main` (and by hand) | unit tests, stories and integration tests on the runner's Docker with the full coverage floor, then the e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
+| `fast` | every pull request into `main`, every push to `main` | `check:action-pins`, typecheck, lint, unit tests and stories (Chromium) with the coverage floor (`test:ci:fast`); its blob report is the `coverage-fast` artifact |
+| `heavy` | pull requests into `main` (and by hand) | integration tests on the runner's Docker (`test:ci:integration`, blob report `coverage-integration`), then the e2e tests on Electron under Xvfb; `test-results/` and `playwright-report/` are uploaded as the `heavy-test-results` artifact |
+| `coverage` | after `fast` and `heavy` | merges the two blob reports and enforces the full coverage floor (`test:ci:coverage`); nothing runs again |
+
+No test runs twice in the CI: the `test:ci:*` scripts of `package.json` exist for that (each layer records a blob report with its coverage, `.vitest-reports/`, git-ignored). Locally `pnpm run test:coverage:full` still runs everything in one go.
 
 What needs the real runtime (Docker Desktop, VS Code, the Windows toolchain) does not run on GitHub's hosted runners. Pull requests are opened with `tools/open-pr.sh`, which pushes the branch and opens (or updates, with a comment) the pull request. **Until the loose-ends plan is implemented** (decided 2026-11-03), a pull request relies on the CI above plus the pre-push hook. With `--real-runtime` the script first syncs the Windows copy and runs there (through `tools/win.sh`) `pnpm run test:real-runtime` (the whole game loop, about 5 minutes) and, when the branch changes the renderer, the preload, the platform layer, the e2e tests or the build configuration, `pnpm run test:e2e` on Windows too (about 8 more minutes); nothing is pushed unless they pass, and the result is written into the pull request. That gate becomes mandatory again before the first version tagged for players. A red run stops before anything is pushed; the logs stay in `pr-gate/` (git-ignored).
 
@@ -234,7 +237,7 @@ points; raise them when coverage rises:
 | Command | Runs | Floor (lines / branches / functions) | Where |
 | --- | --- | --- | --- |
 | `pnpm run test:coverage` | unit tests and stories | 70% / 65% / 59% (`coverage.thresholds` in `vitest.config.ts`) | CI job `fast`, local |
-| `pnpm run test:coverage:full` | unit tests, stories and integration tests (Docker) | 78% / 71% / 69% (passed on the command line in `ci.yml`: `--coverage.thresholds.*`; measured 80.9% / 73.0% / 71.2% on 2026-11-03) | CI job `heavy` |
+| `pnpm run test:coverage:full` | unit tests, stories and integration tests (Docker) | 78% / 71% / 69% (`test:ci:coverage` passes them on the command line; measured 80.9% / 73.0% / 71.2% on 2026-11-03) | CI job `coverage` (merged reports of `fast` and `heavy`), local |
 
 ## Lint and git hooks
 

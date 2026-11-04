@@ -2,8 +2,10 @@ name: ci
 
 # Pull requests into main run the fast layer (typecheck, lint, unit tests, stories) and the heavy
 # layer (integration tests on real Docker, e2e tests on Electron under Xvfb); pushes to main run the
-# fast layer again. Work branches run only through their pull request, so one push never starts two
-# runs. Every action is pinned by commit hash (tools/check-action-pins.mjs).
+# fast layer again. No test runs twice: each layer records its coverage as a blob report
+# (package.json, test:ci:*) and the coverage job merges the two and enforces the full floor. Work
+# branches run only through their pull request, so one push never starts two runs. Every action is
+# pinned by commit hash (tools/check-action-pins.mjs).
 on:
   push:
     branches: [main]
@@ -36,7 +38,11 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - name: Unit tests and stories, with the coverage floor of vitest.config.ts
-        run: pnpm run test:coverage
+        run: pnpm run test:ci:fast
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-fast
+          path: .vitest-reports/fast.json
 
   heavy:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
@@ -50,16 +56,20 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Chromium for the stories (vitest browser mode)
-        run: pnpm exec playwright install --with-deps chromium
       - name: Electron binary and the libraries it needs under Xvfb
+        # Playwright's Chromium dependencies are the ones Electron needs; no browser is downloaded.
         run: |
+          pnpm exec playwright install-deps chromium
           pnpm run electron:install
           sudo apt-get update
           sudo apt-get install -y xvfb libgtk-3-0 libnss3 libgbm1 libxss1
           sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
-      - name: Unit tests, stories and integration tests (real Docker), with the full coverage floor
-        run: pnpm run test:coverage:full -- --coverage.thresholds.lines=78 --coverage.thresholds.branches=71 --coverage.thresholds.functions=69
+      - name: Integration tests (real Docker); the coverage job enforces the full floor
+        run: pnpm run test:ci:integration
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-integration
+          path: .vitest-reports/integration.json
       - name: End-to-end tests (Electron with the fake runtime, under Xvfb)
         # The hosted runner has no setuid chrome-sandbox: Playwright passes --no-sandbox itself, and
         # this variable covers the one test that spawns Electron directly (startup.spec.ts).
@@ -74,3 +84,25 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  coverage:
+    # The full coverage floor over the unit tests, the stories and the integration tests, from the
+    # blob reports of the two jobs above: nothing runs again here.
+    needs: [fast, heavy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: coverage-*
+          path: .vitest-reports
+          merge-multiple: true
+      - name: Merge the reports and enforce the full coverage floor
+        run: pnpm run test:ci:coverage
