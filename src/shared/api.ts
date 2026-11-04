@@ -8,8 +8,8 @@ export interface CheckResult {
   id: CheckId;
   status: 'ok' | 'missing' | 'warning' | 'pending';
   reason?: string;
-  /** A check that passes with a caveat (for example `lowMemory`: the Docker engine has less than 4 GiB). */
-  warning?: string;
+  /** Caveats of a check that passes: `lowMemory` (the Docker engine has less than 4 GiB), `sshAgent` and `githubCredential` (what an attached VS Code could still carry into the container). */
+  warnings?: string[];
   detail?: string;
   /** Version of the tool, when it could be read (Docker Desktop or engine, VS Code, the extension, WSL). */
   version?: string;
@@ -352,6 +352,8 @@ export const EXTERNAL_LINKS = {
   linuxContainers: 'https://docs.docker.com/desktop/setup/install/windows-install/#switch-between-windows-and-linux-containers',
   /** The memory WSL 2 (and so the Docker engine) may use: .wslconfig. */
   wslConfig: 'https://learn.microsoft.com/windows/wsl/wsl-config#configuration-setting-for-wslconfig',
+  /** What the app does about the credentials VS Code could carry into the container, and what it cannot turn off. */
+  credentialsHelp: 'https://github.com/bug-detective-project/desktop#vs-code-and-your-credentials',
 } as const;
 
 export type ExternalLink = keyof typeof EXTERNAL_LINKS;

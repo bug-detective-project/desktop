@@ -14,6 +14,13 @@ const LINKS: Record<CheckResult['id'], ExternalLink> = {
   devcontainers: 'devContainers',
 };
 
+/** Each warning of a passing check: its text key, and the page that explains it. */
+const WARNING_HELP: Record<string, { link: ExternalLink; label: string }> = {
+  lowMemory: { link: 'wslConfig', label: 'checklist.docker.memoryHelp' },
+  sshAgent: { link: 'credentialsHelp', label: 'checklist.vscode.credentialsHelp' },
+  githubCredential: { link: 'credentialsHelp', label: 'checklist.vscode.credentialsHelp' },
+};
+
 /** The help page and its label for a failed check: most point at the install page; Docker's container mode has its own. */
 function helpFor(check: CheckResult): { link: ExternalLink; label: string } {
   if (check.id === 'docker' && check.reason === 'windowsContainers') {
@@ -71,16 +78,23 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                   <span className="text-sm text-muted-foreground">{t(`checklist.status.${check.status}`)}</span>
                 </div>
                 <p className="mt-1 text-base text-muted-foreground">{t(`checklist.${check.id}.${reason}`)}</p>
-                {check.warning && (
-                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-amber-700 dark:text-amber-400" data-testid={`check-${check.id}-warning`} data-warning={check.warning}>
+                {check.warnings?.map((warning) => (
+                  <p
+                    key={warning}
+                    className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-amber-700 dark:text-amber-400"
+                    data-testid={`check-${check.id}-warning-${warning}`}
+                    data-warning={warning}
+                  >
                     <Icon name="alertTriangle" className="size-4 shrink-0" aria-hidden />
-                    <span>{t(`checklist.${check.id}.${check.warning}`)}</span>
-                    <button type="button" className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline" onClick={() => void api.openExternal('wslConfig')}>
-                      {t('checklist.docker.memoryHelp')}
-                      <Icon name="externalLink" className="size-3" />
-                    </button>
+                    <span>{t(`checklist.${check.id}.${warning}`)}</span>
+                    {WARNING_HELP[warning] && (
+                      <button type="button" className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline" onClick={() => void api.openExternal(WARNING_HELP[warning].link)}>
+                        {t(WARNING_HELP[warning].label)}
+                        <Icon name="externalLink" className="size-3" />
+                      </button>
+                    )}
                   </p>
-                )}
+                ))}
                 {check.status !== 'ok' && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {check.id === 'docker' && check.reason !== 'notInstalled' && check.reason !== 'windowsContainers' && (

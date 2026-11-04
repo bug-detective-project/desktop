@@ -37,10 +37,21 @@ export const LowMemory: Story = {
   render: () => {
     const snapshot = snapshotFixture('queued');
     const prerequisites = snapshot.prerequisites!;
-    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'docker' ? { ...check, warning: 'lowMemory' } : check));
+    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'docker' ? { ...check, warnings: ['lowMemory'] } : check));
     return <Checklist snapshot={{ ...snapshot, prerequisites }} onContinue={fn()} />;
   },
 };
 export const LowMemoryInPortuguese: Story = { ...LowMemory, globals: { locale: 'pt' } };
+
+/** An SSH agent and a stored GitHub credential on the computer: VS Code passes with two warnings and a link to what the app does; the player can start. */
+export const CredentialWarnings: Story = {
+  render: () => {
+    const snapshot = snapshotFixture('queued');
+    const prerequisites = snapshot.prerequisites!;
+    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'vscode' ? { ...check, warnings: ['sshAgent', 'githubCredential'] } : check));
+    return <Checklist snapshot={{ ...snapshot, prerequisites }} onContinue={fn()} />;
+  },
+};
+export const CredentialWarningsInPortuguese: Story = { ...CredentialWarnings, globals: { locale: 'pt' } };
 
 export const DockerStoppedBanner: Story = { render: () => <DockerBanner snapshot={snapshotFixture('active', { dockerState: 'notRunning' })} /> };

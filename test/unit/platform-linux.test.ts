@@ -98,6 +98,38 @@ describe('Linux platform on WSL 2', () => {
   });
 });
 
+describe('VS Code global storage and host credentials', () => {
+  it("on WSL, points the attached-container configuration at the Windows VS Code's globalStorage through /mnt/c", async () => {
+    const platform = createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) });
+    expect((await platform.locateVSCode())!.globalStorage).toBe('/mnt/c/Users/João Silva/AppData/Roaming/Code/User/globalStorage');
+    // A cmd.exe that answers %APPDATA% too.
+    const withAppData = async (command: string, args: readonly string[]) =>
+      command.endsWith('cmd.exe') ? ok('C:\\Users\\João Silva\\AppData\\Local|C:\\Program Files|C:\\WINDOWS|D:\\Roaming\r\n') : windowsRunner(command, args);
+    expect((await createLinuxPlatform({ env: wslEnv, runner: withAppData, ...fakeFs(wslFiles) }).locateVSCode())!.globalStorage).toBe('/mnt/d/Roaming/Code/User/globalStorage');
+  });
+
+  it('on WSL, asks Windows about the OpenSSH agent service and the stored github.com credential', async () => {
+    const runner = async (command: string, args: readonly string[]) => {
+      if (command.endsWith('sc.exe')) return ok('        STATE              : 4  RUNNING\r\n');
+      if (command.endsWith('cmdkey.exe')) return ok('Target: LegacyGeneric:target=git:https://github.com\r\n');
+      return windowsRunner(command, args);
+    };
+    expect(await createLinuxPlatform({ env: wslEnv, runner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({ sshAgent: true, githubCredential: true });
+    expect(await createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
+  });
+
+  it('on plain Linux, uses ~/.config/Code (or XDG_CONFIG_HOME) and only the SSH_AUTH_SOCK of this session', async () => {
+    const env = { PATH: '/usr/local/bin:/usr/bin', HOME: '/home/u', SSH_AUTH_SOCK: '/run/user/1000/keyring/ssh' };
+    const files = { '/proc/version': 'Linux version 6.8.0-45-generic', '/usr/bin/docker': '', '/usr/bin/code': '' };
+    const platform = createLinuxPlatform({ env, runner: async () => ok('', 1), ...fakeFs(files) });
+    expect((await platform.locateVSCode())!.globalStorage).toBe('/home/u/.config/Code/User/globalStorage');
+    expect(await platform.hostCredentials()).toEqual({ sshAgent: true, githubCredential: false });
+    const xdg = createLinuxPlatform({ env: { ...env, XDG_CONFIG_HOME: '/cfg', SSH_AUTH_SOCK: undefined }, runner: async () => ok('', 1), ...fakeFs(files) });
+    expect((await xdg.locateVSCode())!.globalStorage).toBe('/cfg/Code/User/globalStorage');
+    expect(await xdg.hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
+  });
+});
+
 describe('free disk space on WSL 2', () => {
   it("measures the Windows disk that holds Docker Desktop's WSL data", async () => {
     const statfs = async (path: string) => {

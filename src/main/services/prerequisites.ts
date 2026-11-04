@@ -50,7 +50,7 @@ export class Prerequisites {
   async check(environment?: Environment): Promise<PrerequisiteReport> {
     const env = environment ?? (await this.locate());
     // Versions are extra information: a failure to read one never fails a check.
-    const [dockerState, dockerVersion, dockerInfo, wsl, vscodeVersion, devcontainers] = await Promise.all([
+    const [dockerState, dockerVersion, dockerInfo, wsl, vscodeVersion, devcontainers, host] = await Promise.all([
       this.dockerState(env),
       env.docker?.versionInfo().catch(() => null) ?? Promise.resolve(null),
       env.docker?.serverInfo().catch(() => null) ?? Promise.resolve(null),
@@ -58,7 +58,10 @@ export class Prerequisites {
       env.vscode?.version().catch(() => null) ?? Promise.resolve(null),
       // undefined: the extensions could not be listed.
       env.vscode?.devContainersVersion().catch(() => undefined) ?? Promise.resolve(undefined),
+      // What an attached VS Code could still carry into the container (a warning, never a failure).
+      env.vscodeCli ? this.platform.hostCredentials().catch(() => null) : Promise.resolve(null),
     ]);
+    const vscodeWarnings = [...(host?.sshAgent ? ['sshAgent'] : []), ...(host?.githubCredential ? ['githubCredential'] : [])];
     const version = (value: string | null | undefined) => (value ? { version: value } : {});
     const dockerCheck = (): CheckResult => {
       if (dockerState !== 'running') {
@@ -70,7 +73,7 @@ export class Prerequisites {
         return { id: 'docker', status: 'missing', reason: 'windowsContainers', ...docker };
       }
       if (dockerInfo && dockerInfo.memTotalBytes < MIN_ENGINE_MEMORY_BYTES) {
-        return { id: 'docker', status: 'ok', warning: 'lowMemory', ...docker };
+        return { id: 'docker', status: 'ok', warnings: ['lowMemory'], ...docker };
       }
       return { id: 'docker', status: 'ok', ...docker };
     };
@@ -82,7 +85,7 @@ export class Prerequisites {
           ? { id: 'wsl', status: 'ok', detail: wsl.detail, ...(wsl.notNeeded && { reason: 'notNeeded' }), ...version(wsl.version) }
           : { id: 'wsl', status: 'missing', reason: 'wsl1Only', detail: wsl.detail, ...version(wsl.version) },
       env.vscodeCli
-        ? { id: 'vscode', status: 'ok', detail: env.vscodeCli.launcher, ...version(vscodeVersion) }
+        ? { id: 'vscode', status: 'ok', detail: env.vscodeCli.launcher, ...version(vscodeVersion), ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }) }
         : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       typeof devcontainers === 'string'
         ? { id: 'devcontainers', status: 'ok', ...version(devcontainers) }

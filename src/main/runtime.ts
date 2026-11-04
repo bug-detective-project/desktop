@@ -18,6 +18,8 @@ import type { Environment } from './services/prerequisites.ts';
 import type { PrerequisiteReport } from '../shared/api.ts';
 import { QaRunner } from './services/qa.ts';
 import { qaImageTag, writeQaContext } from './services/qa-image.ts';
+import { VSCODE_MACHINE_SETTINGS } from './services/vscode.ts';
+import type { VSCode } from './services/vscode.ts';
 import { Workspace, publishedPorts, resourceNames } from './services/workspace.ts';
 import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
@@ -465,12 +467,24 @@ export class DockerRuntime implements GameRuntime {
     await (await this.runningWorkspace()).stopDevServer();
   }
 
+  /**
+   * Before VS Code attaches: the extension must not carry the player's git credentials, .gitconfig
+   * or agents into the container. The settings go into the container's machine settings (what the
+   * attach setup reads) and into the extension's per-container configuration file (its remoteEnv
+   * drops the SSH agent socket). Nothing is written to the user's global VS Code settings.
+   */
+  private async prepareAttach(workspace: Workspace, vscode: VSCode): Promise<void> {
+    await workspace.seedVSCodeMachineSettings(VSCODE_MACHINE_SETTINGS);
+    await vscode.writeAttachedConfig(workspace.containerName, workspace.dir);
+  }
+
   async openVSCode() {
     const workspace = await this.runningWorkspace();
     const { vscode } = await this.env();
     if (!vscode) {
       throw new Error('VS Code was not found');
     }
+    await this.prepareAttach(workspace, vscode);
     await vscode.openAttached(workspace.containerName, workspace.dir);
   }
 
@@ -535,6 +549,7 @@ export class DockerRuntime implements GameRuntime {
     if (!vscode) {
       throw new Error('VS Code was not found');
     }
+    await this.prepareAttach(workspace, vscode);
     await vscode.openAttached(workspace.containerName, workspace.dir, { reuseWindow: true });
   }
 

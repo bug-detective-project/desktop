@@ -5,10 +5,21 @@ FROM node:26.12.1-bookworm
 
 # The snapshot imports and the player's work keep LF line endings, whatever the host settings are.
 # One user inside the container; the repository folder is created per project at run time.
-RUN git config --system core.autocrlf false \
- && git config --system core.eol lf \
- && git config --system --add safe.directory '*' \
- && git config --system init.defaultBranch main
+# Git reads its settings from a read-only file of the image (GIT_CONFIG_GLOBAL) and ignores
+# /etc/gitconfig (GIT_CONFIG_NOSYSTEM): the Dev Containers extension writes the player's git
+# credential helper there (`git config --system` as root, `--global` as node) and copies the
+# player's ~/.gitconfig into the container; with this, the global write fails and neither file
+# is ever read. GnuPG leaves the image too: the extension forwards the computer's gpg agent only
+# into a container that has gpg. (Task 4.2 of the loose-ends plan.)
+RUN mkdir -p /etc/bugdetective \
+ && git config --file /etc/bugdetective/gitconfig core.autocrlf false \
+ && git config --file /etc/bugdetective/gitconfig core.eol lf \
+ && git config --file /etc/bugdetective/gitconfig --add safe.directory '*' \
+ && git config --file /etc/bugdetective/gitconfig init.defaultBranch main \
+ && chmod 444 /etc/bugdetective/gitconfig && chmod 555 /etc/bugdetective \
+ && (apt-get purge -y --auto-remove gnupg gpg gpg-agent gpgconf gpgsm dirmngr gpg-wks-client gpg-wks-server || true) \
+ && rm -rf /var/lib/apt/lists/*
+ENV GIT_CONFIG_GLOBAL=/etc/bugdetective/gitconfig GIT_CONFIG_NOSYSTEM=1
 
 COPY forward.mjs /usr/local/lib/bugdetective/forward.mjs
 

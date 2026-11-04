@@ -55,9 +55,27 @@ test('Docker in Windows containers mode blocks the game with its own help link; 
     await simulate(app, { dockerOs: 'linux', dockerMemoryBytes: 2 * 1024 ** 3 });
     await page.getByTestId('check-again').click();
     await expect(page.getByTestId('check-docker')).toHaveAttribute('data-status', 'ok');
-    await expect(page.getByTestId('check-docker-warning')).toHaveAttribute('data-warning', 'lowMemory');
-    await expect(page.getByTestId('check-docker-warning')).toContainText('less than 4 GB of memory');
+    await expect(page.getByTestId('check-docker-warning-lowMemory')).toHaveAttribute('data-warning', 'lowMemory');
+    await expect(page.getByTestId('check-docker-warning-lowMemory')).toContainText('less than 4 GB of memory');
     await expect(page.getByTestId('start-playing')).toBeEnabled();
+  } finally {
+    await close();
+  }
+});
+
+test('an SSH agent or a stored GitHub credential on the computer only warns, with a link to what the app does', async () => {
+  const { app, page, close } = await launch({ sshAgent: true, githubCredential: true });
+  try {
+    await expect(page.getByTestId('check-vscode')).toHaveAttribute('data-status', 'ok');
+    await expect(page.getByTestId('check-vscode-warning-sshAgent')).toContainText('An SSH agent is running');
+    await expect(page.getByTestId('check-vscode-warning-githubCredential')).toContainText('A GitHub credential is stored');
+    await expect(page.getByTestId('check-vscode').getByRole('button', { name: 'What the app does about it' })).toHaveCount(2);
+    await expect(page.getByTestId('start-playing')).toBeEnabled();
+    // Agent stopped and credential removed: the warnings go.
+    await simulate(app, { sshAgent: false, githubCredential: false });
+    await page.getByTestId('check-again').click();
+    await expect(page.getByTestId('check-vscode-warning-sshAgent')).toHaveCount(0);
+    await expect(page.getByTestId('check-vscode-warning-githubCredential')).toHaveCount(0);
   } finally {
     await close();
   }

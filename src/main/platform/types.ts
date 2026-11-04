@@ -13,6 +13,20 @@ export interface VSCodeCli {
   command: string;
   baseArgs: string[];
   env: NodeJS.ProcessEnv;
+  /**
+   * That VS Code's `User/globalStorage` folder, as a path this process can write (the Windows
+   * folder through /mnt/c from WSL): the Dev Containers extension keeps its per-container
+   * configuration files there (`ms-vscode-remote.remote-containers/nameConfigs/`).
+   */
+  globalStorage: string;
+}
+
+/** What the Dev Containers extension would carry into an attached container from this computer, beyond what the app turns off. */
+export interface HostCredentials {
+  /** An SSH agent runs (SSH_AUTH_SOCK set, or the Windows OpenSSH agent service): the extension forwards it. */
+  sshAgent: boolean;
+  /** A git credential for github.com is stored on the computer (the Windows Credential Manager): the extension's helper channel can hand it to the container. */
+  githubCredential: boolean;
 }
 
 export interface WslStatus {
@@ -49,6 +63,18 @@ export interface Platform {
   browserCommand(url: string): { command: string; args: string[] } | null;
   /** Free bytes on the disk that holds Docker's data (images, volumes, build cache), or null when it cannot be measured. */
   freeDiskBytes(): Promise<number | null>;
+  /** The credentials an attached VS Code could carry into the container from this computer (the checklist warns about them). */
+  hostCredentials(): Promise<HostCredentials>;
+}
+
+/** `sc query ssh-agent` says the Windows OpenSSH agent service is running. */
+export function serviceRunning(scQueryOutput: string): boolean {
+  return /STATE\s*:\s*\d+\s+RUNNING/i.test(scQueryOutput);
+}
+
+/** `cmdkey /list` lists a git credential for github.com (what the Git Credential Manager stores). */
+export function hasGitHubCredential(cmdkeyListOutput: string): boolean {
+  return /git:https:\/\/github\.com/i.test(cmdkeyListOutput);
 }
 
 /** The part of `fs.statfs` the platforms use. */

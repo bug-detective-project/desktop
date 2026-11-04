@@ -143,6 +143,35 @@ describe('WSL detection', () => {
   });
 });
 
+describe('VS Code global storage and host credentials on Windows', () => {
+  const user = 'C:\\Users\\João Silva\\AppData\\Local\\Programs\\Microsoft VS Code';
+  const files = fakeFs({ [`${user}\\bin\\code.cmd`]: CODE_CMD, [`${user}\\Code.exe`]: '', [`${user}\\e646868227\\resources\\app\\out\\cli.js`]: '' });
+
+  it("points the attached-container configuration at the user's %APPDATA%\\Code\\User\\globalStorage", async () => {
+    const withAppData = createWindowsPlatform({ env: { LOCALAPPDATA: 'C:\\Users\\João Silva\\AppData\\Local', APPDATA: 'C:\\Users\\João Silva\\AppData\\Roaming', PATH: '' }, ...files });
+    expect((await withAppData.locateVSCode())!.globalStorage).toBe('C:\\Users\\João Silva\\AppData\\Roaming\\Code\\User\\globalStorage');
+    const fromProfile = createWindowsPlatform({ env: { LOCALAPPDATA: 'C:\\Users\\João Silva\\AppData\\Local', USERPROFILE: 'C:\\Users\\João Silva', PATH: '' }, ...files });
+    expect((await fromProfile.locateVSCode())!.globalStorage).toBe('C:\\Users\\João Silva\\AppData\\Roaming\\Code\\User\\globalStorage');
+  });
+
+  it('reads the OpenSSH agent service and the stored git credential for github.com', async () => {
+    const answers = { agent: '        STATE              : 4  RUNNING\r\n', list: 'Target: LegacyGeneric:target=git:https://github.com\r\n    Type: Generic\r\n' };
+    const runner = async (command: string, args: readonly string[]) => {
+      if (command.endsWith('sc.exe') && args[0] === 'query' && args[1] === 'ssh-agent') return ok(answers.agent);
+      if (command.endsWith('cmdkey.exe') && args[0] === '/list') return ok(answers.list);
+      return ok('', 1);
+    };
+    const platform = createWindowsPlatform({ env: { SystemRoot: 'C:\\Windows' }, runner, ...fakeFs({}) });
+    expect(await platform.hostCredentials()).toEqual({ sshAgent: true, githubCredential: true });
+    answers.agent = '        STATE              : 1  STOPPED\r\n';
+    answers.list = 'Target: LegacyGeneric:target=GitHub - https://api.github.com/someone\r\n';
+    expect(await platform.hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
+    // SSH_AUTH_SOCK in the environment counts as an agent too; a failed query is no agent and no credential.
+    const withSock = createWindowsPlatform({ env: { SystemRoot: 'C:\\Windows', SSH_AUTH_SOCK: '\\\\.\\pipe\\x' }, runner: async () => ok('', 1), ...fakeFs({}) });
+    expect(await withSock.hostCredentials()).toEqual({ sshAgent: true, githubCredential: false });
+  });
+});
+
 describe('free disk space on Windows', () => {
   const env = { LOCALAPPDATA: 'C:\\Users\\João Silva\\AppData\\Local' };
   const dockerDisk = 'C:\\Users\\João Silva\\AppData\\Local\\Docker\\wsl';
