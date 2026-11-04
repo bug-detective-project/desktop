@@ -302,13 +302,13 @@ export class DockerRuntime implements GameRuntime {
     const tags = await this.imageTags();
     if (!(await docker.imageExists(tags.workspace))) {
       onLine(`» docker build ${tags.workspace}`);
-      await docker.build(this.platform.dockerHostPath(join(this.contextRoot, 'workspace')), tags.workspace, 'workspace-image', (line) => onLine(line));
+      await docker.build(this.platform.dockerHostPath(join(this.contextRoot, 'workspace')), tags.workspace, 'workspace-image', (line) => onLine(line), undefined, null, this.names.prefix);
     }
     const qa = await this.requireQaTag();
     if (!(await docker.imageExists(qa))) {
       const context = await writeQaContext(join(this.contextRoot, 'qa'), tags.qaBase, this.qaTool!, this.qaBuildRoot);
       onLine(`» docker build ${qa}`);
-      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line), undefined, this.project);
+      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line), undefined, this.project, this.names.prefix);
     }
     // The workspace container moves to the new image first: the image of an older version is then
     // free and goes away with the other leftovers (an image a container still uses stays).
@@ -385,6 +385,8 @@ export class DockerRuntime implements GameRuntime {
     }
     if (scope === 'everything') {
       result.workspaceKept = await docker.volumeExists(this.names.volume);
+      // The builder (its BuildKit container and cache) goes with the app's data.
+      await docker.removeBuilder(this.names.prefix);
     }
     return result;
   }

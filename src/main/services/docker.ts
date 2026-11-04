@@ -103,11 +103,41 @@ export class Docker {
     return (await this.run(['image', 'inspect', '--format', '{{.Id}}', tag], { timeoutMs: 30_000 })).code === 0;
   }
 
-  async build(contextDir: string, tag: string, role: string, onLine?: RunOptions['onLine'], signal?: AbortSignal, project?: string | null) {
-    await this.checked(['build', '--progress', 'plain', ...labelArgs(role, project), '--tag', tag, contextDir], {
+  /** The app's own BuildKit builder (a docker-container driver), named after the resource prefix. */
+  static builderName(prefix: string): string {
+    return `${prefix}-builder`;
+  }
+
+  /** Creates the builder when it does not exist yet. Its cache is separate from Docker's global build cache, so it can be pruned and removed with the app's data. */
+  async ensureBuilder(prefix: string): Promise<void> {
+    const name = Docker.builderName(prefix);
+    if ((await this.run(['buildx', 'inspect', name], { timeoutMs: 30_000 })).code === 0) {
+      return;
+    }
+    await this.checked(['buildx', 'create', '--name', name, '--driver', 'docker-container'], { timeoutMs: 120_000 });
+  }
+
+  /** Removes the builder and its cache (nothing when it does not exist). */
+  async removeBuilder(prefix: string): Promise<void> {
+    await this.run(['buildx', 'rm', '--force', Docker.builderName(prefix)], { timeoutMs: 60_000 });
+  }
+
+  /** What the builder's cache may keep after a build; the rest is pruned. */
+  static readonly BUILDER_KEEP_STORAGE = '2GB';
+
+  /**
+   * Builds an image in the app's builder and loads it into the engine, then prunes the builder's
+   * cache down to BUILDER_KEEP_STORAGE: the build cache never grows without limit on the player's
+   * computer, and Docker's global cache is never touched.
+   */
+  async build(contextDir: string, tag: string, role: string, onLine?: RunOptions['onLine'], signal?: AbortSignal, project?: string | null, prefix = 'bugdetective') {
+    await this.ensureBuilder(prefix);
+    const builder = Docker.builderName(prefix);
+    await this.checked(['buildx', 'build', '--builder', builder, '--load', '--progress', 'plain', ...labelArgs(role, project), '--tag', tag, contextDir], {
       onLine,
       signal,
     });
+    await this.run(['buildx', 'prune', '--builder', builder, '--force', '--keep-storage', Docker.BUILDER_KEEP_STORAGE], { timeoutMs: 120_000 });
   }
 
   async volumeExists(name: string): Promise<boolean> {

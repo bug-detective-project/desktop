@@ -4,7 +4,9 @@
  * the resource prefix (containers, volumes) or whose image repository is one of the app's, so
  * another program's resources are never touched. A longer prefix that starts with this one (a
  * test run's "bugdetective-test-…") counts as the app's for "everything", and labelled images
- * without a tag are always removed, whichever app version built them.
+ * without a tag are always removed, whichever app version built them. The app's BuildKit builder
+ * (the container buildx_buildkit_<prefix>-builder0 and the moby/buildkit image) carries none of
+ * the app's labels, so no cleanup lists it: "everything" removes it through docker buildx rm.
  */
 import type { DockerCleanupScope } from '../../shared/api.ts';
 
