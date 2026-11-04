@@ -23,8 +23,21 @@ test('a renderer that dies is reloaded on its own', async () => {
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0].webContents.forcefullyCrashRenderer();
     });
-    const reloaded = await app.firstWindow();
-    await expect(reloaded.getByTestId('checklist').or(reloaded.getByTestId('dashboard')).first()).toBeVisible({ timeout: 30_000 });
+    // The crashed page object is gone for Playwright: the main process reports on the reloaded renderer.
+    await expect
+      .poll(
+        () =>
+          app
+            .evaluate(async ({ BrowserWindow }) => {
+              const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+              if (!contents || contents.isCrashed() || contents.isLoading()) return false;
+              return contents.executeJavaScript('document.querySelector("[data-testid=checklist],[data-testid=dashboard]") !== null') as Promise<boolean>;
+            })
+            // Right after the crash the old frame is being disposed: not back yet.
+            .catch(() => false),
+        { timeout: 30_000, intervals: [500] },
+      )
+      .toBe(true);
   } finally {
     await close();
   }

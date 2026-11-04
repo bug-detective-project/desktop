@@ -79,6 +79,7 @@ export function App() {
     // Scrolls inside the window, so the page itself only scrolls below the minimum size.
     return (
       <div className="h-full overflow-y-auto">
+        <E2eThrow enabled={snapshot.e2e} />
         <Checklist snapshot={snapshot} onContinue={() => setChecklistDone(true)} />
       </div>
     );
