@@ -290,6 +290,17 @@ export class FakeRuntime implements GameRuntime {
   /** Records which game owns the fake workspace, like the real repository config. */
   claimed: string | null = null;
 
+  /** The QA run in progress, aborted by abortQa() (sleep) or shutdown(). */
+  private qaAbort: AbortController | null = null;
+  /** How many times a QA run was aborted (for the tests). */
+  abortCalls = 0;
+
+  async abortQa() {
+    if (!this.qaAbort) return;
+    this.abortCalls += 1;
+    this.qaAbort.abort();
+  }
+
   /** How many times the app shut the runtime down on quit (for the tests). */
   shutdownCalls = 0;
 
@@ -495,7 +506,19 @@ export class FakeRuntime implements GameRuntime {
     const outcome = this.scenario.qa[Math.min(this.qaIndex, this.scenario.qa.length - 1)];
     this.qaIndex += 1;
     request.onLine?.('Bug Detective QA (fake)');
-    await new Promise((resolve) => setTimeout(resolve, this.scenario.qaDelayMs));
+    const abort = new AbortController();
+    this.qaAbort = abort;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, this.scenario.qaDelayMs);
+        abort.signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('QA aborted (fake)'));
+        });
+      });
+    } finally {
+      if (this.qaAbort === abort) this.qaAbort = null;
+    }
     const base = { ticket: request.ticket, message: '', durationMs: this.scenario.qaDelayMs };
     switch (outcome) {
       case 'passed':

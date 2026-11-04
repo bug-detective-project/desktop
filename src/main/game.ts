@@ -145,6 +145,8 @@ export class Game {
   private qaRun: Promise<void> | null = null;
   /** The app is quitting: a QA run killed by the shutdown is recorded as interrupted, not as an error. */
   private shuttingDown = false;
+  /** The computer went to sleep during QA: the run is killed and recorded as interrupted, not as an error. */
+  private qaAborted = false;
   /** Tickets were unlocked but the workspace has no repository (its volume was removed outside the game). */
   private workspaceLost = false;
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
@@ -1092,8 +1094,8 @@ export class Game {
       const playerDiff = result.status === 'passed' ? await this.captureApproval(ticket) : null;
       await this.commit((state, ctx) => rules.recordQaResult(state, ticket, { startedAt, branch, branchWarning, timeoutSeconds, result, playerDiff }, ctx));
     } catch (error) {
-      if (this.shuttingDown) {
-        // shutdown() records the run as interrupted (the same path as a crash), once it is over.
+      if (this.shuttingDown || this.qaAborted) {
+        // shutdown() or suspend() records the run as interrupted (the same path as a crash), once it is over.
         return;
       }
       const detail = error instanceof DockerUnavailableError ? 'Docker stopped while QA was running.' : (error as Error).message;
@@ -1122,6 +1124,34 @@ export class Game {
     if (recovered !== this.state) {
       await this.commit(() => recovered);
     }
+  }
+
+  /**
+   * The computer is going to sleep: a QA run cannot survive it (its containers stop, its time
+   * limit would elapse while nothing runs), so it is killed now and recorded as interrupted, as
+   * after a crash: no attempt counted, the card goes back to In Progress.
+   */
+  async suspend(): Promise<void> {
+    if (!this.qaRun) {
+      return;
+    }
+    this.qaAborted = true;
+    this.appendLog('» The computer is going to sleep: the QA run is interrupted');
+    try {
+      await this.options.runtime.abortQa().catch((error: Error) => this.appendLog(`» QA abort: ${error.message}`));
+      await Promise.race([this.qaRun, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+      const recovered = rules.recoverInterruptedQa(this.state, this.ctx());
+      if (recovered !== this.state) {
+        await this.commit(() => recovered);
+      }
+    } finally {
+      this.qaAborted = false;
+    }
+  }
+
+  /** Back from sleep: Docker may have stopped meanwhile. */
+  async resume(): Promise<void> {
+    await this.refreshDockerState().catch(() => {});
   }
 
   async askSenior(ticket: number): Promise<void> {

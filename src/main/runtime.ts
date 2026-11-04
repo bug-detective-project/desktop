@@ -76,6 +76,8 @@ export interface GameRuntime {
   cleanupQaLeftovers(): Promise<void>;
   /** The app is closing: removes the QA containers and stops the workspace container (20 s at most; nothing when Docker is not running). */
   shutdown(): Promise<void>;
+  /** The computer is going to sleep: the QA run in progress is killed (its containers removed); nothing when none runs. */
+  abortQa(): Promise<void>;
   /** The files the last QA run tested (its own copy of the workspace). */
   testedFiles(): Promise<ArchiveFile[]>;
 
@@ -543,6 +545,14 @@ export class DockerRuntime implements GameRuntime {
 
   async cleanupQaLeftovers() {
     await (await this.qa()).cleanupLeftovers();
+  }
+
+  async abortQa() {
+    if (!this.qaAbort) return;
+    this.qaAbort.abort();
+    const docker = await this.docker().catch(() => null);
+    if (!docker) return;
+    await (await this.qa().catch(() => null))?.cleanupLeftovers().catch(() => {});
   }
 
   async shutdown() {
