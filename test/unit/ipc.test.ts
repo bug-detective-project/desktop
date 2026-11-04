@@ -30,6 +30,8 @@ beforeEach(() => {
     switchProject: vi.fn(async () => {}),
     appUrl: vi.fn(async () => 'http://127.0.0.1:5173/'),
     applyDevCatalog: vi.fn(async () => {}),
+    diagnostics: vi.fn(async () => 'Bug Detective 0.1.0 diagnostics'),
+    openLogsFolder: vi.fn(async () => {}),
   };
   openUrl = vi.fn(async (_url: string) => {});
   registerIpc(game as never, null, openUrl);
@@ -38,6 +40,12 @@ beforeEach(() => {
 describe('IPC', () => {
   it('answers the app renderer with the value in an envelope', async () => {
     expect(await call('snapshot', fromApp)).toEqual({ ok: true, value: { ok: 'snapshot' } });
+  });
+
+  it('hands out the diagnostics text and opens the logs folder', async () => {
+    expect(await call('diagnostics', fromApp)).toEqual({ ok: true, value: 'Bug Detective 0.1.0 diagnostics' });
+    expect(await call('openLogsFolder', fromApp)).toEqual({ ok: true, value: undefined });
+    expect(game.openLogsFolder).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a sender that is not the app renderer, without calling the game', async () => {

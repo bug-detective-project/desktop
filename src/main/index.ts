@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
+import { homedir, release, version as osVersion } from 'node:os';
 import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
+import log from 'electron-log/main';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
 import { attachDevToolsShortcuts, loadReactDevTools } from './devtools.ts';
@@ -23,6 +25,7 @@ import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
+import { logFileName, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
 
 // Tests and the "clean profile" checks can point the app at another data folder.
 if (process.env.BUGDETECTIVE_USER_DATA) {
@@ -30,6 +33,18 @@ if (process.env.BUGDETECTIVE_USER_DATA) {
 }
 
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;
+
+// One log file per day the app starts, in <userData>/logs, the 7 most recent kept; every line
+// with the home folder as "~". console.* of the main process goes there too (and to the terminal).
+const logsDir = join(app.getPath('userData'), 'logs');
+const logFile = join(logsDir, logFileName(new Date()));
+const home = homedir();
+log.transports.file.resolvePathFn = () => logFile;
+log.transports.file.level = 'info';
+log.transports.console.level = app.isPackaged ? false : 'info';
+log.hooks.push((message) => ({ ...message, data: message.data.map((item) => (typeof item === 'string' ? redactPaths(item, home) : item)) }));
+Object.assign(console, log.functions);
+void pruneLogs(logsDir);
 const appRoot = app.getAppPath();
 const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
@@ -212,6 +227,15 @@ async function main(): Promise<void> {
     devCatalog: app.isPackaged ? undefined : devCatalogOptions(localCatalogFile(userData), catalog),
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
+    logLine: (line) => log.info(line),
+    diagnostics: {
+      os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
+      home,
+      recentLog: () => recentLines(logFile),
+      openLogsFolder: async () => {
+        await shell.openPath(logsDir);
+      },
+    },
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';
   await game.init(language);

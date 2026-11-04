@@ -734,6 +734,14 @@ function Restoring({ log }: { log: string[] }) {
 
 function About({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation();
+  const toast = useToast();
+  const copyDiagnostics = () => {
+    api
+      .diagnostics()
+      .then((text) => navigator.clipboard.writeText(text))
+      .then(() => toast.info(t('settings.diagnosticsCopied')))
+      .catch(toast.error);
+  };
   const parts = [
     { id: 'electron', name: 'Electron', version: snapshot.versions.electron },
     { id: 'node', name: 'Node.js', version: snapshot.versions.node },
@@ -766,6 +774,18 @@ function About({ snapshot }: { snapshot: Snapshot }) {
               <span className="text-sm text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
             </div>
           ))}
+        </div>
+      </div>
+      <div className="space-y-2 rounded-xl border border-border/80 bg-secondary/40 p-4">
+        <span className="block text-base font-semibold text-foreground">{t('settings.support')}</span>
+        <p className="text-sm text-muted-foreground">{t('settings.supportHelp')}</p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" variant="primary" onClick={copyDiagnostics} data-testid="copy-diagnostics">
+            {t('settings.copyDiagnostics')}
+          </Button>
+          <Button size="sm" onClick={() => void api.openLogsFolder().catch(toast.error)} data-testid="open-logs">
+            {t('settings.openLogs')}
+          </Button>
         </div>
       </div>
     </div>

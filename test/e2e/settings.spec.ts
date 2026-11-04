@@ -91,6 +91,13 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await page.getByTestId('settings-tab-about').click();
     await expect(page.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+/);
     await expect(page.getByTestId('settings-pane-about')).toContainText('Chromium');
+    // Copy diagnostics: the toast, and the text (through the API: the clipboard cannot be read back in the sandboxed page).
+    await page.getByTestId('copy-diagnostics').click();
+    await expect(page.getByText('Diagnostics copied.')).toBeVisible();
+    const diagnostics = await page.evaluate(() => window.bugDetective.diagnostics());
+    expect(diagnostics).toContain('Bug Detective');
+    expect(diagnostics).toContain('## Versions');
+    expect(diagnostics).not.toContain('João Silva');
 
     // Never git branch names or the number of tickets.
     for (const tab of ['preferences', 'environment', 'backup', 'about']) {

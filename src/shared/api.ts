@@ -291,6 +291,10 @@ export interface BugDetectiveApi {
   discardSave(token: string): Promise<void>;
   /** Recreates the code of every unlocked ticket in a workspace whose repository was lost; the progress stays. */
   rebuildWorkspace(): Promise<void>;
+  /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */
+  diagnostics(): Promise<string>;
+  /** Opens the folder of the log files in the system's file manager. */
+  openLogsFolder(): Promise<void>;
   /** Starts over; the workspace's branches from this game are archived on the next unlock. */
   newGame(): Promise<void>;
   /** Removes QA leftovers and images of older versions; the player's work stays. */

@@ -65,6 +65,19 @@ function createGame(
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
 
+describe('diagnostics', () => {
+  it('describes the versions, the project and the recent log, and keeps the home folder out', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    const text = await game.diagnostics();
+    expect(text).toContain('app: 0.1.0');
+    expect(text).toContain('project: Notes (notes)');
+    expect(text).toMatch(/## Log \(last \d+ lines\)/);
+    expect(text).toContain('» Fetching front-1');
+  });
+});
+
 describe('a workspace whose volume went', () => {
   it('is noticed by the environment check, blocks the code actions, and is recreated ticket by ticket', async () => {
     const { game, runtime } = createGame();

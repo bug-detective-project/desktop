@@ -538,6 +538,11 @@
     "aboutTagline": "Um jogo desktop offline para desenvolvedores que querem praticar depuração em código real.",
     "runtime": "Execução",
     "runtimeHost": "Electron desktop",
+    "support": "Suporte",
+    "supportHelp": "Algo não funciona? Copie o diagnóstico (versões, ambiente e o log recente, com a sua pasta de usuário escondida) e cole onde você pedir ajuda.",
+    "copyDiagnostics": "Copiar diagnóstico",
+    "openLogs": "Abrir pasta de logs",
+    "diagnosticsCopied": "Diagnóstico copiado.",
     "runtimeParts": {
       "electron": "Host desktop",
       "node": "Processo principal",
