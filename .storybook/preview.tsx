@@ -24,7 +24,8 @@ const preview: Preview = {
       toolbar: { title: 'Language', icon: 'globe', items: ['en', 'pt'], dynamicTitle: true },
     },
   },
-  initialGlobals: { theme: 'light', locale: 'en' },
+  // The stories test project sets the theme (every story runs in both); interactive Storybook starts light.
+  initialGlobals: { theme: typeof __STORY_THEME__ === 'string' ? __STORY_THEME__ : 'light', locale: 'en' },
   parameters: {
     a11y: { test: 'error' },
     layout: 'padded',

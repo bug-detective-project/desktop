@@ -40,14 +40,16 @@ export default defineConfig({
           testTimeout: 30_000,
         },
       },
-      {
-        // Every story is a test: it must render and pass axe (pnpm run test:stories).
+      // Every story is a test: it must render and pass axe (pnpm run test:stories), in the light
+      // theme and in the dark one (.storybook/preview.tsx reads __STORY_THEME__).
+      ...(['light', 'dark'] as const).map((theme) => ({
         plugins: [storybookTest({ configDir: resolve(import.meta.dirname, '.storybook') })],
+        define: { __STORY_THEME__: JSON.stringify(theme) },
         test: {
-          name: 'stories',
+          name: theme === 'light' ? 'stories' : 'stories-dark',
           browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] },
         },
-      },
+      })),
       {
         test: {
           name: 'integration',
