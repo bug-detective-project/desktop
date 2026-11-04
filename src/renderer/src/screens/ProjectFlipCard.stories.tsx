@@ -22,6 +22,7 @@ export const Intermediate: Story = { render: card({ details: { ...details, diffi
 export const Advanced: Story = { render: card({ details: { ...details, difficulty: 'advanced' } }) };
 export const WithoutDetails: Story = { render: card({ details: null }) };
 export const NeedsNewerApp: Story = { render: card({ unavailable: 'appTooOld' }) };
+export const Unavailable: Story = { render: card({ unavailable: 'projectUnavailable' }) };
 
 /** "View specifications" flips to the brief and moves the focus to the button that flips back. */
 export const Brief: Story = {

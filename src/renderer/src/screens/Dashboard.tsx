@@ -958,13 +958,15 @@ export function Dashboard({
   // The download of the environment, or of a ticket, with its log in the install modal. The
   // environment's stays open until "Close"; a ticket's closes by itself when it succeeds (the
   // Board is the next step) and stays open with the error and the log when it fails.
-  const [install, setInstall] = useState<{ kind: InstallKind; phase: InstallPhase; lines: string[]; error: string | null } | null>(null)
-  const failed = async (kind: InstallKind, error: unknown) => {
+  const [install, setInstall] = useState<{ kind: InstallKind; phase: InstallPhase; lines: string[]; error: string | null; retry: (() => void) | null } | null>(null)
+  /** No internet and GitHub's limit pass: the same download is worth repeating as it is. */
+  const retryable = (code: string) => code === 'noConnection' || code === 'githubRateLimited'
+  const failed = async (kind: InstallKind, error: unknown, retry: () => void) => {
     const { code, message } = errorInfo(error)
-    setInstall({ kind, phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }) })
+    setInstall({ kind, phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }), retry: retryable(code) ? retry : null })
   }
   const nextAssignment = (track: TrackChoice) => {
-    setInstall({ kind: 'ticket', phase: 'running', lines: [], error: null })
+    setInstall({ kind: 'ticket', phase: 'running', lines: [], error: null, retry: null })
     api
       .nextAssignment(track)
       .then(
@@ -972,17 +974,17 @@ export function Dashboard({
           setInstall(null)
           onOpenBoard()
         },
-        (error: unknown) => failed('ticket', error),
+        (error: unknown) => failed('ticket', error, () => nextAssignment(track)),
       )
       .catch(toast.error)
   }
   const installEnvironment = () => {
-    setInstall({ kind: 'environment', phase: 'running', lines: [], error: null })
+    setInstall({ kind: 'environment', phase: 'running', lines: [], error: null, retry: null })
     api
       .installEnvironment()
       .then(
-        async () => setInstall({ kind: 'environment', phase: 'done', lines: (await api.snapshot()).log, error: null }),
-        (error: unknown) => failed('environment', error),
+        async () => setInstall({ kind: 'environment', phase: 'done', lines: (await api.snapshot()).log, error: null, retry: null }),
+        (error: unknown) => failed('environment', error, installEnvironment),
       )
       .catch(toast.error)
   }
@@ -1019,6 +1021,7 @@ export function Dashboard({
           lines={install.phase === 'running' ? (snapshot.busy === 'installing' || snapshot.busy === 'unlocking' ? snapshot.log : []) : install.lines}
           error={install.error}
           onClose={() => setInstall(null)}
+          onRetry={install.retry}
         />
       )}
       {snapshot.state.projectSwitch && <PendingSwitch snapshot={snapshot} />}

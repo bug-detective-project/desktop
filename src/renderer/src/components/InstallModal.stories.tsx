@@ -4,9 +4,19 @@ import { InstallModal } from './InstallModal.tsx';
 
 const lines = ['» docker build bugdetective-workspace', 'Step 1/8 : FROM node:26.12.1-bookworm', '» docker build bugdetective-qa'];
 
-const meta = { title: 'Components/InstallModal', component: InstallModal, args: { lines, error: null, onClose: fn() } } satisfies Meta<typeof InstallModal>;
+const meta = { title: 'Components/InstallModal', component: InstallModal, args: { lines, error: null, onClose: fn(), onRetry: null } } satisfies Meta<typeof InstallModal>;
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+/** No internet: the same download is worth repeating, so "Try again" shows next to the log. */
+export const FailedNoConnection: Story = {
+  args: { phase: 'failed', error: 'No internet connection. Connect and try again.', onRetry: fn() },
+  play: async ({ args, canvasElement }) => {
+    const modal = within(canvasElement.ownerDocument.body);
+    await userEvent.click(modal.getByTestId('install-modal-retry'));
+    await expect(args.onRetry).toHaveBeenCalledTimes(1);
+  },
+};
 
 /** While it runs it cannot be closed. */
 export const Running: Story = {

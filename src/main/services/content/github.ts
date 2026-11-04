@@ -23,6 +23,8 @@ export interface GitHubSourceOptions {
   timeoutMs?: number;
   retries?: number;
   maxBytes?: number;
+  /** Tests: the wait for Retry-After and between attempts, without really waiting. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export class DownloadError extends Error {
@@ -32,6 +34,40 @@ export class DownloadError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+/** Every attempt failed on the network (DNS, a refused or dropped connection, a timeout): no internet, most likely. */
+export class NoConnectionError extends Error {}
+
+/** GitHub answered 429 or 403 with Retry-After beyond what a download waits (shared networks hit the anonymous limit). */
+export class RateLimitedError extends Error {
+  readonly retryAfterSeconds: number;
+
+  constructor(message: string, retryAfterSeconds: number) {
+    super(message);
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+/** The project's qa ref is not there: the repository or the branch is gone, private, or renamed. */
+export class ProjectUnavailableError extends Error {
+  readonly repository: string;
+
+  constructor(repository: string, qaRef: string) {
+    super(`${repository} has no ${qaRef} branch or tag`);
+    this.repository = repository;
+  }
+}
+
+/** The longest a download waits, in total, for GitHub's Retry-After. */
+export const MAX_RETRY_AFTER_SECONDS = 60;
+
+/** The seconds of a Retry-After header (a delay, or an HTTP date), or null when there is none. */
+export function retryAfterSeconds(value: string | null, now = Date.now()): number | null {
+  if (value === null || value.trim() === '') return null;
+  if (/^\d+$/.test(value.trim())) return Number(value.trim());
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? null : Math.max(0, Math.ceil((date - now) / 1000));
 }
 
 const REPOSITORY = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
@@ -61,6 +97,7 @@ export class GitHubContentSource implements ContentSource {
   private readonly timeoutMs: number;
   private readonly retries: number;
   private readonly maxBytes: number;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: GitHubSourceOptions) {
     if (!REPOSITORY.test(options.repository) || options.repository.split('/').some((part) => /^\.+$/.test(part))) {
@@ -78,6 +115,7 @@ export class GitHubContentSource implements ContentSource {
     this.timeoutMs = options.timeoutMs ?? 120_000;
     this.retries = options.retries ?? 3;
     this.maxBytes = options.maxBytes ?? 100 * 1024 * 1024;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   describe(): string {
@@ -92,13 +130,20 @@ export class GitHubContentSource implements ContentSource {
     return `${this.base}/${this.repository}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
   }
 
-  /** The archive of the qa ref: a branch of that name, or else a tag. */
+  /** The archive of the qa ref: a branch of that name, or else a tag; neither means the project is gone. */
   private async qaArchive(signal?: AbortSignal): Promise<Uint8Array> {
     try {
       return await this.download(this.branchArchiveUrl(this.qaRef), signal);
     } catch (error) {
       if (error instanceof DownloadError && error.status === 404) {
-        return this.download(this.tagArchiveUrl(this.qaRef), signal);
+        try {
+          return await this.download(this.tagArchiveUrl(this.qaRef), signal);
+        } catch (tagError) {
+          if (tagError instanceof DownloadError && tagError.status === 404) {
+            throw new ProjectUnavailableError(this.repository, this.qaRef);
+          }
+          throw tagError;
+        }
       }
       throw error;
     }
@@ -108,13 +153,19 @@ export class GitHubContentSource implements ContentSource {
     return `${this.base}/${this.repository}/archive/${commit}.zip`;
   }
 
-  /** Downloads into memory with a size limit and a timeout, retrying network errors and 5xx. */
+  /**
+   * Downloads into memory with a size limit and a timeout, retrying network errors and 5xx; a
+   * 429 (or a 403 with Retry-After: GitHub's anonymous limit) waits what the header says, up to
+   * MAX_RETRY_AFTER_SECONDS in all, then gives up as RateLimitedError. Network errors on every
+   * attempt end as NoConnectionError.
+   */
   async download(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     let lastError: unknown;
+    let waitedSeconds = 0;
     for (let attempt = 0; attempt <= this.retries; attempt += 1) {
       signal?.throwIfAborted();
       if (attempt > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+        await this.sleep(250 * 2 ** attempt);
       }
       try {
         const timeout = AbortSignal.timeout(this.timeoutMs);
@@ -123,6 +174,17 @@ export class GitHubContentSource implements ContentSource {
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
           headers: { 'User-Agent': 'BugDetective' },
         });
+        const retryAfter = retryAfterSeconds(response.headers.get('retry-after'));
+        if (response.status === 429 || (response.status === 403 && retryAfter !== null)) {
+          const seconds = retryAfter ?? 5;
+          if (waitedSeconds + seconds > MAX_RETRY_AFTER_SECONDS) {
+            throw new RateLimitedError(`${url}: HTTP ${response.status}, retry after ${seconds} s`, seconds);
+          }
+          waitedSeconds += seconds;
+          await this.sleep(seconds * 1000);
+          attempt -= 1; // A wait GitHub asked for is not one of the retries.
+          continue;
+        }
         if (response.status >= 500) {
           lastError = new DownloadError(`${url}: HTTP ${response.status}`, response.status);
           continue;
@@ -141,13 +203,16 @@ export class GitHubContentSource implements ContentSource {
         }
         return new Uint8Array(Buffer.concat(chunks));
       } catch (error) {
-        if (error instanceof DownloadError || signal?.aborted) {
+        if (error instanceof DownloadError || error instanceof RateLimitedError || signal?.aborted) {
           throw error;
         }
         lastError = error;
       }
     }
-    throw new DownloadError(`Download failed: ${url} (${lastError instanceof Error ? lastError.message : String(lastError)})`);
+    if (lastError instanceof DownloadError) {
+      throw new DownloadError(`Download failed: ${url} (${lastError.message})`, lastError.status);
+    }
+    throw new NoConnectionError(`Download failed: ${url} (${lastError instanceof Error ? lastError.message : String(lastError)})`);
   }
 
   /** The qa branch: the manifest and every ticket package, verified, plus the project files. */

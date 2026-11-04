@@ -163,8 +163,8 @@ export interface ProjectCard {
     counts: Record<Track, number>;
   } | null;
   progress: Record<Track, { done: number; total: number }> | null;
-  /** appTooOld: the project needs a newer Bug Detective (its minAppVersion, or a newer content format). */
-  unavailable: 'appTooOld' | null;
+  /** appTooOld: the project needs a newer Bug Detective (its minAppVersion, or a newer content format); projectUnavailable: its repository or qa ref could not be found. */
+  unavailable: 'appTooOld' | 'projectUnavailable' | null;
 }
 
 export type ProjectDifficulty = 'beginner' | 'intermediate' | 'advanced';

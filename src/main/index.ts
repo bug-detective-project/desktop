@@ -275,7 +275,9 @@ async function main(): Promise<void> {
   const userData = app.getPath('userData');
   let window: BrowserWindow | null = null;
   const catalog = catalogService(userData);
-  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch }, console.log);
+  // Development and tests only: another content host (an e2e test points it at a closed port to play offline).
+  const baseUrl = app.isPackaged ? undefined : process.env.BUGDETECTIVE_CONTENT_BASE_URL;
+  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch, baseUrl }, console.log);
   // The starter until the game names its own project (Game.init points everything at that one).
   const starter = (await catalog.current()).find((item) => item.starter)!;
   const game = new Game({

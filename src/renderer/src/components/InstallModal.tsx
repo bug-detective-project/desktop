@@ -17,12 +17,15 @@ export function InstallModal({
   lines,
   error,
   onClose,
+  onRetry,
 }: {
   kind?: InstallKind;
   phase: InstallPhase;
   lines: string[];
   error: string | null;
   onClose: () => void;
+  /** A failure worth repeating as it is (no internet, GitHub's limit): "Try again" runs the same download. */
+  onRetry?: (() => void) | null;
 }) {
   const { t } = useTranslation();
   const text = kind === 'ticket' ? 'dashboard.ticketModal' : 'dashboard.installModal';
@@ -60,6 +63,11 @@ export function InstallModal({
         <LogView lines={lines} className="min-h-0 flex-1 select-text" follow={phase === 'running'} />
         {phase !== 'running' && (
           <div className="flex justify-end gap-2">
+            {phase === 'failed' && onRetry && (
+              <Button variant="primary" onClick={onRetry} data-testid="install-modal-retry">
+                {t('dashboard.installModal.retry')}
+              </Button>
+            )}
             <Button onClick={() => void copy()} data-testid="install-modal-copy">
               {t('dashboard.installModal.copy')}
             </Button>

@@ -34,6 +34,7 @@
     "intro": "O Bug Detective roda o SupportDesk no Docker e o abre no seu próprio VS Code. Vamos verificar se está tudo instalado.",
     "allOk": "Está tudo pronto.",
     "proxy": "Numa rede com proxy, o app segue as configurações do sistema; o Docker Desktop e o VS Code precisam das deles.",
+    "firstDownload": "O primeiro download precisa de internet e de uns 4 GB (as imagens do Docker e o projeto).",
     "proxyHelp": "Como configurar",
     "continue": "Começar a jogar",
     "status": {
@@ -160,6 +161,7 @@
     "trackDone": "Trilha concluída · {{done}}/{{total}}",
     "downloadProjectFirst": "Baixe o projeto primeiro.",
     "installModal": {
+      "retry": "Tentar de novo",
       "title": "Baixando o ambiente do jogo",
       "running": "Baixando e instalando. Na primeira vez isso pode levar vários minutos.",
       "done": "Tudo pronto.",
@@ -638,6 +640,9 @@
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
     "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
     "workspaceLost": "O código do seu workspace sumiu. Recrie-o no Painel, ou restaure um backup.",
+    "noConnection": "Sem conexão com a internet. Conecte-se e tente de novo.",
+    "githubRateLimited": "O GitHub limitou os downloads temporariamente (comum em redes compartilhadas). Tente de novo em alguns minutos.",
+    "projectUnavailable": "O projeto não está disponível agora: o repositório ou a publicação não foram encontrados.",
     "dbResetFailed": "Os dados da aplicação não puderam ser reiniciados. Veja o log do Docker e tente de novo.",
     "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
@@ -656,6 +661,7 @@
   },
   "projects": {
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",
+    "unavailable": "Indisponível: o projeto não pôde ser baixado agora.",
     "title": "Projetos",
     "intro": "Escolha o seu próximo projeto. Só um projeto fica no seu computador: trocar remove o atual do Docker e baixa o próximo. O seu progresso e os seus PRs ficam guardados.",
     "difficulty": "Dificuldade",
