@@ -45,7 +45,6 @@ export const Failed: Story = {
     await expect(within(canvasElement.ownerDocument.body).getByTestId('install-modal-error')).toHaveAttribute('data-tone', 'danger');
   },
 };
-export const DoneInDark: Story = { args: { phase: 'done' }, globals: { theme: 'dark' } };
 export const FailedInPortuguese: Story = { ...Failed, globals: { locale: 'pt' } };
 export const TicketRunning: Story = { args: { kind: 'ticket', phase: 'running', lines: ['» Fetching front-1 from the local qa folder', '» Verified front-1 (42 files and the ticket package, SHA-256)'] } };
 export const TicketFailed: Story = { args: { kind: 'ticket', phase: 'failed', lines: ['» Fetching front-1 from GitHub'], error: 'No internet connection. Connect and try again.' } };

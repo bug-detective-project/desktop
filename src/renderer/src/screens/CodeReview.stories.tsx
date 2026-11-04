@@ -7,4 +7,3 @@ const meta = { title: 'Screens/CodeReview', parameters: { layout: 'fullscreen' }
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Comparison: Story = { render: () => <CodeReview snapshot={snapshotFixture('review')} ticketNumber={1} onBack={fn()} /> };
-export const Dark: Story = { ...Comparison, globals: { theme: 'dark' } };

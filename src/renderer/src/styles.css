@@ -45,7 +45,8 @@
   --popover: oklch(0.165 0.014 240);
   --popover-foreground: oklch(0.98 0.005 240);
 
-  --primary: oklch(0.68 0.15 265);
+  /* Lighter than the light theme's: primary text on the tinted surfaces and the badges stays above 4.5:1 (axe, every story in the dark theme). */
+  --primary: oklch(0.72 0.14 265);
   --primary-foreground: oklch(0.12 0.01 240);
 
   --secondary: oklch(0.22 0.014 240);
@@ -54,11 +55,12 @@
   --muted-foreground: oklch(0.65 0.015 240);
   --accent: oklch(0.24 0.02 200);
   --accent-foreground: oklch(0.98 0.005 240);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 240);
+  /* A lighter red for text on the dark tints, with dark text on the solid danger button. */
+  --destructive: oklch(0.72 0.19 25);
+  --destructive-foreground: oklch(0.12 0.01 240);
   --border: oklch(0.25 0.014 240);
   --input: oklch(0.25 0.014 240);
-  --ring: oklch(0.68 0.15 265);
+  --ring: oklch(0.72 0.14 265);
 }
 
 @theme inline {

@@ -42,7 +42,6 @@ export const NoMatch: Story = {
   },
 };
 
-export const Dark: Story = { globals: { theme: 'dark' } };
 export const Portuguese: Story = { globals: { locale: 'pt' } };
 
 export const CatalogOutdated: Story = { render: outdated };
