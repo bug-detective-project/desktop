@@ -71,6 +71,14 @@ describe('containerLimits', () => {
 });
 
 describe('QaRunner', () => {
+  it('mounts the dependency cache read-only for a test run and writable only for the preparation', () => {
+    const { docker } = fakeDocker(false);
+    const qa = runner(docker);
+    const cache = (args: string[]) => args[args.findIndex((arg) => arg.includes('dst=/cache'))];
+    expect(cache(qa.containerArgs('x', { network: false, packageDir: '/tmp/pkg' }))).toMatch(/dst=\/cache,readonly/);
+    expect(cache(qa.containerArgs('x', { network: true }))).not.toMatch(/readonly/);
+  });
+
   it('records an out-of-memory result when the QA container was OOM-killed, and removes the container', async () => {
     const { docker, calls } = fakeDocker(true);
     const result = await runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' });
