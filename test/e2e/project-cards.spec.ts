@@ -137,7 +137,7 @@ test('a project without details cannot open its brief, and can still be played',
   const { page, close } = await openProjects();
   try {
     const card = page.getByTestId('project-gone');
-    await expect(card).toContainText('Connect to the internet to see the details.');
+    await expect(card).toContainText('Details unavailable without a connection.');
     await expect(page.getByTestId('project-gone-brief')).toBeDisabled();
     await expect(page.getByTestId('switch-gone')).toBeEnabled();
   } finally {
