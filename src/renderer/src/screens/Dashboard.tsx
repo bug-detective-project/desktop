@@ -14,7 +14,7 @@ import { INSTALL_DISK_BYTES } from '@shared/api.ts'
 import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
-import { Badge, Button, Notice, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
+import { Badge, Button, Notice, Spinner, StagePill, Tooltip, Modal } from '../components/ui.tsx'
 import { WorkspaceLostNotice } from '../components/WorkspaceLostNotice.tsx'
 import type { Story } from '../content.ts'
 import { story } from '../content.ts'
@@ -530,6 +530,83 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
   )
 }
 
+/**
+ * The workspace's network: closed by default, opened by the player after a warning. The game
+ * closes it again on the next ticket, on a project switch and when it quits.
+ */
+function InternetRow({ snapshot }: { snapshot: Snapshot }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const on = snapshot.workspaceInternet
+  const tone: Tone = on ? 'warn' : 'ok'
+  const change = async (next: boolean) => {
+    setConfirming(false)
+    setBusy(true)
+    try {
+      await api.setWorkspaceInternet(next)
+    } catch (error) {
+      toast.error(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <li
+      className="flex min-w-0 items-center gap-2.5"
+      data-testid="env-internet"
+      data-tone={tone}
+      data-on={String(on)}
+    >
+      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[tone].circle}`}>
+        <Icon
+          name="globe"
+          className="size-[13px]"
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-foreground">{t('dashboard.env.internet')}</span>
+        <span className={`block text-xs font-medium ${TONE_STYLES[tone].text}`}>{t(`dashboard.workspaceInternet.${on ? 'on' : 'off'}`)}</span>
+      </span>
+      <Button
+        size="sm"
+        busy={busy}
+        disabled={busy || snapshot.busy !== null || snapshot.dockerState !== 'running'}
+        onClick={() => (on ? void change(false) : setConfirming(true))}
+        data-testid="workspace-internet-toggle"
+      >
+        {t(`dashboard.workspaceInternet.${on ? 'close' : 'open'}`)}
+      </Button>
+      {confirming && (
+        <Modal
+          title={t('dashboard.workspaceInternet.title')}
+          onClose={() => setConfirming(false)}
+          data-testid="workspace-internet-dialog"
+        >
+          <Notice data-testid="workspace-internet-warning">{t('dashboard.workspaceInternet.text')}</Notice>
+          <p className="mt-3 text-base text-muted-foreground">{t('dashboard.workspaceInternet.why')}</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button
+              onClick={() => setConfirming(false)}
+              data-testid="workspace-internet-cancel"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void change(true)}
+              data-testid="workspace-internet-confirm"
+            >
+              {t('dashboard.workspaceInternet.confirm')}
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </li>
+  )
+}
+
 /** Local environment, always expanded: four rows and a summary badge of their worst state. */
 function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation()
@@ -554,7 +631,7 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
     }
   }, [unchecked])
   const rows = environmentRows(snapshot, t)
-  const tone = environmentSummary(rows)
+  const tone = environmentSummary(rows, snapshot.state.tickets.length > 0 && snapshot.workspaceInternet)
   return (
     <section
       className="flex flex-col gap-3"
@@ -599,6 +676,7 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
           </li>
         ))}
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
+        {snapshot.state.tickets.length > 0 && <InternetRow snapshot={snapshot} />}
       </ul>
     </section>
   )

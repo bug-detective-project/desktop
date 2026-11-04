@@ -98,10 +98,10 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
   return rows
 }
 
-/** The summary badge: danger when something is missing or stopped, warn while something runs, ok otherwise. */
-export function environmentSummary(rows: EnvRow[]): 'ok' | 'warn' | 'danger' {
+/** The summary badge: danger when something is missing or stopped, warn while something runs or the workspace is open to the internet, ok otherwise. */
+export function environmentSummary(rows: EnvRow[], workspaceInternet = false): 'ok' | 'warn' | 'danger' {
   if (rows.some((row) => row.tone === 'danger')) return 'danger'
-  if (rows.some((row) => row.tone === 'warn')) return 'warn'
+  if (workspaceInternet || rows.some((row) => row.tone === 'warn')) return 'warn'
   return 'ok'
 }
 

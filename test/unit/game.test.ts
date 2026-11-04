@@ -223,6 +223,55 @@ describe('a restored save is checked against the publication', () => {
   });
 });
 
+describe("the workspace's internet", () => {
+  it('opens when asked, shows in the snapshot, and closes on the next ticket', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'] } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().workspaceInternet).toBe(false);
+    await game.setWorkspaceInternet(true);
+    expect(game.snapshot().workspaceInternet).toBe(true);
+    expect(game.snapshot().log.join('\n')).toContain('can reach the internet');
+
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(1);
+    await game.nextAssignment();
+    expect(game.snapshot().workspaceInternet).toBe(false);
+    expect(runtime.internetChanges).toEqual([true, false]);
+  });
+
+  it('closes what a crash left open, follows what Docker says, and is refused while the code is lost', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    await runtime.setWorkspaceInternet(true);
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceInternet).toBe(true);
+    await game.cleanupLeftovers();
+    expect(game.snapshot().workspaceInternet).toBe(false);
+    expect(await runtime.workspaceInternet()).toBe(false);
+
+    await runtime.setWorkspaceInternet(true);
+    runtime.simulate({ workspaceLost: true });
+    await game.refreshEnvironment();
+    await expect(game.setWorkspaceInternet(true)).rejects.toMatchObject({ code: 'workspaceLost' });
+    await game.rebuildWorkspace();
+    expect(game.snapshot().workspaceInternet).toBe(false);
+    expect(await runtime.workspaceInternet()).toBe(false);
+  });
+
+  it('is closed when the app quits', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    await game.setWorkspaceInternet(true);
+    await game.shutdown();
+    expect(await runtime.workspaceInternet()).toBe(false);
+  });
+});
+
 describe('a failed database reset', () => {
   it('is logged and shown, never stops the ticket, and clears with a retry that succeeds', async () => {
     const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
@@ -921,7 +970,7 @@ describe('Game', () => {
     expect(clean).toHaveBeenCalledWith('everything');
     // A failure is reported, and the rest still goes.
     expect(result.failed).toEqual([{ kind: 'volume', name: 'bugdetective-qa-cache', reason: 'Error response from daemon: bugdetective-qa-cache is in use' }]);
-    expect(result.removed).toBe(6);
+    expect(result.removed).toBe(8);
     expect(result.workspaceKept).toBe(false);
     expect(game.current.createdAt).not.toBe(firstGame);
     expect(game.current.tickets).toEqual([]);

@@ -144,12 +144,12 @@ beforeAll(async () => {
   docker = new Docker(cli, runCommand);
   runtime = new FixtureRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names }).destroy();
+  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'tasklist' }).destroy();
 });
 
 afterAll(async () => {
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names }).destroy();
+  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'tasklist' }).destroy();
   for (const volume of [runtime.names.vscodeVolume, runtime.names.cacheVolume, runtime.names.qaInputVolume]) {
     await docker.removeVolume(volume);
   }

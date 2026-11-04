@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import type { Snapshot } from '@shared/api.ts';
 import { snapshotFixture } from '../storybook/fixtures.ts';
 import { Dashboard } from './Dashboard.tsx';
@@ -20,6 +20,16 @@ export const TicketInProgress: Story = { render: show(() => snapshotFixture('act
 export const TicketInCodeReview: Story = { render: show(() => snapshotFixture('review')) };
 export const DockerStopped: Story = { render: show(() => snapshotFixture('queued', { dockerState: 'notRunning' })) };
 export const DatabaseResetFailed: Story = { render: show(() => snapshotFixture('active', { dbResetFailed: true })) };
+export const WorkspaceInternetOn: Story = { render: show(() => snapshotFixture('active', { workspaceInternet: true })) };
+export const WorkspaceInternetOnInPortuguese: Story = { ...WorkspaceInternetOn, globals: { locale: 'pt' } };
+/** Opening asks first: the warning says what else the project's code reaches. */
+export const WorkspaceInternetDialog: Story = {
+  render: show(() => snapshotFixture('active')),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByTestId('workspace-internet-toggle'));
+    await expect(within(canvasElement.ownerDocument.body).getByTestId('workspace-internet-warning')).toHaveTextContent('your local network');
+  },
+};
 export const WorkspaceLost: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true })) };
 export const WorkspaceRecreating: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true, busy: 'rebuilding', log: ['» Fetching front-1', '» Recreated the code of ticket 1 (front-1)'] })) };
 export const Portuguese: Story = { render: show(() => snapshotFixture('active')), globals: { locale: 'pt' } };

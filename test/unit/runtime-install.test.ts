@@ -31,6 +31,7 @@ describe('workspaceStatus', () => {
     const ensureRunning = vi.fn();
     (runtime as unknown as Record<string, unknown>).workspace = async () => ({
       info: async () => info,
+      ports: async () => (info ? { client: info.ports[15173], api: info.ports[3001] } : null),
       isDevServerUp: async () => true,
       currentBranch: async () => 'player/ticket-1',
       ensureRunning,

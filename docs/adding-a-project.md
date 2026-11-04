@@ -42,8 +42,8 @@ Published content runs on the player's PC: in the workspace container, in VS Cod
 browser. These rules keep that safe; `bd validate` checks the ones marked with it, and the review of
 a third-party project reads the rest.
 
-- **Offline.** No bug needs a new package, and the app calls no external API: the workspace will
-  have no internet, and a bug that cannot be fixed offline cannot be fixed at all.
+- **Offline.** No bug needs a new package, and the app calls no external API: the workspace has
+  no internet unless the player opens it, and a bug that cannot be fixed offline cannot be fixed at all.
 - **Dependencies** (`bd validate`): every package of `main` and of every ticket branch comes from
   `https://registry.npmjs.org/` with an integrity hash (no git or URL dependencies); install
   scripts are allowed only for the packages of the catalog's `ALLOWED_INSTALL_SCRIPTS`

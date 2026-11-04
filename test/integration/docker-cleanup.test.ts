@@ -37,9 +37,10 @@ const exists = {
 };
 
 async function removeEverythingOfTheTest() {
-  for (const container of [`${PREFIX}-workspace`, `${PREFIX}-qa-0001`]) {
+  for (const container of [`${PREFIX}-workspace`, `${PREFIX}-qa-0001`, `${PREFIX}-forward-other`]) {
     await docker.removeContainer(container);
   }
+  await docker.removeNetwork(`${PREFIX}-net-other`).catch(() => {});
   for (const volume of [`${PREFIX}-workspace`, `${PREFIX}-qa-input`]) {
     await docker.removeVolume(volume).catch(() => {});
   }
@@ -64,9 +65,11 @@ beforeAll(async () => {
   }
   await docker.createVolume(`${PREFIX}-workspace`, 'workspace');
   await docker.createVolume(`${PREFIX}-qa-input`, 'qa-input');
+  await docker.createInternalNetwork(`${PREFIX}-net-other`, 'network', 'other');
   for (const [name, role] of [
     [`${PREFIX}-workspace`, 'workspace'],
     [`${PREFIX}-qa-0001`, 'qa'],
+    [`${PREFIX}-forward-other`, 'forwarder'],
   ]) {
     await docker.checked(['container', 'create', '--name', name, '--label', `${LABEL}=${role}`, IMAGES.workspace, 'true']);
   }
@@ -97,6 +100,8 @@ describe('Docker cleanup', () => {
     expect(result.workspaceKept).toBe(false);
     expect(await exists.container(`${PREFIX}-workspace`)).toBe(false);
     expect(await exists.volume(`${PREFIX}-workspace`)).toBe(false);
+    expect(await exists.container(`${PREFIX}-forward-other`)).toBe(false);
+    expect(await docker.networkExists(`${PREFIX}-net-other`)).toBe(false);
     expect(await exists.image(IMAGES.workspace)).toBe(false);
     expect(await exists.image(IMAGES.qa)).toBe(false);
     // Another namespace (the image the tags were made from) is untouched.

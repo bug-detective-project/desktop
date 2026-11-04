@@ -13,12 +13,13 @@ import type { DockerCleanupScope } from '../../shared/api.ts';
 export interface LabelledResources {
   containers: string[];
   volumes: string[];
+  networks: string[];
   /** "repository:tag" (or "<none>:<none>" for an untagged image) and the image id. */
   images: { ref: string; id: string }[];
 }
 
 export interface CleanupTarget {
-  kind: 'container' | 'volume' | 'image';
+  kind: 'container' | 'volume' | 'network' | 'image';
   /** The name shown to the player, and the reference passed to docker. */
   name: string;
 }
@@ -31,6 +32,8 @@ export interface CleanupPlanOptions {
   qaInputVolume: string;
   /** The image tags of this app version ("repository:tag"). */
   currentImages: readonly string[];
+  /** The active project: its forwarder and network are in use; those of any other project are leftovers. */
+  activeProject?: string | null;
 }
 
 const repository = (ref: string) => ref.slice(0, ref.lastIndexOf(':'));
@@ -42,9 +45,11 @@ export function isQaContainer(name: string, prefix: string): boolean {
 }
 
 /**
- * The resources to remove, containers first (they hold volumes and images), then volumes, then images.
- * leftovers: QA containers, the QA input volume and images of other app versions; the player's work stays.
- * everything: every container, volume and image of the app, including the player's code.
+ * The resources to remove, containers first (they hold volumes, networks and images), then
+ * volumes, networks and images.
+ * leftovers: QA containers, the QA input volume, images of other app versions and the forwarder
+ * and network of a project that is not the active one; the player's work stays.
+ * everything: every container, volume, network and image of the app, including the player's code.
  */
 export function planCleanup(found: LabelledResources, options: CleanupPlanOptions): CleanupTarget[] {
   const everything = options.scope === 'everything';
@@ -52,8 +57,14 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
   const repositories = new Set(options.currentImages.map(repository));
   const current = new Set(options.currentImages);
 
-  const containers = found.containers.filter((name) => ours(name) && (everything || isQaContainer(name, options.prefix)));
+  const orphan = (name: string, kind: 'forward' | 'net') => {
+    const stem = `${options.prefix}-${kind}-`;
+    return Boolean(options.activeProject) && name.startsWith(stem) && name !== `${stem}${options.activeProject}`;
+  };
+
+  const containers = found.containers.filter((name) => ours(name) && (everything || isQaContainer(name, options.prefix) || orphan(name, 'forward')));
   const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume));
+  const networks = found.networks.filter((name) => ours(name) && (everything || orphan(name, 'net')));
   const images = found.images.filter(({ ref }) => {
     // Untagged images with the app's label ("<none>:<none>", or "repository:<none>") are what a rebuild leaves behind.
     if (untagged(ref)) {
@@ -65,6 +76,7 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
   return [
     ...containers.map((name) => ({ kind: 'container' as const, name })),
     ...volumes.map((name) => ({ kind: 'volume' as const, name })),
+    ...networks.map((name) => ({ kind: 'network' as const, name })),
     // An untagged image is removed by id ("repository:<none>" is no valid reference); a tagged one by
     // its tag, so an id shared with another tag keeps that tag.
     ...images.map(({ ref, id }) => ({ kind: 'image' as const, name: untagged(ref) ? id : ref })),

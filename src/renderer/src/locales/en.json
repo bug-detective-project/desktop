@@ -132,7 +132,8 @@
       "qaImage": "QA image",
       "projectDependencies": "Dependencies",
       "devServer": "Dev server",
-      "database": "App data"
+      "database": "App data",
+      "internet": "Workspace internet"
     },
     "retryReset": "Try again",
     "envStatus": {
@@ -182,6 +183,16 @@
       "title": "Downloading the ticket",
       "running": "Downloading the ticket's code and its package, and preparing your workspace.",
       "done": "The ticket is ready."
+    },
+    "workspaceInternet": {
+      "off": "Off",
+      "on": "On until the next ticket",
+      "open": "Open",
+      "close": "Close it",
+      "title": "Open the workspace to the internet?",
+      "text": "While on, the project's code can reach the internet, your computer (host.docker.internal) and your local network. The game turns it off again on the next ticket and when it closes.",
+      "why": "You need this only to install a package or for an extension that needs the network inside the container.",
+      "confirm": "Open to the internet"
     }
   },
   "onboarding": {
@@ -590,7 +601,8 @@
       "kinds": {
         "container": "Container",
         "volume": "Volume",
-        "image": "Image"
+        "image": "Image",
+        "network": "Network"
       },
       "gameKept": "Your progress was kept: the volume with your code could not be removed.",
       "gameReset": "A new game has started."

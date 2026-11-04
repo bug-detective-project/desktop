@@ -92,7 +92,7 @@ export type DockerCleanupScope = 'leftovers' | 'everything';
 /** What a Docker cleanup removed, and what it could not remove (with Docker's reason). */
 export interface DockerCleanup {
   removed: number;
-  failed: { kind: 'container' | 'volume' | 'image'; name: string; reason: string }[];
+  failed: { kind: 'container' | 'volume' | 'network' | 'image'; name: string; reason: string }[];
   /** "everything" only: the volume with the player's code is still there, so the game was kept. */
   workspaceKept?: boolean;
 }
@@ -186,7 +186,7 @@ export interface Snapshot {
   /** A new game cannot start: the catalog's starter project needs a newer Bug Detective. */
   starterNeedsUpdate: boolean;
   /** While a project switch is pending: what Docker still holds of other projects. */
-  projectSwitchLeft: { kind: 'container' | 'volume' | 'image'; name: string }[] | null;
+  projectSwitchLeft: { kind: 'container' | 'volume' | 'network' | 'image'; name: string }[] | null;
   titles: Record<number, Record<Language, string>>;
   hintsTotal: Record<number, number>;
   busy: BusyTask;
@@ -194,6 +194,8 @@ export interface Snapshot {
   workspaceLost: boolean;
   /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
   dbResetFailed: boolean;
+  /** The player opened the workspace to the internet (it also reaches the computer and the local network); the game closes it on the next ticket. */
+  workspaceInternet: boolean;
   /** The last catalog refresh failed (offline, or an invalid catalog): the Projects screen shows the last saved list. */
   catalogRefresh: { failedAt: string } | null;
   dockerState: EngineState | null;
@@ -311,6 +313,8 @@ export interface BugDetectiveApi {
   reportRendererError(message: string, stack: string): Promise<void>;
   /** Runs `npm run db:reset` again after a failed reset (the Dashboard's "Try again"). */
   retryDatabaseReset(): Promise<void>;
+  /** Opens the workspace container to the internet, or closes it again. */
+  setWorkspaceInternet(on: boolean): Promise<void>;
   /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */
   diagnostics(): Promise<string>;
   /** Opens the folder of the log files in the system's file manager. */
