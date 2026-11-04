@@ -14,7 +14,7 @@ import type { ContentSource } from './content/source.ts';
 
 export function contentSourceFor(
   project: ResolvedProject,
-  options: { userData: string; minVersion: string | null; baseUrl?: string },
+  options: { userData: string; minVersion: string | null; baseUrl?: string; fetch?: typeof fetch },
   log: (line: string) => void,
 ): ContentSource {
   if (project.qaDir !== undefined) {
@@ -24,6 +24,7 @@ export function contentSourceFor(
     repository: project.repository,
     project: project.id,
     qaRef: project.qaRef,
+    fetch: options.fetch,
     minVersion: options.minVersion ?? undefined,
     baseUrl: options.baseUrl,
   });

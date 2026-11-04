@@ -327,6 +327,7 @@ export const EXTERNAL_LINKS = {
   wsl: 'https://learn.microsoft.com/windows/wsl/install',
   vscode: 'https://code.visualstudio.com/download',
   devContainers: 'https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers',
+  proxyHelp: 'https://github.com/bug-detective-project/desktop#networks-with-a-proxy',
 } as const;
 
 export type ExternalLink = keyof typeof EXTERNAL_LINKS;

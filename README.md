@@ -45,6 +45,15 @@ renderer.config.ts     the renderer's Vite plugins and aliases, shared by the ap
 - For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
 - For editing game content only: `../supportdesk` and `../supportdesk-qa` next to this folder, a clone of the SupportDesk repository and its published `qa` branch (see below). The integration tests play their own example project (`test/fixtures/notes`), and the e2e tests use `../supportdesk-qa` when it is there, otherwise the SupportDesk publication pinned in `test/e2e/supportdesk-version.ts`, cloned once into `test/.cache/` (git-ignored; that first run needs internet). The unit tests play `test/fixtures/notes` too: no automated test reads `../supportdesk-qa` except the e2e ones, which fall back to the pinned publication. `pnpm run dev` and `pnpm run build` need no game project: the app downloads each project's content, QA CLI included, at run time.
 
+## Networks with a proxy
+
+The app downloads the projects catalog and each project's content through Electron's `net.fetch`, so it follows the Windows proxy settings (including an authenticating proxy) and the Windows certificate store, exactly as a browser does: nothing to configure in the app. Two other programs download on their own and need their own settings:
+
+- **Docker Desktop** pulls the base images and, when a ticket's dependencies are prepared, the npm packages: Settings → Resources → Proxies (manual proxy configuration, with the same address the browser uses).
+- **VS Code** downloads its server and the Dev Containers extension: `http.proxy` in its settings (and `http.proxyStrictSSL` when the proxy inspects TLS with its own certificate).
+
+The first-run checklist links to this section.
+
 ### Getting the SupportDesk repository
 
 > **You never need to create a branch in a project listed in the projects catalog to run the app.** Every project is already published on GitHub (`main`, `qa`, the ticket branches and their tags), and the app downloads everything from there at run time. To run the tests or edit content, all you do is clone the repository and check out its existing `qa` branch with the two commands below. The ticket branches are created only by `npx bd build` when content authors change them.
