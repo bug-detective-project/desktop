@@ -167,6 +167,9 @@ export interface ReviewSession {
 }
 
 export const SCHEMA_VERSION = 8;
+/** The schema and the save format of the first version for players: from here on, a change ships a migration (services/migrations.ts). */
+export const RELEASED_SCHEMA_VERSION = 8;
+export const RELEASED_SAVE_FORMAT_VERSION = 5;
 
 /** What a game keeps of a project that is not the active one: its progress and its PRs' history. */
 export interface ProjectProgress {

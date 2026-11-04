@@ -15,6 +15,7 @@ import { SCHEMA_VERSION } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
 import { UnsafeArchiveError, readZip, sha256Hex, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import { SAVE_MIGRATIONS, STATE_MIGRATIONS, canMigrate, migrate } from './migrations.ts';
 import { parseState } from './state.ts';
 
 export const SAVE_EXTENSION = 'bdsave';
@@ -151,7 +152,7 @@ export function readSave(bytes: Uint8Array, key: Uint8Array): ValidatedSave {
     }
     throw new InvalidSaveError('The file is not a Bug Detective save (not a valid zip)');
   }
-  const byPath = new Map(files.map((file) => [file.path, file]));
+  let byPath = new Map(files.map((file) => [file.path, file]));
   const manifestFile = byPath.get('manifest.json');
   if (!manifestFile) {
     throw new InvalidSaveError('The save has no manifest');
@@ -167,17 +168,16 @@ export function readSave(bytes: Uint8Array, key: Uint8Array): ValidatedSave {
     throw new InvalidSaveError(`The save manifest is invalid: ${parsed.error.issues[0]?.message}`);
   }
   const manifest = parsed.data;
-  if (manifest.formatVersion !== SAVE_FORMAT_VERSION) {
-    throw new InvalidSaveError(
-      manifest.formatVersion < SAVE_FORMAT_VERSION
-        ? 'This save was made by an older, unsupported version of Bug Detective'
-        : 'This save was created by a newer version of Bug Detective',
-    );
+  if (manifest.formatVersion > SAVE_FORMAT_VERSION) {
+    throw new InvalidSaveError('This save was created by a newer version of Bug Detective');
+  }
+  if (!canMigrate(manifest.formatVersion, SAVE_FORMAT_VERSION, SAVE_MIGRATIONS)) {
+    throw new InvalidSaveError('This save was made by an older, unsupported version of Bug Detective');
   }
   if (manifest.schemaVersion > SCHEMA_VERSION) {
     throw new InvalidSaveError('This save was created by a newer version of Bug Detective');
   }
-  if (manifest.schemaVersion < SCHEMA_VERSION) {
+  if (!canMigrate(manifest.schemaVersion, SCHEMA_VERSION, STATE_MIGRATIONS)) {
     throw new InvalidSaveError('This save was made by an older, unsupported version of Bug Detective');
   }
   if (!manifest.files['state.json']) {
@@ -194,6 +194,7 @@ export function readSave(bytes: Uint8Array, key: Uint8Array): ValidatedSave {
       throw new InvalidSaveError(`The save contains an unexpected file: ${path}`);
     }
   }
+  byPath = migrate(byPath, manifest.formatVersion, SAVE_FORMAT_VERSION, SAVE_MIGRATIONS) as typeof byPath;
 
   let state: GameState;
   try {
