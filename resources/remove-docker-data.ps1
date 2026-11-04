@@ -53,5 +53,7 @@ foreach ($name in (Invoke-Docker @('volume', 'ls', '--filter', $filter, '--forma
 foreach ($id in (Invoke-Docker @('image', 'ls', '--filter', $filter, '--format', '{{.ID}}') | Sort-Object -Unique)) {
   $null = Invoke-Docker @('image', 'rm', '--force', $id) 120
 }
+# The app's BuildKit builder (its container and build cache) carries no label: removed by name.
+$null = Invoke-Docker @('buildx', 'rm', '--force', 'bugdetective-builder') 120
 Write-Output 'Removed the Bug Detective data from Docker.'
 exit 0
