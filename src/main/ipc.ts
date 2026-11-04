@@ -11,6 +11,7 @@ import type { Envelope } from '../shared/api.ts';
 import { COLUMNS, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, TRACK_CHOICES } from '../shared/types.ts';
 import type { Game } from './game.ts';
 import { GameError } from './game.ts';
+import { nativeText } from './native-text.ts';
 import { SAVE_EXTENSION } from './services/backup.ts';
 import { localCatalogSchema } from './services/catalog.ts';
 import { DockerUnavailableError } from './services/docker.ts';
@@ -141,10 +142,11 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     exportProgress: async () => {
       const window = BrowserWindow.getFocusedWindow();
       const date = new Date().toISOString().slice(0, 10);
+      const text = (key: Parameters<typeof nativeText>[1]) => nativeText(game.snapshot().state.settings.language, key);
       const options = {
-        title: 'Export progress',
+        title: text('exportProgress'),
         defaultPath: `bug-detective-${date}.${SAVE_EXTENSION}`,
-        filters: [{ name: 'Bug Detective save', extensions: [SAVE_EXTENSION] }],
+        filters: [{ name: text('saveFilter'), extensions: [SAVE_EXTENSION] }],
       };
       const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
       if (result.canceled || !result.filePath) {
@@ -155,10 +157,11 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     },
     inspectSave: async () => {
       const window = BrowserWindow.getFocusedWindow();
+      const text = (key: Parameters<typeof nativeText>[1]) => nativeText(game.snapshot().state.settings.language, key);
       const options = {
-        title: 'Restore progress',
+        title: text('restoreProgress'),
         properties: ['openFile' as const],
-        filters: [{ name: 'Bug Detective save', extensions: [SAVE_EXTENSION] }],
+        filters: [{ name: text('saveFilter'), extensions: [SAVE_EXTENSION] }],
       };
       const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
       const [file] = result.filePaths;
@@ -181,10 +184,11 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
         throw new GameError('notAllowed');
       }
       const window = BrowserWindow.getFocusedWindow();
+      const text = (key: Parameters<typeof nativeText>[1]) => nativeText(game.snapshot().state.settings.language, key);
       const options =
         kind === 'file'
-          ? { title: 'Projects catalog', properties: ['openFile' as const], filters: [{ name: 'Projects catalog', extensions: ['json'] }] }
-          : { title: 'Project qa folder', properties: ['openDirectory' as const] };
+          ? { title: text('projectsCatalog'), properties: ['openFile' as const], filters: [{ name: text('projectsCatalog'), extensions: ['json'] }] }
+          : { title: text('projectQaFolder'), properties: ['openDirectory' as const] };
       const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
