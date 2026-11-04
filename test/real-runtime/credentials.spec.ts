@@ -249,7 +249,8 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
 
     // VS Code really attached (the extension's IPC socket of this session exists in the server's environment).
     expect(after['environment of the vscode-server processes (selected variables)']).toMatch(/REMOTE_CONTAINERS_IPC=/);
-    // What the app guarantees.
+    // What the app guarantees. The workspace reaches nothing outside (task 4.3), and VS Code attached all the same.
+    expect(after['internet from the container (VS Code update server)']).not.toMatch(/\b200\b/);
     expect(after['credential.helper (git config --show-origin)']).toBe('(none)');
     expect(after['~/.gitconfig']).not.toMatch(/credential|pedro|@users\.noreply\.github\.com/);
     expect(after['git credential fill for github.com, plain docker exec (redacted)']).not.toMatch(/^username=/m);

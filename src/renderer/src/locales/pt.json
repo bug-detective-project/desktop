@@ -132,7 +132,8 @@
       "qaImage": "Imagem de QA",
       "projectDependencies": "Dependências",
       "devServer": "Servidor de desenvolvimento",
-      "database": "Dados da aplicação"
+      "database": "Dados da aplicação",
+      "internet": "Internet do workspace"
     },
     "retryReset": "Tentar de novo",
     "envStatus": {
@@ -182,6 +183,16 @@
       "title": "Baixando o ticket",
       "running": "Baixando o código e o pacote do ticket e preparando o seu workspace.",
       "done": "O ticket está pronto."
+    },
+    "workspaceInternet": {
+      "off": "Desligada",
+      "on": "Ligada até o próximo ticket",
+      "open": "Liberar",
+      "close": "Desligar",
+      "title": "Liberar a internet do workspace?",
+      "text": "Enquanto estiver ligada, o código do projeto alcança a internet, o seu computador (host.docker.internal) e a sua rede local. O jogo desliga de novo no próximo ticket e ao fechar.",
+      "why": "Só é preciso para instalar um pacote ou para uma extensão que use a rede dentro do container.",
+      "confirm": "Liberar a internet"
     }
   },
   "onboarding": {
@@ -590,7 +601,8 @@
       "kinds": {
         "container": "Container",
         "volume": "Volume",
-        "image": "Imagem"
+        "image": "Imagem",
+        "network": "Rede"
       },
       "gameKept": "Seu progresso foi mantido: o volume com o seu código não pôde ser removido.",
       "gameReset": "Um novo jogo começou."

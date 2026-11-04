@@ -24,6 +24,8 @@ export interface ContainerInfo {
   image: string;
   /** Published host ports by container port, for example { 15173: 5173 }. */
   ports: Record<number, number>;
+  /** The Docker networks the container is connected to. */
+  networks: string[];
   labels: Record<string, string>;
 }
 
@@ -175,6 +177,7 @@ export class Docker {
       State: { Running: boolean };
       Config: { Image: string; Labels: Record<string, string> | null };
       HostConfig: { PortBindings: Record<string, { HostPort: string }[] | null> | null };
+      NetworkSettings?: { Networks?: Record<string, unknown> | null };
     }[];
     const ports: Record<number, number> = {};
     for (const [key, bindings] of Object.entries(raw.HostConfig.PortBindings ?? {})) {
@@ -188,6 +191,7 @@ export class Docker {
       running: raw.State.Running,
       image: raw.Config.Image,
       ports,
+      networks: Object.keys(raw.NetworkSettings?.Networks ?? {}),
       labels: raw.Config.Labels ?? {},
     };
   }
@@ -211,14 +215,16 @@ export class Docker {
   async labelled(): Promise<LabelledResources> {
     const filter = ['--filter', `label=${LABEL}`];
     const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
-    const [containers, volumes, images] = await Promise.all([
+    const [containers, volumes, networks, images] = await Promise.all([
       this.checked(['container', 'ls', '--all', ...filter, '--format', '{{.Names}}'], { timeoutMs: 30_000 }),
       this.checked(['volume', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
+      this.checked(['network', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
       this.checked(['image', 'ls', ...filter, '--format', '{{.Repository}}:{{.Tag}}|{{.ID}}'], { timeoutMs: 30_000 }),
     ]);
     return {
       containers: lines(containers),
       volumes: lines(volumes),
+      networks: lines(networks),
       images: lines(images).map((line) => {
         const [ref = '', id = ''] = line.split('|');
         return { ref, id };
@@ -230,19 +236,47 @@ export class Docker {
   async ofProject(project: string): Promise<LabelledResources> {
     const filter = ['--filter', `label=${PROJECT_LABEL}=${project}`];
     const lines = (result: RunResult) => result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
-    const [containers, volumes, images] = await Promise.all([
+    const [containers, volumes, networks, images] = await Promise.all([
       this.checked(['container', 'ls', '--all', ...filter, '--format', '{{.Names}}'], { timeoutMs: 30_000 }),
       this.checked(['volume', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
+      this.checked(['network', 'ls', ...filter, '--format', '{{.Name}}'], { timeoutMs: 30_000 }),
       this.checked(['image', 'ls', ...filter, '--format', '{{.Repository}}:{{.Tag}}|{{.ID}}'], { timeoutMs: 30_000 }),
     ]);
     return {
       containers: lines(containers),
       volumes: lines(volumes),
+      networks: lines(networks),
       images: lines(images).map((line) => {
         const [ref = '', id = ''] = line.split('|');
         return { ref, id };
       }),
     };
+  }
+
+  async networkExists(name: string): Promise<boolean> {
+    return (await this.run(['network', 'inspect', name], { timeoutMs: 30_000 })).code === 0;
+  }
+
+  /** Creates an internal network (no gateway: nothing on it reaches the internet, the computer or the local network). */
+  async createInternalNetwork(name: string, role: string, project?: string | null): Promise<void> {
+    if (!(await this.networkExists(name))) {
+      await this.checked(['network', 'create', '--internal', ...labelArgs(role, project), name], { timeoutMs: 60_000 });
+    }
+  }
+
+  /** Removes a network (nothing when it does not exist; it fails while a container is connected). */
+  async removeNetwork(name: string): Promise<void> {
+    if (await this.networkExists(name)) {
+      await this.checked(['network', 'rm', name], { timeoutMs: 60_000 });
+    }
+  }
+
+  async connectNetwork(network: string, container: string): Promise<void> {
+    await this.checked(['network', 'connect', network, container], { timeoutMs: 30_000 });
+  }
+
+  async disconnectNetwork(network: string, container: string): Promise<void> {
+    await this.checked(['network', 'disconnect', network, container], { timeoutMs: 30_000 });
   }
 
   /** Names of containers carrying the given role label (running or not). */

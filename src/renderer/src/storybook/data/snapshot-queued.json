@@ -122,6 +122,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "workspaceInternet": false,
   "catalogRefresh": null,
   "dockerState": "running",
   "prerequisites": {

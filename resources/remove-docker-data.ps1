@@ -1,5 +1,5 @@
 # Removes everything Bug Detective created in Docker: containers, volumes (the player's code
-# included) and images. Run by the Windows uninstaller (resources/installer.nsh), never on an
+# included), networks and images. Run by the Windows uninstaller (resources/installer.nsh), never on an
 # update; it can also be run by hand:
 #   powershell -ExecutionPolicy Bypass -File "<install folder>\resources\remove-docker-data.ps1"
 # Everything the app creates carries the label bugdetective.role and a name starting with
@@ -49,6 +49,9 @@ foreach ($name in (Invoke-Docker @('container', 'ls', '--all', '--filter', $filt
 }
 foreach ($name in (Invoke-Docker @('volume', 'ls', '--filter', $filter, '--format', '{{.Name}}'))) {
   if ($name -like 'bugdetective-*') { $null = Invoke-Docker @('volume', 'rm', '--force', $name) }
+}
+foreach ($name in (Invoke-Docker @('network', 'ls', '--filter', $filter, '--format', '{{.Name}}'))) {
+  if ($name -like 'bugdetective-*') { $null = Invoke-Docker @('network', 'rm', $name) }
 }
 foreach ($id in (Invoke-Docker @('image', 'ls', '--filter', $filter, '--format', '{{.ID}}') | Sort-Object -Unique)) {
   $null = Invoke-Docker @('image', 'rm', '--force', $id) 120

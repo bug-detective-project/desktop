@@ -15,6 +15,11 @@ export const WORKSPACE_LIMITS: ContainerLimits = { memory: '3g', pids: 1024 };
 /** A QA run or the dependency preparation: the project's tests, Vite, Chromium. */
 export const QA_LIMITS: ContainerLimits = { memory: '2g', pids: 512 };
 
+/** The forwarder: a small TCP relay, and the only container on both networks. */
+export const FORWARDER_LIMITS: ContainerLimits = { memory: '128m', pids: 64 };
+
+const DEFAULT_LIMITS = { workspace: WORKSPACE_LIMITS, qa: QA_LIMITS, forwarder: FORWARDER_LIMITS } as const;
+
 /**
  * The environment variables that override the defaults, read when a container is created (so a
  * change applies to the next container, with no new build): a memory size as docker takes it
@@ -23,12 +28,13 @@ export const QA_LIMITS: ContainerLimits = { memory: '2g', pids: 512 };
 export const LIMIT_ENV = {
   workspace: { memory: 'BUGDETECTIVE_WORKSPACE_MEMORY', pids: 'BUGDETECTIVE_WORKSPACE_PIDS' },
   qa: { memory: 'BUGDETECTIVE_QA_MEMORY', pids: 'BUGDETECTIVE_QA_PIDS' },
+  forwarder: { memory: 'BUGDETECTIVE_FORWARDER_MEMORY', pids: 'BUGDETECTIVE_FORWARDER_PIDS' },
 } as const;
 
 const MEMORY = /^[1-9]\d*[kmg]?b?$/i;
 
 export function containerLimits(kind: keyof typeof LIMIT_ENV, env: Record<string, string | undefined> = process.env): ContainerLimits {
-  const defaults = kind === 'workspace' ? WORKSPACE_LIMITS : QA_LIMITS;
+  const defaults = DEFAULT_LIMITS[kind];
   const memory = env[LIMIT_ENV[kind].memory]?.trim();
   const pids = env[LIMIT_ENV[kind].pids]?.trim();
   return {

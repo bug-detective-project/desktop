@@ -37,6 +37,13 @@ export interface ResourceNames {
   qaInputVolume: string;
 }
 
+/** The internal network of a project's workspace: no internet, no computer, no local network. */
+export const networkName = (prefix: string, project: string | null) => `${prefix}-net-${project ?? 'none'}`;
+/** The container that publishes the app's ports and relays them to the workspace over that network. */
+export const forwarderName = (prefix: string, project: string | null) => `${prefix}-forward-${project ?? 'none'}`;
+/** Docker's normal network: the forwarder's way to the published ports, and the workspace's while the player opens it. */
+export const OPEN_NETWORK = 'bridge';
+
 /** Docker resource names. Tests use another prefix so they never touch a player's volume. */
 export function resourceNames(prefix = 'bugdetective'): ResourceNames {
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(prefix)) {
@@ -532,9 +539,17 @@ export class Workspace {
     return this.docker.inspectContainer(this.names.container);
   }
 
-  /** Published host ports, or null when the container does not exist. */
+  private get network(): string {
+    return networkName(this.names.prefix, this.project);
+  }
+
+  private get forwarder(): string {
+    return forwarderName(this.names.prefix, this.project);
+  }
+
+  /** Published host ports (on the forwarder), or null when it does not exist. */
   async ports(): Promise<WorkspacePorts | null> {
-    const info = await this.info();
+    const info = await this.docker.inspectContainer(this.forwarder);
     return info ? publishedPorts(info) : null;
   }
 
@@ -547,42 +562,110 @@ export class Workspace {
     throw new Error(`No free port found near ${preferred}`);
   }
 
-  private async create(): Promise<void> {
+  /** Creates the forwarder (normal network, then the internal one) on free ports. */
+  private async createForwarder(): Promise<void> {
     const avoid = new Set<number>();
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const client = await this.pickPort(PREFERRED_HOST_PORTS.client, avoid);
       avoid.add(client);
       const api = await this.pickPort(PREFERRED_HOST_PORTS.api, avoid);
       avoid.add(api);
-      const result = await this.docker.run([
-        'run',
-        '--detach',
+      const routes = Object.values(CONTAINER_PORTS)
+        .map((port) => `${port}:${this.names.container}:${port}`)
+        .join(',');
+      await this.docker.checked([
+        'container',
+        'create',
         '--init',
         '--name',
-        this.names.container,
-        ...labelArgs('workspace', this.project),
-        ...limitArgs(containerLimits('workspace')),
-        '--mount',
-        mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACES_ROOT }),
-        '--mount',
-        mountArg({ type: 'volume', src: this.names.vscodeVolume, dst: '/home/node/.vscode-server' }),
-        '--mount',
-        mountArg({ type: 'volume', src: this.names.cacheVolume, dst: CACHE_DIR, readonly: true }),
+        this.forwarder,
+        ...labelArgs('forwarder', this.project),
+        ...limitArgs(containerLimits('forwarder')),
+        '--network',
+        OPEN_NETWORK,
+        '--env',
+        `BUGDETECTIVE_FORWARD=${routes}`,
         '--publish',
         `127.0.0.1:${client}:${CONTAINER_PORTS.client}`,
         '--publish',
         `127.0.0.1:${api}:${CONTAINER_PORTS.api}`,
         this.image,
       ]);
+      await this.docker.connectNetwork(this.network, this.forwarder);
+      const result = await this.docker.run(['container', 'start', this.forwarder]);
       if (result.code === 0) {
         return;
       }
-      await this.docker.removeContainer(this.names.container);
+      await this.docker.removeContainer(this.forwarder);
       if (!/port is already allocated|address already in use|ports are not available/i.test(result.stderr)) {
-        throw new Error(`Could not start the workspace container: ${result.stderr.trim()}`);
+        throw new Error(`Could not start the forwarder container: ${result.stderr.trim()}`);
       }
     }
-    throw new Error('Could not find free ports for the workspace container');
+    throw new Error('Could not find free ports for the forwarder container');
+  }
+
+  private async ensureForwarder(): Promise<void> {
+    let info = await this.docker.inspectContainer(this.forwarder);
+    if (info && (info.image !== this.image || !info.networks.includes(this.network))) {
+      await this.docker.removeContainer(this.forwarder);
+      info = null;
+    }
+    if (info && !info.running) {
+      const started = await this.docker.run(['container', 'start', this.forwarder]);
+      if (started.code !== 0) {
+        // Usually a published port was taken by another program meanwhile.
+        await this.docker.removeContainer(this.forwarder);
+        info = null;
+      }
+    }
+    if (!info) {
+      await this.createForwarder();
+    }
+  }
+
+  /** The workspace lives on the internal network only: nothing is published from it. */
+  private async create(): Promise<void> {
+    const result = await this.docker.run([
+      'run',
+      '--detach',
+      '--init',
+      '--name',
+      this.names.container,
+      ...labelArgs('workspace', this.project),
+      ...limitArgs(containerLimits('workspace')),
+      '--network',
+      this.network,
+      '--mount',
+      mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACES_ROOT }),
+      '--mount',
+      mountArg({ type: 'volume', src: this.names.vscodeVolume, dst: '/home/node/.vscode-server' }),
+      '--mount',
+      mountArg({ type: 'volume', src: this.names.cacheVolume, dst: CACHE_DIR, readonly: true }),
+      this.image,
+    ]);
+    if (result.code !== 0) {
+      await this.docker.removeContainer(this.names.container);
+      throw new Error(`Could not start the workspace container: ${result.stderr.trim()}`);
+    }
+  }
+
+  /** True while the player has the workspace open to the normal network. */
+  async internet(): Promise<boolean> {
+    return (await this.info())?.networks.includes(OPEN_NETWORK) ?? false;
+  }
+
+  /** Connects or disconnects the normal network, without restarting anything; nothing when there is no container. */
+  async setInternet(on: boolean): Promise<void> {
+    const info = await this.info();
+    if (!info || info.networks.includes(OPEN_NETWORK) === on) {
+      return;
+    }
+    await (on ? this.docker.connectNetwork(OPEN_NETWORK, this.names.container) : this.docker.disconnectNetwork(OPEN_NETWORK, this.names.container));
+  }
+
+  /** Stops the forwarder (it comes back with the next action of the game). */
+  async stopForwarder(signal?: AbortSignal): Promise<void> {
+    await this.docker.run(['container', 'stop', '--time', '2', this.forwarder], { timeoutMs: 15_000, signal });
   }
 
   /** Creates the volumes and starts the workspace container. The volume (the player's work) is never removed here. */
@@ -591,16 +674,16 @@ export class Workspace {
     // VS Code's server does not depend on the project, so it is kept across projects.
     await this.docker.createVolume(this.names.vscodeVolume, 'vscode-server');
     await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
+    await this.docker.createInternalNetwork(this.network, 'network', this.project);
     let info = await this.info();
-    if (info && info.image !== this.image) {
-      // A newer app version ships a newer image: recreate the container, keep the volumes.
+    if (info && (info.image !== this.image || !info.networks.includes(this.network))) {
+      // A newer app version ships a newer image, or the container is of another project's network: recreate it, keep the volumes.
       await this.docker.removeContainer(this.names.container);
       info = null;
     }
     if (info && !info.running) {
       const started = await this.docker.run(['container', 'start', this.names.container]);
       if (started.code !== 0) {
-        // Usually a published port was taken by another program meanwhile.
         await this.docker.removeContainer(this.names.container);
         info = null;
       }
@@ -608,6 +691,7 @@ export class Workspace {
     if (!info) {
       await this.create();
     }
+    await this.ensureForwarder();
     const running = await this.info();
     if (!running?.running) {
       throw new Error('The workspace container is not running');
@@ -910,6 +994,8 @@ export class Workspace {
   /** Removes the container and the workspace volume (used only by restore, after the player confirmed). */
   async destroy(): Promise<void> {
     await this.docker.removeContainer(this.names.container);
+    await this.docker.removeContainer(this.forwarder);
+    await this.docker.removeNetwork(this.network).catch(() => {});
     await this.docker.removeVolume(this.names.volume);
   }
 }

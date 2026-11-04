@@ -271,7 +271,7 @@ export class FakeRuntime implements GameRuntime {
 
   async cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup> {
     // Leftovers: a QA container, the QA input volume and an image of an older version.
-    const targets: { kind: 'container' | 'volume' | 'image'; name: string }[] =
+    const targets: { kind: 'container' | 'volume' | 'network' | 'image'; name: string }[] =
       scope === 'leftovers'
         ? [
             { kind: 'container', name: 'bugdetective-qa-1a2b3c4d' },
@@ -280,10 +280,12 @@ export class FakeRuntime implements GameRuntime {
           ]
         : [
             { kind: 'container', name: 'bugdetective-workspace' },
+            { kind: 'container', name: 'bugdetective-forward-supportdesk' },
             { kind: 'volume', name: 'bugdetective-workspace' },
             { kind: 'volume', name: 'bugdetective-vscode-server' },
             { kind: 'volume', name: 'bugdetective-qa-cache' },
             { kind: 'volume', name: 'bugdetective-qa-input' },
+            { kind: 'network', name: 'bugdetective-net-supportdesk' },
             { kind: 'image', name: 'bugdetective-workspace:281e4701af14' },
             { kind: 'image', name: 'bugdetective-qa:9c8db3bee0fc' },
           ];
@@ -332,6 +334,7 @@ export class FakeRuntime implements GameRuntime {
   async shutdown() {
     this.shutdownCalls += 1;
     this.devServerUp = false;
+    this.internet = false;
   }
 
   /** How many times "New game" sanitized the repository (for the tests). */
@@ -397,6 +400,21 @@ export class FakeRuntime implements GameRuntime {
 
   async workspacePorts() {
     return { client: 5173, api: 3001 };
+  }
+
+  private internet = false;
+  /** Every change of the workspace's internet (for the tests). */
+  internetChanges: boolean[] = [];
+
+  async workspaceInternet() {
+    return this.internet;
+  }
+
+  async setWorkspaceInternet(on: boolean) {
+    if (on !== this.internet) {
+      this.internetChanges.push(on);
+    }
+    this.internet = on;
   }
 
   async workspaceStatus() {

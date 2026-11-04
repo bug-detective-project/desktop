@@ -165,6 +165,7 @@ export class Game {
   private qaAborted = false;
   /** Tickets were unlocked but the workspace has no repository (its volume was removed outside the game). */
   private workspaceLost = false;
+  private workspaceInternet = false;
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
   private dbResetFailed = false;
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
@@ -548,6 +549,7 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
+      workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
       dockerState: this.dockerState,
       prerequisites: this.prerequisites,
@@ -684,10 +686,41 @@ export class Game {
     }
   }
 
-  /** Removes QA containers left behind by a crash or a closed app. */
+  /** Removes QA containers left behind by a crash or a closed app, and closes a workspace a crash left open. */
   async cleanupLeftovers(): Promise<void> {
     if ((await this.refreshDockerState()) === 'running') {
       await this.options.runtime.cleanupQaLeftovers().catch(() => {});
+      await this.closeWorkspaceInternet();
+    }
+  }
+
+  /**
+   * Opens the workspace to the internet (the player asked, after a warning: the project's code
+   * then also reaches the computer and the local network), or closes it again. No restart.
+   */
+  async setWorkspaceInternet(on: boolean): Promise<void> {
+    await this.requireDocker();
+    this.requireWorkspace();
+    if (this.busy) {
+      throw new GameError('busy', `Busy: ${this.busy}`);
+    }
+    await this.options.runtime.setWorkspaceInternet(on);
+    this.workspaceInternet = on;
+    this.appendLog(on ? '» The workspace can reach the internet until the next ticket' : '» The workspace is closed again');
+    this.emit();
+  }
+
+  /** The game closes the workspace by itself; a failure is logged and shown by the next refresh. */
+  private async closeWorkspaceInternet(): Promise<void> {
+    try {
+      await this.options.runtime.setWorkspaceInternet(false);
+      if (this.workspaceInternet) {
+        this.workspaceInternet = false;
+        this.appendLog('» The workspace is closed again');
+        this.emit();
+      }
+    } catch (error) {
+      this.appendLog(`» Could not close the workspace: ${(error as Error).message}`);
     }
   }
 
@@ -718,6 +751,8 @@ export class Game {
     if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
       await this.checkWorkspace();
     }
+    // What Docker says wins: a recreated container is closed again.
+    this.workspaceInternet = await this.options.runtime.workspaceInternet().catch(() => false);
     this.emit();
     return this.environment;
   }
@@ -787,6 +822,7 @@ export class Game {
     this.requireNoSwitch();
     await this.requireDocker();
     await this.exclusive('rebuilding', async () => {
+      await this.closeWorkspaceInternet();
       const { runtime } = this.options;
       const tickets = [...this.state.tickets].sort((a, b) => a.ticket - b.ticket);
       for (const item of tickets) {
@@ -876,6 +912,7 @@ export class Game {
     });
     await this.requireDocker();
     await this.exclusive('switchingProject', async () => {
+      await this.closeWorkspaceInternet();
       this.appendLog(`» Downloading ${to}`);
       let content: ProjectContent;
       try {
@@ -990,6 +1027,7 @@ export class Game {
     // A newer catalog applies from here on; the ticket never waits for it.
     void this.refreshCatalog();
     await this.exclusive('unlocking', async () => {
+      await this.closeWorkspaceInternet();
       await this.beforePlayerCode();
       this.followCatalog();
       if (!this.content) {

@@ -20,7 +20,7 @@ import { QaRunner } from './services/qa.ts';
 import { qaImageTag, writeQaContext } from './services/qa-image.ts';
 import { VSCODE_MACHINE_SETTINGS } from './services/vscode.ts';
 import type { VSCode } from './services/vscode.ts';
-import { Workspace, publishedPorts, resourceNames } from './services/workspace.ts';
+import { Workspace, resourceNames } from './services/workspace.ts';
 import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 export type LineHandler = (line: string) => void;
@@ -46,6 +46,10 @@ export interface GameRuntime {
   /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
   removeProjects(projects: readonly string[]): Promise<CleanupTarget[]>;
   environment(): Promise<EnvironmentReport>;
+  /** True while the workspace is open to the normal network. */
+  workspaceInternet(): Promise<boolean>;
+  /** Opens the workspace to the normal network, or closes it, without restarting it; nothing when it has no container. */
+  setWorkspaceInternet(on: boolean): Promise<void>;
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
   /** Free bytes on the disk that holds Docker's data, or null when unknown. */
@@ -195,6 +199,7 @@ export class DockerRuntime implements GameRuntime {
         targets.push(
           ...found.containers.map((name) => ({ kind: 'container' as const, name })),
           ...found.volumes.map((name) => ({ kind: 'volume' as const, name })),
+          ...found.networks.map((name) => ({ kind: 'network' as const, name })),
           ...found.images.map(({ ref, id }) => ({ kind: 'image' as const, name: ref.endsWith(':<none>') ? id : ref })),
         );
       }
@@ -205,6 +210,7 @@ export class DockerRuntime implements GameRuntime {
       try {
         if (target.kind === 'container') await docker.removeContainer(target.name);
         else if (target.kind === 'volume') await docker.removeVolume(target.name);
+        else if (target.kind === 'network') await docker.removeNetwork(target.name);
         else await docker.removeImage(target.name, { force: true });
       } catch {
         // Reported below, by what is still there.
@@ -373,6 +379,7 @@ export class DockerRuntime implements GameRuntime {
       prefix: this.names.prefix,
       qaInputVolume: this.names.qaInputVolume,
       currentImages: [tags.workspace, await this.qaTag()].filter((tag): tag is string => tag !== null),
+      activeProject: this.project,
     });
     const result: DockerCleanup = { removed: 0, failed: [] };
     for (const target of targets) {
@@ -384,6 +391,8 @@ export class DockerRuntime implements GameRuntime {
           }
         } else if (target.kind === 'volume') {
           await docker.removeVolume(target.name);
+        } else if (target.kind === 'network') {
+          await docker.removeNetwork(target.name);
         } else {
           // Leftovers keep an image that a container still uses; everything removes it by force.
           await docker.removeImage(target.name, { force: scope === 'everything' });
@@ -449,14 +458,22 @@ export class DockerRuntime implements GameRuntime {
     return (await this.runningWorkspace()).ports();
   }
 
+  async workspaceInternet() {
+    return (await this.workspace()).internet();
+  }
+
+  async setWorkspaceInternet(on: boolean) {
+    await (await this.workspace()).setInternet(on);
+  }
+
   async workspaceStatus(): Promise<WorkspaceStatus> {
     const workspace = await this.workspace();
     const info = await workspace.info();
     if (!info?.running) {
       return { ports: null, devServerUp: false, branch: null };
     }
-    const [devServerUp, branch] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch()]);
-    return { ports: publishedPorts(info), devServerUp, branch };
+    const [devServerUp, branch, ports] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch(), workspace.ports()]);
+    return { ports, devServerUp, branch };
   }
 
   async startDevServer() {
@@ -590,7 +607,11 @@ export class DockerRuntime implements GameRuntime {
     // The QA containers first (a run in progress is killed), then the workspace: its volume stays,
     // the dev server and VS Code's server stop with it. "No such container" is fine.
     await (await this.qa().catch(() => null))?.cleanupLeftovers().catch(() => {});
+    const workspace = await this.workspace().catch(() => null);
+    // The workspace always comes back closed.
+    await workspace?.setInternet(false).catch(() => {});
     await docker.run(['container', 'stop', '--time', '5', this.names.container], { timeoutMs: 15_000, signal });
+    await workspace?.stopForwarder(signal).catch(() => {});
   }
 
   async bundle() {

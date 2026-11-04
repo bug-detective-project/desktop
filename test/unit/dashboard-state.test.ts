@@ -63,6 +63,7 @@ describe('environmentRows', () => {
     expect(rows.map((row) => row.id)).toEqual(['docker', 'workspaceImage', 'qaImage', 'projectDependencies']);
     expect(rows[1].status).toBe('dashboard.envStatus.ready · 1.1 GB');
     expect(environmentSummary(rows)).toBe('ok');
+    expect(environmentSummary(rows, true)).toBe('warn');
   });
 
   it('adds the app data row with a retry only after a failed database reset', () => {
