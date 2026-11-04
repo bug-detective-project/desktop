@@ -110,3 +110,21 @@ test('a game in progress whose project now needs a newer app shows a notice and 
   }
 });
 
+
+test('a catalog that cannot be refreshed shows a warning with "Try again" over the last saved list', async () => {
+  // An unreadable catalog: the refresh fails, the bundled list shows.
+  const { page, close } = await launch({}, { env: showProjects, catalogText: 'not a catalog' });
+  try {
+    await expect(page.getByTestId('start-playing')).toBeVisible();
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('nav-projects').click();
+    await expect(page.getByTestId('catalog-warning')).toBeVisible();
+    await expect(page.getByTestId('catalog-warning')).toContainText('could not update the project list');
+    await page.getByTestId('catalog-retry').click();
+    // Still unreadable: the warning stays, the list too.
+    await expect(page.getByTestId('catalog-warning')).toBeVisible();
+    await expect(page.getByTestId('projects')).toBeVisible();
+  } finally {
+    await close();
+  }
+});

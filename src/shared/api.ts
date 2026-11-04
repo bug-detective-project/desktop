@@ -192,6 +192,8 @@ export interface Snapshot {
   workspaceLost: boolean;
   /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
   dbResetFailed: boolean;
+  /** The last catalog refresh failed (offline, or an invalid catalog): the Projects screen shows the last saved list. */
+  catalogRefresh: { failedAt: string } | null;
   dockerState: EngineState | null;
   prerequisites: PrerequisiteReport | null;
   environment: EnvironmentReport | null;

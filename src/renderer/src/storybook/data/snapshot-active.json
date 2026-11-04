@@ -183,6 +183,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "catalogRefresh": null,
   "dockerState": "running",
   "prerequisites": {
     "checks": [

@@ -165,6 +165,8 @@ export class Game {
   private dbResetFailed = false;
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
   private readonly unavailableProjects = new Set<string>();
+  /** When the last catalog refresh failed, or null after one that succeeded. */
+  private catalogRefresh: { failedAt: string } | null = null;
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
   private pendingSave: (ValidatedSave & { file: string; fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
@@ -290,7 +292,8 @@ export class Game {
     if (!this.options.projects) {
       return;
     }
-    await this.options.projects.catalog.refresh().catch(() => false);
+    const refreshed = await this.options.projects.catalog.refresh().catch(() => false);
+    this.catalogRefresh = refreshed ? null : { failedAt: this.ctx().now };
     await this.loadCatalog().catch(() => {});
     if (this.busy === null && this.followCatalog()) {
       await this.loadContent();
@@ -541,6 +544,7 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
+      catalogRefresh: this.catalogRefresh,
       dockerState: this.dockerState,
       prerequisites: this.prerequisites,
       environment: this.environment,

@@ -11,6 +11,9 @@ const projects = [
   projectCardFixture({ id: 'stock', details: { ...base, name: both('Stock Room'), difficulty: 'intermediate', stack: { backend: 'Node.js · Express' } } }),
 ];
 
+/** The catalog could not be refreshed: the last saved list, with the warning and its retry. */
+const outdated = () => <Projects snapshot={snapshotFixture('active', { projects, catalogRefresh: { failedAt: '2026-11-04T10:00:00.000Z' } })} />;
+
 const meta = {
   title: 'Screens/Projects',
   parameters: { layout: 'fullscreen' },
@@ -41,3 +44,5 @@ export const NoMatch: Story = {
 
 export const Dark: Story = { globals: { theme: 'dark' } };
 export const Portuguese: Story = { globals: { locale: 'pt' } };
+
+export const CatalogOutdated: Story = { render: outdated };
