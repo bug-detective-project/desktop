@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Opens (or updates) a pull request into main.
 #
-#   desktop/tools/open-pr.sh --title "<type>(<scope>): <subject>" --body-file <file> [--real-runtime]
+#   desktop/tools/open-pr.sh --title "<type>(<scope>): <subject>" --body-file <file> [--skip-real-runtime]
 #
-# Until the loose-ends plan is implemented (decided 2026-11-03), a pull request relies on the CI:
-# unit tests, stories, integration tests on real Docker and e2e tests under Xvfb (.github/workflows/ci.yml),
-# plus the pre-push hook. With --real-runtime the script first runs, on the Windows side (Docker
-# Desktop, VS Code, the Windows toolchain), test/real-runtime (the whole game loop through the real
-# UI, about 5 minutes) and, when the branch changes what differs on Windows (the renderer, the
-# preload, the platform layer, the e2e tests or the build configuration), the e2e tests on Windows
-# too (about 8 minutes); nothing is pushed unless they pass. That gate becomes mandatory again
-# before the first version tagged for players.
+# The script first runs, on the Windows side (Docker Desktop, VS Code, the Windows toolchain),
+# test/real-runtime (the whole game loop through the real UI, about 5 minutes) and, when the branch
+# changes what differs on Windows (the renderer, the preload, the platform layer, the e2e tests or
+# the build configuration), the e2e tests on Windows too (about 8 minutes); nothing is pushed unless
+# they pass. The CI runs the rest: unit tests, stories, integration tests on real Docker and e2e
+# tests under Xvfb (.github/workflows/ci.yml), plus the pre-push hook.
+# --skip-real-runtime is for a pull request the suite cannot speak to: the body must say why, in a
+# line starting with "Real-runtime skipped:". Never for a version tagged for players.
 # When the branch already has an open pull request, the script pushes and comments the result on it
 # instead of creating another. Logs stay in pr-gate/ (git-ignored; never under test-results/, which
 # Playwright empties when a suite starts). Set BUGDETECTIVE_INSTALLED_EXE on the Windows side
@@ -48,17 +48,21 @@ run_gate() {
 
 title=""
 body_file=""
-real_runtime=false
+real_runtime=true
 while [ $# -gt 0 ]; do
   case $1 in
     --title) title=$2; shift 2 ;;
     --body-file) body_file=$2; shift 2 ;;
-    --real-runtime) real_runtime=true; shift ;;
+    --skip-real-runtime) real_runtime=false; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 if [ -z "$title" ] || [ -z "$body_file" ]; then
-  echo "Usage: tools/open-pr.sh --title <title> --body-file <file>" >&2
+  echo "Usage: tools/open-pr.sh --title <title> --body-file <file> [--skip-real-runtime]" >&2
+  exit 1
+fi
+if ! $real_runtime && ! grep -qE '^Real-runtime skipped: .+' "$body_file"; then
+  echo '--skip-real-runtime needs a line starting with "Real-runtime skipped:" in the body.' >&2
   exit 1
 fi
 
@@ -83,7 +87,7 @@ if $real_runtime; then
   rr_summary=$(grep -E '^\s+[0-9]+ passed' "$logs/real-runtime.log" | tail -n 1 | xargs)
   gate="Pull request gate (tools/open-pr.sh) on $stamp: $e2e_summary; real-runtime suite $rr_summary."
 else
-  gate="Pull request gate (tools/open-pr.sh) on $stamp: real-runtime suite deferred until the loose-ends plan is implemented (decided 2026-11-03); the CI runs the unit, stories, integration and e2e suites."
+  gate="Pull request gate (tools/open-pr.sh) on $stamp: real-runtime suite skipped, see the reason above; the CI runs the unit, stories, integration and e2e suites."
 fi
 echo "$gate"
 
