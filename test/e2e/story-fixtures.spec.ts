@@ -1,28 +1,41 @@
 /**
- * Regenerates the data the Storybook stories render (src/renderer/src/storybook/data/): real
- * snapshots of the app playing the neutral notes fixture, with the fake runtime. Skipped unless
- * BUGDETECTIVE_UPDATE_STORY_DATA=1:
+ * The data the Storybook stories render (src/renderer/src/storybook/data/): real snapshots of the
+ * app playing the neutral notes fixture, with the fake runtime. Always runs: it captures the
+ * snapshots and compares their shape (field paths and types, test/helpers/shape.ts) with the
+ * stored files, so a changed Snapshot never leaves the stories rendering stale data. With
+ * BUGDETECTIVE_UPDATE_STORY_DATA=1 it writes the files instead:
  *
  *   BUGDETECTIVE_UPDATE_STORY_DATA=1 pnpm run test:e2e:headless:linux test/e2e/story-fixtures.spec.ts
  */
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { createNotesProject } from '../helpers/notes-project.ts';
+import { shapeDifferences, shapeOf } from '../helpers/shape.ts';
 import { dragCard, launch, takeNextTicket } from './fixtures.ts';
 
 const out = resolve(import.meta.dirname, '..', '..', 'src', 'renderer', 'src', 'storybook', 'data');
+const update = process.env.BUGDETECTIVE_UPDATE_STORY_DATA === '1';
 
-test.skip(process.env.BUGDETECTIVE_UPDATE_STORY_DATA !== '1', 'Only when regenerating the stories data');
-
-test('capture the snapshots the stories render', async () => {
+test('capture the snapshots the stories render, and keep the stored data in the same shape', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bd-story-data-'));
   const notes = await createNotesProject(dir);
   const { page, close } = await launch({ qa: ['gate2', 'passed'] }, { catalog: [{ id: 'notes', qaDir: notes.qaDir, starter: true }] });
   // Temporary folders get random names: stable ones keep the data's diff readable.
   const stable = (text: string) => text.replaceAll(dir, '/tmp/notes-project').replace(/\/tmp\/João Silva e2e-[A-Za-z0-9]+/g, '/tmp/bug-detective-data');
-  const save = async (name: string, value: unknown) => writeFile(join(out, `${name}.json`), stable(`${JSON.stringify(value, null, 2)}\n`));
+  const problems: string[] = [];
+  const save = async (name: string, value: unknown) => {
+    const file = join(out, `${name}.json`);
+    if (update) {
+      await writeFile(file, stable(`${JSON.stringify(value, null, 2)}\n`));
+      return;
+    }
+    const stored = JSON.parse(await readFile(file, 'utf8')) as unknown;
+    for (const line of shapeDifferences(shapeOf(stored), shapeOf(JSON.parse(stable(JSON.stringify(value)))))) {
+      problems.push(`${name}.json ${line}`);
+    }
+  };
   const snapshot = () => page.evaluate(() => window.bugDetective.snapshot());
   try {
     await page.getByTestId('start-playing').click();
@@ -47,4 +60,8 @@ test('capture the snapshots the stories render', async () => {
     await close();
     await rm(dir, { recursive: true, force: true });
   }
+  expect(
+    problems,
+    `The stories' data no longer matches what the app produces. Regenerate it:\n  BUGDETECTIVE_UPDATE_STORY_DATA=1 pnpm run test:e2e:headless:linux test/e2e/story-fixtures.spec.ts\n${problems.join('\n')}`,
+  ).toEqual([]);
 });
