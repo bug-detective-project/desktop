@@ -22,7 +22,7 @@ describe('chooseCatalogSource', () => {
   it('uses the test variable first, then catalog.local.json', () => {
     expect(chooseCatalogSource({ ...base, env: { BUGDETECTIVE_CATALOG_FILE: '/tmp/c.json' }, localCatalog: { catalog: { file: 'y.json' } } })).toEqual({ kind: 'file', path: '/tmp/c.json' });
     expect(chooseCatalogSource({ ...base, localCatalog: { catalog: { file: '../catalog/projects.json' } } })).toEqual({ kind: 'file', path: '/catalog/projects.json' });
-    expect(chooseCatalogSource({ ...base, localCatalog: { catalog: { github: 'me/catalog', branch: 'testar-x' } } })).toEqual({ kind: 'github', repository: 'me/catalog', branch: 'testar-x' });
+    expect(chooseCatalogSource({ ...base, localCatalog: { catalog: { github: 'bug-detective-project/catalog', branch: 'testar-x' } } })).toEqual({ kind: 'github', repository: 'bug-detective-project/catalog', branch: 'testar-x' });
   });
 });
 
@@ -36,6 +36,7 @@ describe('parseLocalCatalog', () => {
   it.each([
     ['a project with both qaDir and qaRef', { projects: { a: { qaDir: 'x', qaRef: 'y' } } }],
     ['a catalog with neither github nor file', { catalog: { url: 'x' } }],
+    ['a catalog repository outside the organization', { catalog: { github: 'me/catalog' } }],
     ['an unknown field', { catalogs: {} }],
   ])('refuses %s, naming the file', (_name, raw) => {
     expect(() => parseLocalCatalog(raw)).toThrow(/Invalid catalog\.local\.json/);
@@ -70,7 +71,7 @@ describe('catalog.local.json file', () => {
   });
 
   it('writes the settings and reads them back', async () => {
-    const settings = { catalog: { github: 'me/catalog', branch: 'x' }, projects: { supportdesk: { qaRef: 'qa-next' } } };
+    const settings = { catalog: { github: 'bug-detective-project/catalog', branch: 'x' }, projects: { supportdesk: { qaRef: 'qa-next' } } };
     await writeLocalCatalogFile(file, settings);
     expect(await readLocalCatalogFile(file)).toEqual({ settings, error: null });
     expect(await readFile(file, 'utf8')).toMatch(/\n$/);
@@ -148,13 +149,13 @@ describe('CatalogService', () => {
     expect(projects[1]).toMatchObject({ id: 'tasklist', qaRef: 'qa-next', official: false });
   });
 
-  it('reads a file catalog, whose projects may be local folders, and never treats it as official', async () => {
+  it('reads a file catalog, whose projects may be local folders (listed under the organization), and never treats it as official', async () => {
     const file = join(dir, 'projects.json');
     await writeFile(file, JSON.stringify({ projects: [{ id: 'supportdesk', qaDir: 'supportdesk-qa', starter: true }, project('tasklist')] }));
     const catalog = service(async () => { throw new Error('no network for a file'); }, { choice: { kind: 'file', path: file } });
     await catalog.refresh();
     const projects = await catalog.current();
-    expect(projects[0]).toMatchObject({ id: 'supportdesk', qaDir: join(dir, 'supportdesk-qa'), official: false });
+    expect(projects[0]).toMatchObject({ id: 'supportdesk', repository: 'bug-detective-project/supportdesk', qaDir: join(dir, 'supportdesk-qa'), official: false });
     expect(projects[1]).toMatchObject({ id: 'tasklist', official: false });
   });
 
@@ -167,9 +168,9 @@ describe('CatalogService', () => {
 
   it('downloads another branch of a catalog repository, never official', async () => {
     const urls: string[] = [];
-    const catalog = service(async (url) => { urls.push(url); return catalogJson(project('supportdesk', { starter: true })); }, { choice: { kind: 'github', repository: 'me/catalog', branch: 'testar-x' } });
+    const catalog = service(async (url) => { urls.push(url); return catalogJson(project('supportdesk', { starter: true })); }, { choice: { kind: 'github', repository: 'bug-detective-project/catalog', branch: 'testar-x' } });
     await catalog.refresh();
-    expect(urls).toEqual(['https://raw.githubusercontent.com/me/catalog/testar-x/projects.json']);
+    expect(urls).toEqual(['https://raw.githubusercontent.com/bug-detective-project/catalog/testar-x/projects.json']);
     expect((await catalog.current())[0].official).toBe(false);
   });
 
@@ -192,7 +193,7 @@ describe('CatalogService', () => {
     const catalog = service(async () => {
       if (!online) throw new Error('offline');
       return catalogJson(project('supportdesk', { starter: true }));
-    }, { choice: { kind: 'github', repository: 'me/catalog', branch: 'testar-x' } });
+    }, { choice: { kind: 'github', repository: 'bug-detective-project/catalog', branch: 'testar-x' } });
     await catalog.refresh();
     await catalog.current();
     expect(catalog.usingFallback()).toBe(true);
@@ -203,7 +204,7 @@ describe('CatalogService', () => {
   });
 
   it('does not reuse a cache downloaded from another source', async () => {
-    await writeFile(cacheFile, JSON.stringify({ source: 'github me/catalog@testar-x', fetchedAt: 'x', catalog: { projects: [project('other', { starter: true })] } }));
+    await writeFile(cacheFile, JSON.stringify({ source: 'github bug-detective-project/catalog@testar-x', fetchedAt: 'x', catalog: { projects: [project('other', { starter: true })] } }));
     expect((await service(async () => '').current()).map((item) => item.id)).toEqual(['supportdesk']);
   });
 });

@@ -3,13 +3,14 @@
  * says where each game project lives. The app downloads it at run time (on start, when the player
  * takes a ticket, and when the Projects screen opens), keeps the last valid copy in
  * <userData>/catalog.json, and falls back to the copy bundled at build time when it never
- * downloaded one. In development, desktop/catalog.local.json may point at another branch or a
- * file and override a project's qa ref or folder; the tests use BUGDETECTIVE_CATALOG_FILE.
+ * downloaded one. In development, desktop/catalog.local.json may point at another branch of a
+ * catalog repository of the organization, or at a file, and override a project's qa ref or folder;
+ * the tests use BUGDETECTIVE_CATALOG_FILE.
  */
 import { readFile, rm } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
-import { parseCatalog } from '@bug-detective/catalog/contract';
+import { PROJECT_OWNER, parseCatalog } from '@bug-detective/catalog/contract';
 import type { Catalog, CatalogProject } from '@bug-detective/catalog/contract';
 import { writeFileAtomic } from './content/store.ts';
 import type { LocalCatalog } from '../../shared/api.ts';
@@ -17,7 +18,8 @@ import type { LocalCatalog } from '../../shared/api.ts';
 export const OFFICIAL_CATALOG_URL = 'https://raw.githubusercontent.com/bug-detective-project/catalog/main/projects.json';
 const FETCH_TIMEOUT_MS = 30_000;
 
-const REPOSITORY = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+/** A repository of the organization, like the contract's rule for project repositories. */
+const REPOSITORY = new RegExp(`^${PROJECT_OWNER}/[A-Za-z0-9_.-]{1,100}$`);
 const PROJECT_ID = /^[a-z][a-z0-9-]{0,39}$/;
 
 export type CatalogSourceChoice = { kind: 'official' } | { kind: 'github'; repository: string; branch: string } | { kind: 'file'; path: string };
@@ -28,7 +30,7 @@ export const localCatalogSchema = z
   .object({
     catalog: z
       .union([
-        z.object({ github: z.string().regex(REPOSITORY, 'use owner/name'), branch: z.string().min(1).max(100).default('main') }).strict(),
+        z.object({ github: z.string().regex(REPOSITORY, `use ${PROJECT_OWNER}/<name>`), branch: z.string().min(1).max(100).default('main') }).strict(),
         z.object({ file: z.string().min(1) }).strict(),
       ])
       .optional(),
@@ -113,7 +115,7 @@ export function describeSource(choice: CatalogSourceChoice): string {
 /** A project of the catalog as the app uses it: with a local folder when one is set, and whether its source is the official one. */
 export type ResolvedProject = CatalogProject & { qaDir?: string; official: boolean };
 
-/** A file catalog (development and tests): an entry may name a local qa folder instead of a repository. */
+/** A file catalog (development and tests): an entry may name a local qa folder instead of a repository (the placeholder repository satisfies the contract; the folder wins). */
 function parseFileCatalog(raw: unknown): Catalog & { folders: Record<string, string> } {
   const projects = (raw as { projects?: unknown })?.projects;
   const folders: Record<string, string> = {};
@@ -122,7 +124,7 @@ function parseFileCatalog(raw: unknown): Catalog & { folders: Record<string, str
         if (entry && typeof entry.qaDir === 'string' && entry.repository === undefined) {
           folders[String(entry.id)] = entry.qaDir;
           const { qaDir: _local, ...rest } = entry;
-          return { ...rest, repository: `local/${String(entry.id)}` };
+          return { ...rest, repository: `${PROJECT_OWNER}/${String(entry.id)}` };
         }
         return entry;
       })
