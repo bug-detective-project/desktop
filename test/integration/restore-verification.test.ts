@@ -70,6 +70,7 @@ afterAll(async () => {
   await docker.removeVolume(runtime.names.vscodeVolume);
   await docker.removeVolume(runtime.names.cacheVolume);
   await docker.removeVolume(runtime.names.qaInputVolume);
+  await docker.removeBuilder(PREFIX);
   await rm(dir, { recursive: true, force: true });
 });
 
