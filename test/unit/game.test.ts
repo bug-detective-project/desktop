@@ -943,6 +943,20 @@ describe('Game with several projects', () => {
     return { make, runtime, catalog, sources, versions, broken, fetched, hold };
   }
 
+  it('reports a catalog refresh that failed, and clears it when one succeeds', async () => {
+    const { make, catalog } = await twoProjects();
+    const game = make();
+    await game.init();
+    expect(game.snapshot().catalogRefresh).toBeNull();
+    catalog.failRefresh = true;
+    await game.refreshCatalog();
+    expect(game.snapshot().catalogRefresh).toEqual({ failedAt: expect.any(String) });
+    expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first', 'second']);
+    catalog.failRefresh = false;
+    await game.loadProjects();
+    expect(game.snapshot().catalogRefresh).toBeNull();
+  });
+
   async function finishFirstTicket(game: Game) {
     await game.nextAssignment('front');
     await game.move(1, 'inProgress');

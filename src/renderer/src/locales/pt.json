@@ -666,7 +666,9 @@
     "intro": "Escolha o seu próximo projeto. Só um projeto fica no seu computador: trocar remove o atual do Docker e baixa o próximo. O seu progresso e os seus PRs ficam guardados.",
     "difficulty": "Dificuldade",
     "tickets": "Tickets",
-    "noDetails": "Conecte-se à internet para ver os detalhes.",
+    "noDetails": "Detalhes indisponíveis sem conexão.",
+    "catalogWarning": "Não conseguimos atualizar a lista de projetos agora. Mostrando a última lista salva.",
+    "catalogRetry": "Tentar de novo",
     "difficulties": {
       "beginner": "Iniciante",
       "intermediate": "Intermediário",

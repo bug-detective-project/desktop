@@ -666,7 +666,9 @@
     "intro": "Pick your next project. Only one project stays on your computer: switching removes the current one from Docker and downloads the next. Your progress and PRs are kept.",
     "difficulty": "Difficulty",
     "tickets": "Tickets",
-    "noDetails": "Connect to the internet to see the details.",
+    "noDetails": "Details unavailable without a connection.",
+    "catalogWarning": "We could not update the project list right now. Showing the last saved list.",
+    "catalogRetry": "Try again",
     "difficulties": {
       "beginner": "Beginner",
       "intermediate": "Intermediate",

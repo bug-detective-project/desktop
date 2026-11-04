@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProjectCard, Snapshot } from '@shared/api.ts';
 import { api } from '../api.ts';
+import { CatalogWarning } from '../components/CatalogWarning.tsx';
 import { Icon } from '../components/icons.tsx';
 import { Button, Modal, Notice } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
@@ -74,6 +75,11 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
     <main className="mx-auto w-full max-w-10xl px-6 py-8" data-testid="projects">
       <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('projects.title')}</h1>
       <p className="mt-1 text-base text-muted-foreground">{t('projects.intro')}</p>
+      {snapshot.catalogRefresh && (
+        <div className="mt-4">
+          <CatalogWarning />
+        </div>
+      )}
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3" role="search">
         <label className="relative min-w-0 max-w-[420px] flex-[1_1_320px]">
           <span className="sr-only">{t('projects.search.label')}</span>
