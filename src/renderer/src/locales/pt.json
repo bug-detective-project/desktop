@@ -323,7 +323,6 @@
     "attemptResult": {
       "passed": "aprovada",
       "failed": "reprovada",
-    "logsFolderFailed": "Não foi possível abrir a pasta de logs: {{message}}",
       "timeout": "tempo esgotado",
       "outOfMemory": "sem memória"
     },
@@ -620,6 +619,7 @@
     "hintsRemaining": "Peça primeiro as dicas que faltam.",
     "workspaceNotRunning": "O workspace não está rodando.",
     "failed": "Algo deu errado: {{message}}",
+    "logsFolderFailed": "Não foi possível abrir a pasta de logs: {{message}}",
     "noReview": "O review deste ticket não está disponível.",
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",

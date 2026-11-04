@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { appendFile, writeFile } from 'node:fs/promises';
 import { homedir, release, version as osVersion } from 'node:os';
 import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
 import log from 'electron-log/main';
@@ -127,6 +127,21 @@ function runtime(): GameRuntime {
   return new DockerRuntime(platform, { contextRoot, qaBuildRoot: join(app.getPath('userData'), 'docker') });
 }
 
+/**
+ * How "Open logs folder" opens a folder: Windows Explorer under WSL (a bare WSL has no xdg-open),
+ * shell.openPath elsewhere. The e2e tests open nothing: the path goes to <userData>/opened-paths.log
+ * and BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM is the answer (a failure message, or none).
+ */
+function folderOpener(userData: string): (path: string) => Promise<string> {
+  if (isE2E) {
+    return async (path) => {
+      await appendFile(join(userData, 'opened-paths.log'), `${path}\n`);
+      return process.env.BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM ?? '';
+    };
+  }
+  return isWsl() ? openWithWindowsExplorer : (path) => shell.openPath(path);
+}
+
 /** Opens an allowlisted URL with the platform's browser command (WSL: the Windows browser). */
 async function openUrl(url: string): Promise<void> {
   const command = platform?.browserCommand(url);
@@ -234,7 +249,7 @@ async function main(): Promise<void> {
       os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
       home,
       recentLog: () => recentLines(logFile),
-      openLogsFolder: () => openLogsFolder(logsDir, isWsl() ? openWithWindowsExplorer : (path) => shell.openPath(path)),
+      openLogsFolder: () => openLogsFolder(logsDir, folderOpener(userData)),
     },
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';

@@ -78,9 +78,9 @@ describe('openLogsFolder', () => {
     expect((await stat(dir)).isDirectory()).toBe(true);
   });
 
-  it('turns the message shell.openPath resolves with into an error the screen can show', async () => {
+  it('turns the message shell.openPath resolves with into a rejection', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'bd-logs-')), 'logs');
-    await expect(openLogsFolder(dir, async () => 'Failed to open path')).rejects.toThrow('[logsFolderFailed] Failed to open path');
+    await expect(openLogsFolder(dir, async () => 'Failed to open path')).rejects.toThrow('Failed to open path');
   });
 });
 

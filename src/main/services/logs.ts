@@ -54,14 +54,15 @@ export function redactPaths(line: string, home: string): string {
 
 /**
  * Opens the logs folder with `open` (Electron's shell.openPath, which resolves with an error
- * message instead of rejecting). The folder is created first: electron-log creates it at the
- * first write, which may not have happened yet.
+ * message instead of rejecting): that message becomes the rejection (Game.openLogsFolder gives it
+ * the logsFolderFailed code). The folder is created first: electron-log creates it at the first
+ * write, which may not have happened yet.
  */
 export async function openLogsFolder(dir: string, open: (path: string) => Promise<string>): Promise<void> {
   await mkdir(dir, { recursive: true });
   const problem = await open(dir);
   if (problem) {
-    throw new Error(`[logsFolderFailed] ${problem}`);
+    throw new Error(problem);
   }
 }
 

@@ -1,7 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { dragCard, expectFlagsLoaded, launch, startFirstTicket } from './fixtures.ts';
 import { supportdesk } from './content.ts';
 
@@ -225,5 +225,42 @@ test('removing everything keeps the game when Docker could not remove the code',
     await expect(page.getByTestId('card-1')).toBeVisible();
   } finally {
     await close();
+  }
+});
+
+test('open logs folder: a failure shows its reason, and a success opens the folder with the day\'s log', async () => {
+  // The same data folder for both starts: the second one finds the log of the first.
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
+  const openLogs = async (page: Page) => {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-about').click();
+    await page.getByTestId('open-logs').click();
+  };
+  try {
+    // The opener answers with a problem (no file manager, say): the toast carries it. Nothing else
+    // on the screen reacts, which is what happened before this was handled.
+    const failing = await launch({}, { userData, env: { BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM: 'No file manager is installed' } });
+    try {
+      await openLogs(failing.page);
+      await expect(failing.page.getByTestId('toast-error')).toContainText('The logs folder could not be opened: No file manager is installed');
+    } finally {
+      await failing.close();
+    }
+    const working = await launch({}, { userData });
+    try {
+      await openLogs(working.page);
+      await expect(working.page.getByTestId('toast-error')).toHaveCount(0);
+      // The folder that was opened is the logs folder, and it holds the day's file: the main
+      // process logs one line at every start.
+      await expect.poll(() => readFile(join(userData, 'opened-paths.log'), 'utf8').catch(() => '')).toContain(join(userData, 'logs'));
+      const logs = await readdir(join(userData, 'logs'));
+      expect(logs).toEqual([expect.stringMatching(/^bug-detective-\d{4}-\d{2}-\d{2}\.log$/)]);
+      expect(await readFile(join(userData, 'logs', logs[0]), 'utf8')).toContain('Bug Detective');
+    } finally {
+      await working.close();
+    }
+  } finally {
+    await rm(userData, { recursive: true, force: true });
   }
 });

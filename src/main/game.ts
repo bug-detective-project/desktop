@@ -565,8 +565,13 @@ export class Game {
     });
   }
 
+  /** A failure (no file manager, say) reaches the screen with its reason, under the logsFolderFailed code. */
   async openLogsFolder(): Promise<void> {
-    await this.options.diagnostics?.openLogsFolder();
+    try {
+      await this.options.diagnostics?.openLogsFolder();
+    } catch (error) {
+      throw new GameError('logsFolderFailed', error instanceof Error ? error.message : String(error));
+    }
   }
 
   /**
