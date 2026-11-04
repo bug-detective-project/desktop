@@ -109,6 +109,13 @@
     "contacts": "Contacts",
     "mentorTag": "Hints mentor",
     "environment": "Local environment",
+    "workspaceLost": {
+      "title": "The code of your workspace is gone",
+      "text": "The code of your workspace was removed outside the game (for example by a Docker cleanup). Your progress is saved. The game can recreate the code of every ticket; changes you had not sent to QA on the current ticket are lost.",
+      "rebuild": "Recreate the code",
+      "rebuilding": "Recreating…",
+      "restore": "Restore a backup instead"
+    },
     "env": {
       "docker": "Docker Engine",
       "workspaceImage": "Workspace image",
@@ -505,7 +512,8 @@
         "removingDocker": "everything is being removed from Docker",
         "solvingBug": "the bug is being solved (development)",
         "switchingProject": "the project is being switched",
-        "applyingCatalog": "the development settings are being applied"
+        "applyingCatalog": "the development settings are being applied",
+        "rebuilding": "the workspace code is being recreated"
       }
     },
     "dangerZone": "Danger zone",
@@ -610,6 +618,7 @@
     "reviewFailed": "The review could not be opened, and your code was restored: {{message}}",
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
     "solveBugNotAllowed": "Only the ticket in progress can be solved.",
+    "workspaceLost": "The code of your workspace is gone. Recreate it from the Dashboard, or restore a backup.",
     "incompletePublication": "The project's publication is incomplete. Try again later.",
     "switchIncomplete": "The project switch is not finished: {{message}}",
     "otherProjectsLeft": "Docker still has another project: {{message}}",

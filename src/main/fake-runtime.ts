@@ -20,6 +20,8 @@ interface Scenario {
   vscode: boolean;
   devcontainers: boolean;
   environmentReady: boolean;
+  /** The workspace volume already holds a repository (a game restarted on the same computer); by default only once a stage was imported here. */
+  repository?: boolean;
   qa: QaOutcome[];
   qaDelayMs: number;
   branch: string | null;
@@ -347,7 +349,7 @@ export class FakeRuntime implements GameRuntime {
   async resetDatabase() {}
 
   async hasRepository() {
-    return this.stages.size > 0;
+    return this.scenario.repository ?? this.stages.size > 0;
   }
 
   async workspacePorts() {
@@ -376,9 +378,15 @@ export class FakeRuntime implements GameRuntime {
    * For the e2e tests (through Playwright's app.evaluate): changes made outside the app, such as
    * Docker Desktop stopping or `npm run dev` started in the VS Code terminal.
    */
-  simulate(change: { docker?: EngineState; devServerUp?: boolean }) {
+  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean }) {
     if (change.docker) this.scenario.docker = change.docker;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
+    if (change.workspaceLost) {
+      // The volume went: no stages, no branch, as a fresh repository-less workspace.
+      this.stages.clear();
+      this.branch = null;
+      this.scenario.repository = undefined;
+    }
   }
 
   async openVSCode() {}

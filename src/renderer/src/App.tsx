@@ -114,6 +114,7 @@ export function App() {
               setOpenTicket(ticket);
             }}
             onOpenReview={openReview}
+            onOpenSettings={() => setView('settings')}
             onboarding={onboarding !== null}
           />
         )}

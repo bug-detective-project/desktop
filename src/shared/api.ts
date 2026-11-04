@@ -76,6 +76,7 @@ export type BusyTask =
   | 'solvingBug'
   | 'switchingProject'
   | 'applyingCatalog'
+  | 'rebuilding'
   | null;
 
 /** Opening VS Code waits for every task except QA (it tests its own copy of the code, so the player may look meanwhile). */
@@ -187,6 +188,8 @@ export interface Snapshot {
   titles: Record<number, Record<Language, string>>;
   hintsTotal: Record<number, number>;
   busy: BusyTask;
+  /** Tickets were unlocked but the workspace holds no repository (its volume was removed outside the game): the code can be recreated. */
+  workspaceLost: boolean;
   dockerState: EngineState | null;
   prerequisites: PrerequisiteReport | null;
   environment: EnvironmentReport | null;
@@ -286,6 +289,8 @@ export interface BugDetectiveApi {
   restoreProgress(token: string): Promise<void>;
   /** The player cancelled the restore: the main process stops keeping the save. */
   discardSave(token: string): Promise<void>;
+  /** Recreates the code of every unlocked ticket in a workspace whose repository was lost; the progress stays. */
+  rebuildWorkspace(): Promise<void>;
   /** Starts over; the workspace's branches from this game are archived on the next unlock. */
   newGame(): Promise<void>;
   /** Removes QA leftovers and images of older versions; the player's work stays. */

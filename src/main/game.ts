@@ -131,6 +131,8 @@ export class Game {
   private qaRun: Promise<void> | null = null;
   /** The app is quitting: a QA run killed by the shutdown is recorded as interrupted, not as an error. */
   private shuttingDown = false;
+  /** Tickets were unlocked but the workspace has no repository (its volume was removed outside the game). */
+  private workspaceLost = false;
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
   private pendingSave: (ValidatedSave & { fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
@@ -505,6 +507,7 @@ export class Game {
       titles: this.titles,
       hintsTotal: this.hintsTotal,
       busy: this.busy,
+      workspaceLost: this.workspaceLost,
       dockerState: this.dockerState,
       prerequisites: this.prerequisites,
       environment: this.environment,
@@ -642,8 +645,73 @@ export class Game {
   async refreshEnvironment(): Promise<EnvironmentReport> {
     await this.requireDocker();
     this.environment = await this.options.runtime.environment();
+    if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
+      await this.checkWorkspace();
+    }
     this.emit();
     return this.environment;
+  }
+
+  /**
+   * A workspace without a repository after tickets were unlocked lost its volume outside the game
+   * (a Docker cleanup, a prune). Every action on the code is refused until it is recreated.
+   */
+  private async checkWorkspace(): Promise<void> {
+    const lost = this.state.tickets.length > 0 && !(await this.options.runtime.hasRepository());
+    if (lost !== this.workspaceLost) {
+      this.workspaceLost = lost;
+      if (lost) {
+        this.appendLog('» The workspace has no repository: the code of the tickets must be recreated');
+      }
+      this.emit();
+    }
+  }
+
+  private requireWorkspace(): void {
+    if (this.workspaceLost) {
+      throw new GameError('workspaceLost');
+    }
+  }
+
+  /**
+   * Recreates the code of every unlocked ticket in the workspace, in order: each stage is fetched
+   * (from the cache or downloaded) and imported again, and the player's branches are created from
+   * the stages. Work that had not reached QA on the current ticket is gone; the progress stays.
+   */
+  async rebuildWorkspace(): Promise<void> {
+    this.requireNoSwitch();
+    await this.requireDocker();
+    await this.exclusive('rebuilding', async () => {
+      const { runtime } = this.options;
+      const tickets = [...this.state.tickets].sort((a, b) => a.ticket - b.ticket);
+      for (const item of tickets) {
+        this.appendLog(`» Fetching ${item.id} from ${this.source.describe()}`);
+        let fetched: FetchedTicket;
+        try {
+          fetched = await this.source.fetchTicket(item.id);
+        } catch (error) {
+          throw contentError(error);
+        }
+        const commit = await runtime.importStage(item.ticket, fetched.codeFiles, fetched.entry.commitMessage);
+        await runtime.claimWorkspace(this.state.createdAt);
+        await runtime.checkoutPlayerBranch(item.ticket);
+        await this.commit((state) => rules.rebuiltStage(state, item.ticket, commit));
+        this.appendLog(`» Recreated the code of ticket ${item.ticket} (${item.id}) as commit ${commit.slice(0, 12)}`);
+      }
+      const current = this.state.currentTicket;
+      if (current !== null) {
+        await runtime.checkoutPlayerBranch(current);
+      }
+      await runtime.resetDatabase().catch(() => {});
+      // A run that was in QA when the volume went has nothing to test any more: not an attempt.
+      const recovered = rules.recoverInterruptedQa(this.state, this.ctx());
+      if (recovered !== this.state) {
+        await this.commit(() => recovered);
+      }
+      this.workspaceLost = false;
+      this.appendLog('» Workspace recreated');
+    });
+    await this.refreshEnvironment().catch(() => {});
   }
 
   async diskUsage(): Promise<DiskUsageItem[]> {
@@ -1139,6 +1207,7 @@ export class Game {
 
   async openVSCode(): Promise<void> {
     await this.requireDocker();
+    this.requireWorkspace();
     if (blocksVSCode(this.busy)) {
       throw new GameError('busy', `Busy: ${this.busy}`);
     }
@@ -1150,6 +1219,7 @@ export class Game {
 
   async startDevServer(): Promise<void> {
     await this.requireDocker();
+    this.requireWorkspace();
     await this.options.runtime.startDevServer();
   }
 
@@ -1278,6 +1348,7 @@ export class Game {
   async openReview(ticket: number): Promise<void> {
     this.requireReviewable(ticket);
     await this.requireDocker();
+    this.requireWorkspace();
     await this.exclusive('openingReview', async () => {
       const open = this.state.reviewSession;
       if (open && (open.ticket !== ticket || open.phase !== 'open')) {
@@ -1334,6 +1405,8 @@ export class Game {
    * Called inside the action's exclusive task, so it never runs while another task changes the workspace.
    */
   private async beforePlayerCode(): Promise<void> {
+    await this.checkWorkspace();
+    this.requireWorkspace();
     if (this.state.reviewSession) {
       await this.returnToPlayerCode();
     }
