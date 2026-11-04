@@ -74,6 +74,8 @@ export interface GameRuntime {
 
   runQa(request: QaRequest): Promise<QaResult>;
   cleanupQaLeftovers(): Promise<void>;
+  /** The app is closing: removes the QA containers and stops the workspace container (20 s at most; nothing when Docker is not running). */
+  shutdown(): Promise<void>;
   /** The files the last QA run tested (its own copy of the workspace). */
   testedFiles(): Promise<ArchiveFile[]>;
 
@@ -142,6 +144,8 @@ export class DockerRuntime implements GameRuntime {
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
+  /** The QA run in progress, aborted by shutdown() so it starts no further container. */
+  private qaAbort: AbortController | null = null;
 
   constructor(platform: Platform, images: ImageConfig) {
     this.platform = platform;
@@ -526,11 +530,34 @@ export class DockerRuntime implements GameRuntime {
 
   async runQa(request: QaRequest) {
     await this.runningWorkspace();
-    return (await this.qa()).run({ ...request, onLine: request.onLine && ((line) => request.onLine!(line)) });
+    const controller = new AbortController();
+    this.qaAbort = controller;
+    try {
+      return await (await this.qa()).run({ ...request, signal: controller.signal, onLine: request.onLine && ((line) => request.onLine!(line)) });
+    } finally {
+      if (this.qaAbort === controller) this.qaAbort = null;
+    }
   }
 
   async cleanupQaLeftovers() {
     await (await this.qa()).cleanupLeftovers();
+  }
+
+  async shutdown() {
+    // First no new QA container: the run in progress stops at its next step, and the cleanup below removes what exists.
+    this.qaAbort?.abort();
+    let docker: Docker;
+    try {
+      docker = await this.docker();
+    } catch (error) {
+      if (error instanceof DockerUnavailableError) return;
+      throw error;
+    }
+    const signal = AbortSignal.timeout(20_000);
+    // The QA containers first (a run in progress is killed), then the workspace: its volume stays,
+    // the dev server and VS Code's server stop with it. "No such container" is fine.
+    await (await this.qa().catch(() => null))?.cleanupLeftovers().catch(() => {});
+    await docker.run(['container', 'stop', '--time', '5', this.names.container], { timeoutMs: 15_000, signal });
   }
 
   async bundle() {
