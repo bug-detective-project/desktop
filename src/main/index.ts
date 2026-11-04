@@ -22,6 +22,7 @@ import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
 import { CatalogService, chooseCatalogSource, parseLocalCatalog, readLocalCatalogFile, writeLocalCatalogFile } from './services/catalog.ts';
+import { isDevelopmentRun } from './services/dev-mode.ts';
 import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
 import { contentSourceFor } from './services/projects.ts';
 import { PackageStore } from './services/content/store.ts';
@@ -37,6 +38,8 @@ if (process.env.BUGDETECTIVE_USER_DATA) {
 }
 
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;
+// pnpm run dev. A build run from source (pnpm run start) behaves like the installed app.
+const isDev = isDevelopmentRun({ packaged: app.isPackaged, env: process.env });
 // Every download (the catalog, the projects' content) goes through Electron's net: the system
 // proxy and certificates apply, as in the browser.
 const downloadFetch = appFetch({ net });
@@ -55,21 +58,21 @@ void pruneLogs(logsDir);
 // The first line of the day's file, so every start leaves a trace for the diagnostics.
 console.info(`Bug Detective ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron}${isWsl() ? ', under WSL' : ''})`);
 const appRoot = app.getAppPath();
-const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+const devRendererUrl = isDev ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
-const devTools = !app.isPackaged && !isE2E;
+const devTools = isDev && !isE2E;
 
 // Development only: desktop/.env (never packaged; the e2e tests pass their variables themselves).
 const envFile = join(appRoot, '.env');
-if (!app.isPackaged && !isE2E && existsSync(envFile)) {
+if (isDev && !isE2E && existsSync(envFile)) {
   process.loadEnvFile(envFile);
 }
 // "Solve bug" on the board card: BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true, never in the installed app.
-const devSolveBug = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
+const devSolveBug = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
 // "Skip onboarding" in Rafaela's onboarding: BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON=true, never in the installed app.
-const devSkipOnboarding = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
+const devSkipOnboarding = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
 // The Projects screen from the start (it normally waits for a done project): BUGDETECTIVE_DEV_SHOW_PROJECTS=true, never in the installed app.
-const devShowProjects = !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SHOW_PROJECTS ?? '');
+const devShowProjects = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SHOW_PROJECTS ?? '');
 // The e2e tests keep the onboarding from opening on its own unless BUGDETECTIVE_E2E_SHOW_ONBOARDING=true.
 const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E_SHOW_ONBOARDING ?? '');
 
@@ -80,7 +83,7 @@ const autoOnboarding = !isE2E || /^(true|1)$/i.test(process.env.BUGDETECTIVE_E2E
  * invalid file reads as the defaults, and Settings → Development shows why.
  */
 function localCatalog(file: string): LocalCatalog | null {
-  if (app.isPackaged || !existsSync(file)) {
+  if (!isDev || !existsSync(file)) {
     return null;
   }
   try {
@@ -100,7 +103,7 @@ function localCatalogFile(userData: string): string {
 function catalogService(userData: string): CatalogService {
   const local = localCatalog(localCatalogFile(userData));
   return new CatalogService({
-    choice: chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: local, baseDir: appRoot }),
+    choice: chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: local, baseDir: appRoot }),
     overrides: local?.projects ?? {},
     baseDir: appRoot,
     cacheFile: join(userData, 'catalog.json'),
@@ -118,7 +121,7 @@ function devCatalogOptions(file: string, catalog: CatalogService): DevCatalogOpt
     read: () => readLocalCatalogFile(file),
     write: (settings) => writeLocalCatalogFile(file, settings),
     reconfigure: (settings) =>
-      catalog.reconfigure(chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: settings, baseDir: appRoot }), settings.projects ?? {}),
+      catalog.reconfigure(chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: settings, baseDir: appRoot }), settings.projects ?? {}),
   };
 }
 
@@ -277,7 +280,7 @@ async function main(): Promise<void> {
   let window: BrowserWindow | null = null;
   const catalog = catalogService(userData);
   // Development and tests only: another content host (an e2e test points it at a closed port to play offline).
-  const baseUrl = app.isPackaged ? undefined : process.env.BUGDETECTIVE_CONTENT_BASE_URL;
+  const baseUrl = isDev ? process.env.BUGDETECTIVE_CONTENT_BASE_URL : undefined;
   const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch, baseUrl }, console.log);
   // The starter until the game names its own project (Game.init points everything at that one).
   const starter = (await catalog.current()).find((item) => item.starter)!;
@@ -301,7 +304,7 @@ async function main(): Promise<void> {
     devSkipOnboarding,
     devShowProjects,
     e2e: isE2E,
-    devCatalog: app.isPackaged ? undefined : devCatalogOptions(localCatalogFile(userData), catalog),
+    devCatalog: isDev ? devCatalogOptions(localCatalogFile(userData), catalog) : undefined,
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
     logLine: (line) => log.info(line),

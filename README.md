@@ -53,6 +53,30 @@ For development:
 - Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
 - For editing game content only: `../supportdesk` and `../supportdesk-qa` next to this folder, a clone of the SupportDesk repository and its published `qa` branch (see below). The integration tests play their own example project (`test/fixtures/notes`), and the e2e tests use `../supportdesk-qa` when it is there, otherwise the SupportDesk publication pinned in `test/e2e/supportdesk-version.ts`, cloned once into `test/.cache/` (git-ignored; that first run needs internet). The unit tests play `test/fixtures/notes` too: no automated test reads `../supportdesk-qa` except the e2e ones, which fall back to the pinned publication. `pnpm run dev` and `pnpm run build` need no game project: the app downloads each project's content, QA CLI included, at run time.
 
+## How to play
+
+There are no published installers yet: they will come later, on GitHub Releases. Today the game runs from this repository. Besides the requirements above, you need Git, [Node.js 26.12.1](https://nodejs.org/) and pnpm 12.15.0 (`npm install -g pnpm@12.15.0`).
+
+```sh
+git clone https://github.com/bug-detective-project/desktop.git
+cd desktop
+pnpm install --frozen-lockfile
+pnpm run start
+```
+
+To update, run `git pull`, `pnpm install --frozen-lockfile` and `pnpm run start`. `pnpm run start` builds the app and opens it as a player gets it: official catalog, no development tools. `pnpm run dev` is the one with the development tools (DevTools, `desktop/.env`, `catalog.local.json`, Settings → Development).
+
+## Install from source
+
+To build an installer on your own computer:
+
+| System | Command | Result |
+| --- | --- | --- |
+| Windows | `pnpm run dist:win` | `dist\Bug-Detective-Setup-<version>.exe` |
+| Linux (beta) | `pnpm run dist:linux` | `dist/Bug-Detective-<version>.AppImage` |
+
+The CI builds the AppImage only when asked: run the `ci` workflow by hand with `build-appimage` on, and it stays as the `linux-appimage` artifact.
+
 ## Networks with a proxy
 
 The app downloads the projects catalog and each project's content through Electron's `net.fetch`, so it follows the Windows proxy settings (including an authenticating proxy) and the Windows certificate store, exactly as a browser does: nothing to configure in the app. Two other programs download on their own and need their own settings:
@@ -127,7 +151,7 @@ Neither is set up in the packaged app or in the e2e tests (`BUGDETECTIVE_E2E=1`)
 
 ## Development settings (`.env`)
 
-Development builds (`pnpm run dev`, or `out/` started without packaging) load `desktop/.env` at start. Copy `.env.example` to `.env`; the file is git-ignored, never packaged, and ignored by the e2e tests (they pass their own variables). Variables already set in the environment win over the file.
+`pnpm run dev` loads `desktop/.env` at start; `pnpm run start` and the installer never do. Copy `.env.example` to `.env`; the file is git-ignored, never packaged, and ignored by the e2e tests (they pass their own variables). Variables already set in the environment win over the file.
 
 | Variable | Effect |
 | --- | --- |
