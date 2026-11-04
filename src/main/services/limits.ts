@@ -15,6 +15,28 @@ export const WORKSPACE_LIMITS: ContainerLimits = { memory: '3g', pids: 1024 };
 /** A QA run or the dependency preparation: the project's tests, Vite, Chromium. */
 export const QA_LIMITS: ContainerLimits = { memory: '2g', pids: 512 };
 
+/**
+ * The environment variables that override the defaults, read when a container is created (so a
+ * change applies to the next container, with no new build): a memory size as docker takes it
+ * (3g, 2048m, 512m) and a positive number of pids. An invalid value keeps the default.
+ */
+export const LIMIT_ENV = {
+  workspace: { memory: 'BUGDETECTIVE_WORKSPACE_MEMORY', pids: 'BUGDETECTIVE_WORKSPACE_PIDS' },
+  qa: { memory: 'BUGDETECTIVE_QA_MEMORY', pids: 'BUGDETECTIVE_QA_PIDS' },
+} as const;
+
+const MEMORY = /^[1-9]\d*[kmg]?b?$/i;
+
+export function containerLimits(kind: keyof typeof LIMIT_ENV, env: Record<string, string | undefined> = process.env): ContainerLimits {
+  const defaults = kind === 'workspace' ? WORKSPACE_LIMITS : QA_LIMITS;
+  const memory = env[LIMIT_ENV[kind].memory]?.trim();
+  const pids = env[LIMIT_ENV[kind].pids]?.trim();
+  return {
+    memory: memory && MEMORY.test(memory) ? memory.toLowerCase() : defaults.memory,
+    pids: pids && /^[1-9]\d*$/.test(pids) ? Number(pids) : defaults.pids,
+  };
+}
+
 /** No capability at all, and no way to gain one (setuid binaries, file capabilities). */
 export const HARDENING_ARGS: readonly string[] = ['--cap-drop', 'ALL', '--security-opt', 'no-new-privileges'];
 

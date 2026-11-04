@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Docker } from '../../src/main/services/docker.ts';
-import { HARDENING_ARGS, QA_LIMITS, WORKSPACE_LIMITS, limitArgs } from '../../src/main/services/limits.ts';
+import { HARDENING_ARGS, QA_LIMITS, WORKSPACE_LIMITS, containerLimits, limitArgs } from '../../src/main/services/limits.ts';
 import type { RunResult } from '../../src/main/services/process.ts';
 import { QaRunner } from '../../src/main/services/qa.ts';
 import { resourceNames } from '../../src/main/services/workspace.ts';
@@ -34,6 +34,39 @@ describe('limitArgs', () => {
   it('sets the memory and pids limits and drops every capability', () => {
     expect(limitArgs(WORKSPACE_LIMITS)).toEqual(['--memory', '3g', '--pids-limit', '1024', ...HARDENING_ARGS]);
     expect(limitArgs(QA_LIMITS)).toEqual(['--memory', '2g', '--pids-limit', '512', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges']);
+  });
+});
+
+describe('containerLimits', () => {
+  it('takes the defaults without the environment variables', () => {
+    expect(containerLimits('workspace', {})).toEqual(WORKSPACE_LIMITS);
+    expect(containerLimits('qa', {})).toEqual(QA_LIMITS);
+  });
+
+  it('reads the environment variables, memory as docker takes it and pids as a number', () => {
+    const env = { BUGDETECTIVE_WORKSPACE_MEMORY: '6G', BUGDETECTIVE_WORKSPACE_PIDS: '2048', BUGDETECTIVE_QA_MEMORY: '2560m', BUGDETECTIVE_QA_PIDS: '256' };
+    expect(containerLimits('workspace', env)).toEqual({ memory: '6g', pids: 2048 });
+    expect(containerLimits('qa', env)).toEqual({ memory: '2560m', pids: 256 });
+  });
+
+  it('keeps the default for a value docker would refuse', () => {
+    const env = { BUGDETECTIVE_WORKSPACE_MEMORY: 'lots', BUGDETECTIVE_WORKSPACE_PIDS: '0', BUGDETECTIVE_QA_MEMORY: '', BUGDETECTIVE_QA_PIDS: '12 pids' };
+    expect(containerLimits('workspace', env)).toEqual(WORKSPACE_LIMITS);
+    expect(containerLimits('qa', env)).toEqual(QA_LIMITS);
+  });
+
+  it('is read when a container is created: the QA runner picks a change up', async () => {
+    const before = process.env.BUGDETECTIVE_QA_MEMORY;
+    process.env.BUGDETECTIVE_QA_MEMORY = '1536m';
+    try {
+      const { docker, calls } = fakeDocker(false);
+      await runner(docker).prepareDependencies(1);
+      const run = calls.find((args) => args[0] === 'run')!;
+      expect(run[run.indexOf('--memory') + 1]).toBe('1536m');
+    } finally {
+      if (before === undefined) delete process.env.BUGDETECTIVE_QA_MEMORY;
+      else process.env.BUGDETECTIVE_QA_MEMORY = before;
+    }
   });
 });
 

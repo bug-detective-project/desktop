@@ -15,7 +15,7 @@ import { isQaContainer } from './cleanup.ts';
 import { readTar } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
-import { QA_LIMITS, limitArgs } from './limits.ts';
+import { containerLimits, limitArgs } from './limits.ts';
 import type { Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 import { PROJECT_ID, resourceNames } from './workspace.ts';
@@ -138,7 +138,7 @@ export class QaRunner {
       name,
       ...labelArgs('qa', this.project),
       '--init',
-      ...limitArgs(QA_LIMITS),
+      ...limitArgs(containerLimits('qa')),
       '--network',
       options.network ? 'bridge' : 'none',
       '--mount',
@@ -171,7 +171,7 @@ export class QaRunner {
           '--name',
           name,
           ...labelArgs('qa', this.project),
-          ...limitArgs(QA_LIMITS),
+          ...limitArgs(containerLimits('qa')),
           '--network',
           'none',
           '--env',
