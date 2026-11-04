@@ -12,6 +12,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build-appimage:
+        description: Also build the Linux AppImage (slow) and keep it as an artifact
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -84,6 +89,17 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+      - name: Linux AppImage, by hand only
+        if: ${{ inputs.build-appimage }}
+        run: |
+          pnpm run dist:linux
+          node tools/check-fuses.mjs dist/linux-unpacked/bug-detective
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.build-appimage }}
+        with:
+          name: linux-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
 
   coverage:
     # The full coverage floor over the unit tests, the stories and the integration tests, from the

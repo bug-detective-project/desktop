@@ -53,6 +53,30 @@ For development:
 - Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
 - For editing game content only: `../supportdesk` and `../supportdesk-qa` next to this folder, a clone of the SupportDesk repository and its published `qa` branch (see below). The integration tests play their own example project (`test/fixtures/notes`), and the e2e tests use `../supportdesk-qa` when it is there, otherwise the SupportDesk publication pinned in `test/e2e/supportdesk-version.ts`, cloned once into `test/.cache/` (git-ignored; that first run needs internet). The unit tests play `test/fixtures/notes` too: no automated test reads `../supportdesk-qa` except the e2e ones, which fall back to the pinned publication. `pnpm run dev` and `pnpm run build` need no game project: the app downloads each project's content, QA CLI included, at run time.
 
+## How to play
+
+There are no published installers yet: they will come later, on GitHub Releases. Today the game runs from this repository. Besides the requirements above, you need Git, [Node.js 26.12.1](https://nodejs.org/) and pnpm 12.15.0 (`npm install -g pnpm@12.15.0`).
+
+```sh
+git clone https://github.com/bug-detective-project/desktop.git
+cd desktop
+pnpm install --frozen-lockfile
+pnpm run start
+```
+
+To update, run `git pull`, `pnpm install --frozen-lockfile` and `pnpm run start`. `pnpm run start` builds the app and opens it as a player gets it: official catalog, no development tools. `pnpm run dev` is the one with the development tools (DevTools, `desktop/.env`, `catalog.local.json`, Settings → Development).
+
+## Install from source
+
+To build an installer on your own computer:
+
+| System | Command | Result |
+| --- | --- | --- |
+| Windows | `pnpm run dist:win` | `dist\Bug-Detective-Setup-<version>.exe` |
+| Linux (beta) | `pnpm run dist:linux` | `dist/Bug-Detective-<version>.AppImage` |
+
+The CI builds the AppImage only when asked: run the `ci` workflow by hand with `build-appimage` on, and it stays as the `linux-appimage` artifact.
+
 ## Networks with a proxy
 
 The app downloads the projects catalog and each project's content through Electron's `net.fetch`, so it follows the Windows proxy settings (including an authenticating proxy) and the Windows certificate store, exactly as a browser does: nothing to configure in the app. Two other programs download on their own and need their own settings:
@@ -127,7 +151,7 @@ Neither is set up in the packaged app or in the e2e tests (`BUGDETECTIVE_E2E=1`)
 
 ## Development settings (`.env`)
 
-Development builds (`pnpm run dev`, or `out/` started without packaging) load `desktop/.env` at start. Copy `.env.example` to `.env`; the file is git-ignored, never packaged, and ignored by the e2e tests (they pass their own variables). Variables already set in the environment win over the file.
+`pnpm run dev` loads `desktop/.env` at start; `pnpm run start` and the installer never do. Copy `.env.example` to `.env`; the file is git-ignored, never packaged, and ignored by the e2e tests (they pass their own variables). Variables already set in the environment win over the file.
 
 | Variable | Effect |
 | --- | --- |
@@ -282,6 +306,8 @@ The hooks need Node.js 26 on the `PATH` of the shell that runs git. If you commi
 pnpm run dist:win    # dist\Bug-Detective-Setup-<version>.exe (not signed)
 ```
 
+**Fuses.** The packaged app has the Electron security fuses flipped (`tools/after-pack.mjs`): it cannot run as plain Node, ignores `NODE_OPTIONS` and the inspector flags, and loads code only from its archive. It also ignores `BUGDETECTIVE_USER_DATA`. `pnpm run dist:win:test` and `pnpm run dist:linux:test` build the test build, which keeps the fuses as they are and reads that variable: `installed-ticket1.spec.ts` needs it, and it is never for players.
+
 The installer is per-user (no admin rights), lets the player choose the folder, and adds Start menu and desktop shortcuts. Uninstalling removes everything the app created in Docker (`resources/remove-docker-data.ps1`, run from `resources/installer.nsh`; nothing is done while Docker is not running) and the app data folder (`deleteAppDataOnUninstall`). An update keeps both: electron-builder runs the old uninstaller with `isUpdated`, and the cleanup step is skipped then. The script can also be run by hand: `powershell -ExecutionPolicy Bypass -File "<install folder>\resources\remove-docker-data.ps1"`. The packaged app carries `resources/docker/` (Dockerfiles, the QA CLI, `images.json`); images are built on the player's machine the first time, with the player's consent.
 
 ### Building and installing on Windows from WSL 2
@@ -338,7 +364,7 @@ The version number comes from `package.json`. A rebuild with the same version st
 | Content source | Each project downloads from its `repository` on its `qaRef`; the manifest must declare the project's `id`. The game keeps each played project's source and the newest version it accepted from the official catalog (`projectSources` in `state.json`): an older publication is ignored, and a project that left the catalog keeps playing from that source. Development: `desktop/catalog.local.json` (see "Getting the SupportDesk repository"); tests: `BUGDETECTIVE_CATALOG_FILE`, a catalog file whose projects may name a `qaDir`. The installed app always reads the official catalog. |
 | Container limits | `BUGDETECTIVE_WORKSPACE_MEMORY` (default `3g`), `BUGDETECTIVE_WORKSPACE_PIDS` (`1024`), `BUGDETECTIVE_QA_MEMORY` (`2g`), `BUGDETECTIVE_QA_PIDS` (`512`), `BUGDETECTIVE_FORWARDER_MEMORY` (`128m`) and `BUGDETECTIVE_FORWARDER_PIDS` (`64`): the memory and pids limits of the workspace container, of the QA containers and of the forwarder, as `docker run --memory` and `--pids-limit` take them. Read when a container is created, so a change applies to the next one (in development from `desktop/.env`; for the installed app, set in the system before opening it). An invalid value keeps the default. |
 | Logs | `%APPDATA%\Bug Detective\logs\bug-detective-<YYYY-MM-DD>.log`: one file per day the app started (`electron-log`, level info; `console.*` of the main process and every line of the install and QA logs), the 7 most recent kept, the user folder written as `~`. **Settings → About → Copy diagnostics** copies versions, the environment and the last 200 lines; **Open logs folder** opens the folder (under WSL, in Windows Explorer: a bare WSL has no `xdg-open`); a failure shows its reason in a toast. The main process logs one line at every start, so the day's file always exists. In the e2e tests the button opens nothing: the path goes to `<userData>/opened-paths.log` and `BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM` is its answer. |
-| Data folder | `BUGDETECTIVE_USER_DATA` replaces `%APPDATA%\Bug Detective` (tests, clean-profile checks) |
+| Data folder | `BUGDETECTIVE_USER_DATA` replaces `%APPDATA%\Bug Detective` (tests, clean-profile checks). An installed app ignores it, unless it is the test build |
 | Docker resources | Volumes `bugdetective-workspace` (the player's repository), `bugdetective-vscode-server`, `bugdetective-qa-cache` (dependency cache), `bugdetective-qa-input` (the copy of the workspace the last QA run tested); containers `bugdetective-workspace` and `bugdetective-forward-<project id>` (the port forwarder); internal network `bugdetective-net-<project id>`; images `bugdetective-workspace:<hash>`, `bugdetective-qa:<hash>`; QA containers `bugdetective-qa-*`. All labeled `bugdetective.role`. |
 
 ## Publishing a project (GitHub)

@@ -30,11 +30,19 @@ extraResources:
     to: THIRD_PARTY_NOTICES.md
 asar: true
 npmRebuild: false
+# The Electron security fuses; the test build keeps them as they are.
+afterPack: tools/after-pack.mjs
 win:
   target:
     - target: nsis
       arch: [x64]
   artifactName: Bug-Detective-Setup-${version}.${ext}
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  artifactName: Bug-Detective-${version}.${ext}
 nsis:
   oneClick: false
   perMachine: false

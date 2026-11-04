@@ -6,6 +6,7 @@
 import { readdir, readFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { STATE_MIGRATIONS, canMigrate, migrate } from './migrations.ts';
 import { createInitialState } from '../../shared/kanban.ts';
 import type { RuleContext } from '../../shared/kanban.ts';
 import {
@@ -211,10 +212,10 @@ export function parseState(raw: unknown): GameState {
   if (version > SCHEMA_VERSION) {
     throw new StateVersionError(`The saved game was created by a newer version of Bug Detective (schema ${version})`);
   }
-  if (version < SCHEMA_VERSION) {
+  if (!canMigrate(version, SCHEMA_VERSION, STATE_MIGRATIONS)) {
     throw new StateVersionError(`The saved game was made by an older, unsupported version of Bug Detective (schema ${version})`);
   }
-  return gameStateSchema.parse(raw) as GameState;
+  return gameStateSchema.parse(migrate(raw, version, SCHEMA_VERSION, STATE_MIGRATIONS)) as GameState;
 }
 
 /** How many state.corrupt-<time>.json files stay in the data folder (the most recent). */
