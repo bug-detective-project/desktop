@@ -328,6 +328,8 @@ export const EXTERNAL_LINKS = {
   vscode: 'https://code.visualstudio.com/download',
   devContainers: 'https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers',
   proxyHelp: 'https://github.com/bug-detective-project/desktop#networks-with-a-proxy',
+  /** "Send feedback": the repository's discussions, until a feedback form exists. */
+  feedback: 'https://github.com/bug-detective-project/desktop/discussions',
 } as const;
 
 export type ExternalLink = keyof typeof EXTERNAL_LINKS;

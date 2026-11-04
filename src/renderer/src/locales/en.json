@@ -548,6 +548,7 @@
     "copyDiagnostics": "Copy diagnostics",
     "openLogs": "Open logs folder",
     "diagnosticsCopied": "Diagnostics copied.",
+    "sendFeedback": "Send feedback",
     "runtimeParts": {
       "electron": "Desktop host",
       "node": "Main process",

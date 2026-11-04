@@ -149,6 +149,11 @@ function folderOpener(userData: string): (path: string) => Promise<string> {
 
 /** Opens an allowlisted URL with the platform's browser command (WSL: the Windows browser). */
 async function openUrl(url: string): Promise<void> {
+  if (isE2E) {
+    // No browser under the e2e tests: they read which links the app opened.
+    await appendFile(join(app.getPath('userData'), 'opened-urls.log'), `${url}\n`);
+    return;
+  }
   const command = platform?.browserCommand(url);
   if (!command) {
     await shell.openExternal(url);

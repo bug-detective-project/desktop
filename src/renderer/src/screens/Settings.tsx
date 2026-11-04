@@ -786,6 +786,10 @@ function About({ snapshot }: { snapshot: Snapshot }) {
           <Button size="sm" onClick={() => void api.openLogsFolder().catch(toast.error)} data-testid="open-logs">
             {t('settings.openLogs')}
           </Button>
+          <Button size="sm" onClick={() => void api.openExternal('feedback').catch(toast.error)} data-testid="send-feedback">
+            {t('settings.sendFeedback')}
+            <Icon name="externalLink" className="size-3.5" />
+          </Button>
         </div>
       </div>
     </div>

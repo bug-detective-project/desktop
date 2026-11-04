@@ -6,7 +6,8 @@ import { dragCard, expectFlagsLoaded, launch, startFirstTicket } from './fixture
 import { supportdesk } from './content.ts';
 
 test('settings: preferences, developer tools, backup and about tabs', async () => {
-  const { app, page, close } = await launch();
+  const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-settings-'));
+  const { app, page, close } = await launch({}, { userData });
   const saves = await mkdtemp(join(tmpdir(), 'Meus saves '));
   try {
     await startFirstTicket(page);
@@ -98,6 +99,9 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     expect(diagnostics).toContain('Bug Detective');
     expect(diagnostics).toContain('## Versions');
     expect(diagnostics).not.toContain('João Silva');
+    // Send feedback opens the discussions page (the e2e build logs the links it would open).
+    await page.getByTestId('send-feedback').click();
+    await expect.poll(() => readFile(join(userData, 'opened-urls.log'), 'utf8').catch(() => '')).toContain('https://github.com/bug-detective-project/desktop/discussions');
 
     // Never git branch names or the number of tickets.
     for (const tab of ['preferences', 'environment', 'backup', 'about']) {
@@ -107,6 +111,7 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     }
   } finally {
     await close();
+    await rm(userData, { recursive: true, force: true });
     await rm(saves, { recursive: true, force: true });
   }
 });
