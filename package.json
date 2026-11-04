@@ -40,6 +40,9 @@
     "pretest:integration": "pnpm run prepare:resources",
     "verify:push": "pnpm run typecheck && pnpm test",
     "check:action-pins": "node tools/check-action-pins.mjs",
+    "test:ci:fast": "pnpm run test:coverage --reporter=default --reporter=blob --outputFile.blob=.vitest-reports/fast.json",
+    "test:ci:integration": "pnpm run test:integration --coverage --coverage.thresholds.lines=0 --coverage.thresholds.branches=0 --coverage.thresholds.functions=0 --reporter=default --reporter=blob --outputFile.blob=.vitest-reports/integration.json",
+    "test:ci:coverage": "vitest run --merge-reports .vitest-reports --coverage --coverage.thresholds.lines=78 --coverage.thresholds.branches=71 --coverage.thresholds.functions=69",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

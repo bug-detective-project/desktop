@@ -133,7 +133,13 @@ export class QaRunner {
    * the container), so they run with --network none: offline by design, and the player's code
    * cannot reach anything outside. Installing dependencies does use the network.
    */
-  private baseArgs(name: string, options: { packageDir?: string; network: boolean; source?: string }): string[] {
+  /**
+   * The `docker run` arguments of a QA container (before the image): labels, limits, network, the
+   * workspace (or its copy) read-only at /workspace, the dependency cache at /cache and the stage
+   * package read-only at /package. Only the dependency preparation, which has the network, may
+   * write to the cache: a test run cannot plant anything the next workspace install would pick up.
+   */
+  containerArgs(name: string, options: { packageDir?: string; network: boolean; source?: string }): string[] {
     const args = [
       'run',
       '--name',
@@ -146,7 +152,7 @@ export class QaRunner {
       '--mount',
       mountArg({ type: 'volume', src: options.source ?? this.names.volume, dst: '/workspace', readonly: true }),
       '--mount',
-      mountArg({ type: 'volume', src: this.names.cacheVolume, dst: '/cache' }),
+      mountArg({ type: 'volume', src: this.names.cacheVolume, dst: '/cache', ...(options.network ? {} : { readonly: true }) }),
     ];
     const { packageDir } = options;
     if (packageDir) {
@@ -231,7 +237,7 @@ export class QaRunner {
     const name = `${this.names.prefix}-qa-${randomUUID().slice(0, 8)}`;
     const startedAt = Date.now();
     const args = [
-      ...this.baseArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume }),
+      ...this.containerArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume }),
       this.image,
       '--ticket',
       String(request.ticket),
@@ -286,7 +292,7 @@ export class QaRunner {
     try {
       const run = await this.docker.run(
         [
-          ...this.baseArgs(name, { network: true }),
+          ...this.containerArgs(name, { network: true }),
           this.image,
           '--ticket',
           String(ticket),
