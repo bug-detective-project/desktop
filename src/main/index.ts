@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { homedir, release, version as osVersion } from 'node:os';
-import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, net, screen, session, shell } from 'electron';
 import log from 'electron-log/main';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -13,6 +13,7 @@ import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
 import type { DevCatalogOptions } from './game.ts';
 import { channelName, registerIpc } from './ipc.ts';
+import { appFetch, fetchTextWith } from './net.ts';
 import { startupErrorText } from './startup-error.ts';
 import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
@@ -33,6 +34,9 @@ if (process.env.BUGDETECTIVE_USER_DATA) {
 }
 
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;
+// Every download (the catalog, the projects' content) goes through Electron's net: the system
+// proxy and certificates apply, as in the browser.
+const downloadFetch = appFetch({ net });
 
 // One log file per day the app starts, in <userData>/logs, the 7 most recent kept; every line
 // with the home folder as "~". console.* of the main process goes there too (and to the terminal).
@@ -98,6 +102,7 @@ function catalogService(userData: string): CatalogService {
     baseDir: appRoot,
     cacheFile: join(userData, 'catalog.json'),
     fallbackFile: app.isPackaged ? join(process.resourcesPath, 'catalog.fallback.json') : join(appRoot, 'build', 'catalog.fallback.json'),
+    fetchText: fetchTextWith(downloadFetch),
     log: console.log,
   });
 }
@@ -220,7 +225,7 @@ async function main(): Promise<void> {
   const userData = app.getPath('userData');
   let window: BrowserWindow | null = null;
   const catalog = catalogService(userData);
-  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion }, console.log);
+  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch }, console.log);
   // The starter until the game names its own project (Game.init points everything at that one).
   const starter = (await catalog.current()).find((item) => item.starter)!;
   const game = new Game({

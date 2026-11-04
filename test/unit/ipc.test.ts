@@ -61,6 +61,11 @@ describe('IPC', () => {
     expect((shown[0].filters as { name: string }[])[0].name).toBe('Save do Bug Detective');
   });
 
+  it('opens the proxy help page, which is on the allowlist', async () => {
+    expect(await call('openExternal', fromApp, 'proxyHelp')).toEqual({ ok: true, value: undefined });
+    expect(openUrl).toHaveBeenCalledWith('https://github.com/bug-detective-project/desktop#networks-with-a-proxy');
+  });
+
   it('hands out the diagnostics text and opens the logs folder', async () => {
     expect(await call('diagnostics', fromApp)).toEqual({ ok: true, value: 'Bug Detective 0.1.0 diagnostics' });
     expect(await call('openLogsFolder', fromApp)).toEqual({ ok: true, value: undefined });

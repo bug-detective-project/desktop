@@ -33,6 +33,8 @@
     "title": "Before you start",
     "intro": "Bug Detective runs SupportDesk in Docker and opens it in your own VS Code. Let's check that everything is installed.",
     "allOk": "Everything is ready.",
+    "proxy": "On a network with a proxy, the app follows the system settings; Docker Desktop and VS Code need theirs.",
+    "proxyHelp": "How to set them up",
     "continue": "Start playing",
     "status": {
       "ok": "Ready",

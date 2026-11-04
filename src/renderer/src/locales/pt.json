@@ -33,6 +33,8 @@
     "title": "Antes de começar",
     "intro": "O Bug Detective roda o SupportDesk no Docker e o abre no seu próprio VS Code. Vamos verificar se está tudo instalado.",
     "allOk": "Está tudo pronto.",
+    "proxy": "Numa rede com proxy, o app segue as configurações do sistema; o Docker Desktop e o VS Code precisam das deles.",
+    "proxyHelp": "Como configurar",
     "continue": "Começar a jogar",
     "status": {
       "ok": "Pronto",
