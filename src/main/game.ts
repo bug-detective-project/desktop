@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import type {
   BusyTask,
   DiskUsageItem,
@@ -149,7 +150,7 @@ export class Game {
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
   private dbResetFailed = false;
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
-  private pendingSave: (ValidatedSave & { fileName: string; token: string }) | null = null;
+  private pendingSave: (ValidatedSave & { file: string; fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
   /** A review was still checked out when the app started: bring the player's code back once Docker answers. */
   private recoverReview = false;
@@ -1548,11 +1549,11 @@ export class Game {
       }
       const bundle = await this.options.runtime.bundle();
       const at = this.ctx().now;
-      // The save carries its own export record, so a restored game starts as backed up.
-      const lastExport = { at, path: file };
-      const state = { ...this.state, lastExport };
+      // The save carries its own export record, so a restored game starts as backed up; inside the
+      // file only the name: the folder of this computer stays out of a file that may travel.
+      const state = { ...this.state, lastExport: { at, path: basename(file) } };
       await writeFileAtomic(file, createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at));
-      await this.commit((current) => ({ ...current, lastExport }));
+      await this.commit((current) => ({ ...current, lastExport: { at, path: file } }));
     });
   }
 
@@ -1567,7 +1568,7 @@ export class Game {
       throw new GameError('invalidSave', (error as Error).message);
     }
     const token = randomUUID();
-    this.pendingSave = { ...validated, fileName, token };
+    this.pendingSave = { ...validated, file, fileName, token };
     return {
       token,
       summary: {
@@ -1627,7 +1628,12 @@ export class Game {
       }
       // A save taken during QA restores as interrupted, like after a crash. Exports always return
       // from a review first, so a restored workspace never has one checked out.
-      await this.commit((_state, ctx) => ({ ...rules.recoverInterruptedQa(save.state, ctx), reviewSession: null }));
+      // The restored game was last backed up when the save was made, into the file just chosen.
+      await this.commit((_state, ctx) => ({
+        ...rules.recoverInterruptedQa(save.state, ctx),
+        reviewSession: null,
+        lastExport: { at: save.state.lastExport?.at ?? save.manifest.createdAt, path: save.file },
+      }));
       this.titles = {};
       await this.loadTicketMeta();
       const content = await this.source.current().catch(() => null);

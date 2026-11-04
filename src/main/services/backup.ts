@@ -45,7 +45,8 @@ export interface ProjectFiles {
   reviews: Map<string, Uint8Array>;
 }
 
-export const SAVE_FORMAT_VERSION = 3;
+/** 4: the save's lastExport holds the file name only, never the folder of the player's computer. */
+export const SAVE_FORMAT_VERSION = 4;
 
 export interface SaveContents {
   state: GameState;

@@ -74,6 +74,24 @@ function createGame(
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
 
+describe('a restored save', () => {
+  it('points the last export at the file just restored, dated when the save was made', async () => {
+    // Before any ticket: the fake runtime has no repository to bundle, and a save with progress needs one.
+    const { game } = createGame();
+    await game.init();
+    const file = join(dir, 'bug-detective-2026-11-04.bdsave');
+    await game.exportProgress(file);
+    const at = game.current.lastExport!.at;
+
+    const restored = join(dir, 'from-another-computer.bdsave');
+    const { copyFile } = await import('node:fs/promises');
+    await copyFile(file, restored);
+    const { token } = await game.inspectSave(restored, 'from-another-computer.bdsave');
+    await game.restoreProgress(token);
+    expect(game.current.lastExport).toEqual({ at, path: restored });
+  });
+});
+
 describe('a failed database reset', () => {
   it('is logged and shown, never stops the ticket, and clears with a retry that succeeds', async () => {
     const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
@@ -623,10 +641,11 @@ describe('Game', () => {
     await game.exportProgress(file);
     expect(game.current.lastExport).toEqual({ at: expect.any(String), path: file });
     expect(backupStatus(game.current)).toBe('current');
-    // Saved with the game, and inside the save itself.
+    // Saved with the game, and inside the save itself: there with the file name only, never this computer's folder.
     expect(JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')).lastExport.path).toBe(file);
     const saved = readZip(new Uint8Array(await readFile(file))).find((entry) => entry.path === 'state.json')!;
-    expect(JSON.parse(Buffer.from(saved.data).toString('utf8')).lastExport).toEqual(game.current.lastExport);
+    expect(JSON.parse(Buffer.from(saved.data).toString('utf8')).lastExport).toEqual({ at: game.current.lastExport!.at, path: 'bug-detective-2026-10-24.bdsave' });
+    expect(Buffer.from(await readFile(file)).toString('latin1')).not.toContain('Meus saves');
 
     await new Promise((resolve) => setTimeout(resolve, 5));
     await game.move(1, 'inProgress');
