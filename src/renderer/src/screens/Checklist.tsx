@@ -14,6 +14,14 @@ const LINKS: Record<CheckResult['id'], ExternalLink> = {
   devcontainers: 'devContainers',
 };
 
+/** The help page and its label for a failed check: most point at the install page; Docker's container mode has its own. */
+function helpFor(check: CheckResult): { link: ExternalLink; label: string } {
+  if (check.id === 'docker' && check.reason === 'windowsContainers') {
+    return { link: 'linuxContainers', label: 'checklist.docker.switchHelp' };
+  }
+  return { link: LINKS[check.id], label: 'common.learnMore' };
+}
+
 export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onContinue: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -63,9 +71,19 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                   <span className="text-sm text-muted-foreground">{t(`checklist.status.${check.status}`)}</span>
                 </div>
                 <p className="mt-1 text-base text-muted-foreground">{t(`checklist.${check.id}.${reason}`)}</p>
+                {check.warning && (
+                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-amber-700 dark:text-amber-400" data-testid={`check-${check.id}-warning`} data-warning={check.warning}>
+                    <Icon name="alertTriangle" className="size-4 shrink-0" aria-hidden />
+                    <span>{t(`checklist.${check.id}.${check.warning}`)}</span>
+                    <button type="button" className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline" onClick={() => void api.openExternal('wslConfig')}>
+                      {t('checklist.docker.memoryHelp')}
+                      <Icon name="externalLink" className="size-3" />
+                    </button>
+                  </p>
+                )}
                 {check.status !== 'ok' && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {check.id === 'docker' && check.reason !== 'notInstalled' && (
+                    {check.id === 'docker' && check.reason !== 'notInstalled' && check.reason !== 'windowsContainers' && (
                       <Button
                         variant="primary"
                         busy={busy === 'docker' || snapshot.busy === 'startingDocker'}
@@ -85,8 +103,8 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                         {t('checklist.devcontainers.install')}
                       </Button>
                     )}
-                    <Button variant="ghost" onClick={() => void api.openExternal(LINKS[check.id])}>
-                      {t('common.learnMore')}
+                    <Button variant="ghost" onClick={() => void api.openExternal(helpFor(check).link)}>
+                      {t(helpFor(check).label)}
                       <Icon name="externalLink" className="size-3.5" />
                     </Button>
                   </div>

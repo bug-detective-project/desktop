@@ -3,11 +3,13 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { statfs } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { win32 } from 'node:path';
 import { runCommand } from '../services/process.ts';
 import type { CommandRunner } from '../services/process.ts';
-import type { DockerLocations, Platform, VSCodeCli, WslStatus } from './types.ts';
+import { freeBytesOf } from './types.ts';
+import type { DockerLocations, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
 
 const path = win32;
 
@@ -16,6 +18,7 @@ export interface WindowsDeps {
   runner: CommandRunner;
   fileExists: (file: string) => boolean;
   readText: (file: string) => string;
+  statfs: StatFs;
 }
 
 const defaultDeps = (): WindowsDeps => ({
@@ -23,6 +26,7 @@ const defaultDeps = (): WindowsDeps => ({
   runner: runCommand,
   fileExists: existsSync,
   readText: (file) => readFileSync(file, 'utf8'),
+  statfs,
 });
 
 /** wsl.exe writes UTF-16LE unless WSL_UTF8=1 is honored; detect which one we got. */
@@ -191,6 +195,12 @@ export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Pla
 
     browserCommand() {
       return null;
+    },
+
+    freeDiskBytes() {
+      // Docker Desktop keeps its WSL 2 disk under %LOCALAPPDATA%\Docker\wsl; before the first start, the folder's disk is the same.
+      const candidates = localAppData ? [path.join(localAppData, 'Docker', 'wsl'), localAppData] : [];
+      return freeBytesOf(deps.statfs, candidates);
     },
   };
 }

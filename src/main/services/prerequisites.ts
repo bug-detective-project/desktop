@@ -11,6 +11,9 @@ export interface Environment {
   vscodeCli: VSCodeCli | null;
 }
 
+/** Below this, the engine (WSL 2's memory, see .wslconfig) is likely too small for the workspace and the QA runs. */
+export const MIN_ENGINE_MEMORY_BYTES = 4 * 1024 ** 3;
+
 export class Prerequisites {
   private readonly platform: Platform;
 
@@ -47,19 +50,32 @@ export class Prerequisites {
   async check(environment?: Environment): Promise<PrerequisiteReport> {
     const env = environment ?? (await this.locate());
     // Versions are extra information: a failure to read one never fails a check.
-    const [dockerState, dockerVersion, wsl, vscodeVersion, devcontainers] = await Promise.all([
+    const [dockerState, dockerVersion, dockerInfo, wsl, vscodeVersion, devcontainers] = await Promise.all([
       this.dockerState(env),
       env.docker?.versionInfo().catch(() => null) ?? Promise.resolve(null),
+      env.docker?.serverInfo().catch(() => null) ?? Promise.resolve(null),
       this.platform.checkWsl().catch((error: Error): WslStatus => ({ installed: false, version2: false, detail: error.message })),
       env.vscode?.version().catch(() => null) ?? Promise.resolve(null),
       // undefined: the extensions could not be listed.
       env.vscode?.devContainersVersion().catch(() => undefined) ?? Promise.resolve(undefined),
     ]);
     const version = (value: string | null | undefined) => (value ? { version: value } : {});
+    const dockerCheck = (): CheckResult => {
+      if (dockerState !== 'running') {
+        return { id: 'docker', status: dockerState === 'starting' ? 'pending' : 'missing', reason: dockerState };
+      }
+      const docker = version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine));
+      // Docker Desktop switched to Windows containers: the Linux images cannot be built or run.
+      if (dockerInfo && dockerInfo.osType !== 'linux') {
+        return { id: 'docker', status: 'missing', reason: 'windowsContainers', ...docker };
+      }
+      if (dockerInfo && dockerInfo.memTotalBytes < MIN_ENGINE_MEMORY_BYTES) {
+        return { id: 'docker', status: 'ok', warning: 'lowMemory', ...docker };
+      }
+      return { id: 'docker', status: 'ok', ...docker };
+    };
     const checks: CheckResult[] = [
-      dockerState === 'running'
-        ? { id: 'docker', status: 'ok', ...version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine)) }
-        : { id: 'docker', status: dockerState === 'starting' ? 'pending' : 'missing', reason: dockerState },
+      dockerCheck(),
       !wsl.installed
         ? { id: 'wsl', status: 'missing', reason: 'notFound', detail: wsl.detail }
         : wsl.version2

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launch, takeNextTicket } from './fixtures.ts';
+import { launch, simulate, takeNextTicket } from './fixtures.ts';
 
 test('the first-run checklist blocks the game until every prerequisite passes', async () => {
   const { page, close } = await launch({ docker: 'notRunning', devcontainers: false });
@@ -37,6 +37,27 @@ test('missing VS Code and WSL show instructions instead of an install button', a
     await expect(page.getByTestId('check-vscode').getByRole('button', { name: /How to install/ })).toBeVisible();
     await expect(page.getByTestId('install-devcontainers')).toHaveCount(0);
     await expect(page.getByTestId('start-playing')).toBeDisabled();
+  } finally {
+    await close();
+  }
+});
+
+test('Docker in Windows containers mode blocks the game with its own help link; little memory only warns', async () => {
+  const { app, page, close } = await launch({ dockerOs: 'windows' });
+  try {
+    await expect(page.getByTestId('check-docker')).toHaveAttribute('data-status', 'missing');
+    await expect(page.getByTestId('check-docker')).toContainText('Windows containers mode');
+    await expect(page.getByTestId('check-docker').getByRole('button', { name: 'How to switch' })).toBeVisible();
+    await expect(page.getByTestId('start-docker')).toHaveCount(0);
+    await expect(page.getByTestId('start-playing')).toBeDisabled();
+
+    // Switched back to Linux containers, but WSL 2 has only 2 GB: a warning, and the game can start.
+    await simulate(app, { dockerOs: 'linux', dockerMemoryBytes: 2 * 1024 ** 3 });
+    await page.getByTestId('check-again').click();
+    await expect(page.getByTestId('check-docker')).toHaveAttribute('data-status', 'ok');
+    await expect(page.getByTestId('check-docker-warning')).toHaveAttribute('data-warning', 'lowMemory');
+    await expect(page.getByTestId('check-docker-warning')).toContainText('less than 4 GB of memory');
+    await expect(page.getByTestId('start-playing')).toBeEnabled();
   } finally {
     await close();
   }

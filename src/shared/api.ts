@@ -8,6 +8,8 @@ export interface CheckResult {
   id: CheckId;
   status: 'ok' | 'missing' | 'warning' | 'pending';
   reason?: string;
+  /** A check that passes with a caveat (for example `lowMemory`: the Docker engine has less than 4 GiB). */
+  warning?: string;
   detail?: string;
   /** Version of the tool, when it could be read (Docker Desktop or engine, VS Code, the extension, WSL). */
   version?: string;
@@ -235,6 +237,13 @@ export interface WorkspaceStatus {
   branch: string | null;
 }
 
+/** What the images, the dependency cache and the workspace need on the Docker disk (10 GB). */
+export const INSTALL_DISK_BYTES = 10e9;
+
+export interface InstallOptions {
+  ignoreDiskSpace?: boolean;
+}
+
 export interface ApiError {
   code: string;
   message: string;
@@ -251,7 +260,8 @@ export interface BugDetectiveApi {
   installDevContainers(): Promise<PrerequisiteReport>;
 
   refreshEnvironment(): Promise<EnvironmentReport>;
-  installEnvironment(): Promise<EnvironmentReport>;
+  /** `ignoreDiskSpace`: download even with less than 10 GiB free on the Docker disk (the `lowDiskSpace` error carries the free bytes as its message). */
+  installEnvironment(options?: InstallOptions): Promise<EnvironmentReport>;
   /** Disk space used by the game's images and volumes. Needs Docker running; can take a few seconds. */
   diskUsage(): Promise<DiskUsageItem[]>;
 
@@ -336,6 +346,10 @@ export const EXTERNAL_LINKS = {
   proxyHelp: 'https://github.com/bug-detective-project/desktop#networks-with-a-proxy',
   /** "Send feedback": the repository's discussions, until a feedback form exists. */
   feedback: 'https://github.com/bug-detective-project/desktop/discussions',
+  /** Docker Desktop in Windows containers mode: how to switch back to Linux containers. */
+  linuxContainers: 'https://docs.docker.com/desktop/setup/install/windows-install/#switch-between-windows-and-linux-containers',
+  /** The memory WSL 2 (and so the Docker engine) may use: .wslconfig. */
+  wslConfig: 'https://learn.microsoft.com/windows/wsl/wsl-config#configuration-setting-for-wslconfig',
 } as const;
 
 export type ExternalLink = keyof typeof EXTERNAL_LINKS;

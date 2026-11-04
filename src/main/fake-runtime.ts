@@ -44,6 +44,12 @@ interface Scenario {
   installDelayMs: number;
   /** Downloading the environment fails with this message (after writing its log). */
   installFails: string | null;
+  /** Free bytes on the Docker disk; null when it cannot be measured. */
+  freeDiskBytes: number | null;
+  /** The engine's container OS: 'windows' simulates Docker Desktop in Windows containers mode. */
+  dockerOs: 'linux' | 'windows';
+  /** The engine's memory in bytes. */
+  dockerMemoryBytes: number;
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -65,6 +71,9 @@ const DEFAULT_SCENARIO: Scenario = {
   unlockFails: null,
   installDelayMs: 0,
   installFails: null,
+  freeDiskBytes: 50 * 1024 ** 3,
+  dockerOs: 'linux',
+  dockerMemoryBytes: 8 * 1024 ** 3,
 };
 
 const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
@@ -178,9 +187,15 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async checkPrerequisites(): Promise<PrerequisiteReport> {
-    const { docker, wsl, vscode, devcontainers } = this.scenario;
+    const { docker, wsl, vscode, devcontainers, dockerOs, dockerMemoryBytes } = this.scenario;
+    const dockerCheck = (): PrerequisiteReport['checks'][number] => {
+      if (docker !== 'running') return { id: 'docker', status: 'missing', reason: docker };
+      if (dockerOs !== 'linux') return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
+      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warning: 'lowMemory', version: '4.37.1' };
+      return { id: 'docker', status: 'ok', version: '4.37.1' };
+    };
     const checks: PrerequisiteReport['checks'] = [
-      docker === 'running' ? { id: 'docker', status: 'ok', version: '4.37.1' } : { id: 'docker', status: 'missing', reason: docker },
+      dockerCheck(),
       wsl ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)', version: '2.3.24.0' } : { id: 'wsl', status: 'missing', reason: 'notFound' },
       vscode ? { id: 'vscode', status: 'ok', version: '1.95.1' } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       devcontainers && vscode
@@ -232,6 +247,10 @@ export class FakeRuntime implements GameRuntime {
       ],
       ready,
     };
+  }
+
+  async freeDiskBytes() {
+    return this.scenario.freeDiskBytes;
   }
 
   async installEnvironment(onLine: LineHandler) {
@@ -396,8 +415,11 @@ export class FakeRuntime implements GameRuntime {
    * For the e2e tests (through Playwright's app.evaluate): changes made outside the app, such as
    * Docker Desktop stopping or `npm run dev` started in the VS Code terminal.
    */
-  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean }) {
+  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean; dockerOs?: 'linux' | 'windows'; dockerMemoryBytes?: number; freeDiskBytes?: number | null }) {
     if (change.docker) this.scenario.docker = change.docker;
+    if (change.dockerOs) this.scenario.dockerOs = change.dockerOs;
+    if (change.dockerMemoryBytes !== undefined) this.scenario.dockerMemoryBytes = change.dockerMemoryBytes;
+    if (change.freeDiskBytes !== undefined) this.scenario.freeDiskBytes = change.freeDiskBytes;
     if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
     if (change.workspaceLost) {

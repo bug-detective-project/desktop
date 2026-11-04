@@ -45,6 +45,19 @@ export const Failed: Story = {
     await expect(within(canvasElement.ownerDocument.body).getByTestId('install-modal-error')).toHaveAttribute('data-tone', 'danger');
   },
 };
+/** Less than 10 GB free on the Docker disk: a warning, and the player chooses to continue or cancel. */
+export const LowDiskSpace: Story = {
+  args: { phase: 'lowDisk', lines: [], lowDisk: { freeBytes: 1_200_000_000, neededBytes: 10e9 }, onContinueAnyway: fn() },
+  play: async ({ args, canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(body.getByTestId('install-modal-low-disk')).toHaveTextContent('About 10 GB are needed on the Docker disk; you have 1.2 GB free.');
+    await userEvent.click(body.getByRole('button', { name: 'Continue anyway' }));
+    await expect(args.onContinueAnyway).toHaveBeenCalled();
+    await userEvent.click(body.getByRole('button', { name: 'Cancel' }));
+    await expect(args.onClose).toHaveBeenCalled();
+  },
+};
+export const LowDiskSpaceInPortuguese: Story = { args: LowDiskSpace.args, globals: { locale: 'pt' } };
 export const FailedInPortuguese: Story = { ...Failed, globals: { locale: 'pt' } };
 export const TicketRunning: Story = { args: { kind: 'ticket', phase: 'running', lines: ['» Fetching front-1 from the local qa folder', '» Verified front-1 (42 files and the ticket package, SHA-256)'] } };
 export const TicketFailed: Story = { args: { kind: 'ticket', phase: 'failed', lines: ['» Fetching front-1 from GitHub'], error: 'No internet connection. Connect and try again.' } };

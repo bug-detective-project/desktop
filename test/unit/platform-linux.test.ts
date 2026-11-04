@@ -98,6 +98,17 @@ describe('Linux platform on WSL 2', () => {
   });
 });
 
+describe('free disk space on WSL 2', () => {
+  it("measures the Windows disk that holds Docker Desktop's WSL data", async () => {
+    const statfs = async (path: string) => {
+      if (path === '/mnt/c/Users/João Silva/AppData/Local/Docker/wsl') return { bsize: 4096, bavail: 2_000_000 };
+      throw new Error('ENOENT');
+    };
+    const platform = createLinuxPlatform({ env: wslEnv, runner: windowsRunner, statfs, ...fakeFs(wslFiles) });
+    expect(await platform.freeDiskBytes()).toBe(4096 * 2_000_000);
+  });
+});
+
 describe('Linux platform on plain Linux', () => {
   const env = { PATH: '/usr/local/bin:/usr/bin' };
   const files = { '/proc/version': 'Linux version 6.8.0-45-generic', '/usr/bin/docker': '', '/usr/bin/code': '' };
@@ -111,5 +122,16 @@ describe('Linux platform on plain Linux', () => {
   it('does not need WSL and uses the default browser opener', async () => {
     expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true, notNeeded: true });
     expect(platform().browserCommand('http://127.0.0.1:5173/')).toBeNull();
+  });
+
+  it("measures the disk of Docker Engine's data folder, or the root file system without one", async () => {
+    const statfsOf = (disks: Record<string, number>) => async (path: string) => {
+      if (path in disks) return { bsize: 4096, bavail: disks[path] };
+      throw new Error('ENOENT');
+    };
+    expect(await createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: statfsOf({ '/var/lib/docker': 3_000_000, '/': 500 }), ...fakeFs(files) }).freeDiskBytes()).toBe(4096 * 3_000_000);
+    expect(await createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: statfsOf({ '/': 500 }), ...fakeFs(files) }).freeDiskBytes()).toBe(4096 * 500);
+    const unreadable = createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: async () => { throw new Error('EPERM'); }, ...fakeFs(files) });
+    expect(await unreadable.freeDiskBytes()).toBeNull();
   });
 });

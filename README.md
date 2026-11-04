@@ -40,9 +40,17 @@ renderer.config.ts     the renderer's Vite plugins and aliases, shared by the ap
 
 ## Requirements
 
-- Windows 10/11 with WSL 2 and Docker Desktop (WSL 2 backend)
+To play (provisional until the real-runtime assertion settles, see the loose-ends plan):
+
+- Windows 10 22H2 or Windows 11, 64-bit, with WSL 2
+- 8 GB of RAM (16 GB recommended): the first-run checklist warns when the Docker engine (WSL 2's memory, set in `.wslconfig`) has less than 4 GB
+- 10 GB free on the disk that holds Docker Desktop's data (`%LOCALAPPDATA%\Docker\wsl`): the download of the environment asks before going on with less, and a full disk while the game writes its state shows "The disk is full"
+- Docker Desktop with the WSL 2 backend, in **Linux containers** mode (the checklist refuses Windows containers mode, with a link to switch back)
 - VS Code (the app installs the Dev Containers extension)
-- For development: Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
+
+For development:
+
+- Node.js 26.12.1 and pnpm 12.15.0 on Windows; optionally the same in WSL for unit tests. Install pnpm with `npm install -g pnpm@12.15.0` (`packageManager` and `engines` in `package.json` pin it; Node.js 26 no longer ships Corepack)
 - For editing game content only: `../supportdesk` and `../supportdesk-qa` next to this folder, a clone of the SupportDesk repository and its published `qa` branch (see below). The integration tests play their own example project (`test/fixtures/notes`), and the e2e tests use `../supportdesk-qa` when it is there, otherwise the SupportDesk publication pinned in `test/e2e/supportdesk-version.ts`, cloned once into `test/.cache/` (git-ignored; that first run needs internet). The unit tests play `test/fixtures/notes` too: no automated test reads `../supportdesk-qa` except the e2e ones, which fall back to the pinned publication. `pnpm run dev` and `pnpm run build` need no game project: the app downloads each project's content, QA CLI included, at run time.
 
 ## Networks with a proxy
@@ -136,7 +144,7 @@ The e2e tests keep the onboarding from opening on its own: `launch()` starts the
 The app also runs as a Linux app inside WSL 2, shown on the Windows desktop through WSLg. Requirements:
 
 - Windows 11 (or Windows 10 with WSLg) and Node.js 26.12.1 in the distro (`nvm use`), with pnpm 12.15.0 (`npm install -g pnpm@12.15.0`).
-- Docker Desktop with **WSL integration enabled for this distro** (Settings → Resources → WSL integration), so `docker` works inside WSL. Docker Engine installed in the distro also works.
+- Docker Desktop with **WSL integration enabled for this distro** (Settings → Resources → WSL integration), so `docker` works inside WSL. With the integration off, the checklist reports Docker as not installed (the `docker` CLI is not there), even though Docker Desktop runs on Windows. Docker Engine installed in the distro also works.
 - Electron's system libraries, once: `sudo apt-get install -y libgtk-3-0 libasound2 libnss3 libgbm1 libxss1`.
 - VS Code on Windows with the Dev Containers extension (the app installs it).
 
@@ -352,7 +360,7 @@ The app downloads `archive/refs/heads/qa.zip` (the manifest and every ticket pac
 - The app's git commands and scripts run with `core.hooksPath=/dev/null` and `core.fsmonitor=false`: hooks or an fsmonitor planted in the repository by the player's code never run under the app (the player's own git in VS Code keeps them). **Settings → New game** also removes them from the repository, with `core.sshCommand`, `core.pager`, `core.editor` and filter or diff drivers.
 - Closing the app stops QA and the workspace container (the volume stays): a QA run in progress is recorded as interrupted, `npm run dev` and VS Code's server stop with the container, and an attached VS Code window disconnects. The next action of the game starts everything again.
 - The repository records its game (`git config bugdetective.game`, the state's `createdAt`). When another game unlocks a stage (a new playthrough on the same computer, or **Settings → New game**), the old `player/*` branches are renamed to `archive/<time>/player/ticket-N` and uncommitted work is stashed. A restore marks the repository with the restored game.
-- Starting a ticket (To Do → In Progress, once per ticket) forces `player/ticket-N` back to `stage-N`: uncommitted changes, untracked files and extra commits are discarded (ignored files such as `node_modules` stay) and `npm run db:reset` reseeds the database. Returning from QA keeps the player's work. This step needs Docker.
+- Starting a ticket (To Do → In Progress, once per ticket) forces `player/ticket-N` back to `stage-N`: uncommitted changes, untracked files and extra commits are discarded (ignored files such as `node_modules` stay) and `npm run db:reset` reseeds the database. Returning from QA keeps the player's work. This step needs Docker. A failed `db:reset` (on unlock, start or workspace rebuild) never blocks the ticket: it is logged, and the Dashboard's Local environment shows an "App data: Could not be reset" row with "Try again" until a reset succeeds.
 - **Open in VS Code** runs `Code.exe <commit>\resources\app\out\cli.js --new-window --folder-uri vscode-remote://attached-container+<hex of {"containerName":"/bugdetective-workspace"}>/workspaces/<project id>` with `ELECTRON_RUN_AS_NODE=1`, which is exactly what `bin\code.cmd` does, without going through `cmd.exe`.
 - QA runs in a new container per attempt, with `--network none`, the stage package bind-mounted read-only, and dependencies from the cache volume (mounted read-only for test runs; only the dependency preparation, which has the network, writes to it). The workspace (without `.git` and `node_modules`) is first copied into the `bugdetective-qa-input` volume, which QA mounts read-only; edits made while QA runs do not change what it tests. The containers are always removed.
 - **Code review.** When QA passes, the files QA tested (from `bugdetective-qa-input`, minus the review excludes) become the approved snapshot: stored in the app data folder and as a commit tagged `qa-approved/ticket-N` that is on no player branch. The app also builds `review/ticket-N` with two commits on the stage commit, the reference (stage + `reference.patch`) then the approved snapshot, so the snapshot commit's diff is exactly "reference → your solution". Excluded paths keep the reference's version in both commits, and both carry a `.vscode/settings.json` with `"files.readonlyInclude": { "**": true }` (merged into the project's own settings). Commits use the approval date, so rebuilding from the stored data gives the same commits. The in-app comparison uses diffs computed by git at that moment (with and without whitespace), so it works with Docker stopped.
