@@ -89,6 +89,11 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 {t('projects.needsUpdate')}
               </p>
             )}
+            {card.unavailable === 'projectUnavailable' && (
+              <p className="text-sm font-medium text-destructive" data-testid="project-unavailable">
+                {t('projects.unavailable')}
+              </p>
+            )}
             {!card.active && blocked && <p className="text-sm text-muted-foreground">{blocked}</p>}
             <div className="mt-auto flex items-center justify-between gap-3 whitespace-nowrap">
               <Button ref={briefButton} size="sm" disabled={!details} onClick={() => flip(true)} data-testid={`project-${card.id}-brief`}>
@@ -99,7 +104,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 <Button
                   variant="primary"
                   disabled={blocked !== null || card.unavailable !== null}
-                  title={card.unavailable ? t('projects.needsUpdate') : (blocked ?? undefined)}
+                  title={card.unavailable === 'appTooOld' ? t('projects.needsUpdate') : card.unavailable ? t('projects.unavailable') : (blocked ?? undefined)}
                   onClick={() => onPlay(card)}
                   data-testid={`switch-${card.id}`}
                 >

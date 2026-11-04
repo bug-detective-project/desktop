@@ -34,6 +34,7 @@
     "intro": "Bug Detective runs SupportDesk in Docker and opens it in your own VS Code. Let's check that everything is installed.",
     "allOk": "Everything is ready.",
     "proxy": "On a network with a proxy, the app follows the system settings; Docker Desktop and VS Code need theirs.",
+    "firstDownload": "The first download needs the internet and about 4 GB (the Docker images and the project).",
     "proxyHelp": "How to set them up",
     "continue": "Start playing",
     "status": {
@@ -160,6 +161,7 @@
     "trackDone": "Track done · {{done}}/{{total}}",
     "downloadProjectFirst": "Download the project first.",
     "installModal": {
+      "retry": "Try again",
       "title": "Downloading the game environment",
       "running": "Downloading and installing. The first time this can take several minutes.",
       "done": "Everything is ready.",
@@ -638,6 +640,9 @@
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
     "solveBugNotAllowed": "Only the ticket in progress can be solved.",
     "workspaceLost": "The code of your workspace is gone. Recreate it from the Dashboard, or restore a backup.",
+    "noConnection": "No internet connection. Connect and try again.",
+    "githubRateLimited": "GitHub temporarily limited the downloads (common on shared networks). Try again in a few minutes.",
+    "projectUnavailable": "The project is not available right now: its repository or publication could not be found.",
     "dbResetFailed": "The app data could not be reset. Check the Docker log and try again.",
     "incompletePublication": "The project's publication is incomplete. Try again later.",
     "switchIncomplete": "The project switch is not finished: {{message}}",
@@ -656,6 +661,7 @@
   },
   "projects": {
     "needsUpdate": "Update Bug Detective to play this project.",
+    "unavailable": "Unavailable: the project could not be downloaded right now.",
     "title": "Projects",
     "intro": "Pick your next project. Only one project stays on your computer: switching removes the current one from Docker and downloads the next. Your progress and PRs are kept.",
     "difficulty": "Difficulty",

@@ -40,6 +40,9 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
         </p>
         <h1 className="mt-4 text-3xl font-bold tracking-tight">{t('checklist.title')}</h1>
         <p className="mt-2 text-muted-foreground">{t('checklist.intro')}</p>
+        <p className="mt-2 text-sm text-muted-foreground" data-testid="checklist-first-download">
+          {t('checklist.firstDownload')}
+        </p>
         <p className="mt-2 text-sm text-muted-foreground">
           {t('checklist.proxy')}{' '}
           <button type="button" className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline" onClick={() => void api.openExternal('proxyHelp')} data-testid="proxy-help">

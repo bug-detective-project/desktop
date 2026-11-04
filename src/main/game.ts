@@ -40,6 +40,7 @@ import type { ResolvedProject } from './services/catalog.ts';
 import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
+import { NoConnectionError, ProjectUnavailableError, RateLimitedError } from './services/content/github.ts';
 import { excludeMatcher, excludePathspecs, excludesFileContent } from './services/review/config.ts';
 import { buildDiagnostics } from './services/logs.ts';
 import type { DiagnosticsInput } from './services/logs.ts';
@@ -59,6 +60,15 @@ export class GameError extends Error {
 
 /** Content errors the player can act on get their own code; anything else is shown as it is. */
 export function contentError(error: unknown): unknown {
+  if (error instanceof NoConnectionError) {
+    return new GameError('noConnection', error.message);
+  }
+  if (error instanceof RateLimitedError) {
+    return new GameError('githubRateLimited', error.message);
+  }
+  if (error instanceof ProjectUnavailableError) {
+    return new GameError('projectUnavailable', error.message);
+  }
   if (error instanceof IncompletePublicationError) {
     return new GameError('incompletePublication', error.message);
   }
@@ -153,6 +163,8 @@ export class Game {
   private workspaceLost = false;
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
   private dbResetFailed = false;
+  /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
+  private readonly unavailableProjects = new Set<string>();
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
   private pendingSave: (ValidatedSave & { file: string; fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
@@ -891,10 +903,12 @@ export class Game {
         .prepare()
         .catch((error: unknown) => {
           if (error instanceof UnsupportedFormatError) this.newerFormat.add(id);
+          if (error instanceof ProjectUnavailableError) this.unavailableProjects.add(id);
           return null;
         });
       if (content) {
         this.projectInfo.set(id, content);
+        this.unavailableProjects.delete(id);
       }
     }
     this.emit();
@@ -937,7 +951,7 @@ export class Game {
         played: progress !== null && progress.tickets.length > 0,
         details,
         progress: progress?.tracks ? { front: { done: done('front'), total: progress.tracks.front }, back: { done: done('back'), total: progress.tracks.back } } : null,
-        unavailable: this.needsUpdate(item.id) ? 'appTooOld' : null,
+        unavailable: this.needsUpdate(item.id) ? 'appTooOld' : this.unavailableProjects.has(item.id) ? 'projectUnavailable' : null,
       };
     });
   }

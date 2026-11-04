@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, textFile, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectManifest } from '@bug-detective/catalog/contract';
-import { DownloadError, GitHubContentSource, validateBaseUrl } from '../../src/main/services/content/github.ts';
+import { DownloadError, GitHubContentSource, ProjectUnavailableError, validateBaseUrl } from '../../src/main/services/content/github.ts';
 import { LocalContentSource, gitArchive } from '../../src/main/services/content/local.ts';
 import { publishLocally } from '../helpers/publication.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
@@ -194,7 +194,8 @@ describe('GitHubContentSource (mock server)', () => {
   });
 
   it('reports a missing repository', async () => {
-    await expect(source('owner/missing').fetchTicket('front-1')).rejects.toThrow(/HTTP 404/);
+    await expect(source('owner/missing').fetchTicket('front-1')).rejects.toThrow(ProjectUnavailableError);
+    await expect(source('owner/missing').fetchTicket('front-1')).rejects.toThrow(/has no qa branch or tag/);
   });
 
   it('accepts only https, or http on loopback', () => {

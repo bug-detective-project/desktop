@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeZip } from '@bug-detective/catalog/contract';
-import { CachedContentSource, FirstDownloadError } from '../../src/main/services/content/cache.ts';
+import { CachedContentSource } from '../../src/main/services/content/cache.ts';
 import { gitArchive } from '../../src/main/services/content/git.ts';
-import { GitHubContentSource } from '../../src/main/services/content/github.ts';
+import { GitHubContentSource, NoConnectionError } from '../../src/main/services/content/github.ts';
 import { publishLocally } from '../helpers/publication.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { createProjectRepo } from '../helpers/project-repo.ts';
@@ -110,9 +110,9 @@ describe('CachedContentSource', () => {
     expect(requests.filter((url) => /[0-9a-f]{40}\.zip$/.test(url))).toEqual([`/owner/demo/archive/${commitOf('front-2')}.zip`]);
   });
 
-  it('asks for internet when nothing was downloaded yet', async () => {
+  it('reports no connection when nothing was downloaded yet and the network is down', async () => {
     offline = true;
-    await expect(cached().fetchTicket('front-1')).rejects.toThrow(FirstDownloadError);
-    await expect(cached().prepare()).rejects.toThrow(FirstDownloadError);
+    await expect(cached().fetchTicket('front-1')).rejects.toThrow(NoConnectionError);
+    await expect(cached().prepare()).rejects.toThrow(NoConnectionError);
   });
 });
