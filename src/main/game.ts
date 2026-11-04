@@ -1784,7 +1784,11 @@ export class Game {
     }
     await this.requireDocker();
     await this.exclusive('restoring', async () => {
-      await this.beforePlayerCode();
+      // The restore replaces the workspace, so it is also the way back from a lost one.
+      await this.checkWorkspace();
+      if (!this.workspaceLost && this.state.reviewSession) {
+        await this.returnToPlayerCode();
+      }
       this.pendingSave = null;
       const current = save.state.currentTicket;
       // The save's active project becomes this game's: its stores, and the labels of its volume.
@@ -1796,6 +1800,7 @@ export class Game {
       }
       this.appendLog('» Recreating the workspace volume from the save');
       await this.options.runtime.restoreWorkspace(save.bundle, current === null ? null : playerBranch(current), save.state.createdAt);
+      this.workspaceLost = false;
       await this.packages.clear();
       for (const [stage, zip] of save.packages) {
         await this.packages.save(stage, zip);
