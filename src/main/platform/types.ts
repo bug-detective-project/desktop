@@ -47,4 +47,22 @@ export interface Platform {
   isPortFree(port: number): Promise<boolean>;
   /** A command that opens a URL in the user's browser, or null to use Electron's shell.openExternal. */
   browserCommand(url: string): { command: string; args: string[] } | null;
+  /** Free bytes on the disk that holds Docker's data (images, volumes, build cache), or null when it cannot be measured. */
+  freeDiskBytes(): Promise<number | null>;
+}
+
+/** The part of `fs.statfs` the platforms use. */
+export type StatFs = (path: string) => Promise<{ bsize: number; bavail: number }>;
+
+/** `bavail × bsize` of the first candidate path `statfs` answers for (a missing folder falls through to the next), or null when none does. */
+export async function freeBytesOf(statfs: StatFs, candidates: readonly string[]): Promise<number | null> {
+  for (const candidate of candidates) {
+    try {
+      const stats = await statfs(candidate);
+      return Number(stats.bavail) * Number(stats.bsize);
+    } catch {
+      // Not there, or not readable: try the next one.
+    }
+  }
+  return null;
 }

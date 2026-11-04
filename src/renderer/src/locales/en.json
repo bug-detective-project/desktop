@@ -49,7 +49,11 @@
       "notInstalled": "Docker Desktop is not installed. Install it with the WSL 2 backend, then come back.",
       "notRunning": "Docker Desktop is installed but not running.",
       "starting": "Docker Desktop is starting. This can take a minute.",
-      "start": "Start Docker Desktop"
+      "start": "Start Docker Desktop",
+      "windowsContainers": "Docker Desktop is in Windows containers mode. Switch it to Linux containers (right-click the whale icon), then check again.",
+      "switchHelp": "How to switch",
+      "lowMemory": "Docker has less than 4 GB of memory, so the game may be slow or fail. Give WSL 2 more memory in .wslconfig.",
+      "memoryHelp": "How to change it"
     },
     "wsl": {
       "title": "WSL 2",
@@ -167,7 +171,9 @@
       "done": "Everything is ready.",
       "copy": "Copy log",
       "copied": "Log copied.",
-      "close": "Close"
+      "close": "Close",
+      "lowDisk": "About {{needed}} GB are needed on the Docker disk; you have {{free}} GB free. The download may fail or fill the disk.",
+      "continueAnyway": "Continue anyway"
     },
     "ticketModal": {
       "title": "Downloading the ticket",
@@ -657,7 +663,9 @@
     "invalidInput": "The app received an invalid request: {{message}}",
     "noMoreTickets": "There are no more tickets in this track.",
     "noSuchTicket": "That ticket does not exist.",
-    "notAllowed": "This action is not allowed here."
+    "notAllowed": "This action is not allowed here.",
+    "diskFull": "The disk is full: free some space and try again.",
+    "lowDiskSpace": "There is not enough free space on the Docker disk."
   },
   "projects": {
     "needsUpdate": "Update Bug Detective to play this project.",

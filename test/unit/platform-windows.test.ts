@@ -143,6 +143,27 @@ describe('WSL detection', () => {
   });
 });
 
+describe('free disk space on Windows', () => {
+  const env = { LOCALAPPDATA: 'C:\\Users\\João Silva\\AppData\\Local' };
+  const dockerDisk = 'C:\\Users\\João Silva\\AppData\\Local\\Docker\\wsl';
+  const statfsOf = (disks: Record<string, number>) => async (path: string) => {
+    if (path in disks) return { bsize: 4096, bavail: disks[path] };
+    throw new Error('ENOENT');
+  };
+
+  it("measures the disk that holds Docker Desktop's WSL data, or the local app data when Docker has none yet", async () => {
+    const withDocker = createWindowsPlatform({ env, statfs: statfsOf({ [dockerDisk]: 2_500_000, [env.LOCALAPPDATA]: 1_000 }), ...fakeFs({}) });
+    expect(await withDocker.freeDiskBytes()).toBe(4096 * 2_500_000);
+    const fresh = createWindowsPlatform({ env, statfs: statfsOf({ [env.LOCALAPPDATA]: 1_000 }), ...fakeFs({}) });
+    expect(await fresh.freeDiskBytes()).toBe(4096 * 1_000);
+  });
+
+  it('answers null when the space cannot be read', async () => {
+    const platform = createWindowsPlatform({ env: {}, statfs: async () => { throw new Error('EPERM'); }, ...fakeFs({}) });
+    expect(await platform.freeDiskBytes()).toBeNull();
+  });
+});
+
 describe('attached-container URI', () => {
   it('hex-encodes the container name JSON', () => {
     const uri = attachedContainerUri('bugdetective-workspace', '/workspaces/supportdesk');

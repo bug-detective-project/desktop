@@ -20,11 +20,15 @@ function fakePlatform(answer: Answer, wsl: WslStatus = { installed: true, versio
     dockerHostPath: (path) => path,
     isPortFree: async () => true,
     browserCommand: () => null,
+    freeDiskBytes: async () => null,
   };
 }
 
 const healthy: Answer = (command, args) => {
   if (command === 'docker') {
+    if (args[0] === 'info') {
+      return ok('linux 16777216000\n');
+    }
     return args.includes('{{.Server.Version}}|{{.Server.Platform.Name}}') ? ok('27.3.1|Docker Desktop 4.37.1 (178610)\n') : ok('27.3.1\n');
   }
   if (args.includes('--version')) {
@@ -125,6 +129,25 @@ describe('Docker state and the other checks when something is missing', () => {
     const notRunning = await new Prerequisites(platform(stopped, { isDockerDesktopRunning: async () => false })).check();
     expect(notRunning.checks[0]).toEqual({ id: 'docker', status: 'missing', reason: 'notRunning' });
     expect(notRunning.allOk).toBe(false);
+  });
+
+  it('refuses Docker Desktop in Windows containers mode, and warns when the engine has little memory', async () => {
+    const windowsContainers: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('windows 16777216000\n') : healthy(command, args));
+    const refused = await new Prerequisites(fakePlatform(windowsContainers)).check();
+    expect(refused.checks[0]).toEqual({ id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' });
+    expect(refused.allOk).toBe(false);
+    expect(refused.dockerState).toBe('running');
+
+    const lowMemory: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('linux 3221225472\n') : healthy(command, args));
+    const warned = await new Prerequisites(fakePlatform(lowMemory)).check();
+    expect(warned.checks[0]).toEqual({ id: 'docker', status: 'ok', warning: 'lowMemory', version: '4.37.1' });
+    expect(warned.allOk).toBe(true);
+
+    // Exactly 4 GiB is enough; an unreadable `docker info` never fails the check.
+    const enough: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('linux 4294967296\n') : healthy(command, args));
+    expect((await new Prerequisites(fakePlatform(enough)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
+    const noInfo: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('', 1) : healthy(command, args));
+    expect((await new Prerequisites(fakePlatform(noInfo)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
   });
 
   it('reports WSL missing, WSL 1 only, and VS Code without its CLI', async () => {

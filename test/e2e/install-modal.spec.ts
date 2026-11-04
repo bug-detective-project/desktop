@@ -50,6 +50,28 @@ test('downloading the environment opens a large modal with the log that only clo
   }
 });
 
+test('less than 10 GB free on the Docker disk asks before downloading: Cancel keeps the download offered, "Continue anyway" downloads', async () => {
+  const { page, close } = await launch({ environmentReady: false, freeDiskBytes: 1_000_000_000 });
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('install-environment').click();
+    const modal = page.getByTestId('install-modal');
+    await expect(modal.getByTestId('install-modal-low-disk')).toContainText('About 10 GB are needed on the Docker disk; you have 1.0 GB free.');
+    await expect(modal.getByTestId('install-modal-close')).toHaveCount(0);
+    await modal.getByTestId('install-modal-cancel').click();
+    await expect(modal).toHaveCount(0);
+    await expect(page.getByTestId('environment-panel')).toHaveAttribute('data-state', 'download');
+
+    await page.getByTestId('install-environment').click();
+    await modal.getByTestId('install-modal-continue').click();
+    await expect(modal.getByTestId('install-modal-status')).toHaveText('Everything is ready.', { timeout: 10_000 });
+    await modal.getByTestId('install-modal-close').click();
+    await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+  } finally {
+    await close();
+  }
+});
+
 test('a failed download keeps the modal open with the error and the log until "Close", in Portuguese too', async () => {
   const { page, close } = await launch({ environmentReady: false, installFails: 'docker build failed: no space left on device' });
   try {

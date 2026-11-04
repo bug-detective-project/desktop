@@ -112,6 +112,18 @@ describe('IPC', () => {
     expect(await call('nextAssignment', fromApp, 'front')).toMatchObject({ ok: false, error: { code: 'dockerUnavailable' } });
     game.nextAssignment.mockRejectedValueOnce(new Error('disk full'));
     expect(await call('nextAssignment', fromApp, 'front')).toEqual({ ok: false, error: { code: 'failed', message: 'disk full' } });
+    // A full disk while the state or a package is written gets its own code.
+    game.nextAssignment.mockRejectedValueOnce(Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' }));
+    expect(await call('nextAssignment', fromApp, 'front')).toEqual({ ok: false, error: { code: 'diskFull', message: 'ENOSPC: no space left on device, write' } });
+  });
+
+  it('passes the install options through, and refuses unknown ones', async () => {
+    game.installEnvironment = vi.fn(async () => ({ items: [], ready: true }));
+    expect(await call('installEnvironment', fromApp)).toMatchObject({ ok: true });
+    expect(game.installEnvironment).toHaveBeenLastCalledWith(undefined);
+    expect(await call('installEnvironment', fromApp, { ignoreDiskSpace: true })).toMatchObject({ ok: true });
+    expect(game.installEnvironment).toHaveBeenLastCalledWith({ ignoreDiskSpace: true });
+    expect(await call('installEnvironment', fromApp, { force: true })).toMatchObject({ ok: false, error: { code: 'invalidInput' } });
   });
 
   it('opens only the workspace app on the loopback address in the browser', async () => {

@@ -3,7 +3,8 @@ import { useToast } from '../toast-context.ts';
 import { Icon } from './icons.tsx';
 import { Button, LogView, Modal, Notice, Spinner } from './ui.tsx';
 
-export type InstallPhase = 'running' | 'done' | 'failed';
+/** `lowDisk`: the Docker disk has less than the download needs; the player decides whether to go on. */
+export type InstallPhase = 'running' | 'done' | 'failed' | 'lowDisk';
 /** What is being downloaded: the game environment (images) or a ticket (its code and package). */
 export type InstallKind = 'environment' | 'ticket';
 
@@ -18,6 +19,8 @@ export function InstallModal({
   error,
   onClose,
   onRetry,
+  lowDisk,
+  onContinueAnyway,
 }: {
   kind?: InstallKind;
   phase: InstallPhase;
@@ -26,6 +29,9 @@ export function InstallModal({
   onClose: () => void;
   /** A failure worth repeating as it is (no internet, GitHub's limit): "Try again" runs the same download. */
   onRetry?: (() => void) | null;
+  /** With phase `lowDisk`: bytes free on the Docker disk and bytes needed. */
+  lowDisk?: { freeBytes: number; neededBytes: number } | null;
+  onContinueAnyway?: () => void;
 }) {
   const { t } = useTranslation();
   const text = kind === 'ticket' ? 'dashboard.ticketModal' : 'dashboard.installModal';
@@ -49,6 +55,11 @@ export function InstallModal({
             {error}
           </Notice>
         )}
+        {phase === 'lowDisk' && lowDisk && (
+          <Notice tone="warn" data-testid="install-modal-low-disk">
+            {t('dashboard.installModal.lowDisk', { needed: Math.round(lowDisk.neededBytes / 1e9), free: (lowDisk.freeBytes / 1e9).toFixed(1) })}
+          </Notice>
+        )}
         {phase === 'done' && (
           <Notice tone="success" data-testid="install-modal-status">
             {t(`${text}.done`)}
@@ -61,7 +72,17 @@ export function InstallModal({
           </p>
         )}
         <LogView lines={lines} className="min-h-0 flex-1 select-text" follow={phase === 'running'} />
-        {phase !== 'running' && (
+        {phase === 'lowDisk' && (
+          <div className="flex justify-end gap-2">
+            <Button onClick={onClose} data-testid="install-modal-cancel">
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" onClick={onContinueAnyway} data-testid="install-modal-continue">
+              {t('dashboard.installModal.continueAnyway')}
+            </Button>
+          </div>
+        )}
+        {phase !== 'running' && phase !== 'lowDisk' && (
           <div className="flex justify-end gap-2">
             {phase === 'failed' && onRetry && (
               <Button variant="primary" onClick={onRetry} data-testid="install-modal-retry">

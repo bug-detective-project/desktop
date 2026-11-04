@@ -49,7 +49,11 @@
       "notInstalled": "O Docker Desktop não está instalado. Instale com o backend WSL 2 e depois volte aqui.",
       "notRunning": "O Docker Desktop está instalado, mas não está rodando.",
       "starting": "O Docker Desktop está iniciando. Isso pode levar um minuto.",
-      "start": "Iniciar o Docker Desktop"
+      "start": "Iniciar o Docker Desktop",
+      "windowsContainers": "O Docker Desktop está no modo de containers Windows. Mude para containers Linux (clique com o botão direito no ícone da baleia) e verifique de novo.",
+      "switchHelp": "Como mudar",
+      "lowMemory": "O Docker tem menos de 4 GB de memória, então o jogo pode ficar lento ou falhar. Dê mais memória ao WSL 2 no .wslconfig.",
+      "memoryHelp": "Como mudar"
     },
     "wsl": {
       "title": "WSL 2",
@@ -167,7 +171,9 @@
       "done": "Tudo pronto.",
       "copy": "Copiar log",
       "copied": "Log copiado.",
-      "close": "Fechar"
+      "close": "Fechar",
+      "lowDisk": "São necessários cerca de {{needed}} GB no disco do Docker; você tem {{free}} GB livres. O download pode falhar ou lotar o disco.",
+      "continueAnyway": "Continuar mesmo assim"
     },
     "ticketModal": {
       "title": "Baixando o ticket",
@@ -657,7 +663,9 @@
     "invalidInput": "O app recebeu um pedido inválido: {{message}}",
     "noMoreTickets": "Não há mais tickets nesta trilha.",
     "noSuchTicket": "Esse ticket não existe.",
-    "notAllowed": "Esta ação não é permitida aqui."
+    "notAllowed": "Esta ação não é permitida aqui.",
+    "diskFull": "O disco está cheio: libere espaço e tente de novo.",
+    "lowDiskSpace": "Não há espaço livre suficiente no disco do Docker."
   },
   "projects": {
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",

@@ -46,6 +46,8 @@ export interface GameRuntime {
   environment(): Promise<EnvironmentReport>;
   /** Downloads and installs everything the environment report lists as missing. Needs internet. */
   installEnvironment(onLine: LineHandler): Promise<void>;
+  /** Free bytes on the disk that holds Docker's data, or null when unknown. */
+  freeDiskBytes(): Promise<number | null>;
   diskUsage(): Promise<DiskUsageItem[]>;
   /** Removes the app's Docker leftovers, or everything it created; one failure never stops the rest. */
   cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup>;
@@ -297,6 +299,10 @@ export class DockerRuntime implements GameRuntime {
       }
     }
     return { items, ready: items.every((item) => item.ready) };
+  }
+
+  freeDiskBytes() {
+    return this.platform.freeDiskBytes();
   }
 
   async installEnvironment(onLine: LineHandler) {

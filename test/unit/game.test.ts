@@ -153,6 +153,34 @@ describe('a failed database reset', () => {
   });
 });
 
+describe('disk space before the environment download', () => {
+  it('refuses the download under 10 GiB free with the free bytes, unless the player continues anyway', async () => {
+    const { game, runtime } = createGame({ scenario: { environmentReady: false, freeDiskBytes: 1_000_000_000 } });
+    await game.init();
+    await game.contentLoaded();
+    await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'lowDiskSpace', message: '1000000000' });
+    expect((await runtime.environment()).ready).toBe(false);
+    expect(game.snapshot().log.join('\n')).toContain('» 1.0 GB free on the Docker disk; about 10 GB are needed');
+
+    await game.installEnvironment({ ignoreDiskSpace: true });
+    expect((await runtime.environment()).ready).toBe(true);
+  });
+
+  it('downloads when the space is enough or cannot be measured', async () => {
+    const enough = createGame({ scenario: { environmentReady: false, freeDiskBytes: 10 * 1024 ** 3 } });
+    await enough.game.init();
+    await enough.game.contentLoaded();
+    await enough.game.installEnvironment();
+    expect((await enough.runtime.environment()).ready).toBe(true);
+
+    const unknown = createGame({ scenario: { environmentReady: false, freeDiskBytes: null } });
+    await unknown.game.init();
+    await unknown.game.contentLoaded();
+    await unknown.game.installEnvironment();
+    expect((await unknown.runtime.environment()).ready).toBe(true);
+  });
+});
+
 describe('diagnostics', () => {
   it('describes the versions, the project and the recent log, and keeps the home folder out', async () => {
     const { game } = createGame();

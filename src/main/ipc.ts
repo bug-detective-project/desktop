@@ -26,7 +26,7 @@ const schemas = {
   startDocker: none,
   installDevContainers: none,
   refreshEnvironment: none,
-  installEnvironment: none,
+  installEnvironment: z.tuple([z.object({ ignoreDiskSpace: z.boolean().optional() }).strict().optional()]),
   diskUsage: none,
   nextAssignment: z.tuple([z.enum(TRACK_CHOICES)]),
   switchProject: z.tuple([z.string().regex(/^[a-z][a-z0-9-]{0,39}$/)]),
@@ -96,6 +96,10 @@ function toEnvelopeError(error: unknown): Envelope<never> {
   if (error instanceof z.ZodError) {
     return { ok: false, error: { code: 'invalidInput', message: error.issues[0]?.message ?? 'Invalid input' } };
   }
+  // The disk is full while the state, a package or a review is written.
+  if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOSPC') {
+    return { ok: false, error: { code: 'diskFull', message: error.message } };
+  }
   return { ok: false, error: { code: 'failed', message: error instanceof Error ? error.message : String(error) } };
 }
 
@@ -109,7 +113,7 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     startDocker: () => game.startDocker(),
     installDevContainers: () => game.installDevContainers(),
     refreshEnvironment: () => game.refreshEnvironment(),
-    installEnvironment: () => game.installEnvironment(),
+    installEnvironment: (options) => game.installEnvironment(options),
     diskUsage: () => game.diskUsage(),
     nextAssignment: (track) => game.nextAssignment(track),
     switchProject: (project) => game.switchProject(project),
@@ -204,7 +208,7 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
         return { ok: false, error: { code: 'notAllowed', message: 'Untrusted sender' } };
       }
       try {
-        const args = schemas[channel].parse(raw) as never[];
+        const args = schemas[channel].parse(raw) as unknown as never[];
         const value = await (handlers[channel] as (...input: never[]) => unknown)(...args);
         return { ok: true, value };
       } catch (error) {

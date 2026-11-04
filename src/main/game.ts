@@ -11,6 +11,7 @@ import type {
   DockerCleanup,
   EngineState,
   EnvironmentReport,
+  InstallOptions,
   PrerequisiteReport,
   ReviewComparison,
   ReviewNotice,
@@ -23,6 +24,7 @@ import type {
   DevCatalogView,
   LocalCatalog,
 } from '../shared/api.ts';
+import { INSTALL_DISK_BYTES } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
@@ -820,10 +822,19 @@ export class Game {
     return this.options.runtime.diskUsage();
   }
 
-  async installEnvironment(): Promise<EnvironmentReport> {
+  static readonly INSTALL_DISK_BYTES = INSTALL_DISK_BYTES;
+
+  async installEnvironment(options: InstallOptions = {}): Promise<EnvironmentReport> {
     this.requireNoSwitch();
     await this.requireDocker();
     await this.exclusive('installing', async () => {
+      if (!options.ignoreDiskSpace) {
+        const free = await this.options.runtime.freeDiskBytes().catch(() => null);
+        if (free !== null && free < Game.INSTALL_DISK_BYTES) {
+          this.appendLog(`» ${(free / 1e9).toFixed(1)} GB free on the Docker disk; about ${Math.round(Game.INSTALL_DISK_BYTES / 1e9)} GB are needed`);
+          throw new GameError('lowDiskSpace', String(free));
+        }
+      }
       const left = await this.cleanOtherProjects();
       if (left.length > 0) {
         throw new GameError('otherProjectsLeft', `Docker still has resources of another project: ${left.map((item) => item.name).join(', ')}`);

@@ -78,6 +78,14 @@ export class Docker {
     return { engine, desktop: /Docker Desktop (\d+\.\d+\.\d+)/.exec(platform)?.[1] ?? null };
   }
 
+  /** The engine's container OS and total memory (`docker info`), or null when it does not answer. */
+  async serverInfo(timeoutMs = 15_000): Promise<{ osType: string; memTotalBytes: number } | null> {
+    const result = await this.run(['info', '--format', '{{.OSType}} {{.MemTotal}}'], { timeoutMs });
+    const [osType, memory] = result.stdout.toString('utf8').trim().split(/\s+/);
+    const memTotalBytes = Number(memory);
+    return result.code === 0 && osType && Number.isFinite(memTotalBytes) ? { osType, memTotalBytes } : null;
+  }
+
   /** Size of an image in bytes, or null when it does not exist. */
   async imageSize(tag: string): Promise<number | null> {
     const result = await this.run(['image', 'inspect', '--format', '{{.Size}}', tag], { timeoutMs: 30_000 });

@@ -6,11 +6,13 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { statfs } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { posix as path, win32 } from 'node:path';
 import { runCommand } from '../services/process.ts';
 import type { CommandRunner } from '../services/process.ts';
-import type { DockerLocations, Platform, VSCodeCli, WslStatus } from './types.ts';
+import { freeBytesOf } from './types.ts';
+import type { DockerLocations, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
 import { decodeWslOutput, parseWslVersion } from './windows.ts';
 
 export interface LinuxDeps {
@@ -18,6 +20,7 @@ export interface LinuxDeps {
   runner: CommandRunner;
   fileExists: (file: string) => boolean;
   readText: (file: string) => string;
+  statfs: StatFs;
 }
 
 const defaultDeps = (): LinuxDeps => ({
@@ -25,6 +28,7 @@ const defaultDeps = (): LinuxDeps => ({
   runner: runCommand,
   fileExists: existsSync,
   readText: (file) => readFileSync(file, 'utf8'),
+  statfs,
 });
 
 /** True inside WSL (any version). */
@@ -199,6 +203,13 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
     browserCommand(url) {
       // On WSL, open the Windows default browser; the published ports answer on Windows too.
       return wsl ? { command: '/mnt/c/Windows/explorer.exe', args: [url] } : null;
+    },
+
+    async freeDiskBytes() {
+      // WSL 2: Docker Desktop's disk lives on Windows (%LOCALAPPDATA%\Docker\wsl). Plain Linux: Docker Engine's data folder, or the root file system.
+      const side = await windows();
+      const candidates = side ? [side.toLinux(win32.join(side.localAppData, 'Docker', 'wsl')), side.toLinux(side.localAppData)] : ['/var/lib/docker', '/'];
+      return freeBytesOf(deps.statfs, candidates);
     },
   };
 }

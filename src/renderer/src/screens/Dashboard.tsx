@@ -10,6 +10,7 @@ import { api, errorInfo } from '../api.ts'
 import { Icon } from '../components/icons.tsx'
 import { InstallModal } from '../components/InstallModal.tsx'
 import type { InstallKind, InstallPhase } from '../components/InstallModal.tsx'
+import { INSTALL_DISK_BYTES } from '@shared/api.ts'
 import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
@@ -958,11 +959,23 @@ export function Dashboard({
   // The download of the environment, or of a ticket, with its log in the install modal. The
   // environment's stays open until "Close"; a ticket's closes by itself when it succeeds (the
   // Board is the next step) and stays open with the error and the log when it fails.
-  const [install, setInstall] = useState<{ kind: InstallKind; phase: InstallPhase; lines: string[]; error: string | null; retry: (() => void) | null } | null>(null)
+  const [install, setInstall] = useState<{
+    kind: InstallKind
+    phase: InstallPhase
+    lines: string[]
+    error: string | null
+    retry: (() => void) | null
+    lowDisk?: { freeBytes: number; neededBytes: number }
+  } | null>(null)
   /** No internet and GitHub's limit pass: the same download is worth repeating as it is. */
   const retryable = (code: string) => code === 'noConnection' || code === 'githubRateLimited'
   const failed = async (kind: InstallKind, error: unknown, retry: () => void) => {
     const { code, message } = errorInfo(error)
+    if (kind === 'environment' && code === 'lowDiskSpace') {
+      // The main process refused the download; the message carries the free bytes. The player may go on anyway.
+      setInstall({ kind, phase: 'lowDisk', lines: (await api.snapshot()).log, error: null, retry: null, lowDisk: { freeBytes: Number(message), neededBytes: INSTALL_DISK_BYTES } })
+      return
+    }
     setInstall({ kind, phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }), retry: retryable(code) ? retry : null })
   }
   const nextAssignment = (track: TrackChoice) => {
@@ -978,13 +991,13 @@ export function Dashboard({
       )
       .catch(toast.error)
   }
-  const installEnvironment = () => {
+  const installEnvironment = (options?: { ignoreDiskSpace: boolean }) => {
     setInstall({ kind: 'environment', phase: 'running', lines: [], error: null, retry: null })
     api
-      .installEnvironment()
+      .installEnvironment(options)
       .then(
         async () => setInstall({ kind: 'environment', phase: 'done', lines: (await api.snapshot()).log, error: null, retry: null }),
-        (error: unknown) => failed('environment', error, installEnvironment),
+        (error: unknown) => failed('environment', error, () => installEnvironment(options)),
       )
       .catch(toast.error)
   }
@@ -999,7 +1012,7 @@ export function Dashboard({
     openReview: onOpenReview,
     nextAssignment,
     run,
-    install: installEnvironment,
+    install: () => installEnvironment(),
     busy,
   }
 
@@ -1022,6 +1035,8 @@ export function Dashboard({
           error={install.error}
           onClose={() => setInstall(null)}
           onRetry={install.retry}
+          lowDisk={install.lowDisk}
+          onContinueAnyway={() => installEnvironment({ ignoreDiskSpace: true })}
         />
       )}
       {snapshot.state.projectSwitch && <PendingSwitch snapshot={snapshot} />}
