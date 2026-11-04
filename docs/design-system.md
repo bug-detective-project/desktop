@@ -58,7 +58,7 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 
 Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap`). Markdown (`Markdown.tsx`): `h1` 24px, paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-base`.
 
-**Contrast.** Text meets WCAG AA (4.5:1). In the light theme, colored text uses the `-700` tone, and pills and badges, which sit on their own tint (and sometimes on another one), use `-800`; `--destructive` is red-700. Text is never faded with an opacity modifier on a tinted row (diff line numbers use `text-foreground/70`). The Storybook stories check it with axe (`pnpm run test:stories`).
+**Contrast.** Text meets WCAG AA (4.5:1). In the light theme, colored text uses the `-700` tone, and pills and badges, which sit on their own tint (and sometimes on another one), use `-800`; `--destructive` is red-700. Text is never faded with an opacity modifier on a tinted row (diff line numbers use `text-foreground/70`). The Storybook stories check it with axe (`pnpm run test:stories`), every story in the light theme and in the dark one (the `stories` and `stories-dark` vitest projects; `.storybook/preview.tsx` reads `__STORY_THEME__`); in the dark theme `--primary` is `oklch(0.72 0.14 265)` and `--destructive` `oklch(0.72 0.19 25)` with dark text on the solid danger button, so colored text on the tints stays above 4.5:1. A story never needs a manual dark variant. The Code Review stage pill uses `indigo-300` in the dark theme (`indigo-400` fell to 4.1:1 at 12px on the tinted current-task surface).
 
 ## Workflow stage colors
 
