@@ -15,6 +15,7 @@ import { isQaContainer } from './cleanup.ts';
 import { readTar } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
+import { containerLimits, limitArgs } from './limits.ts';
 import type { Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 import { PROJECT_ID, resourceNames } from './workspace.ts';
@@ -24,7 +25,8 @@ const RESULT_PATH = '/tmp/qa-result.json';
 
 /**
  * Replaces the QA input volume's content with the project's files of the workspace volume
- * (/source/<project id>: the volume holds one folder per project), as root (the fresh volume is root-owned).
+ * (/source/<project id>: the volume holds one folder per project). Runs as node: the QA image owns
+ * /input and /source as node, so the fresh input volume takes that owner on its first mount.
  */
 const COPY_SCRIPT = `set -eu
 find /input -mindepth 1 -delete
@@ -65,6 +67,18 @@ export function parseQaResult(json: string, ticket: number): QaResult {
     throw new QaInfrastructureError(`QA result is for ticket ${parsed.data.ticket}, expected ${ticket}`);
   }
   return parsed.data;
+}
+
+/** The result recorded when the kernel killed the QA container for exceeding its memory limit. */
+export function outOfMemoryResult(ticket: number, durationMs: number): QaResult {
+  return {
+    ticket,
+    gate: 1,
+    status: 'outOfMemory',
+    message: 'QA stopped because the app used too much memory.',
+    tests: [],
+    durationMs,
+  };
 }
 
 /** The result recorded when the container itself had to be stopped (the CLI never reported). */
@@ -124,6 +138,7 @@ export class QaRunner {
       name,
       ...labelArgs('qa', this.project),
       '--init',
+      ...limitArgs(containerLimits('qa')),
       '--network',
       options.network ? 'bridge' : 'none',
       '--mount',
@@ -146,7 +161,7 @@ export class QaRunner {
     return this.project;
   }
 
-  /** A short-lived root container from the QA image, with the given volumes, running `command`. */
+  /** A short-lived container from the QA image (as node, with the QA limits), with the given volumes, running `command`. */
   private async helper(mounts: string[], command: string[], timeoutMs: number) {
     const name = `${this.names.prefix}-qa-copy-${randomUUID().slice(0, 8)}`;
     try {
@@ -156,10 +171,9 @@ export class QaRunner {
           '--name',
           name,
           ...labelArgs('qa', this.project),
+          ...limitArgs(containerLimits('qa')),
           '--network',
           'none',
-          '--user',
-          'root',
           '--env',
           `PROJECT_ID=${this.projectId()}`,
           '--entrypoint',
@@ -236,6 +250,11 @@ export class QaRunner {
       });
       if (run.timedOut) {
         return outerTimeoutResult(request.ticket, request.timeoutSeconds, Date.now() - startedAt);
+      }
+      // 137 is SIGKILL: the memory limit (checked here, before the container is removed), or a stop.
+      if (run.code === 137 && (await this.docker.oomKilled(name))) {
+        request.onLine?.('» QA container killed: out of memory', 'stderr');
+        return outOfMemoryResult(request.ticket, Date.now() - startedAt);
       }
       const copied = await this.docker.run(['container', 'cp', `${name}:${RESULT_PATH}`, '-'], { timeoutMs: 60_000 });
       if (copied.code !== 0) {
