@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard, takeNextTicket } from '../e2e/fixtures.ts';
-import { finishOnboarding } from './onboarding.ts';
+import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -70,7 +70,12 @@ function memoryInUse(nameFilter: string): number {
   const names = docker('ps', '--filter', `name=${nameFilter}`, '--format', '{{.Names}}').trim().split('\n').filter(Boolean);
   let total = 0;
   for (const name of names) {
-    const usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name).trim().split('/')[0].trim();
+    let usage: string;
+    try {
+      usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name).trim().split('/')[0].trim();
+    } catch {
+      continue; // The container ended between ps and stats: a QA run finishing.
+    }
     const match = /^([\d.]+)\s*([KMG]i?B|B)$/i.exec(usage);
     if (!match) continue;
     const unit = match[2].toUpperCase();
@@ -113,6 +118,7 @@ async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'co
 }
 
 test('the full game loop with real Docker and VS Code', async () => {
+  await closeAttachedWindows();
   const userData = await mkdtemp(join(tmpdir(), 'João Silva full-loop-'));
   let { app, page } = await open(userData);
 

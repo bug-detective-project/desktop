@@ -347,6 +347,26 @@ describe('diagnostics', () => {
 });
 
 describe('a workspace whose volume went', () => {
+  it('comes back from a save: the restore is the way out, not an action the lost workspace refuses', async () => {
+    const { game, runtime } = createGame();
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+
+    runtime.simulate({ workspaceLost: true });
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceLost).toBe(true);
+
+    const { token } = await game.inspectSave(file, 'progress.bdsave');
+    await game.restoreProgress(token);
+    expect(game.snapshot().workspaceLost).toBe(false);
+    expect(game.current.currentTicket).toBe(1);
+    expect(await runtime.hasRepository()).toBe(true);
+  });
+
   it('is noticed by the environment check, blocks the code actions, and is recreated ticket by ticket', async () => {
     const { game, runtime } = createGame();
     await game.init();
