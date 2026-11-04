@@ -76,6 +76,23 @@ describe('state validation', () => {
     expect((await readdir(dir)).some((name) => /^state\.corrupt-\d+\.json$/.test(name))).toBe(true);
   });
 
+  it('keeps only the three most recent kept-aside states', async () => {
+    for (const time of [5, 1, 4, 2, 3]) {
+      await writeFile(join(dir, `state.corrupt-${time}.json`), '{}');
+    }
+    await writeFile(join(dir, 'state.corrupt-notes.txt'), '{}');
+    await writeFile(join(dir, 'state.json'), JSON.stringify({ ...rules.createInitialState(ctx), schemaVersion: 7 }));
+    const { recovered } = await new StateStore(dir).load(ctx);
+    expect(recovered).toBe(true);
+    const kept = (await readdir(dir)).filter((name) => name.startsWith('state.corrupt-')).sort();
+    expect(kept).toHaveLength(4);
+    expect(kept).toContain('state.corrupt-notes.txt');
+    expect(kept).not.toContain('state.corrupt-1.json');
+    expect(kept).not.toContain('state.corrupt-2.json');
+    expect(kept).not.toContain('state.corrupt-3.json');
+    expect(kept.filter((name) => /^state\.corrupt-\d+\.json$/.test(name))).toHaveLength(3);
+  });
+
   it('rejects a state with tickets but no track counts, a repeated id or a ticket of the wrong track', () => {
     const one = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'), ctx);
     expect(() => parseState({ ...one, tracks: null })).toThrow();

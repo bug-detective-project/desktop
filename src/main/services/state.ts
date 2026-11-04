@@ -3,7 +3,7 @@
  * (temp file + rename) and validated before use. Only the current schema is read: an older file
  * is kept aside and a new game starts (the app has not shipped, so there is nothing to migrate).
  */
-import { readFile, rename } from 'node:fs/promises';
+import { readdir, readFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { createInitialState } from '../../shared/kanban.ts';
@@ -217,6 +217,20 @@ export function parseState(raw: unknown): GameState {
   return gameStateSchema.parse(raw) as GameState;
 }
 
+/** How many state.corrupt-<time>.json files stay in the data folder (the most recent). */
+export const CORRUPT_STATES_KEPT = 3;
+const CORRUPT_STATE = /^state\.corrupt-(\d+)\.json$/;
+
+/** Removes the oldest kept-aside states beyond CORRUPT_STATES_KEPT: a folder that never fills up with them. */
+export async function pruneCorruptStates(dir: string, keep = CORRUPT_STATES_KEPT): Promise<string[]> {
+  const names = (await readdir(dir)).filter((name) => CORRUPT_STATE.test(name)).sort((a, b) => Number(CORRUPT_STATE.exec(a)![1]) - Number(CORRUPT_STATE.exec(b)![1]));
+  const removed = names.slice(0, Math.max(0, names.length - keep));
+  for (const name of removed) {
+    await rm(join(dir, name), { force: true });
+  }
+  return removed;
+}
+
 export class StateStore {
   readonly file: string;
   private queue: Promise<unknown> = Promise.resolve();
@@ -247,6 +261,7 @@ export class StateStore {
         throw error;
       }
       await rename(this.file, join(this.file, '..', `state.corrupt-${Date.now()}.json`));
+      await pruneCorruptStates(join(this.file, '..'));
       return { state: createInitialState(ctx, language), recovered: true };
     }
   }
