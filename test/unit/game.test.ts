@@ -65,6 +65,41 @@ function createGame(
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
 
+describe('a workspace whose volume went', () => {
+  it('is noticed by the environment check, blocks the code actions, and is recreated ticket by ticket', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    expect(game.snapshot().workspaceLost).toBe(false);
+
+    runtime.simulate({ workspaceLost: true });
+    expect(await runtime.hasRepository()).toBe(false);
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceLost).toBe(true);
+    await expect(game.move(1, 'inQa')).rejects.toMatchObject({ code: 'workspaceLost' });
+    await expect(game.openVSCode()).rejects.toMatchObject({ code: 'workspaceLost' });
+    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'workspaceLost' });
+    await expect(game.nextAssignment()).rejects.toMatchObject({ code: 'ticketNotDone' });
+
+    await game.rebuildWorkspace();
+    expect(game.snapshot().workspaceLost).toBe(false);
+    expect(await runtime.hasRepository()).toBe(true);
+    expect(await runtime.currentBranch()).toBe('player/ticket-1');
+    expect(game.snapshot().log.join('\n')).toMatch(/Recreated the code of ticket 1 \(front-1\)/);
+    expect(status(game)).toBe('inProgress');
+    await game.openVSCode();
+  });
+
+  it('is never reported before any ticket was unlocked', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    runtime.simulate({ workspaceLost: true });
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceLost).toBe(false);
+  });
+});
+
 describe('Game', () => {
   it('unlocks stage 1 from the local source and stores its package', async () => {
     const { game } = createGame();
@@ -322,8 +357,8 @@ describe('Game', () => {
     await expect(off.game.solveBug(1)).rejects.toMatchObject({ code: 'solveBugNotAllowed' });
     expect(off.runtime.solved).toEqual([]);
 
-    // The same saved game, with the development flag on.
-    const { game, runtime } = createGame({ devSolveBug: true });
+    // The same saved game, with the development flag on (the workspace volume still holds the repository).
+    const { game, runtime } = createGame({ devSolveBug: true, scenario: { repository: true } });
     await game.init();
     expect(game.snapshot().devSolveBug).toBe(true);
     await expect(game.solveBug(2)).rejects.toMatchObject({ code: 'solveBugNotAllowed' });

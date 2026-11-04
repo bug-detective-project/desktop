@@ -217,6 +217,11 @@ export function playerMove(state: GameState, ticket: number, to: Column, ctx: Ru
   return move(state, ticket, to, ctx, 'player', 'started');
 }
 
+/** The stage of a ticket was imported again (the workspace was recreated): its commit may differ. */
+export function rebuiltStage(state: GameState, ticket: number, commit: string): GameState {
+  return updateTicket(state, ticket, (item) => (item.stageCommit === commit ? item : { ...item, stageCommit: commit }));
+}
+
 /** Adds a warning comment when QA starts on a branch other than player/ticket-N. */
 export function addBranchWarning(state: GameState, ticket: number, branch: string | null, ctx: RuleContext): GameState {
   const comment: QaComment = { id: ctx.id(), at: ctx.now, kind: 'branchWarning', branch };

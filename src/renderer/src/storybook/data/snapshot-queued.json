@@ -120,6 +120,7 @@
   "titles": {},
   "hintsTotal": {},
   "busy": null,
+  "workspaceLost": false,
   "dockerState": "running",
   "prerequisites": {
     "checks": [

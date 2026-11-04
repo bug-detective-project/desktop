@@ -109,6 +109,13 @@
     "contacts": "Contatos",
     "mentorTag": "Mentora de dicas",
     "environment": "Ambiente local",
+    "workspaceLost": {
+      "title": "O código do seu workspace sumiu",
+      "text": "O código do seu workspace foi removido fora do jogo (por exemplo, por uma limpeza do Docker). Seu progresso está salvo. O jogo pode recriar o código de todos os tickets; as mudanças que você ainda não tinha enviado para a QA no ticket atual se perdem.",
+      "rebuild": "Recriar o código",
+      "rebuilding": "Recriando…",
+      "restore": "Restaurar um backup"
+    },
     "env": {
       "docker": "Docker Engine",
       "workspaceImage": "Imagem do workspace",
@@ -505,6 +512,7 @@
         "removingDocker": "tudo está sendo removido do Docker",
         "solvingBug": "o bug está sendo resolvido (desenvolvimento)",
         "switchingProject": "o projeto está sendo trocado",
+        "rebuilding": "o código do workspace está sendo recriado",
         "applyingCatalog": "as configurações de desenvolvimento estão sendo aplicadas"
       }
     },
@@ -610,6 +618,7 @@
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
     "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
+    "workspaceLost": "O código do seu workspace sumiu. Recrie-o no Painel, ou restaure um backup.",
     "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
     "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",

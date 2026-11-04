@@ -14,6 +14,7 @@ import type { IconName } from '../components/icons.tsx'
 import { Markdown } from '../components/Markdown.tsx'
 import { ticketTitle } from '../components/ticketTitle.ts'
 import { Badge, Button, Notice, Spinner, StagePill, Tooltip } from '../components/ui.tsx'
+import { WorkspaceLostNotice } from '../components/WorkspaceLostNotice.tsx'
 import type { Story } from '../content.ts'
 import { story } from '../content.ts'
 import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx'
@@ -873,12 +874,15 @@ export function Dashboard({
   onOpenBoard,
   onOpenTicket,
   onOpenReview,
+  onOpenSettings,
   onboarding = false,
 }: {
   snapshot: Snapshot
   onOpenBoard: () => void
   onOpenTicket: (ticket: number) => void
   onOpenReview: (ticket: number) => void
+  /** "Restore a backup instead" opens Settings (its Backup pane). */
+  onOpenSettings: () => void
   /** Rafaela's onboarding is showing: the drawer stays closed so it does not cover the steps. */
   onboarding?: boolean
 }) {
@@ -960,6 +964,10 @@ export function Dashboard({
       .catch(toast.error)
   }
 
+  const rebuildWorkspace = () => {
+    api.rebuildWorkspace().catch(toast.error)
+  }
+
   const actions: Actions = {
     openBoard: onOpenBoard,
     openTicket: onOpenTicket,
@@ -1008,6 +1016,13 @@ export function Dashboard({
             actions={actions}
           />
           <div className="flex flex-1 flex-col gap-5 p-5">
+            {snapshot.workspaceLost && (
+              <WorkspaceLostNotice
+                busy={snapshot.busy === 'rebuilding'}
+                onRebuild={rebuildWorkspace}
+                onRestore={onOpenSettings}
+              />
+            )}
             <LocalEnvironment snapshot={snapshot} />
             <div className="h-px shrink-0 bg-border" />
             <section
