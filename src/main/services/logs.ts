@@ -5,7 +5,7 @@
  * carries no user name. electron-log does the writing (index.ts); this module has no Electron
  * dependency, so it is tested as plain Node.
  */
-import { readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CheckResult, EngineState, EnvironmentReport } from '../../shared/api.ts';
 
@@ -48,6 +48,19 @@ export function redactPaths(line: string, home: string): string {
     }
   }
   return result;
+}
+
+/**
+ * Opens the logs folder with `open` (Electron's shell.openPath, which resolves with an error
+ * message instead of rejecting). The folder is created first: electron-log creates it at the
+ * first write, which may not have happened yet.
+ */
+export async function openLogsFolder(dir: string, open: (path: string) => Promise<string>): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  const problem = await open(dir);
+  if (problem) {
+    throw new Error(`[logsFolderFailed] ${problem}`);
+  }
 }
 
 /** The last `count` lines of a file, or [] when it does not exist. */

@@ -323,6 +323,7 @@
     "attemptResult": {
       "passed": "aprovada",
       "failed": "reprovada",
+    "logsFolderFailed": "Não foi possível abrir a pasta de logs: {{message}}",
       "timeout": "tempo esgotado",
       "outOfMemory": "sem memória"
     },

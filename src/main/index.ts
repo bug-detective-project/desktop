@@ -25,7 +25,7 @@ import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
-import { logFileName, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
+import { logFileName, openLogsFolder, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
 
 // Tests and the "clean profile" checks can point the app at another data folder.
 if (process.env.BUGDETECTIVE_USER_DATA) {
@@ -232,9 +232,7 @@ async function main(): Promise<void> {
       os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
       home,
       recentLog: () => recentLines(logFile),
-      openLogsFolder: async () => {
-        await shell.openPath(logsDir);
-      },
+      openLogsFolder: () => openLogsFolder(logsDir, (path) => shell.openPath(path)),
     },
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';

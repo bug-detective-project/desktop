@@ -1,8 +1,8 @@
-import { mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildDiagnostics, logFileName, pruneLogs, recentLines, redactPaths } from '../../src/main/services/logs.ts';
+import { buildDiagnostics, logFileName, openLogsFolder, pruneLogs, recentLines, redactPaths } from '../../src/main/services/logs.ts';
 
 describe('log files', () => {
   it('names the file after the day, in local time', () => {
@@ -63,5 +63,23 @@ describe('buildDiagnostics', () => {
     expect(text).toContain('## Log (last 2 lines)');
     expect(text).toContain('saved ~\\AppData\\Roaming\\Bug Detective\\state.json');
     expect(text).not.toContain('João Silva');
+  });
+});
+
+describe('openLogsFolder', () => {
+  it('creates the folder when nothing was logged yet, then opens it', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'bd-logs-')), 'logs');
+    const opened: string[] = [];
+    await openLogsFolder(dir, async (path) => {
+      opened.push(path);
+      return '';
+    });
+    expect(opened).toEqual([dir]);
+    expect((await stat(dir)).isDirectory()).toBe(true);
+  });
+
+  it('turns the message shell.openPath resolves with into an error the screen can show', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'bd-logs-')), 'logs');
+    await expect(openLogsFolder(dir, async () => 'Failed to open path')).rejects.toThrow('[logsFolderFailed] Failed to open path');
   });
 });

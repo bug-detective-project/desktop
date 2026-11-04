@@ -619,6 +619,7 @@
     "hintsRemaining": "Ask for the remaining hints first.",
     "workspaceNotRunning": "The workspace is not running.",
     "failed": "Something went wrong: {{message}}",
+    "logsFolderFailed": "The logs folder could not be opened: {{message}}",
     "noReview": "The review of this ticket is not available.",
     "reviewFailed": "The review could not be opened, and your code was restored: {{message}}",
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
