@@ -9,6 +9,7 @@
  *                        the same for every other project of the game (no repository: only the
  *                        active project's code is in Docker)
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { SCHEMA_VERSION } from '../../shared/types.ts';
 import type { GameState } from '../../shared/types.ts';
@@ -33,6 +34,8 @@ export const saveManifestSchema = z.object({
       ),
     z.string().regex(/^[0-9a-f]{64}$/),
   ),
+  /** HMAC-SHA256, with the installation's key, of the manifest without this field (canonical JSON). */
+  hmac: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
 export type SaveManifest = z.infer<typeof saveManifestSchema>;
@@ -45,8 +48,38 @@ export interface ProjectFiles {
   reviews: Map<string, Uint8Array>;
 }
 
-/** 4: the save's lastExport holds the file name only, never the folder of the player's computer. */
-export const SAVE_FORMAT_VERSION = 4;
+/**
+ * 4: the save's lastExport holds the file name only, never the folder of the player's computer.
+ * 5: the manifest is signed with the installation's key (hmac), so a foreign save is told apart.
+ */
+export const SAVE_FORMAT_VERSION = 5;
+
+/** JSON with every object's keys sorted, so the same manifest always signs the same bytes. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** The signature of a manifest (without its hmac field) with an installation key. */
+export function signManifest(manifest: Omit<SaveManifest, 'hmac'>, key: Uint8Array): string {
+  const { hmac: _ignored, ...rest } = manifest as SaveManifest;
+  return createHmac('sha256', key).update(canonicalJson(rest)).digest('hex');
+}
+
+/** True when the manifest was signed with this key: the save was made by this installation. */
+export function signedBy(manifest: SaveManifest, key: Uint8Array): boolean {
+  const expected = Buffer.from(signManifest(manifest, key), 'hex');
+  const actual = Buffer.from(manifest.hmac, 'hex');
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
 
 export interface SaveContents {
   state: GameState;
@@ -58,8 +91,8 @@ export interface SaveContents {
   others?: Map<string, ProjectFiles>;
 }
 
-/** Builds a save; one larger than readSave accepts would export fine and never restore, so it throws. */
-export function createSave(contents: SaveContents, appVersion: string, now: string, maxBytes = MAX_SAVE_BYTES): Uint8Array {
+/** Builds a save signed with the installation key; one larger than readSave accepts would export fine and never restore, so it throws. */
+export function createSave(contents: SaveContents, appVersion: string, now: string, key: Uint8Array, maxBytes = MAX_SAVE_BYTES): Uint8Array {
   const files: ArchiveFile[] = [
     { path: 'state.json', data: Buffer.from(`${JSON.stringify(contents.state, null, 2)}\n`), executable: false },
   ];
@@ -80,14 +113,15 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
       files.push({ path: `projects/${project}/${path}`, data, executable: false });
     }
   }
-  const manifest: SaveManifest = {
-    format: 'bug-detective-save',
+  const unsigned = {
+    format: 'bug-detective-save' as const,
     formatVersion: SAVE_FORMAT_VERSION,
     appVersion,
     schemaVersion: SCHEMA_VERSION,
     createdAt: now,
     files: Object.fromEntries(files.map((file) => [file.path, sha256Hex(file.data)])),
   };
+  const manifest: SaveManifest = { ...unsigned, hmac: signManifest(unsigned, key) };
   const save = writeZip([...files, { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)), executable: false }]);
   if (save.length > maxBytes) {
     throw new Error(`The save would be larger than ${maxBytes} bytes, the most a save can restore`);
@@ -99,10 +133,12 @@ export interface ValidatedSave extends SaveContents {
   manifest: SaveManifest;
   reviews: Map<string, Uint8Array>;
   others: Map<string, ProjectFiles>;
+  /** The manifest is signed with this installation's key: the save was made here, not on another computer. */
+  fromThisInstall: boolean;
 }
 
 /** Validates a .bdsave completely (manifest, checksums, state schema) before anything is restored. */
-export function readSave(bytes: Uint8Array): ValidatedSave {
+export function readSave(bytes: Uint8Array, key: Uint8Array): ValidatedSave {
   if (bytes.length > MAX_SAVE_BYTES) {
     throw new InvalidSaveError('The file is too large to be a Bug Detective save');
   }
@@ -202,5 +238,5 @@ export function readSave(bytes: Uint8Array): ValidatedSave {
       }
     }
   }
-  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews, others };
+  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews, others, fromThisInstall: signedBy(manifest, key) };
 }

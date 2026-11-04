@@ -187,6 +187,21 @@ describe('GitHubContentSource (mock server)', () => {
     await expect(source().fetchTicket('front-1')).resolves.toBeDefined();
   });
 
+  it('fetches a given publication by its tag, without the version floor, and refuses a tag that publishes another version', async () => {
+    requests.length = 0;
+    const floored = new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, retries: 0, minVersion: '9.0.0' });
+    await expect(floored.prepare()).rejects.toThrow(/older than 9.0.0/);
+    const content = await floored.publication('1.0.0');
+    expect(content.manifest.version).toBe('1.0.0');
+    expect(requests.filter((url) => url.includes('qa-v1.0.0'))).toEqual(['/owner/demo/archive/refs/heads/qa-v1.0.0.zip', '/owner/demo/archive/refs/tags/qa-v1.0.0.zip']);
+    // The code of an entry, verified.
+    const entry = content.manifest.entries[0];
+    expect((await floored.codeOf(entry)).length).toBe(entry.codeFiles);
+    // A publication that is not there.
+    await expect(floored.publication('1.0.1')).rejects.toThrow(ProjectUnavailableError);
+    expect(GitHubContentSource.publicationTag('1.2.3')).toBe('qa-v1.2.3');
+  });
+
   it('gives up after the retries', async () => {
     failNext = 10;
     await expect(source().fetchTicket('front-1')).rejects.toThrow(DownloadError);

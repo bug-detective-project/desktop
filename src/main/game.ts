@@ -32,8 +32,8 @@ import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SEC
 import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { createSave, readSave } from './services/backup.ts';
-import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, fileText, parseReviewConfig, projectContentOf, qaToolFiles, writeZip } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectFiles, ReviewConfig } from '@bug-detective/catalog/contract';
+import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry } from '@bug-detective/catalog/contract';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './services/content/source.ts';
@@ -112,6 +112,8 @@ export interface GameOptions {
   clock?: () => Date;
   /** Every log line of the game (installs, QA, notes) also goes here: the log file of the day. */
   logLine?: (line: string) => void;
+  /** The installation's secret (services/install-key.ts): saves are signed with it, so a save from another computer is told apart. */
+  installKey?: Uint8Array;
   /** What "Copy diagnostics" needs from the process: the OS, the home folder (redacted), the recent log, and the logs folder to open. */
   diagnostics?: DiagnosticsOptions;
 }
@@ -1596,6 +1598,11 @@ export class Game {
   // -------------------------------------------------------------------------
   // Export and restore
 
+  /** The key saves are signed with; without one (tests), a fixed key: every save then counts as this installation's. */
+  private installKey(): Uint8Array {
+    return this.options.installKey ?? new Uint8Array(32);
+  }
+
   async exportProgress(file: string): Promise<void> {
     await this.requireDocker();
     await this.exclusive('exporting', async () => {
@@ -1620,7 +1627,7 @@ export class Game {
       // The save carries its own export record, so a restored game starts as backed up; inside the
       // file only the name: the folder of this computer stays out of a file that may travel.
       const state = { ...this.state, lastExport: { at, path: basename(file) } };
-      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at));
+      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at, this.installKey()));
       await this.commit((current) => ({ ...current, lastExport: { at, path: file } }));
     });
   }
@@ -1631,7 +1638,7 @@ export class Game {
     this.pendingSave = null;
     let validated: ValidatedSave;
     try {
-      validated = readSave(new Uint8Array(await readFile(file)));
+      validated = readSave(new Uint8Array(await readFile(file)), this.installKey());
     } catch (error) {
       throw new GameError('invalidSave', (error as Error).message);
     }
@@ -1646,6 +1653,7 @@ export class Game {
         ticketsDone: validated.state.tickets.filter((ticket) => ticket.status === 'done').length,
         currentTicket: validated.state.currentTicket,
         overwritesProgress: this.state.tickets.length > 0,
+        fromThisInstall: validated.fromThisInstall,
       },
     };
   }
@@ -1655,6 +1663,76 @@ export class Game {
     if (this.pendingSave?.token === token) {
       this.pendingSave = null;
     }
+  }
+
+  /**
+   * Checks every ticket package of a save against the publication its ticket was unlocked from
+   * (the manifest of that version: from the content cache, or downloaded by its tag), and fetches
+   * the verified code of the active project's tickets. Nothing of the save is used before this
+   * passes: a package that does not match is a tampered save, and a publication that cannot be
+   * reached leaves the save unverified.
+   */
+  private async verifySave(save: ValidatedSave, active: string | null): Promise<Map<number, { entry: TicketEntry; codeFiles: ArchiveFile[] }>> {
+    const verified = new Map<number, { entry: TicketEntry; codeFiles: ArchiveFile[] }>();
+    const sourceFor = (id: string | null): ContentSource | null => {
+      if (!this.options.projects || id === null) {
+        return this.source;
+      }
+      return this.sourceOf(id) ? this.contentOf(id) : null;
+    };
+    const check = async (project: string | null, tickets: readonly { ticket: number; id: string; manifestVersion: string }[], packages: Map<number, Uint8Array>, withCode: boolean) => {
+      const source = sourceFor(project);
+      if (!source) {
+        return; // A project no longer in the catalog: its packages are not restored either.
+      }
+      const label = project ?? 'the project';
+      const publications = new Map<string, ProjectContent>();
+      for (const ticket of [...tickets].sort((a, b) => a.ticket - b.ticket)) {
+        let content = publications.get(ticket.manifestVersion);
+        if (!content) {
+          this.appendLog(`» Checking the save against ${label} ${ticket.manifestVersion}`);
+          try {
+            content = await source.publication(ticket.manifestVersion);
+          } catch (error) {
+            if (error instanceof NoConnectionError || error instanceof FirstDownloadError) {
+              throw new GameError('contentNeedsInternet', `The publication ${ticket.manifestVersion} of ${label} is needed to check the save: ${(error as Error).message}`);
+            }
+            throw new GameError('saveUnverified', `${label} ${ticket.manifestVersion}: ${(error as Error).message}`);
+          }
+          publications.set(ticket.manifestVersion, content);
+        }
+        let entry: TicketEntry;
+        try {
+          entry = entryById(content.manifest, ticket.id);
+          verifyPackage(entry, readZip(packages.get(ticket.ticket)!));
+        } catch (error) {
+          if (error instanceof ContentVerificationError) {
+            throw new GameError('saveTampered', `${label} ${ticket.id} (ticket ${ticket.ticket})`);
+          }
+          throw error;
+        }
+        if (withCode) {
+          let codeFiles: ArchiveFile[];
+          try {
+            codeFiles = await source.codeOf(entry);
+          } catch (error) {
+            if (error instanceof NoConnectionError || error instanceof FirstDownloadError) {
+              throw new GameError('contentNeedsInternet', `The code of ${ticket.id} is needed to check the save: ${(error as Error).message}`);
+            }
+            throw new GameError('saveUnverified', `${label} ${ticket.id}: ${(error as Error).message}`);
+          }
+          verified.set(ticket.ticket, { entry, codeFiles });
+        }
+      }
+    };
+    await check(active, save.state.tickets, save.packages, true);
+    for (const [id, progress] of Object.entries(save.state.otherProjects)) {
+      const other = save.others.get(id);
+      if (other) {
+        await check(id, progress.tickets, other.packages, false);
+      }
+    }
+    return verified;
   }
 
   /** Recreates the volume and repository from the bundle, then restores packages and state. */
@@ -1673,6 +1751,8 @@ export class Game {
       const current = save.state.currentTicket;
       // The save's active project becomes this game's: its stores, and the labels of its volume.
       const active = save.state.project ?? this.starterId();
+      // Every package is checked against its publication, and the ticket code fetched, before anything is touched.
+      const verified = await this.verifySave(save, active);
       if (active) {
         this.useProject(active);
       }
@@ -1702,6 +1782,20 @@ export class Game {
         reviewSession: null,
         lastExport: { at: save.state.lastExport?.at ?? save.manifest.createdAt, path: save.file },
       }));
+      // The stage of every ticket is imported again from the verified code: the stage-N tags of a
+      // foreign bundle are replaced, so "Restart the ticket" always returns to the published code.
+      for (const ticket of [...save.state.tickets].sort((a, b) => a.ticket - b.ticket)) {
+        const item = verified.get(ticket.ticket);
+        if (!item) {
+          continue;
+        }
+        const commit = await this.options.runtime.importStage(ticket.ticket, item.codeFiles, item.entry.commitMessage);
+        await this.commit((state) => rules.rebuiltStage(state, ticket.ticket, commit));
+        this.appendLog(`» Verified the code of ticket ${ticket.ticket} (${ticket.id}) as commit ${commit.slice(0, 12)}`);
+      }
+      if (current !== null) {
+        await this.options.runtime.checkoutPlayerBranch(current);
+      }
       this.titles = {};
       await this.loadTicketMeta();
       const content = await this.source.current().catch(() => null);

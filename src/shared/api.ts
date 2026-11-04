@@ -335,6 +335,8 @@ export interface SaveSummary {
   currentTicket: number | null;
   /** True when the current game has progress that the restore would overwrite. */
   overwritesProgress: boolean;
+  /** False when the save was made by another installation (its manifest is not signed with this one's key): it brings code that will run in the workspace. */
+  fromThisInstall: boolean;
 }
 
 /** The only external pages the app opens (besides the workspace app on 127.0.0.1). */

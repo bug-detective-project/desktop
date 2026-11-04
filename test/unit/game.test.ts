@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
@@ -11,6 +11,7 @@ import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import type { LocalCatalog, ResolvedProject } from '../../src/main/services/catalog.ts';
 import type { ContentSource, ProjectContent } from '../../src/main/services/content/source.ts';
 import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, readZip } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
@@ -53,6 +54,7 @@ function createGame(
     autoOnboarding?: boolean;
     diagnostics?: GameOptions['diagnostics'];
     clock?: () => Date;
+    installKey?: Uint8Array;
   } = {},
 ) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
@@ -70,6 +72,7 @@ function createGame(
     autoOnboarding: options.autoOnboarding,
     diagnostics: options.diagnostics,
     clock: options.clock,
+    installKey: options.installKey,
   });
   return { game, runtime };
 }
@@ -131,6 +134,92 @@ describe('a restored save', () => {
     const { token } = await game.inspectSave(restored, 'from-another-computer.bdsave');
     await game.restoreProgress(token);
     expect(game.current.lastExport).toEqual({ at, path: restored });
+  });
+});
+
+describe('a restored save is checked against the publication', () => {
+  /** Rewrites one entry of a save and signs the manifest again with the given key (what a forged save would do). */
+  async function reforge(file: string, key: Uint8Array, change: (files: ArchiveFile[]) => ArchiveFile[]): Promise<string> {
+    const { readFile: read, writeFile: write } = await import('node:fs/promises');
+    const { signManifest } = await import('../../src/main/services/backup.ts');
+    const { readZip, sha256Hex, textFile, writeZip } = await import('@bug-detective/catalog/contract');
+    const files = change(readZip(new Uint8Array(await read(file))).filter((item) => item.path !== 'manifest.json'));
+    const original = JSON.parse(Buffer.from(readZip(new Uint8Array(await read(file))).find((item) => item.path === 'manifest.json')!.data).toString()) as Record<string, unknown>;
+    const unsigned: Record<string, unknown> = { ...original, files: Object.fromEntries(files.map((item) => [item.path, sha256Hex(item.data)])) };
+    delete unsigned.hmac;
+    const manifest = { ...unsigned, hmac: signManifest(unsigned as never, key) };
+    const forged = join(dirname(file), `forged-${basename(file)}`);
+    await write(forged, writeZip([...files, textFile('manifest.json', JSON.stringify(manifest))]));
+    return forged;
+  }
+
+  it('refuses a save whose ticket package was changed, before touching anything', async () => {
+    const { game, runtime } = createGame();
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    await game.init();
+    await game.nextAssignment();
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+    const { readZip, textFile, writeZip } = await import('@bug-detective/catalog/contract');
+    const forged = await reforge(file, new Uint8Array(32), (files) =>
+      files.map((item) => {
+        if (item.path !== 'packages/stage-1.zip') return item;
+        const inside = readZip(item.data).map((entry) => (entry.path === 'reference.patch' ? textFile('reference.patch', 'anything\n') : entry));
+        return { ...item, data: writeZip(inside) };
+      }),
+    );
+    const restore = vi.spyOn(runtime, 'restoreWorkspace');
+    const before = game.current;
+    const { token, summary } = await game.inspectSave(forged, 'forged.bdsave');
+    expect(summary.fromThisInstall).toBe(true);
+    await expect(game.restoreProgress(token)).rejects.toMatchObject({ code: 'saveTampered', message: expect.stringContaining('front-1') });
+    expect(restore).not.toHaveBeenCalled();
+    expect(game.current).toEqual(before);
+    expect(game.snapshot().busy).toBeNull();
+  });
+
+  it('tells a save made by another installation apart, and imports the stages again from the verified code', async () => {
+    const { game, runtime } = createGame({ installKey: new Uint8Array(Buffer.from('11'.repeat(32), 'hex')) });
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    await game.init();
+    await game.nextAssignment();
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+    expect((await game.inspectSave(file, 'progress.bdsave')).summary.fromThisInstall).toBe(true);
+
+    // The same file, signed by another installation's key.
+    const foreign = await reforge(file, new Uint8Array(Buffer.from('22'.repeat(32), 'hex')), (files) => files);
+    const { token, summary } = await game.inspectSave(foreign, 'foreign.bdsave');
+    expect(summary.fromThisInstall).toBe(false);
+    const importStage = vi.spyOn(runtime, 'importStage');
+    await game.restoreProgress(token);
+    expect(importStage).toHaveBeenCalledTimes(1);
+    expect(importStage.mock.calls[0][0]).toBe(1);
+    expect(game.snapshot().log.join('\n')).toContain('» Verified the code of ticket 1 (front-1)');
+    expect(rules.findTicket(game.current, 1)!.stageCommit).toBe(await importStage.mock.results[0].value);
+  });
+
+  it('needs the internet when the publication to check against is neither cached nor reachable', async () => {
+    const offline: ContentSource = {
+      ...localSource(),
+      kind: 'github',
+      describe: () => 'mock',
+      prepare: () => localSource().prepare(),
+      current: () => localSource().current(),
+      fetchTicket: (id) => localSource().fetchTicket(id),
+      codeOf: (entry) => localSource().codeOf(entry),
+      publication: () => Promise.reject(new FirstDownloadError('offline')),
+    };
+    const { game, runtime } = createGame({ content: offline });
+    vi.spyOn(runtime as GameRuntime, 'bundle').mockResolvedValue(new Uint8Array(Buffer.from('# v2 git bundle\n')));
+    await game.init();
+    await game.nextAssignment();
+    const file = join(dir, 'progress.bdsave');
+    await game.exportProgress(file);
+    const restore = vi.spyOn(runtime, 'restoreWorkspace');
+    const { token } = await game.inspectSave(file, 'progress.bdsave');
+    await expect(game.restoreProgress(token)).rejects.toMatchObject({ code: 'contentNeedsInternet' });
+    expect(restore).not.toHaveBeenCalled();
   });
 });
 
@@ -298,6 +387,8 @@ describe('Game', () => {
       kind: 'github',
       describe: () => 'mock',
       current: async () => null,
+      publication: () => localSource().prepare(),
+      codeOf: (entry) => localSource().codeOf(entry),
       prepare: async () => {
         await later;
         return localSource().prepare();
@@ -318,6 +409,8 @@ describe('Game', () => {
       kind: 'github',
       describe: () => 'mock',
       current: async () => null,
+      publication: () => Promise.reject(new FirstDownloadError('offline')),
+      codeOf: () => Promise.reject(new Error('offline')),
       prepare: async () => {
         order.push('prepare');
         throw new FirstDownloadError('offline');
@@ -342,6 +435,8 @@ describe('Game', () => {
       prepare: () => localSource().prepare(),
       current: () => localSource().current(),
       fetchTicket: vi.fn().mockRejectedValueOnce(new Error('network down')).mockImplementation((id: string) => localSource().fetchTicket(id)),
+      publication: () => localSource().prepare(),
+      codeOf: (entry) => localSource().codeOf(entry),
     };
     const { game, runtime } = createGame({ content: failing });
     const importStage = vi.spyOn(runtime, 'importStage');
@@ -370,6 +465,8 @@ describe('Game', () => {
       prepare: () => localSource().prepare(),
       current: () => localSource().current(),
       fetchTicket: (id: string) => Promise.reject(new TicketNotPublishedError(id, { front: 1, back: 0 })),
+      publication: () => localSource().prepare(),
+      codeOf: (entry) => localSource().codeOf(entry),
     };
     (game as unknown as { source: ContentSource }).source = shrunk;
     const importStage = vi.spyOn(runtime, 'importStage');
@@ -420,6 +517,8 @@ describe('Game', () => {
       prepare: () => localSource().prepare(),
       current: () => localSource().current(),
       fetchTicket: () => Promise.reject(new IncompletePublicationError('no commit')),
+      publication: () => localSource().prepare(),
+      codeOf: (entry) => localSource().codeOf(entry),
     };
     const { game } = createGame({ content: incomplete });
     await game.init();
@@ -892,6 +991,8 @@ function withVersion(source: ContentSource, version: () => string): ContentSourc
       return value ? content(value) : null;
     },
     fetchTicket: async (id, signal) => ({ ...(await source.fetchTicket(id, signal)), manifestVersion: version() }),
+    publication: async (requested, signal) => content(await source.publication(requested, signal)),
+    codeOf: (entry, signal) => source.codeOf(entry, signal),
   };
 }
 
@@ -948,7 +1049,15 @@ describe('Game with several projects', () => {
             sources.push({ id: project.id, repository: project.repository, minVersion });
             if (broken[project.id] || project.qaDir === '/missing') {
               const error = broken[project.id] ?? new Error('/missing is not a qa folder');
-              return { kind: 'github', describe: () => project.id, prepare: () => Promise.reject(error), current: async () => null, fetchTicket: () => Promise.reject(error) };
+              return {
+                kind: 'github',
+                describe: () => project.id,
+                prepare: () => Promise.reject(error),
+                current: async () => null,
+                fetchTicket: () => Promise.reject(error),
+                publication: () => Promise.reject(error),
+                codeOf: () => Promise.reject(error),
+              };
             }
             const source = withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
             return {

@@ -130,23 +130,28 @@ export class GitHubContentSource implements ContentSource {
     return `${this.base}/${this.repository}/archive/refs/tags/${encodeURIComponent(tag)}.zip`;
   }
 
-  /** The archive of the qa ref: a branch of that name, or else a tag; neither means the project is gone. */
-  private async qaArchive(signal?: AbortSignal): Promise<Uint8Array> {
+  /** The archive of a qa ref: a branch of that name, or else a tag; neither means the project (or that publication) is gone. */
+  private async qaArchive(signal?: AbortSignal, ref = this.qaRef): Promise<Uint8Array> {
     try {
-      return await this.download(this.branchArchiveUrl(this.qaRef), signal);
+      return await this.download(this.branchArchiveUrl(ref), signal);
     } catch (error) {
       if (error instanceof DownloadError && error.status === 404) {
         try {
-          return await this.download(this.tagArchiveUrl(this.qaRef), signal);
+          return await this.download(this.tagArchiveUrl(ref), signal);
         } catch (tagError) {
           if (tagError instanceof DownloadError && tagError.status === 404) {
-            throw new ProjectUnavailableError(this.repository, this.qaRef);
+            throw new ProjectUnavailableError(this.repository, ref);
           }
           throw tagError;
         }
       }
       throw error;
     }
+  }
+
+  /** The tag a publication gets when its pull request into qa is merged. */
+  static publicationTag(version: string): string {
+    return `qa-v${version}`;
   }
 
   commitArchiveUrl(commit: string): string {
@@ -217,7 +222,20 @@ export class GitHubContentSource implements ContentSource {
 
   /** The qa branch: the manifest and every ticket package, verified, plus the project files. */
   async fetchQa(signal?: AbortSignal): Promise<ProjectContent> {
-    const qaFiles = readZip(await this.qaArchive(signal), { stripTopDirectory: true });
+    return this.fetchQaRef(this.qaRef, true, signal);
+  }
+
+  /** A given publication (its qa-v<version> tag), verified like the qa branch; the version floor does not apply to it. */
+  async publication(version: string, signal?: AbortSignal): Promise<ProjectContent> {
+    const content = await this.fetchQaRef(GitHubContentSource.publicationTag(version), false, signal);
+    if (content.manifest.version !== version) {
+      throw new ContentVerificationError(`${this.repository}: ${GitHubContentSource.publicationTag(version)} publishes ${content.manifest.version}, not ${version}`);
+    }
+    return content;
+  }
+
+  private async fetchQaRef(ref: string, applyFloor: boolean, signal?: AbortSignal): Promise<ProjectContent> {
+    const qaFiles = readZip(await this.qaArchive(signal, ref), { stripTopDirectory: true });
     const manifestFile = qaFiles.find((file) => file.path === 'manifest.json');
     if (!manifestFile) {
       throw new ContentVerificationError(`${this.repository}: the qa branch has no manifest.json`);
@@ -229,7 +247,7 @@ export class GitHubContentSource implements ContentSource {
       throw new ContentVerificationError('The project manifest is not valid JSON');
     }
     const manifest = parseManifest(json, this.project);
-    if (this.minVersion && compareVersions(manifest.version, this.minVersion) < 0) {
+    if (applyFloor && this.minVersion && compareVersions(manifest.version, this.minVersion) < 0) {
       throw new IncompletePublicationError(`${this.repository} publishes ${manifest.version}, older than ${this.minVersion}`);
     }
     for (const entry of manifest.entries) {
@@ -263,6 +281,10 @@ export class GitHubContentSource implements ContentSource {
 
   async current(): Promise<ProjectContent | null> {
     return null;
+  }
+
+  codeOf(entry: TicketEntry, signal?: AbortSignal): Promise<ArchiveFile[]> {
+    return this.fetchCode(entry, signal);
   }
 
   async fetchTicket(id: string, signal?: AbortSignal): Promise<FetchedTicket> {

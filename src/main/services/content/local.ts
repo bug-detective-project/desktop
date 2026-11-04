@@ -6,7 +6,8 @@
 import type { CommandRunner } from '../process.ts';
 import { gitArchive } from './git.ts';
 import { buildManifest, readQaFiles, readTicketPackage } from './local-manifest.ts';
-import { entryById, countsOf } from '@bug-detective/catalog/contract';
+import { entryById, countsOf, verifyCode } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, TicketEntry } from '@bug-detective/catalog/contract';
 import { verifyTicket } from './source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
 
@@ -42,6 +43,16 @@ export class LocalContentSource implements ContentSource {
   /** A local folder is always available. */
   current(): Promise<ProjectContent | null> {
     return this.prepare();
+  }
+
+  /** A local folder has one version, whatever a save calls it: the content as it is now. */
+  publication(): Promise<ProjectContent> {
+    return this.prepare();
+  }
+
+  async codeOf(entry: TicketEntry): Promise<ArchiveFile[]> {
+    const { qaDir, runner, git = 'git' } = this.options;
+    return verifyCode(entry, await gitArchive(runner, git, qaDir, entry.commit));
   }
 
   async fetchTicket(id: string): Promise<FetchedTicket> {

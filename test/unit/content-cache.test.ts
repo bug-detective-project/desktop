@@ -39,7 +39,8 @@ beforeEach(async () => {
     }
     requests.push(request.url!);
     const sha = /\/archive\/([0-9a-f]{40})\.zip$/.exec(request.url!)?.[1];
-    const ref = request.url === '/owner/demo/archive/refs/heads/qa.zip' ? 'qa' : sha && !missingCommits.has(sha) ? sha : null;
+    const tag = /\/archive\/refs\/tags\/(qa-v[0-9.]+)\.zip$/.exec(request.url!)?.[1];
+    const ref = request.url === '/owner/demo/archive/refs/heads/qa.zip' ? 'qa' : tag && repo.git(repo.qaDir, 'tag', '-l', tag) ? tag : sha && !missingCommits.has(sha) ? sha : null;
     if (!ref) {
       response.writeHead(404).end();
       return;
@@ -108,6 +109,26 @@ describe('CachedContentSource', () => {
     expect(ticket.manifestVersion).toBe('1.1.0');
     expect(ticket.entry.commit).toBe(commitOf('front-2'));
     expect(requests.filter((url) => /[0-9a-f]{40}\.zip$/.test(url))).toEqual([`/owner/demo/archive/${commitOf('front-2')}.zip`]);
+  });
+
+  it('answers a publication from the cache when it is that version, and downloads another version by its tag', async () => {
+    const source = cached();
+    await source.prepare();
+    offline = true;
+    expect((await source.publication('1.0.0')).manifest.version).toBe('1.0.0');
+    await expect(source.publication('1.1.0')).rejects.toThrow(NoConnectionError);
+    offline = false;
+    await republish();
+    repo.git(repo.qaDir, 'tag', 'qa-v1.1.0');
+    requests = [];
+    const newer = await source.publication('1.1.0');
+    expect(newer.manifest.version).toBe('1.1.0');
+    expect(requests).toContain('/owner/demo/archive/refs/tags/qa-v1.1.0.zip');
+    // Not kept: the cache still plays 1.0.0 offline.
+    expect((await source.current())?.manifest.version).toBe('1.0.0');
+    // The code of an entry comes from the cache when it is there, else from the repository.
+    const entry = newer.manifest.entries[1];
+    expect((await source.codeOf(entry)).length).toBe(entry.codeFiles);
   });
 
   it('reports no connection when nothing was downloaded yet and the network is down', async () => {
