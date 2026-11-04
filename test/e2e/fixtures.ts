@@ -69,7 +69,17 @@ export async function launch(
  */
 export async function simulate(
   app: ElectronApplication,
-  change: { docker?: 'running' | 'notRunning'; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean; dockerOs?: 'linux' | 'windows'; dockerMemoryBytes?: number; freeDiskBytes?: number | null },
+  change: {
+    docker?: 'running' | 'notRunning';
+    devServerUp?: boolean;
+    workspaceLost?: boolean;
+    dbResetFails?: boolean;
+    dockerOs?: 'linux' | 'windows';
+    dockerMemoryBytes?: number;
+    freeDiskBytes?: number | null;
+    sshAgent?: boolean;
+    githubCredential?: boolean;
+  },
 ): Promise<void> {
   await app.evaluate((_electron, value) => {
     (globalThis as unknown as { bugDetectiveFake: { simulate(change: unknown): void } }).bugDetectiveFake.simulate(value);

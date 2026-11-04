@@ -64,7 +64,10 @@
     "vscode": {
       "title": "Visual Studio Code",
       "ok": "O VS Code foi encontrado.",
-      "cliNotFound": "O VS Code não foi encontrado. Instale (as opções padrão servem) e verifique de novo."
+      "cliNotFound": "O VS Code não foi encontrado. Instale (as opções padrão servem) e verifique de novo.",
+      "sshAgent": "Há um agente SSH rodando neste computador. O VS Code o repassaria ao workspace; o app o tira do ambiente do VS Code, mas um programa que ache o socket ainda poderia usar suas chaves. Pare o agente enquanto joga, se suas chaves importam.",
+      "githubCredential": "Há uma credencial do GitHub guardada neste computador. O app impede o VS Code de configurá-la no workspace, mas código rodado no terminal do VS Code ainda pode pedi-la ao VS Code. Saia do GitHub no Git (ou não guarde credencial) enquanto joga.",
+      "credentialsHelp": "O que o app faz a respeito"
     },
     "devcontainers": {
       "title": "Extensão Dev Containers",
@@ -664,7 +667,6 @@
     "invalidInput": "O app recebeu um pedido inválido: {{message}}",
     "noMoreTickets": "Não há mais tickets nesta trilha.",
     "noSuchTicket": "Esse ticket não existe.",
-    "notAllowed": "Esta ação não é permitida aqui.",
     "notAllowed": "Esta ação não é permitida aqui.",
     "diskFull": "O disco está cheio: libere espaço e tente de novo.",
     "lowDiskSpace": "Não há espaço livre suficiente no disco do Docker.",

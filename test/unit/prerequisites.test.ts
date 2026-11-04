@@ -16,11 +16,12 @@ function fakePlatform(answer: Answer, wsl: WslStatus = { installed: true, versio
     isDockerDesktopRunning: async () => true,
     startDockerDesktop: async () => {},
     checkWsl: async () => wsl,
-    locateVSCode: async () => ({ source: 'user', launcher: 'code.cmd', command: 'Code.exe', baseArgs: ['cli.js'], env: {} }),
+    locateVSCode: async () => ({ source: 'user', launcher: 'code.cmd', command: 'Code.exe', baseArgs: ['cli.js'], env: {}, globalStorage: 'C:\\Users\\x\\AppData\\Roaming\\Code\\User\\globalStorage' }),
     dockerHostPath: (path) => path,
     isPortFree: async () => true,
     browserCommand: () => null,
     freeDiskBytes: async () => null,
+    hostCredentials: async () => ({ sshAgent: false, githubCredential: false }),
   };
 }
 
@@ -140,7 +141,7 @@ describe('Docker state and the other checks when something is missing', () => {
 
     const lowMemory: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('linux 3221225472\n') : healthy(command, args));
     const warned = await new Prerequisites(fakePlatform(lowMemory)).check();
-    expect(warned.checks[0]).toEqual({ id: 'docker', status: 'ok', warning: 'lowMemory', version: '4.37.1' });
+    expect(warned.checks[0]).toEqual({ id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1' });
     expect(warned.allOk).toBe(true);
 
     // Exactly 4 GiB is enough; an unreadable `docker info` never fails the check.
@@ -148,6 +149,25 @@ describe('Docker state and the other checks when something is missing', () => {
     expect((await new Prerequisites(fakePlatform(enough)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
     const noInfo: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('', 1) : healthy(command, args));
     expect((await new Prerequisites(fakePlatform(noInfo)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
+  });
+
+  it('warns, on the VS Code check, about an SSH agent and a stored GitHub credential, and never fails because of them', async () => {
+    const platform = (credentials: Partial<{ sshAgent: boolean; githubCredential: boolean }>) => ({
+      ...fakePlatform(healthy),
+      hostCredentials: async () => ({ sshAgent: false, githubCredential: false, ...credentials }),
+    });
+    const both = await new Prerequisites(platform({ sshAgent: true, githubCredential: true })).check();
+    expect(both.checks[2]).toMatchObject({ id: 'vscode', status: 'ok', warnings: ['sshAgent', 'githubCredential'] });
+    expect(both.allOk).toBe(true);
+    const agent = await new Prerequisites(platform({ sshAgent: true })).check();
+    expect(agent.checks[2].warnings).toEqual(['sshAgent']);
+    const none = await new Prerequisites(platform({})).check();
+    expect(none.checks[2].warnings).toBeUndefined();
+    // A probe that fails is no warning; without VS Code there is nothing to warn about.
+    const failing = { ...fakePlatform(healthy), hostCredentials: async () => Promise.reject(new Error('sc.exe missing')) };
+    expect((await new Prerequisites(failing).check()).checks[2].warnings).toBeUndefined();
+    const noCode = { ...platform({ sshAgent: true }), locateVSCode: async () => null };
+    expect((await new Prerequisites(noCode).check()).checks[2]).toEqual({ id: 'vscode', status: 'missing', reason: 'cliNotFound' });
   });
 
   it('reports WSL missing, WSL 1 only, and VS Code without its CLI', async () => {

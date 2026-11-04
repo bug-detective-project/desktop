@@ -8,8 +8,8 @@ import { createServer } from 'node:net';
 import { win32 } from 'node:path';
 import { runCommand } from '../services/process.ts';
 import type { CommandRunner } from '../services/process.ts';
-import { freeBytesOf } from './types.ts';
-import type { DockerLocations, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
+import { freeBytesOf, hasGitHubCredential, serviceRunning } from './types.ts';
+import type { DockerLocations, HostCredentials, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
 
 const path = win32;
 
@@ -85,7 +85,13 @@ function findOnPath(deps: WindowsDeps, file: string): string | null {
  * `Code.exe <commit>\resources\app\out\cli.js` with ELECTRON_RUN_AS_NODE=1, so we do the same.
  * Spawning code.cmd directly fails with EINVAL since the CVE-2024-27980 fix.
  */
-export function resolveVSCodeLauncher(deps: WindowsDeps, launcher: string, source: VSCodeCli['source']): VSCodeCli | null {
+export /** %APPDATA%\Code\User\globalStorage of the user's VS Code. */
+function vscodeGlobalStorage(env: NodeJS.ProcessEnv): string {
+  const appData = env.APPDATA ?? (env.USERPROFILE ? path.join(env.USERPROFILE, 'AppData', 'Roaming') : 'C:\\Users\\Default\\AppData\\Roaming');
+  return path.join(appData, 'Code', 'User', 'globalStorage');
+}
+
+function resolveVSCodeLauncher(deps: WindowsDeps, launcher: string, source: VSCodeCli['source']): VSCodeCli | null {
   const root = path.dirname(path.dirname(launcher));
   const exe = path.join(root, 'Code.exe');
   if (!deps.fileExists(exe)) {
@@ -108,7 +114,7 @@ export function resolveVSCodeLauncher(deps: WindowsDeps, launcher: string, sourc
   }
   const env: NodeJS.ProcessEnv = { ...deps.env, ELECTRON_RUN_AS_NODE: '1' };
   delete env.VSCODE_DEV;
-  return { source, launcher, command: exe, baseArgs: [cliJs], env };
+  return { source, launcher, command: exe, baseArgs: [cliJs], env, globalStorage: vscodeGlobalStorage(deps.env) };
 }
 
 export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Platform {
@@ -195,6 +201,15 @@ export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Pla
 
     browserCommand() {
       return null;
+    },
+
+    async hostCredentials(): Promise<HostCredentials> {
+      const agent = await runner(path.join(system32, 'sc.exe'), ['query', 'ssh-agent'], { timeoutMs: 10_000 });
+      const stored = await runner(path.join(system32, 'cmdkey.exe'), ['/list'], { timeoutMs: 10_000 });
+      return {
+        sshAgent: Boolean(env.SSH_AUTH_SOCK) || (agent.code === 0 && serviceRunning(agent.stdout.toString('utf8'))),
+        githubCredential: stored.code === 0 && hasGitHubCredential(stored.stdout.toString('utf8')),
+      };
     },
 
     freeDiskBytes() {

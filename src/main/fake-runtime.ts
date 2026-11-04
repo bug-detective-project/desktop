@@ -50,6 +50,9 @@ interface Scenario {
   dockerOs: 'linux' | 'windows';
   /** The engine's memory in bytes. */
   dockerMemoryBytes: number;
+  /** An SSH agent runs on the computer, and a git credential for github.com is stored there: the checklist warns. */
+  sshAgent: boolean;
+  githubCredential: boolean;
 }
 
 const DEFAULT_SCENARIO: Scenario = {
@@ -74,6 +77,8 @@ const DEFAULT_SCENARIO: Scenario = {
   freeDiskBytes: 50 * 1024 ** 3,
   dockerOs: 'linux',
   dockerMemoryBytes: 8 * 1024 ** 3,
+  sshAgent: false,
+  githubCredential: false,
 };
 
 const fakeCommit = (text: string) => createHash('sha1').update(text).digest('hex');
@@ -187,17 +192,18 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async checkPrerequisites(): Promise<PrerequisiteReport> {
-    const { docker, wsl, vscode, devcontainers, dockerOs, dockerMemoryBytes } = this.scenario;
+    const { docker, wsl, vscode, devcontainers, dockerOs, dockerMemoryBytes, sshAgent, githubCredential } = this.scenario;
+    const vscodeWarnings = [...(sshAgent ? ['sshAgent'] : []), ...(githubCredential ? ['githubCredential'] : [])];
     const dockerCheck = (): PrerequisiteReport['checks'][number] => {
       if (docker !== 'running') return { id: 'docker', status: 'missing', reason: docker };
       if (dockerOs !== 'linux') return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
-      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warning: 'lowMemory', version: '4.37.1' };
+      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1' };
       return { id: 'docker', status: 'ok', version: '4.37.1' };
     };
     const checks: PrerequisiteReport['checks'] = [
       dockerCheck(),
       wsl ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)', version: '2.3.24.0' } : { id: 'wsl', status: 'missing', reason: 'notFound' },
-      vscode ? { id: 'vscode', status: 'ok', version: '1.95.1' } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
+      vscode ? { id: 'vscode', status: 'ok', version: '1.95.1', ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }) } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       devcontainers && vscode
         ? { id: 'devcontainers', status: 'ok', version: '0.388.0' }
         : { id: 'devcontainers', status: 'missing', reason: 'extensionMissing' },
@@ -415,8 +421,20 @@ export class FakeRuntime implements GameRuntime {
    * For the e2e tests (through Playwright's app.evaluate): changes made outside the app, such as
    * Docker Desktop stopping or `npm run dev` started in the VS Code terminal.
    */
-  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean; dockerOs?: 'linux' | 'windows'; dockerMemoryBytes?: number; freeDiskBytes?: number | null }) {
+  simulate(change: {
+    docker?: EngineState;
+    devServerUp?: boolean;
+    workspaceLost?: boolean;
+    dbResetFails?: boolean;
+    dockerOs?: 'linux' | 'windows';
+    dockerMemoryBytes?: number;
+    freeDiskBytes?: number | null;
+    sshAgent?: boolean;
+    githubCredential?: boolean;
+  }) {
     if (change.docker) this.scenario.docker = change.docker;
+    if (change.sshAgent !== undefined) this.scenario.sshAgent = change.sshAgent;
+    if (change.githubCredential !== undefined) this.scenario.githubCredential = change.githubCredential;
     if (change.dockerOs) this.scenario.dockerOs = change.dockerOs;
     if (change.dockerMemoryBytes !== undefined) this.scenario.dockerMemoryBytes = change.dockerMemoryBytes;
     if (change.freeDiskBytes !== undefined) this.scenario.freeDiskBytes = change.freeDiskBytes;

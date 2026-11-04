@@ -394,6 +394,23 @@ export const GIT_FLAGS: readonly string[] = ['-c', 'core.hooksPath=/dev/null', '
 /** The scripts, for the tests that check every one of them. */
 export const WORKSPACE_SCRIPTS: Readonly<Record<string, string>> = SCRIPTS;
 
+/** VS Code's machine settings inside the container (the vscode-server volume): what the Dev Containers extension reads when it attaches. */
+export const VSCODE_MACHINE_SETTINGS_FILE = '/home/node/.vscode-server/data/Machine/settings.json';
+
+/**
+ * Node script (run as `node` in the container with the file and the JSON as arguments) that merges
+ * settings into that file, keeping everything else in it; a file that is not JSON is replaced.
+ */
+export const MERGE_SETTINGS_SCRIPT = String.raw`
+const fs = require("fs"), path = require("path");
+const [file, json] = process.argv.slice(1);
+let current = {};
+try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
+if (!current || typeof current !== "object" || Array.isArray(current)) current = {};
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, JSON.stringify({ ...current, ...JSON.parse(json) }, null, "\t") + "\n");
+`;
+
 export interface ReviewCommits {
   /** The approved snapshot (tag qa-approved/ticket-N), its parent is the stage commit. */
   approved: string;
@@ -648,6 +665,14 @@ export class Workspace {
     const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
     const { stdout } = await this.script('claimForGame', [gameId, stamp], { timeoutMs: 60_000 });
     return Number(stdout.toString('utf8').trim().split('\n').at(-1)) || 0;
+  }
+
+  /** Writes settings into VS Code's machine settings in the container, so the next attach reads them (see vscode.ts). */
+  async seedVSCodeMachineSettings(settings: Readonly<Record<string, string | boolean>>): Promise<void> {
+    await this.docker.execChecked(this.names.container, ['node', '-e', MERGE_SETTINGS_SCRIPT, VSCODE_MACHINE_SETTINGS_FILE, JSON.stringify(settings)], {
+      user: 'node',
+      timeoutMs: 30_000,
+    });
   }
 
   /** Marks the repository as belonging to a game, without archiving anything (used after a restore). */

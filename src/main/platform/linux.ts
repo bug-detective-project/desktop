@@ -11,8 +11,8 @@ import { createServer } from 'node:net';
 import { posix as path, win32 } from 'node:path';
 import { runCommand } from '../services/process.ts';
 import type { CommandRunner } from '../services/process.ts';
-import { freeBytesOf } from './types.ts';
-import type { DockerLocations, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
+import { freeBytesOf, hasGitHubCredential, serviceRunning } from './types.ts';
+import type { DockerLocations, HostCredentials, Platform, StatFs, VSCodeCli, WslStatus } from './types.ts';
 import { decodeWslOutput, parseWslVersion } from './windows.ts';
 
 export interface LinuxDeps {
@@ -54,8 +54,9 @@ function findOnPath(deps: LinuxDeps, file: string, accept: (candidate: string) =
 }
 
 interface WindowsSide {
-  /** %LOCALAPPDATA% and %ProgramFiles% as Windows paths. */
+  /** %LOCALAPPDATA%, %APPDATA% and %ProgramFiles% as Windows paths. */
   localAppData: string;
+  appData: string;
   programFiles: string;
   /** Converts a Windows path to its /mnt/... path. */
   toLinux: (windowsPath: string) => string;
@@ -75,20 +76,22 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
         return null;
       }
       const cmd = '/mnt/c/Windows/System32/cmd.exe';
-      const result = await runner(cmd, ['/d', '/c', 'echo %LOCALAPPDATA%^|%ProgramFiles%^|%SystemRoot%'], {
+      const result = await runner(cmd, ['/d', '/c', 'echo %LOCALAPPDATA%^|%ProgramFiles%^|%SystemRoot%^|%APPDATA%'], {
         cwd: deps.fileExists('/mnt/c') ? '/mnt/c' : undefined,
         timeoutMs: 15_000,
       });
-      const [localAppData, programFiles, systemRoot] = result.stdout.toString('utf8').trim().split('|');
+      const [localAppData, programFiles, systemRoot, appDataRaw] = result.stdout.toString('utf8').trim().split('|');
       if (result.code !== 0 || !localAppData || !programFiles || !systemRoot) {
         return null;
       }
+      // Older callers answer without %APPDATA%: it is next to %LOCALAPPDATA% (…\AppData\Roaming).
+      const appData = appDataRaw && appDataRaw !== '%APPDATA%' ? appDataRaw : win32.join(win32.dirname(localAppData), 'Roaming');
       // Same mapping as wslpath with the default automount root (/mnt).
       const toLinux = (windowsPath: string) => {
         const match = /^([A-Za-z]):\\?(.*)$/.exec(windowsPath);
         return match ? path.join('/mnt', match[1].toLowerCase(), ...match[2].split('\\').filter(Boolean)) : windowsPath;
       };
-      return { localAppData, programFiles, toLinux, system32: toLinux(win32.join(systemRoot, 'System32')) };
+      return { localAppData, appData, programFiles, toLinux, system32: toLinux(win32.join(systemRoot, 'System32')) };
     })();
     return windowsSide;
   };
@@ -121,7 +124,7 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       const wslenv = ['ELECTRON_RUN_AS_NODE', ...(env.WSLENV ?? '').split(':').filter(Boolean)].join(':');
       const childEnv: NodeJS.ProcessEnv = { ...env, ELECTRON_RUN_AS_NODE: '1', WSLENV: wslenv };
       delete childEnv.VSCODE_DEV;
-      return { source, launcher, command: exe, baseArgs: [cliJs], env: childEnv };
+      return { source, launcher, command: exe, baseArgs: [cliJs], env: childEnv, globalStorage: side.toLinux(win32.join(side.appData, 'Code', 'User', 'globalStorage')) };
     }
     return null;
   }
@@ -133,7 +136,8 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       findOnPath(deps, 'code', accept) ??
       ['/usr/bin/code', '/usr/share/code/bin/code', '/snap/bin/code'].find((file) => deps.fileExists(file)) ??
       null;
-    return launcher ? { source: 'path', launcher, command: launcher, baseArgs: [], env: { ...env } } : null;
+    const configHome = env.XDG_CONFIG_HOME || path.join(env.HOME ?? '/root', '.config');
+    return launcher ? { source: 'path', launcher, command: launcher, baseArgs: [], env: { ...env }, globalStorage: path.join(configHome, 'Code', 'User', 'globalStorage') } : null;
   }
 
   return {
@@ -203,6 +207,21 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
     browserCommand(url) {
       // On WSL, open the Windows default browser; the published ports answer on Windows too.
       return wsl ? { command: '/mnt/c/Windows/explorer.exe', args: [url] } : null;
+    },
+
+    async hostCredentials(): Promise<HostCredentials> {
+      const side = await windows();
+      if (!side) {
+        // Plain Linux: only the agent of this session is known; stored git credentials are not probed (a helper could prompt).
+        return { sshAgent: Boolean(env.SSH_AUTH_SOCK), githubCredential: false };
+      }
+      // WSL: the Windows VS Code attaches, so the Windows agent service and credential store count, and the WSL agent too.
+      const agent = await runner(path.join(side.system32, 'sc.exe'), ['query', 'ssh-agent'], { timeoutMs: 10_000 });
+      const stored = await runner(path.join(side.system32, 'cmdkey.exe'), ['/list'], { timeoutMs: 10_000 });
+      return {
+        sshAgent: Boolean(env.SSH_AUTH_SOCK) || (agent.code === 0 && serviceRunning(agent.stdout.toString('utf8'))),
+        githubCredential: stored.code === 0 && hasGitHubCredential(stored.stdout.toString('utf8')),
+      };
     },
 
     async freeDiskBytes() {
