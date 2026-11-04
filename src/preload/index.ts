@@ -67,6 +67,7 @@ const api: BugDetectiveApi = {
   discardSave: (token) => call('discardSave', token),
   rebuildWorkspace: () => call('rebuildWorkspace'),
   retryDatabaseReset: () => call('retryDatabaseReset'),
+  reportRendererError: (message, stack) => call('reportRendererError', message, stack),
   diagnostics: () => call('diagnostics'),
   openLogsFolder: () => call('openLogsFolder'),
   newGame: () => call('newGame'),

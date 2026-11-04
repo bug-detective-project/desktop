@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { homedir, release, version as osVersion } from 'node:os';
-import { app, BrowserWindow, dialog, net, powerMonitor, screen, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, net, powerMonitor, screen, session, shell } from 'electron';
 import log from 'electron-log/main';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -13,6 +13,8 @@ import { FakeRuntime } from './fake-runtime.ts';
 import { Game } from './game.ts';
 import type { DevCatalogOptions } from './game.ts';
 import { channelName, registerIpc } from './ipc.ts';
+import { shouldReloadAfterCrash } from './crash.ts';
+import { nativeText } from './native-text.ts';
 import { appFetch, fetchTextWith } from './net.ts';
 import { startupErrorText } from './startup-error.ts';
 import { currentPlatform } from './platform/index.ts';
@@ -219,6 +221,49 @@ function createWindow(): BrowserWindow {
   return window;
 }
 
+/**
+ * A window that never stays blank: a renderer that dies is reloaded (the first time in a minute,
+ * quietly; after that, the player chooses), and one that stops answering gets a dialog too.
+ */
+function watchRenderer(window: BrowserWindow, game: Game): void {
+  const crashes: number[] = [];
+  const text = (key: Parameters<typeof nativeText>[1]) => nativeText(game.snapshot().state.settings.language, key);
+  const copyDiagnostics = async () => {
+    clipboard.writeText(await game.diagnostics().catch((error: Error) => `diagnostics failed: ${error.message}`));
+  };
+  window.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`Renderer gone: ${details.reason} (exit code ${details.exitCode})`);
+    const now = Date.now();
+    if (shouldReloadAfterCrash(crashes, now)) {
+      crashes.push(now);
+      window.reload();
+      return;
+    }
+    crashes.push(now);
+    void dialog
+      .showMessageBox(window, { type: 'error', title: text('rendererGoneTitle'), message: text('rendererGone'), buttons: [text('reload'), text('copyDiagnostics'), text('quit')], defaultId: 0, cancelId: 2 })
+      .then(async ({ response }) => {
+        if (response === 1) {
+          await copyDiagnostics();
+          window.reload();
+        } else if (response === 0) {
+          window.reload();
+        } else {
+          app.quit();
+        }
+      });
+  });
+  window.webContents.on('unresponsive', () => {
+    console.error('Renderer unresponsive');
+    void dialog
+      .showMessageBox(window, { type: 'warning', title: text('unresponsiveTitle'), message: text('unresponsive'), buttons: [text('wait'), text('reload')], defaultId: 0, cancelId: 0 })
+      .then(({ response }) => {
+        if (response === 1) window.reload();
+      });
+  });
+  window.webContents.on('responsive', () => console.log('Renderer responsive again'));
+}
+
 async function main(): Promise<void> {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -251,6 +296,7 @@ async function main(): Promise<void> {
     devSolveBug,
     devSkipOnboarding,
     devShowProjects,
+    e2e: isE2E,
     devCatalog: app.isPackaged ? undefined : devCatalogOptions(localCatalogFile(userData), catalog),
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
@@ -272,6 +318,7 @@ async function main(): Promise<void> {
     await loadReactDevTools();
   }
   window = createWindow();
+  watchRenderer(window, game);
 
   app.on('second-instance', () => {
     if (window) {

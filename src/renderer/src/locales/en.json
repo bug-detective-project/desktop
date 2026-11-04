@@ -614,6 +614,13 @@
       "nextTicket": "Changes apply from the next ticket. The open ticket keeps the version it was unlocked with."
     }
   },
+  "crash": {
+    "title": "Something went wrong on this screen",
+    "text": "Your progress is saved. Reload the window to go on; if it happens again, copy the diagnostics and send them with your feedback.",
+    "reload": "Reload",
+    "copy": "Copy diagnostics",
+    "copied": "Diagnostics copied"
+  },
   "errors": {
     "dockerUnavailable": "Docker is not running. Start Docker Desktop and try again.",
     "environmentNotReady": "Install the missing downloads on the Dashboard first.",

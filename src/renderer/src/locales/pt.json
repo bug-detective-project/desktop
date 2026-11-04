@@ -614,6 +614,13 @@
       "nextTicket": "As mudanças valem a partir do próximo ticket. O ticket aberto continua na versão em que foi liberado."
     }
   },
+  "crash": {
+    "title": "Algo deu errado nesta tela",
+    "text": "Seu progresso está salvo. Recarregue a janela para continuar; se acontecer de novo, copie o diagnóstico e envie com o seu feedback.",
+    "reload": "Recarregar",
+    "copy": "Copiar diagnóstico",
+    "copied": "Diagnóstico copiado"
+  },
   "errors": {
     "dockerUnavailable": "O Docker não está rodando. Inicie o Docker Desktop e tente de novo.",
     "environmentNotReady": "Instale primeiro os downloads que faltam, no Painel.",

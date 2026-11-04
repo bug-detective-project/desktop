@@ -32,6 +32,7 @@ beforeEach(() => {
     appUrl: vi.fn(async () => 'http://127.0.0.1:5173/'),
     applyDevCatalog: vi.fn(async () => {}),
     diagnostics: vi.fn(async () => 'Bug Detective 0.1.0 diagnostics'),
+    reportRendererError: vi.fn(async () => {}),
     openLogsFolder: vi.fn(async () => {}),
   };
   openUrl = vi.fn(async (_url: string) => {});
@@ -66,6 +67,12 @@ describe('IPC', () => {
     expect(openUrl).toHaveBeenCalledWith('https://github.com/bug-detective-project/desktop#networks-with-a-proxy');
     expect(await call('openExternal', fromApp, 'feedback')).toEqual({ ok: true, value: undefined });
     expect(openUrl).toHaveBeenCalledWith('https://github.com/bug-detective-project/desktop/discussions');
+  });
+
+  it('logs a renderer error, within size limits', async () => {
+    expect(await call('reportRendererError', fromApp, 'boom', 'Error: boom\n    at App')).toEqual({ ok: true, value: undefined });
+    expect(game.reportRendererError).toHaveBeenCalledWith('boom', 'Error: boom\n    at App');
+    expect(await call('reportRendererError', fromApp, 'x'.repeat(2001), '')).toMatchObject({ ok: false, error: { code: 'invalidInput' } });
   });
 
   it('hands out the diagnostics text and opens the logs folder', async () => {
