@@ -285,6 +285,13 @@ export class FakeRuntime implements GameRuntime {
   /** Records which game owns the fake workspace, like the real repository config. */
   claimed: string | null = null;
 
+  /** How many times "New game" sanitized the repository (for the tests). */
+  sanitizeCalls = 0;
+
+  async sanitizeWorkspace() {
+    this.sanitizeCalls += 1;
+  }
+
   async claimWorkspace(gameId: string) {
     const archived = this.claimed !== null && this.claimed !== gameId ? this.stages.size : 0;
     if (archived) {

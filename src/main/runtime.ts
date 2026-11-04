@@ -55,6 +55,8 @@ export interface GameRuntime {
    * another game. Returns the number of archived branches.
    */
   claimWorkspace(gameId: string): Promise<number>;
+  /** "New game": removes what the previous game's code left in the repository (hooks, fsmonitor, command settings); nothing when Docker or the container is not running. */
+  sanitizeWorkspace(): Promise<void>;
   importStage(stage: number, files: ArchiveFile[], message: string): Promise<string>;
   checkoutPlayerBranch(stage: number): Promise<void>;
   /** Discards everything on player/ticket-N and returns it to the clean stage commit. */
@@ -385,6 +387,18 @@ export class DockerRuntime implements GameRuntime {
 
   async claimWorkspace(gameId: string) {
     return (await this.runningWorkspace()).claimForGame(gameId);
+  }
+
+  async sanitizeWorkspace() {
+    let workspace: Workspace;
+    try {
+      workspace = await this.workspace();
+    } catch (error) {
+      if (error instanceof DockerUnavailableError) return;
+      throw error;
+    }
+    if (!(await workspace.info())?.running || !(await workspace.hasRepository())) return;
+    await workspace.sanitizeRepository();
   }
 
   async importStage(stage: number, files: ArchiveFile[], message: string) {

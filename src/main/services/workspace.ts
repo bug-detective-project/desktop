@@ -67,8 +67,15 @@ export const playerBranch = (stage: number) => `player/ticket-${stage}`;
 const ADD_EXCEPT_EXCLUDED = `git add -A -- .
 for spec in "$@"; do git reset -q -- ":(glob)\${spec#:(exclude,glob)}"; done`;
 
+/**
+ * The git the scripts use: never the repository's hooks nor its fsmonitor (the player's code may
+ * have planted them; the player's own git in VS Code keeps them).
+ */
+const SAFE_GIT = String.raw`git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }`;
+
 const SCRIPTS = {
   importStage: `set -eu
+${SAFE_GIT}
 stage="$1"; message="$2"; src="/tmp/bugdetective-import-$stage"
 rm -rf "$src" "$src.index"; mkdir -p "$src"
 tar -x -C "$src"
@@ -108,6 +115,7 @@ git rev-parse "refs/tags/stage-$stage^{commit}"`,
    * Prints the number of archived branches.
    */
   claimForGame: `set -eu
+${SAFE_GIT}
 game="$1"; stamp="$2"
 cd "$WORKSPACE_DIR"
 if [ ! -d .git ]; then echo 0; exit 0; fi
@@ -140,6 +148,7 @@ echo "$count"`,
    * purpose; ignored files (node_modules) stay. Prints "<changed files> <extra commits>".
    */
   resetToStage: `set -eu
+${SAFE_GIT}
 stage="$1"; branch="player/ticket-$stage"
 cd "$WORKSPACE_DIR"
 git rev-parse -q --verify "refs/tags/stage-$stage" >/dev/null
@@ -154,6 +163,7 @@ echo "$changes $commits"`,
 
   /** Switches to player/ticket-N. Uncommitted work from the previous ticket is stashed, never lost. */
   checkoutPlayerBranch: `set -eu
+${SAFE_GIT}
 stage="$1"; branch="player/ticket-$stage"
 cd "$WORKSPACE_DIR"
 current=$(git symbolic-ref -q --short HEAD || true)
@@ -174,6 +184,7 @@ fi`,
    * files are lost; other files and the index stay as they are.
    */
   solveBug: `set -eu
+${SAFE_GIT}
 stage="$1"; patch="/tmp/bugdetective-solve-$stage.patch"
 cat > "$patch"
 cd "$WORKSPACE_DIR"
@@ -189,6 +200,7 @@ rm -f "$patch"`,
 
   /** The reference of a ticket: the stage commit plus its reference patch (stdin), as a tar of the whole tree. */
   referenceTree: `set -eu
+${SAFE_GIT}
 stage="$1"; idx="/tmp/bugdetective-reference-$stage.index"; patch="/tmp/bugdetective-reference-$stage.patch"
 cat > "$patch"
 cd "$WORKSPACE_DIR"
@@ -208,6 +220,7 @@ git archive --format=tar "$tree"`,
    * from the same data gives the same commits. Prints the approved, reference and snapshot commits.
    */
   buildReview: `set -eu
+${SAFE_GIT}
 n="$1"; date="$2"; approvedMessage="$3"; referenceMessage="$4"; snapshotMessage="$5"; shift 5
 tmp="/tmp/bugdetective-review-$n"
 rm -rf "$tmp"; mkdir -p "$tmp/snapshot" "$tmp/reference"
@@ -242,6 +255,7 @@ echo "$approved $reference $snapshot"`,
    * A file inside the repository is reported relative to it, so the state never holds the folder.
    */
   reviewReturnPoint: `set -eu
+${SAFE_GIT}
 cd "$WORKSPACE_DIR"
 branch=$(git symbolic-ref -q --short HEAD || echo -)
 head=$(git rev-parse HEAD)
@@ -255,15 +269,17 @@ printf '%s\n%s\n%s\n%s\n' "$branch" "$head" "$index" "$excludes"`,
    * stash). Excluded paths (arguments) are never added. Prints the commit, or "-" when nothing changed.
    */
   reviewSaveWork: `set -eu
+${SAFE_GIT}
 message="$1"; shift
 cd "$WORKSPACE_DIR"
 ${ADD_EXCEPT_EXCLUDED}
 if git diff --cached --quiet; then echo -; exit 0; fi
-git -c core.hooksPath=/dev/null commit -q --no-verify -m "$message"
+git commit -q --no-verify -m "$message"
 git rev-parse HEAD`,
 
   /** Checks out the review; excluded files are hidden from Source Control meanwhile (stdin: the excludes file). */
   reviewSwitch: `set -eu
+${SAFE_GIT}
 n="$1"
 cd "$WORKSPACE_DIR"
 cat > .git/bugdetective-review-exclude
@@ -278,6 +294,7 @@ git checkout -q "review/ticket-$n"`,
    * Prints "edits" and "restored" or "tipMoved" lines.
    */
   reviewReturn: `set -eu
+${SAFE_GIT}
 n="$1"; branch="$2"; head="$3"; wip="$4"; index="$5"; excludes="$6"; stamp="$7"; editsMessage="$8"; shift 8
 cd "$WORKSPACE_DIR"
 current=$(git symbolic-ref -q --short HEAD || true)
@@ -286,7 +303,7 @@ case "$current" in
     if [ -n "$(git status --porcelain -- . "$@")" ]; then
       if [ "$current" = "review/ticket-$n" ]; then git checkout -q -b "review-edits/ticket-$n-$stamp"; fi
       ${ADD_EXCEPT_EXCLUDED}
-      git -c core.hooksPath=/dev/null commit -q --no-verify -m "$editsMessage"
+      git commit -q --no-verify -m "$editsMessage"
       echo edits
     fi;;
 esac
@@ -314,7 +331,25 @@ if [ "$wip" != - ]; then
   fi
 fi`,
 
+  /**
+   * "New game": the repository goes on with the next game, so whatever the previous game's code
+   * configured in it is removed: hooks, the fsmonitor, commands git would run (ssh, pager, editor)
+   * and filter or diff drivers.
+   */
+  sanitizeRepository: `set -eu
+${SAFE_GIT}
+cd "$WORKSPACE_DIR"
+if [ ! -d .git ]; then exit 0; fi
+rm -rf .git/hooks/* 2>/dev/null || true
+for key in core.fsmonitor core.sshCommand core.pager core.editor; do
+  command git config --unset-all "$key" >/dev/null 2>&1 || true
+done
+for section in $(command git config --name-only --get-regexp '^(filter|diff)\\..*\\.(clean|smudge|process|textconv|command)$' 2>/dev/null | sed -E 's/\\.[^.]+$//' | sort -u); do
+  command git config --remove-section "$section" >/dev/null 2>&1 || true
+done`,
+
   installDepsFromCache: `set -eu
+${SAFE_GIT}
 key="$1"
 cd "$WORKSPACE_DIR"
 rm -rf node_modules client/node_modules server/node_modules
@@ -322,6 +357,7 @@ tar -xf "${CACHE_DIR}/deps/$key.tar" -C .
 printf %s "$key" > node_modules/.bugdetective-deps`,
 
   bundle: `set -eu
+${SAFE_GIT}
 cd "$WORKSPACE_DIR"
 rm -f /tmp/bugdetective.bundle
 git bundle create -q /tmp/bugdetective.bundle --all >/dev/null 2>&1
@@ -330,6 +366,7 @@ rm -f /tmp/bugdetective.bundle`,
 
   /** Checks a bundle in a scratch repository, before anything of the player's is touched. */
   verifyBundle: `set -eu
+${SAFE_GIT}
 rm -rf /tmp/bugdetective-verify /tmp/bugdetective-verify.bundle
 cat > /tmp/bugdetective-verify.bundle
 git init -q /tmp/bugdetective-verify
@@ -337,6 +374,7 @@ git -C /tmp/bugdetective-verify bundle verify -q /tmp/bugdetective-verify.bundle
 rm -rf /tmp/bugdetective-verify /tmp/bugdetective-verify.bundle`,
 
   restoreBundle: `set -eu
+${SAFE_GIT}
 branch="$1"
 cat > /tmp/bugdetective-restore.bundle
 cd "$WORKSPACE_DIR"
@@ -349,6 +387,12 @@ git fetch -q /tmp/bugdetective-restore.bundle "refs/*:refs/*"
 git checkout -q -f "$branch"
 rm -f /tmp/bugdetective-restore.bundle`,
 };
+
+/** The flags of SAFE_GIT, for the git commands the class runs directly. */
+export const GIT_FLAGS: readonly string[] = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false'];
+
+/** The scripts, for the tests that check every one of them. */
+export const WORKSPACE_SCRIPTS: Readonly<Record<string, string>> = SCRIPTS;
 
 export interface ReviewCommits {
   /** The approved snapshot (tag qa-approved/ticket-N), its parent is the stage commit. */
@@ -564,8 +608,14 @@ export class Workspace {
     return this.exec(['sh', '-c', SCRIPTS[name], 'sh', ...args], options);
   }
 
+  /** git without the repository's hooks and fsmonitor, like the scripts (see SAFE_GIT). */
   async git(args: readonly string[], options: Parameters<Docker['exec']>[2] = {}): Promise<string> {
-    return (await this.exec(['git', ...args], options)).stdout.toString('utf8');
+    return (await this.exec(['git', ...GIT_FLAGS, ...args], options)).stdout.toString('utf8');
+  }
+
+  /** Removes hooks, the fsmonitor and command settings the previous game's code may have left (see sanitizeRepository). */
+  async sanitizeRepository(): Promise<void> {
+    await this.script('sanitizeRepository', [], { timeoutMs: 60_000 });
   }
 
   async hasRepository(): Promise<boolean> {
@@ -625,7 +675,7 @@ export class Workspace {
   }
 
   async applyPatch(patch: string): Promise<void> {
-    await this.exec(['git', 'apply', '--whitespace=nowarn', '-'], { input: patch, timeoutMs: 60_000 });
+    await this.git(['apply', '--whitespace=nowarn', '-'], { input: patch, timeoutMs: 60_000 });
   }
 
   /** Development only: replaces the player's fix with the reference patch (see the solveBug script). */

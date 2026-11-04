@@ -988,6 +988,8 @@ export class Game {
 
   /** A fresh game that keeps the preferences; downloaded packages and reviews are removed. */
   private async startOver(): Promise<void> {
+    // The repository goes on with the next game: what the old game's code configured in it goes.
+    await this.options.runtime.sanitizeWorkspace().catch((error: Error) => this.appendLog(`» Workspace not sanitized: ${error.message}`));
     const projects = this.options.projects;
     for (const id of projects ? this.catalog.map((item) => item.id) : []) {
       await projects!.packages(id).clear();
