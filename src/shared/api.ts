@@ -190,6 +190,8 @@ export interface Snapshot {
   busy: BusyTask;
   /** Tickets were unlocked but the workspace holds no repository (its volume was removed outside the game): the code can be recreated. */
   workspaceLost: boolean;
+  /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
+  dbResetFailed: boolean;
   dockerState: EngineState | null;
   prerequisites: PrerequisiteReport | null;
   environment: EnvironmentReport | null;
@@ -291,6 +293,8 @@ export interface BugDetectiveApi {
   discardSave(token: string): Promise<void>;
   /** Recreates the code of every unlocked ticket in a workspace whose repository was lost; the progress stays. */
   rebuildWorkspace(): Promise<void>;
+  /** Runs `npm run db:reset` again after a failed reset (the Dashboard's "Try again"). */
+  retryDatabaseReset(): Promise<void>;
   /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */
   diagnostics(): Promise<string>;
   /** Opens the folder of the log files in the system's file manager. */

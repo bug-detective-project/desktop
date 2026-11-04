@@ -146,6 +146,8 @@ export class Game {
   private shuttingDown = false;
   /** Tickets were unlocked but the workspace has no repository (its volume was removed outside the game). */
   private workspaceLost = false;
+  /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
+  private dbResetFailed = false;
   /** The save chosen to restore, waiting for the player to confirm. One at a time: a save can be hundreds of MB. */
   private pendingSave: (ValidatedSave & { fileName: string; token: string }) | null = null;
   private reviewNotice: ReviewNotice | null = null;
@@ -521,6 +523,7 @@ export class Game {
       hintsTotal: this.hintsTotal,
       busy: this.busy,
       workspaceLost: this.workspaceLost,
+      dbResetFailed: this.dbResetFailed,
       dockerState: this.dockerState,
       prerequisites: this.prerequisites,
       environment: this.environment,
@@ -715,6 +718,35 @@ export class Game {
   }
 
   /**
+   * Reseeds the project's database. A failure never stops the ticket (the player can still work),
+   * but it is logged and shown on the Dashboard, with a retry, because the data may be the
+   * previous ticket's.
+   */
+  private async resetDatabase(): Promise<void> {
+    try {
+      await this.options.runtime.resetDatabase();
+      if (this.dbResetFailed) {
+        this.dbResetFailed = false;
+        this.appendLog('» npm run db:reset succeeded');
+      }
+    } catch (error) {
+      this.dbResetFailed = true;
+      this.appendLog(`» npm run db:reset failed: ${(error as Error).message}`);
+    }
+    this.emit();
+  }
+
+  /** "Try again" after a failed reset; fails with dbResetFailed when it fails again. */
+  async retryDatabaseReset(): Promise<void> {
+    await this.requireDocker();
+    this.requireWorkspace();
+    await this.resetDatabase();
+    if (this.dbResetFailed) {
+      throw new GameError('dbResetFailed');
+    }
+  }
+
+  /**
    * Recreates the code of every unlocked ticket in the workspace, in order: each stage is fetched
    * (from the cache or downloaded) and imported again, and the player's branches are created from
    * the stages. Work that had not reached QA on the current ticket is gone; the progress stays.
@@ -743,7 +775,7 @@ export class Game {
       if (current !== null) {
         await runtime.checkoutPlayerBranch(current);
       }
-      await runtime.resetDatabase().catch(() => {});
+      await this.resetDatabase();
       // A run that was in QA when the volume went has nothing to test any more: not an attempt.
       const recovered = rules.recoverInterruptedQa(this.state, this.ctx());
       if (recovered !== this.state) {
@@ -961,7 +993,7 @@ export class Game {
       this.appendLog(`» Imported as commit ${commit.slice(0, 12)}`);
       await this.options.runtime.checkoutPlayerBranch(ticket);
       this.appendLog(`» Workspace ready for ticket ${ticket} (${fetched.entry.id})`);
-      await this.options.runtime.resetDatabase().catch(() => {});
+      await this.resetDatabase();
       const info = { id: fetched.entry.id, track: fetched.entry.track, commit, manifestVersion: fetched.manifestVersion, counts: fetched.counts };
       await this.commit((state, ctx) => rules.unlockTicket(state, ticket, info, ctx));
       await this.loadTicketMeta();
@@ -995,7 +1027,7 @@ export class Game {
       if (discarded.changes > 0 || discarded.commits > 0) {
         this.appendLog(`» Workspace reset to stage ${ticket}: discarded ${discarded.changes} changed file(s) and ${discarded.commits} commit(s)`);
       }
-      await this.options.runtime.resetDatabase().catch(() => {});
+      await this.resetDatabase();
       await this.commit((state, ctx) => rules.playerMove(state, ticket, 'inProgress', ctx));
     });
   }

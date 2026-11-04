@@ -121,8 +121,10 @@
       "workspaceImage": "Workspace image",
       "qaImage": "QA image",
       "projectDependencies": "Dependencies",
-      "devServer": "Dev server"
+      "devServer": "Dev server",
+      "database": "App data"
     },
+    "retryReset": "Try again",
     "envStatus": {
       "ready": "Ready",
       "missing": "Missing",
@@ -133,7 +135,8 @@
       "notInstalled": "Not installed",
       "checking": "Checking…",
       "needsDocker": "Needs Docker",
-      "notYet": "Not installed yet"
+      "notYet": "Not installed yet",
+      "resetFailed": "Could not be reset; they may be the previous ticket's"
     },
     "desk": "Your desk",
     "projectAndContacts": "Project & contacts",
@@ -625,6 +628,7 @@
     "vscodeFailed": "VS Code could not be opened, and your code was restored: {{message}}",
     "solveBugNotAllowed": "Only the ticket in progress can be solved.",
     "workspaceLost": "The code of your workspace is gone. Recreate it from the Dashboard, or restore a backup.",
+    "dbResetFailed": "The app data could not be reset. Check the Docker log and try again.",
     "incompletePublication": "The project's publication is incomplete. Try again later.",
     "switchIncomplete": "The project switch is not finished: {{message}}",
     "otherProjectsLeft": "Docker still has another project: {{message}}",

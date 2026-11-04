@@ -121,6 +121,7 @@
   "hintsTotal": {},
   "busy": null,
   "workspaceLost": false,
+  "dbResetFailed": false,
   "dockerState": "running",
   "prerequisites": {
     "checks": [

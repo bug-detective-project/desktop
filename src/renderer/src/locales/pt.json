@@ -121,8 +121,10 @@
       "workspaceImage": "Imagem do workspace",
       "qaImage": "Imagem de QA",
       "projectDependencies": "Dependências",
-      "devServer": "Servidor de desenvolvimento"
+      "devServer": "Servidor de desenvolvimento",
+      "database": "Dados da aplicação"
     },
+    "retryReset": "Tentar de novo",
     "envStatus": {
       "ready": "Pronto",
       "missing": "Faltando",
@@ -133,7 +135,8 @@
       "notInstalled": "Não instalado",
       "checking": "Verificando…",
       "needsDocker": "Precisa do Docker",
-      "notYet": "Ainda não instalado"
+      "notYet": "Ainda não instalado",
+      "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior"
     },
     "desk": "Sua mesa",
     "projectAndContacts": "Projeto e contatos",
@@ -625,6 +628,7 @@
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
     "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
     "workspaceLost": "O código do seu workspace sumiu. Recrie-o no Painel, ou restaure um backup.",
+    "dbResetFailed": "Os dados da aplicação não puderam ser reiniciados. Veja o log do Docker e tente de novo.",
     "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
     "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",
