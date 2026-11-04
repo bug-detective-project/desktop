@@ -10,6 +10,7 @@ import { MAX_SAVE_BYTES } from './backup.ts';
 import { readTar, writeTar } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
+import { WORKSPACE_LIMITS, limitArgs } from './limits.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 
@@ -499,6 +500,7 @@ export class Workspace {
         '--name',
         this.names.container,
         ...labelArgs('workspace', this.project),
+        ...limitArgs(WORKSPACE_LIMITS),
         '--mount',
         mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACES_ROOT }),
         '--mount',

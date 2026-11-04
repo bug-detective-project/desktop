@@ -235,6 +235,10 @@ export function commentForResult(result: QaResult, attemptId: string, timeoutSec
     const unfinished = result.tests.filter((test) => test.status === 'unfinished').map((test) => test.name);
     return { ...base, kind: 'timeout', timeoutSeconds, failing, unfinished };
   }
+  if (result.status === 'outOfMemory') {
+    // Counts as a failed attempt, like a timeout: the player's code did it.
+    return { ...base, kind: 'outOfMemory' };
+  }
   return { ...base, kind: result.gate === 1 ? 'gate1Failed' : 'gate2Failed', failing };
 }
 

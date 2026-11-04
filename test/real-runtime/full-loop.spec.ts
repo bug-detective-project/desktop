@@ -64,6 +64,29 @@ async function waitForEnvironment(page: Page) {
     .toBe(true);
 }
 
+const GIB = 1024 ** 3;
+/** Memory in use of the containers whose name matches, in bytes, from `docker stats` ("1.2GiB / 3GiB"). */
+function memoryInUse(nameFilter: string): number {
+  const names = docker('ps', '--filter', `name=${nameFilter}`, '--format', '{{.Names}}').trim().split('\n').filter(Boolean);
+  let total = 0;
+  for (const name of names) {
+    const usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name).trim().split('/')[0].trim();
+    const match = /^([\d.]+)\s*([KMG]i?B|B)$/i.exec(usage);
+    if (!match) continue;
+    const unit = match[2].toUpperCase();
+    total += Number(match[1]) * (unit.startsWith('G') ? GIB : unit.startsWith('M') ? 1024 ** 2 : unit.startsWith('K') ? 1024 : 1);
+  }
+  return total;
+}
+/** The highest memory use seen for the workspace container and for the QA containers (I4: the 8 GB hypothesis as an assertion). */
+const peaks = { workspace: 0, qa: 0 };
+async function sampleWorkspaceMemory(samples = 5, intervalMs = 2000) {
+  for (let i = 0; i < samples; i += 1) {
+    peaks.workspace = Math.max(peaks.workspace, memoryInUse(CONTAINER));
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'codeReview') {
   const started = Date.now();
   await waitForEnvironment(page);
@@ -72,7 +95,20 @@ async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'co
   await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
   await page.waitForTimeout(3000);
   await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'inQa');
-  await cardStatus(page, ticket, expected);
+  // While QA runs, sample the QA containers' memory.
+  let running = true;
+  const sampling = (async () => {
+    while (running) {
+      peaks.qa = Math.max(peaks.qa, memoryInUse('bugdetective-qa-'));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  })();
+  try {
+    await cardStatus(page, ticket, expected);
+  } finally {
+    running = false;
+    await sampling;
+  }
   log(`ticket ${ticket}: QA → ${expected} in ${((Date.now() - started) / 1000).toFixed(0)} s`);
 }
 
@@ -129,6 +165,9 @@ test('the full game loop with real Docker and VS Code', async () => {
       const tickets = (await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()) as unknown[];
       expect(tickets.length).toBeGreaterThan(10);
       log(`ticket 1: app answers on http://127.0.0.1:${port}/ (${tickets.length} tickets through the Vite proxy)`);
+      // VS Code attached and the dev server up: the workspace's heaviest moment.
+      await sampleWorkspaceMemory();
+      log(`ticket 1: workspace memory peak ${(peaks.workspace / GIB).toFixed(2)} GiB with VS Code and the dev server`);
     }
     await page.getByTestId('close-panel').click();
 
@@ -212,6 +251,15 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('settings-tab-backup').click();
   await page.getByTestId('export-progress').click();
   await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress saved' })).toBeVisible({ timeout: 120_000 });
+  // I4: the workspace (with VS Code attached and the dev server) plus a QA run stay well inside the
+  // limits, and together under 4 GiB, so an 8 GB computer plays with room to spare.
+  log(`memory peaks: workspace ${(peaks.workspace / GIB).toFixed(2)} GiB, QA ${(peaks.qa / GIB).toFixed(2)} GiB`);
+  expect(peaks.workspace).toBeGreaterThan(0);
+  expect(peaks.qa).toBeGreaterThan(0);
+  expect(peaks.workspace).toBeLessThan(3 * GIB * 0.9);
+  expect(peaks.qa).toBeLessThan(2 * GIB * 0.9);
+  expect(peaks.workspace + peaks.qa).toBeLessThan(4 * GIB);
+
   const head = docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
   docker('rm', '--force', CONTAINER);
   docker('volume', 'rm', 'bugdetective-workspace');

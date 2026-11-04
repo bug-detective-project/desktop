@@ -6,7 +6,7 @@ import type { QaComment } from './types.ts';
 
 export interface QaMessage {
   /** i18n key under "qa.comment". */
-  key: 'gate1Failed' | 'gate2Failed' | 'timeout' | 'passed' | 'interrupted' | 'error' | 'branchWarning';
+  key: 'gate1Failed' | 'gate2Failed' | 'timeout' | 'outOfMemory' | 'passed' | 'interrupted' | 'error' | 'branchWarning';
   params: Record<string, string | number>;
   /** Failing tests to list under the message, with their errors. */
   failing: { name: string; error?: string }[];
@@ -37,6 +37,8 @@ export function qaMessage(comment: QaComment): QaMessage {
       return { key: 'gate2Failed', params: { count: failing.length }, failing, unfinished, gate: 2 };
     case 'timeout':
       return { key: 'timeout', params: { seconds: comment.timeoutSeconds ?? 0 }, failing, unfinished, gate: null };
+    case 'outOfMemory':
+      return { key: 'outOfMemory', params: {}, failing: [], unfinished: [], gate: null };
     case 'passed':
       return { key: 'passed', params: {}, failing: [], unfinished: [], gate: 2 };
     case 'interrupted':

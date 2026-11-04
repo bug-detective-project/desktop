@@ -154,6 +154,12 @@ export class Docker {
     };
   }
 
+  /** Whether the kernel killed the container for exceeding its memory limit (exit code 137 without a stop). */
+  async oomKilled(name: string): Promise<boolean> {
+    const result = await this.run(['container', 'inspect', '--format', '{{.State.OOMKilled}}', name], { timeoutMs: 30_000 });
+    return result.code === 0 && result.stdout.toString('utf8').trim() === 'true';
+  }
+
   async removeContainer(name: string): Promise<void> {
     await this.run(['container', 'rm', '--force', '--volumes=false', name], { timeoutMs: 60_000 });
   }

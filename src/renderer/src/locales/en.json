@@ -316,7 +316,8 @@
     "attemptResult": {
       "passed": "passed",
       "failed": "failed",
-      "timeout": "timed out"
+      "timeout": "timed out",
+      "outOfMemory": "out of memory"
     },
     "testsSummary": "{{passed}} passed, {{failed}} failed",
     "activity": "Activity",
@@ -348,6 +349,7 @@
       "gate2Failed": "The reported bug is still unresolved. The app still shows the behavior described in the ticket.",
       "timeout": "Timeout: QA exceeded the time limit of {{seconds}} seconds, possibly because of a hang or infinite loop.",
       "passed": "Passed: ready for code review.",
+      "outOfMemory": "QA stopped because the app used too much memory. That is usually a loop or a leak in the code.",
       "interrupted": "QA was interrupted because the app closed. This does not count as an attempt. Move the card to In QA again.",
       "error": "QA could not run. This does not count as an attempt. Details: {{detail}}",
       "branchWarning": "Heads-up: your workspace is not on this ticket's code (it was switched in Git). QA evaluates the current files anyway."

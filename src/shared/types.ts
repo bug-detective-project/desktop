@@ -37,7 +37,8 @@ export interface QaTestRecord {
 export interface QaResult {
   ticket: number;
   gate: 1 | 2;
-  status: 'passed' | 'failed' | 'timeout';
+  /** outOfMemory: the kernel killed the QA container for exceeding its memory limit (the app's own result, never the CLI's). */
+  status: 'passed' | 'failed' | 'timeout' | 'outOfMemory';
   message: string;
   tests: QaTestRecord[];
   durationMs: number;
@@ -60,6 +61,7 @@ export type QaCommentKind =
   | 'gate1Failed'
   | 'gate2Failed'
   | 'timeout'
+  | 'outOfMemory'
   | 'passed'
   | 'interrupted'
   | 'error'
