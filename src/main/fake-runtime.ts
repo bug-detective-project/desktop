@@ -34,6 +34,8 @@ interface Scenario {
   cleanupFails: string[];
   /** Starting and stopping the dev server fail. */
   devServerFails: boolean;
+  /** `npm run db:reset` fails. */
+  dbResetFails: boolean;
   /** How long importing a stage takes, so the "unlocking" state can be seen. */
   unlockDelayMs: number;
   /** Importing a stage fails with this message (after the delay), so a failed ticket download can be seen. */
@@ -58,6 +60,7 @@ const DEFAULT_SCENARIO: Scenario = {
   vscodeFails: false,
   cleanupFails: [],
   devServerFails: false,
+  dbResetFails: false,
   unlockDelayMs: 0,
   unlockFails: null,
   installDelayMs: 0,
@@ -346,7 +349,11 @@ export class FakeRuntime implements GameRuntime {
     return this.scenario.branch ?? this.branch;
   }
 
-  async resetDatabase() {}
+  async resetDatabase() {
+    if (this.scenario.dbResetFails) {
+      throw new Error('npm run db:reset exited with code 1 (fake)');
+    }
+  }
 
   async hasRepository() {
     return this.scenario.repository ?? this.stages.size > 0;
@@ -378,8 +385,9 @@ export class FakeRuntime implements GameRuntime {
    * For the e2e tests (through Playwright's app.evaluate): changes made outside the app, such as
    * Docker Desktop stopping or `npm run dev` started in the VS Code terminal.
    */
-  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean }) {
+  simulate(change: { docker?: EngineState; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean }) {
     if (change.docker) this.scenario.docker = change.docker;
+    if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
     if (change.workspaceLost) {
       // The volume went: no stages, no branch, as a fresh repository-less workspace.

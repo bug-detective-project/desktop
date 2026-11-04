@@ -19,6 +19,7 @@ export const UnlockingTicket: Story = { render: show(() => snapshotFixture('queu
 export const TicketInProgress: Story = { render: show(() => snapshotFixture('active')) };
 export const TicketInCodeReview: Story = { render: show(() => snapshotFixture('review')) };
 export const DockerStopped: Story = { render: show(() => snapshotFixture('queued', { dockerState: 'notRunning' })) };
+export const DatabaseResetFailed: Story = { render: show(() => snapshotFixture('active', { dbResetFailed: true })) };
 export const WorkspaceLost: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true })) };
 export const WorkspaceRecreating: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true, busy: 'rebuilding', log: ['» Fetching front-1', '» Recreated the code of ticket 1 (front-1)'] })) };
 export const Dark: Story = { render: show(() => snapshotFixture('active')), globals: { theme: 'dark' } };

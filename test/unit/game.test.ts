@@ -74,6 +74,25 @@ function createGame(
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
 
+describe('a failed database reset', () => {
+  it('is logged and shown, never stops the ticket, and clears with a retry that succeeds', async () => {
+    const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().dbResetFailed).toBe(true);
+    expect(game.snapshot().log.join('\n')).toContain('» npm run db:reset failed: npm run db:reset exited with code 1 (fake)');
+    expect(status(game)).toBe('todo');
+    await game.move(1, 'inProgress');
+    expect(status(game)).toBe('inProgress');
+
+    await expect(game.retryDatabaseReset()).rejects.toMatchObject({ code: 'dbResetFailed' });
+    runtime.simulate({ dbResetFails: false });
+    await game.retryDatabaseReset();
+    expect(game.snapshot().dbResetFailed).toBe(false);
+    expect(game.snapshot().log.join('\n')).toContain('» npm run db:reset succeeded');
+  });
+});
+
 describe('diagnostics', () => {
   it('describes the versions, the project and the recent log, and keeps the home folder out', async () => {
     const { game } = createGame();

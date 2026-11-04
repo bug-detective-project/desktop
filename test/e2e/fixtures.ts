@@ -67,7 +67,7 @@ export async function launch(
  * Simulates a change made outside the app on the fake runtime (src/main/index.ts exposes it in
  * e2e mode): Docker Desktop stopping, or `npm run dev` started or stopped in the VS Code terminal.
  */
-export async function simulate(app: ElectronApplication, change: { docker?: 'running' | 'notRunning'; devServerUp?: boolean; workspaceLost?: boolean }): Promise<void> {
+export async function simulate(app: ElectronApplication, change: { docker?: 'running' | 'notRunning'; devServerUp?: boolean; workspaceLost?: boolean; dbResetFails?: boolean }): Promise<void> {
   await app.evaluate((_electron, value) => {
     (globalThis as unknown as { bugDetectiveFake: { simulate(change: unknown): void } }).bugDetectiveFake.simulate(value);
   }, change);

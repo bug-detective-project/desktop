@@ -22,14 +22,16 @@ export function deskState(snapshot: Snapshot, active: TicketState | undefined): 
 export type Tone = 'ok' | 'warn' | 'danger' | 'neutral'
 
 export interface EnvRow {
-  id: 'docker' | EnvironmentItemId
-  icon: 'server' | 'package' | 'download'
+  id: 'docker' | EnvironmentItemId | 'database'
+  icon: 'server' | 'package' | 'download' | 'hardDrive'
   name: string
   tone: Tone
   /** Always a word, never only a color. */
   status: string
   /** A spinner replaces the icon. */
   busy: boolean
+  /** The row offers an action ("Try again" after a failed database reset). */
+  action?: 'retryDatabaseReset'
 }
 
 /** Approximate download sizes, shown next to the environment items. */
@@ -88,7 +90,12 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
       ? { ...base, tone: 'neutral', status: t('dashboard.envStatus.notYet'), busy: false }
       : { ...base, tone: 'danger', status: t('dashboard.envStatus.missing'), busy: false }
   }
-  return [dockerRow, ...ENVIRONMENT_ITEMS.map(itemRow)]
+  const rows = [dockerRow, ...ENVIRONMENT_ITEMS.map(itemRow)]
+  if (snapshot.dbResetFailed) {
+    // The data may be the previous ticket's: shown until a retry succeeds.
+    rows.push({ id: 'database', icon: 'hardDrive', name: t('dashboard.env.database'), tone: 'danger', status: t('dashboard.envStatus.resetFailed'), busy: false, action: 'retryDatabaseReset' })
+  }
+  return rows
 }
 
 /** The summary badge: danger when something is missing or stopped, warn while something runs, ok otherwise. */

@@ -65,6 +65,13 @@ describe('environmentRows', () => {
     expect(environmentSummary(rows)).toBe('ok');
   });
 
+  it('adds the app data row with a retry only after a failed database reset', () => {
+    expect(environmentRows(snapshot(), t).some((row) => row.id === 'database')).toBe(false);
+    const rows = environmentRows(snapshot({ dbResetFailed: true }), t);
+    expect(rows.at(-1)).toMatchObject({ id: 'database', tone: 'danger', status: 'dashboard.envStatus.resetFailed', action: 'retryDatabaseReset' });
+    expect(environmentSummary(rows)).toBe('danger');
+  });
+
   it('writes the size the Portuguese way', () => {
     const pt = snapshot();
     (pt.state.settings as { language: string }).language = 'pt';

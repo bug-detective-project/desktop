@@ -532,6 +532,18 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
 /** Local environment, always expanded: four rows and a summary badge of their worst state. */
 function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation()
+  const toast = useToast()
+  const [retrying, setRetrying] = useState(false)
+  const retryDatabaseReset = async () => {
+    setRetrying(true)
+    try {
+      await api.retryDatabaseReset()
+    } catch (error) {
+      toast.error(error)
+    } finally {
+      setRetrying(false)
+    }
+  }
   const docker = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState
   // The report is only made after an unlock or a restore: ask for it as soon as Docker runs.
   const unchecked = docker === 'running' && snapshot.environment === null
@@ -568,10 +580,21 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
                 className="size-[13px]"
               />
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-sm text-foreground">{row.name}</span>
-              <span className={`block truncate text-xs font-medium ${TONE_STYLES[row.tone].text}`}>{row.status}</span>
+              <span className={`block text-xs font-medium ${TONE_STYLES[row.tone].text}`}>{row.status}</span>
             </span>
+            {row.action === 'retryDatabaseReset' && (
+              <Button
+                size="sm"
+                busy={retrying}
+                disabled={retrying || snapshot.busy !== null}
+                onClick={() => void retryDatabaseReset()}
+                data-testid="retry-database-reset"
+              >
+                {t('dashboard.retryReset')}
+              </Button>
+            )}
           </li>
         ))}
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
