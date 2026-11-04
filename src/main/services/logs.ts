@@ -5,7 +5,9 @@
  * carries no user name. electron-log does the writing (index.ts); this module has no Electron
  * dependency, so it is tested as plain Node.
  */
+import { execFile } from 'node:child_process';
 import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { join } from 'node:path';
 import type { CheckResult, EngineState, EnvironmentReport } from '../../shared/api.ts';
 
@@ -61,6 +63,38 @@ export async function openLogsFolder(dir: string, open: (path: string) => Promis
   if (problem) {
     throw new Error(`[logsFolderFailed] ${problem}`);
   }
+}
+
+export type Exec = (file: string, args: string[]) => Promise<unknown>;
+const execFileAsync: Exec = promisify(execFile);
+
+/** Development under WSL (the dev process inherits the shell's variables). */
+export function isWsl(platform = process.platform, env: NodeJS.ProcessEnv = process.env): boolean {
+  return platform === 'linux' && Boolean(env.WSL_DISTRO_NAME || env.WSL_INTEROP);
+}
+
+/**
+ * Opens a folder from WSL in Windows Explorer, as shell.openPath cannot (a bare WSL has no
+ * xdg-open): the folder's \\wsl.localhost path from wslpath. Resolves with '' or with the problem,
+ * like shell.openPath. explorer.exe exits with 1 even when it opened the folder, so only a missing
+ * program counts as a failure.
+ */
+export async function openWithWindowsExplorer(dir: string, exec: Exec = execFileAsync): Promise<string> {
+  let windowsPath: string;
+  try {
+    const { stdout } = (await exec('wslpath', ['-w', dir])) as { stdout: string };
+    windowsPath = stdout.trim();
+  } catch (error) {
+    return `wslpath: ${(error as Error).message}`;
+  }
+  try {
+    await exec('explorer.exe', [windowsPath]);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return `explorer.exe: ${(error as Error).message}`;
+    }
+  }
+  return '';
 }
 
 /** The last `count` lines of a file, or [] when it does not exist. */

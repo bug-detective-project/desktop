@@ -2,7 +2,7 @@ import { mkdtemp, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildDiagnostics, logFileName, openLogsFolder, pruneLogs, recentLines, redactPaths } from '../../src/main/services/logs.ts';
+import { buildDiagnostics, isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from '../../src/main/services/logs.ts';
 
 describe('log files', () => {
   it('names the file after the day, in local time', () => {
@@ -81,5 +81,39 @@ describe('openLogsFolder', () => {
   it('turns the message shell.openPath resolves with into an error the screen can show', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'bd-logs-')), 'logs');
     await expect(openLogsFolder(dir, async () => 'Failed to open path')).rejects.toThrow('[logsFolderFailed] Failed to open path');
+  });
+});
+
+describe('openWithWindowsExplorer', () => {
+  const enoent = () => Object.assign(new Error('spawn explorer.exe ENOENT'), { code: 'ENOENT' });
+
+  it('is the opener only for development under WSL', () => {
+    expect(isWsl('linux', { WSL_DISTRO_NAME: 'Ubuntu-22.04' })).toBe(true);
+    expect(isWsl('linux', { WSL_INTEROP: '/run/WSL/1_interop' })).toBe(true);
+    expect(isWsl('linux', {})).toBe(false);
+    expect(isWsl('win32', { WSL_DISTRO_NAME: 'Ubuntu-22.04' })).toBe(false);
+  });
+
+  it('opens the folder\'s Windows path in Explorer, whose exit code 1 is not a failure', async () => {
+    const calls: [string, string[]][] = [];
+    const exec = async (file: string, args: string[]) => {
+      calls.push([file, args]);
+      if (file === 'wslpath') return { stdout: '\\\\wsl.localhost\\Ubuntu\\home\\dev\\logs\n' };
+      throw Object.assign(new Error('Command failed: explorer.exe'), { code: 1 });
+    };
+    await expect(openWithWindowsExplorer('/home/dev/logs', exec)).resolves.toBe('');
+    expect(calls).toEqual([
+      ['wslpath', ['-w', '/home/dev/logs']],
+      ['explorer.exe', ['\\\\wsl.localhost\\Ubuntu\\home\\dev\\logs']],
+    ]);
+  });
+
+  it('reports a missing wslpath or explorer.exe', async () => {
+    await expect(openWithWindowsExplorer('/home/dev/logs', async () => { throw enoent(); })).resolves.toContain('wslpath:');
+    const exec = async (file: string) => {
+      if (file === 'wslpath') return { stdout: 'C:\\x\n' };
+      throw enoent();
+    };
+    await expect(openWithWindowsExplorer('/home/dev/logs', exec)).resolves.toContain('explorer.exe:');
   });
 });

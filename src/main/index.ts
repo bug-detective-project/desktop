@@ -25,7 +25,7 @@ import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
-import { logFileName, openLogsFolder, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
+import { isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
 
 // Tests and the "clean profile" checks can point the app at another data folder.
 if (process.env.BUGDETECTIVE_USER_DATA) {
@@ -45,6 +45,8 @@ log.transports.console.level = app.isPackaged ? false : 'info';
 log.hooks.push((message) => ({ ...message, data: message.data.map((item) => (typeof item === 'string' ? redactPaths(item, home) : item)) }));
 Object.assign(console, log.functions);
 void pruneLogs(logsDir);
+// The first line of the day's file, so every start leaves a trace for the diagnostics.
+console.info(`Bug Detective ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron}${isWsl() ? ', under WSL' : ''})`);
 const appRoot = app.getAppPath();
 const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
@@ -232,7 +234,7 @@ async function main(): Promise<void> {
       os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
       home,
       recentLog: () => recentLines(logFile),
-      openLogsFolder: () => openLogsFolder(logsDir, (path) => shell.openPath(path)),
+      openLogsFolder: () => openLogsFolder(logsDir, isWsl() ? openWithWindowsExplorer : (path) => shell.openPath(path)),
     },
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';
