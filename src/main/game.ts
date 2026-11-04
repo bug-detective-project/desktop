@@ -40,6 +40,8 @@ import type { PackageStore } from './services/content/store.ts';
 import { writeFileAtomic } from './services/content/store.ts';
 import { DockerUnavailableError } from './services/docker.ts';
 import { excludeMatcher, excludePathspecs, excludesFileContent } from './services/review/config.ts';
+import { buildDiagnostics } from './services/logs.ts';
+import type { DiagnosticsInput } from './services/logs.ts';
 import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from './services/review/review.ts';
 import type { ReviewMeta, ReviewStore } from './services/review/store.ts';
 import type { StateStore } from './services/state.ts';
@@ -93,6 +95,17 @@ export interface GameOptions {
   /** Called after every change, with the new snapshot. */
   onChange?: (snapshot: Snapshot) => void;
   clock?: () => Date;
+  /** Every log line of the game (installs, QA, notes) also goes here: the log file of the day. */
+  logLine?: (line: string) => void;
+  /** What "Copy diagnostics" needs from the process: the OS, the home folder (redacted), the recent log, and the logs folder to open. */
+  diagnostics?: DiagnosticsOptions;
+}
+
+export interface DiagnosticsOptions {
+  os: DiagnosticsInput['os'];
+  home: string;
+  recentLog: () => Promise<string[]>;
+  openLogsFolder: () => Promise<void>;
 }
 
 /** catalog.local.json for Settings → Development (see services/catalog.ts). */
@@ -530,7 +543,35 @@ export class Game {
 
   private appendLog(line: string): void {
     this.log = [...this.log, line].slice(-LOG_LINES);
+    this.options.logLine?.(line);
     this.emit();
+  }
+
+  /** The text "Copy diagnostics" puts in the clipboard. Without the process options (tests), the log part is empty. */
+  async diagnostics(): Promise<string> {
+    const options = this.options.diagnostics;
+    const active = this.activeProject();
+    return buildDiagnostics({
+      appVersion: this.options.appVersion,
+      versions: this.options.versions,
+      os: options?.os ?? { platform: process.platform, release: '', version: '', arch: process.arch },
+      checks: this.prerequisites?.checks ?? [],
+      project: this.content ? { id: this.content.manifest.project.id, name: this.content.manifest.project.name, manifestVersion: this.content.manifest.version } : active ? { id: active, name: active, manifestVersion: '' } : null,
+      dockerState: this.dockerState,
+      environment: this.environment,
+      logLines: options ? await options.recentLog() : this.log,
+      home: options?.home ?? '',
+      now: this.options.clock?.() ?? new Date(),
+    });
+  }
+
+  /** A failure (no file manager, say) reaches the screen with its reason, under the logsFolderFailed code. */
+  async openLogsFolder(): Promise<void> {
+    try {
+      await this.options.diagnostics?.openLogsFolder();
+    } catch (error) {
+      throw new GameError('logsFolderFailed', error instanceof Error ? error.message : String(error));
+    }
   }
 
   /**

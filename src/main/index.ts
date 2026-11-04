@@ -2,8 +2,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { appendFile, writeFile } from 'node:fs/promises';
+import { homedir, release, version as osVersion } from 'node:os';
 import { app, BrowserWindow, dialog, screen, session, shell } from 'electron';
+import log from 'electron-log/main';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
 import { attachDevToolsShortcuts, loadReactDevTools } from './devtools.ts';
@@ -23,6 +25,7 @@ import { PackageStore } from './services/content/store.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
+import { isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
 
 // Tests and the "clean profile" checks can point the app at another data folder.
 if (process.env.BUGDETECTIVE_USER_DATA) {
@@ -30,6 +33,20 @@ if (process.env.BUGDETECTIVE_USER_DATA) {
 }
 
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;
+
+// One log file per day the app starts, in <userData>/logs, the 7 most recent kept; every line
+// with the home folder as "~". console.* of the main process goes there too (and to the terminal).
+const logsDir = join(app.getPath('userData'), 'logs');
+const logFile = join(logsDir, logFileName(new Date()));
+const home = homedir();
+log.transports.file.resolvePathFn = () => logFile;
+log.transports.file.level = 'info';
+log.transports.console.level = app.isPackaged ? false : 'info';
+log.hooks.push((message) => ({ ...message, data: message.data.map((item) => (typeof item === 'string' ? redactPaths(item, home) : item)) }));
+Object.assign(console, log.functions);
+void pruneLogs(logsDir);
+// The first line of the day's file, so every start leaves a trace for the diagnostics.
+console.info(`Bug Detective ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron}${isWsl() ? ', under WSL' : ''})`);
 const appRoot = app.getAppPath();
 const devRendererUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
@@ -108,6 +125,21 @@ function runtime(): GameRuntime {
   }
   const contextRoot = app.isPackaged ? join(process.resourcesPath, 'docker') : join(appRoot, 'build', 'docker');
   return new DockerRuntime(platform, { contextRoot, qaBuildRoot: join(app.getPath('userData'), 'docker') });
+}
+
+/**
+ * How "Open logs folder" opens a folder: Windows Explorer under WSL (a bare WSL has no xdg-open),
+ * shell.openPath elsewhere. The e2e tests open nothing: the path goes to <userData>/opened-paths.log
+ * and BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM is the answer (a failure message, or none).
+ */
+function folderOpener(userData: string): (path: string) => Promise<string> {
+  if (isE2E) {
+    return async (path) => {
+      await appendFile(join(userData, 'opened-paths.log'), `${path}\n`);
+      return process.env.BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM ?? '';
+    };
+  }
+  return isWsl() ? openWithWindowsExplorer : (path) => shell.openPath(path);
 }
 
 /** Opens an allowlisted URL with the platform's browser command (WSL: the Windows browser). */
@@ -212,6 +244,13 @@ async function main(): Promise<void> {
     devCatalog: app.isPackaged ? undefined : devCatalogOptions(localCatalogFile(userData), catalog),
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
+    logLine: (line) => log.info(line),
+    diagnostics: {
+      os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
+      home,
+      recentLog: () => recentLines(logFile),
+      openLogsFolder: () => openLogsFolder(logsDir, folderOpener(userData)),
+    },
   });
   const language = app.getLocale().toLowerCase().startsWith('pt') ? 'pt' : 'en';
   await game.init(language);

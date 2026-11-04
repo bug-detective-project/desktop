@@ -44,7 +44,15 @@ afterEach(async () => {
 });
 
 function createGame(
-  options: { scenario?: object; content?: ContentSource; devSolveBug?: boolean; devSkipOnboarding?: boolean; devShowProjects?: boolean; autoOnboarding?: boolean } = {},
+  options: {
+    scenario?: object;
+    content?: ContentSource;
+    devSolveBug?: boolean;
+    devSkipOnboarding?: boolean;
+    devShowProjects?: boolean;
+    autoOnboarding?: boolean;
+    diagnostics?: GameOptions['diagnostics'];
+  } = {},
 ) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
   const game = new Game({
@@ -59,11 +67,39 @@ function createGame(
     devSkipOnboarding: options.devSkipOnboarding,
     devShowProjects: options.devShowProjects,
     autoOnboarding: options.autoOnboarding,
+    diagnostics: options.diagnostics,
   });
   return { game, runtime };
 }
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
+
+describe('diagnostics', () => {
+  it('describes the versions, the project and the recent log, and keeps the home folder out', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    const text = await game.diagnostics();
+    expect(text).toContain('app: 0.1.0');
+    expect(text).toContain('project: Notes (notes)');
+    expect(text).toMatch(/## Log \(last \d+ lines\)/);
+    expect(text).toContain('» Fetching front-1');
+  });
+
+  it('reports why the logs folder could not be opened, under its own code', async () => {
+    const { game } = createGame({
+      diagnostics: {
+        os: { platform: 'linux', release: '', version: '', arch: 'x64' },
+        home: '/home/dev',
+        recentLog: async () => [],
+        openLogsFolder: async () => {
+          throw new Error('No file manager is installed');
+        },
+      },
+    });
+    await expect(game.openLogsFolder()).rejects.toMatchObject({ code: 'logsFolderFailed', message: 'No file manager is installed' });
+  });
+});
 
 describe('a workspace whose volume went', () => {
   it('is noticed by the environment check, blocks the code actions, and is recreated ticket by ticket', async () => {
