@@ -23,7 +23,7 @@ import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { takeNextTicket } from '../e2e/fixtures.ts';
-import { finishOnboarding } from './onboarding.ts';
+import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -211,6 +211,7 @@ function section(title: string, results: Record<string, string>): string {
 
 test('VS Code attaches without the player\'s git credentials, .gitconfig or agents', async () => {
   test.setTimeout(60 * 60_000);
+  await closeAttachedWindows();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const reportDir = join(root, 'pr-gate');
   await mkdir(reportDir, { recursive: true });

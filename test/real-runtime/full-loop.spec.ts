@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard, takeNextTicket } from '../e2e/fixtures.ts';
-import { finishOnboarding } from './onboarding.ts';
+import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -118,6 +118,7 @@ async function submitQa(page: Page, ticket: number, expected: 'inProgress' | 'co
 }
 
 test('the full game loop with real Docker and VS Code', async () => {
+  await closeAttachedWindows();
   const userData = await mkdtemp(join(tmpdir(), 'João Silva full-loop-'));
   let { app, page } = await open(userData);
 
