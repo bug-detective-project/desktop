@@ -18,7 +18,7 @@ import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { Workspace } from '../../src/main/services/workspace.ts';
+import { Workspace, workspaceDir } from '../../src/main/services/workspace.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -94,6 +94,8 @@ describe('closing the app', () => {
 
   it('records a QA run in progress as interrupted and leaves no QA container', async () => {
     await game.move(1, 'inProgress');
+    // The notes QA is over in seconds: hold this run, so the shutdown finds it running.
+    await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo 120000 > .qa-sleep-ms'], { user: 'node', workdir: workspaceDir('notes') });
     const run = game.move(1, 'inQa');
     await expect.poll(() => game.snapshot().state.tickets.find((item) => item.ticket === 1)?.status, { timeout: 60_000 }).toBe('inQa');
     await run;

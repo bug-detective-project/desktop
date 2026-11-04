@@ -118,6 +118,12 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   const app = await copyWorkspace();
+  // The desktop's tests may plant .qa-sleep-ms in the workspace to hold a run for that long (a
+  // run that lasts, to be interrupted by a shutdown or by sleep); the real projects never do.
+  const hold = Number(await readFile(join(app, '.qa-sleep-ms'), 'utf8').catch(() => '0')) || 0;
+  if (hold > 0) {
+    await new Promise((resolve) => setTimeout(resolve, hold));
+  }
   let gate: 1 | 2 = 1;
   let result: { status: Status; tests: TestResult[] };
   try {
