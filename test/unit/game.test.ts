@@ -52,6 +52,7 @@ function createGame(
     devShowProjects?: boolean;
     autoOnboarding?: boolean;
     diagnostics?: GameOptions['diagnostics'];
+    clock?: () => Date;
   } = {},
 ) {
   const runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, ...options.scenario }));
@@ -68,11 +69,52 @@ function createGame(
     devShowProjects: options.devShowProjects,
     autoOnboarding: options.autoOnboarding,
     diagnostics: options.diagnostics,
+    clock: options.clock,
   });
   return { game, runtime };
 }
 
 const status = (game: Game, ticket = 1) => rules.findTicket(game.current, ticket)!.status;
+
+describe('QA and the computer', () => {
+  it('finishes a run whose wall clock jumped two hours (sleep): the time limit is not the clock', async () => {
+    let now = new Date('2026-11-04T10:00:00.000Z');
+    const { game } = createGame({ scenario: { qa: ['passed'], qaDelayMs: 50 }, clock: () => now });
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    const run = game.move(1, 'inQa');
+    now = new Date('2026-11-04T12:00:00.000Z');
+    await run;
+    await game.waitForQa();
+    expect(status(game)).toBe('codeReview');
+    expect(rules.findTicket(game.current, 1)!.attempts).toHaveLength(1);
+  });
+
+  it('suspend() during a run kills it and records it as interrupted, with no attempt spent', async () => {
+    const { game, runtime } = createGame({ scenario: { qa: ['passed'], qaDelayMs: 5000 } });
+    await game.init();
+    await game.nextAssignment();
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    expect(status(game)).toBe('inQa');
+
+    await game.suspend();
+    expect(runtime.abortCalls).toBe(1);
+    const ticket = rules.findTicket(game.current, 1)!;
+    expect(ticket.status).toBe('inProgress');
+    expect(ticket.attempts).toEqual([]);
+    expect(ticket.comments.at(-1)?.kind).toBe('interrupted');
+    expect(game.snapshot().log.join('\n')).toContain('going to sleep');
+
+    // Nothing to do without a run; the next run works as usual.
+    await game.suspend();
+    expect(runtime.abortCalls).toBe(1);
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+    expect(status(game)).toBe('codeReview');
+  });
+});
 
 describe('a restored save', () => {
   it('points the last export at the file just restored, dated when the save was made', async () => {

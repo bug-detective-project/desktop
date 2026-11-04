@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { homedir, release, version as osVersion } from 'node:os';
-import { app, BrowserWindow, dialog, net, screen, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, net, powerMonitor, screen, session, shell } from 'electron';
 import log from 'electron-log/main';
 import icon from '../../resources/icon.png?asset';
 import type { Snapshot } from '../shared/api.ts';
@@ -280,6 +280,9 @@ async function main(): Promise<void> {
     }
   });
   app.on('window-all-closed', () => app.quit());
+  // Sleep kills a QA run in progress (recorded as interrupted, no attempt counted); waking up rechecks Docker.
+  powerMonitor.on('suspend', () => void game.suspend().catch(() => {}));
+  powerMonitor.on('resume', () => void game.resume());
   // Closing the app stops QA and the workspace container; the quit waits for it (20 s at most).
   let shuttingDown = false;
   app.on('before-quit', (event) => {
