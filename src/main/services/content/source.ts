@@ -32,6 +32,14 @@ export interface ContentSource {
   fetchTicket(id: string, signal?: AbortSignal): Promise<FetchedTicket>;
   /** Deletes the downloaded content (the project left the computer); a local folder has none. */
   forget?(): Promise<void>;
+  /**
+   * The project's content as published under a given manifest version (the tag qa-v<version>),
+   * verified like prepare(): a restore checks every package of a save against the publication its
+   * ticket was unlocked from. A local folder has one version and answers with it.
+   */
+  publication(version: string, signal?: AbortSignal): Promise<ProjectContent>;
+  /** The code of a ticket entry (from the cache when there is one), verified against the entry. */
+  codeOf(entry: TicketEntry, signal?: AbortSignal): Promise<ArchiveFile[]>;
 }
 
 /** The published manifest names a commit that the repository does not have (yet). */

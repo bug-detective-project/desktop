@@ -25,6 +25,7 @@ import { CatalogService, chooseCatalogSource, parseLocalCatalog, readLocalCatalo
 import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
 import { contentSourceFor } from './services/projects.ts';
 import { PackageStore } from './services/content/store.ts';
+import { loadInstallKey } from './services/install-key.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
@@ -280,6 +281,7 @@ async function main(): Promise<void> {
   const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch, baseUrl }, console.log);
   // The starter until the game names its own project (Game.init points everything at that one).
   const starter = (await catalog.current()).find((item) => item.starter)!;
+  const installKey = await loadInstallKey(userData);
   const game = new Game({
     store: new StateStore(userData),
     // Downloaded packages and reviews belong to the project they came from.
@@ -303,6 +305,7 @@ async function main(): Promise<void> {
     autoOnboarding,
     onChange: (snapshot: Snapshot) => window?.webContents.send(channelName('snapshot'), snapshot),
     logLine: (line) => log.info(line),
+    installKey,
     diagnostics: {
       os: { platform: process.platform, release: release(), version: osVersion(), arch: process.arch },
       home,

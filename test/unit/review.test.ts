@@ -17,6 +17,8 @@ import * as rules from '../../src/shared/kanban.ts';
 import { parseDiff, splitRows, visibleFiles } from '../../src/renderer/src/components/diff.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
 
+const KEY = new Uint8Array(32);
+
 const ctx = { now: '2026-10-28T12:00:00.000Z', id: () => crypto.randomUUID() };
 const sha = (char: string) => char.repeat(40);
 
@@ -190,7 +192,7 @@ describe('review store', () => {
     await store.save(stored(1));
     await store.save(stored(2));
     const state = { ...rules.createInitialState(ctx), tickets: [] };
-    const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now));
+    const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now, KEY), KEY);
     expect([...save.reviews.keys()]).toHaveLength(4);
 
     const restored = new ReviewStore(join(dir, 'restored'));
@@ -201,7 +203,7 @@ describe('review store', () => {
 
   it('restores saves made before reviews existed', async () => {
     const state = rules.createInitialState(ctx);
-    const save = readSave(createSave({ state, bundle: null, packages: new Map() }, '0.1.0', ctx.now));
+    const save = readSave(createSave({ state, bundle: null, packages: new Map() }, '0.1.0', ctx.now, KEY), KEY);
     expect(save.reviews.size).toBe(0);
   });
 });

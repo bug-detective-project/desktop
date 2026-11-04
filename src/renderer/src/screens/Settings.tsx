@@ -679,6 +679,14 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             <dt className="text-muted-foreground">{t('settings.restoreProgress')}</dt>
             <dd className="font-semibold">{t('settings.ticketsDone', { count: pending.summary.ticketsDone })}</dd>
           </dl>
+          {!pending.summary.fromThisInstall && (
+            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-base text-foreground" data-testid="foreign-save-warning">
+              <p className="flex items-start gap-2 font-medium">
+                <Icon name="alertTriangle" className="mt-0.5 size-4 shrink-0 text-destructive" />
+                {t('settings.restoreForeign')}
+              </p>
+            </div>
+          )}
           {pending.summary.overwritesProgress && (
             <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-base text-amber-900 dark:text-amber-200" data-testid="restore-warning">
               <p className="flex items-start gap-2 font-medium">

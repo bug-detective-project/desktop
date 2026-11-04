@@ -81,6 +81,19 @@ export class CachedContentSource implements ContentSource {
     }
   }
 
+  /** The cached content when it is that version; otherwise the publication's tag, downloaded (not kept). */
+  async publication(version: string, signal?: AbortSignal): Promise<ProjectContent> {
+    const cached = await this.current().catch(() => null);
+    if (cached?.manifest.version === version) {
+      return cached;
+    }
+    return this.remote.publication(version, signal);
+  }
+
+  codeOf(entry: TicketEntry, signal?: AbortSignal): Promise<ArchiveFile[]> {
+    return this.code(entry, signal);
+  }
+
   private async code(entry: TicketEntry, signal?: AbortSignal): Promise<ArchiveFile[]> {
     const path = this.codePath(entry.commit);
     if (existsSync(path)) {

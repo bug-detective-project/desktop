@@ -116,6 +116,47 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
   }
 });
 
+test('restoring a save made by another installation warns that it brings code into the workspace', async () => {
+  const saves = await mkdtemp(join(tmpdir(), 'Meus saves '));
+  const file = join(saves, 'from-a-friend.bdsave');
+  // One installation exports (before any ticket: the fake runtime has no repository to bundle)…
+  const first = await launch();
+  try {
+    await first.page.getByTestId('start-playing').click();
+    await first.page.getByTestId('nav-settings').click();
+    await first.page.getByTestId('settings-tab-backup').click();
+    await first.app.evaluate(({ dialog }, path) => {
+      dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as never;
+    }, file);
+    await first.page.getByTestId('export-progress').click();
+    await expect(first.page.getByTestId('toast-info')).toContainText('Progress saved');
+  } finally {
+    await first.close();
+  }
+  // …and another one (its own data folder, so its own install key) restores it.
+  const { app, page, close } = await launch();
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('settings-tab-backup').click();
+    await app.evaluate(({ dialog }, path) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as never;
+    }, file);
+    await page.getByTestId('restore-progress').click();
+    const dialog = page.getByTestId('restore-dialog');
+    await expect(dialog.getByTestId('foreign-save-warning')).toContainText('This backup was created on another computer. It brings code that will run in your workspace.');
+    await expect(dialog.getByTestId('restore-warning')).toHaveCount(0);
+    await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));
+    await expect(dialog.getByTestId('foreign-save-warning')).toContainText('Este backup foi criado em outro computador.');
+    await dialog.getByTestId('confirm-restore').click();
+    await expect(page.getByTestId('toast-info')).toContainText('Progresso restaurado.');
+    await expect(page.getByTestId('last-export')).toContainText('from-a-friend.bdsave');
+  } finally {
+    await close();
+    await rm(saves, { recursive: true, force: true });
+  }
+});
+
 test('settings explain why backup actions are unavailable', async () => {
   const { page, close } = await launch({ qa: ['passed'], qaDelayMs: 4000 });
   try {

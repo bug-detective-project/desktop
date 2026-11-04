@@ -620,7 +620,8 @@
       "reset": "Restaurar padrão",
       "applied": "Configurações de desenvolvimento aplicadas.",
       "nextTicket": "As mudanças valem a partir do próximo ticket. O ticket aberto continua na versão em que foi liberado."
-    }
+    },
+    "restoreForeign": "Este backup foi criado em outro computador. Ele traz código que vai rodar no seu workspace. Restaure só backups em que você confia."
   },
   "crash": {
     "title": "Algo deu errado nesta tela",
@@ -664,8 +665,11 @@
     "noMoreTickets": "Não há mais tickets nesta trilha.",
     "noSuchTicket": "Esse ticket não existe.",
     "notAllowed": "Esta ação não é permitida aqui.",
+    "notAllowed": "Esta ação não é permitida aqui.",
     "diskFull": "O disco está cheio: libere espaço e tente de novo.",
-    "lowDiskSpace": "Não há espaço livre suficiente no disco do Docker."
+    "lowDiskSpace": "Não há espaço livre suficiente no disco do Docker.",
+    "saveTampered": "O conteúdo dos tickets deste backup não bate com a publicação do projeto ({{message}}). Nada foi restaurado.",
+    "saveUnverified": "Não foi possível conferir este backup com a publicação do projeto: {{message}}. Nada foi restaurado."
   },
   "projects": {
     "needsUpdate": "Atualize o Bug Detective para jogar este projeto.",
