@@ -144,6 +144,8 @@ export class DockerRuntime implements GameRuntime {
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
+  /** The QA run in progress, aborted by shutdown() so it starts no further container. */
+  private qaAbort: AbortController | null = null;
 
   constructor(platform: Platform, images: ImageConfig) {
     this.platform = platform;
@@ -528,7 +530,13 @@ export class DockerRuntime implements GameRuntime {
 
   async runQa(request: QaRequest) {
     await this.runningWorkspace();
-    return (await this.qa()).run({ ...request, onLine: request.onLine && ((line) => request.onLine!(line)) });
+    const controller = new AbortController();
+    this.qaAbort = controller;
+    try {
+      return await (await this.qa()).run({ ...request, signal: controller.signal, onLine: request.onLine && ((line) => request.onLine!(line)) });
+    } finally {
+      if (this.qaAbort === controller) this.qaAbort = null;
+    }
   }
 
   async cleanupQaLeftovers() {
@@ -536,6 +544,8 @@ export class DockerRuntime implements GameRuntime {
   }
 
   async shutdown() {
+    // First no new QA container: the run in progress stops at its next step, and the cleanup below removes what exists.
+    this.qaAbort?.abort();
     let docker: Docker;
     try {
       docker = await this.docker();

@@ -81,6 +81,14 @@ describe('QaRunner', () => {
     expect(calls).toContainEqual(['container', 'rm', '--force', '--volumes=false', name]);
   });
 
+  it('starts no container once the shutdown aborted the run', async () => {
+    const { docker, calls } = fakeDocker(false);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg', signal: controller.signal })).rejects.toThrow();
+    expect(calls.filter((args) => args[0] === 'run')).toEqual([]);
+  });
+
   it('treats exit code 137 without an OOM kill as a missing result', async () => {
     const { docker } = fakeDocker(false);
     await expect(runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' })).rejects.toThrow(/did not produce a result/);

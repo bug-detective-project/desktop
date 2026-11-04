@@ -974,6 +974,8 @@ export class Game {
     // The QA run ends as soon as its container is gone; never wait for it longer than the stop itself.
     await Promise.race([this.qaRun ?? Promise.resolve(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
     await stopped;
+    // A QA container that started between the abort and the cleanup is removed now that the run is over.
+    await this.options.runtime.cleanupQaLeftovers().catch(() => {});
     const recovered = rules.recoverInterruptedQa(this.state, this.ctx());
     if (recovered !== this.state) {
       await this.commit(() => recovered);

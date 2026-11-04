@@ -100,6 +100,8 @@ export interface QaRunRequest {
   /** Host folder of the extracted stage package. */
   packageDir: string;
   onLine?: RunOptions['onLine'];
+  /** The app is shutting down: no container is started from here on, and the running one is left to the cleanup. */
+  signal?: AbortSignal;
 }
 
 export interface QaRunnerOptions {
@@ -162,8 +164,9 @@ export class QaRunner {
   }
 
   /** A short-lived container from the QA image (as node, with the QA limits), with the given volumes, running `command`. */
-  private async helper(mounts: string[], command: string[], timeoutMs: number) {
+  private async helper(mounts: string[], command: string[], timeoutMs: number, signal?: AbortSignal) {
     const name = `${this.names.prefix}-qa-copy-${randomUUID().slice(0, 8)}`;
+    signal?.throwIfAborted();
     try {
       return await this.docker.run(
         [
@@ -182,7 +185,7 @@ export class QaRunner {
           this.image,
           ...command.slice(1),
         ],
-        { timeoutMs },
+        { timeoutMs, signal },
       );
     } finally {
       await this.docker.removeContainer(name);
@@ -190,7 +193,7 @@ export class QaRunner {
   }
 
   /** Copies the workspace into the QA input volume: the files this QA run tests. */
-  private async copyWorkspace(): Promise<void> {
+  private async copyWorkspace(signal?: AbortSignal): Promise<void> {
     await this.docker.createVolume(this.names.qaInputVolume, 'qa-input', this.project);
     const copied = await this.helper(
       [
@@ -201,6 +204,7 @@ export class QaRunner {
       ],
       ['sh', '-c', COPY_SCRIPT],
       5 * 60_000,
+      signal,
     );
     if (copied.code !== 0) {
       throw new QaInfrastructureError(`Copying the workspace for QA failed: ${copied.stderr.trim()}`);
@@ -222,7 +226,8 @@ export class QaRunner {
 
   /** Runs QA for one ticket. Returns the CLI's result; throws QaInfrastructureError if QA could not run. */
   async run(request: QaRunRequest): Promise<QaResult> {
-    await this.copyWorkspace();
+    await this.copyWorkspace(request.signal);
+    request.signal?.throwIfAborted();
     const name = `${this.names.prefix}-qa-${randomUUID().slice(0, 8)}`;
     const startedAt = Date.now();
     const args = [
@@ -247,6 +252,7 @@ export class QaRunner {
       const run = await this.docker.run(args, {
         timeoutMs: (request.timeoutSeconds + OUTER_GRACE_SECONDS) * 1000,
         onLine: request.onLine,
+        signal: request.signal,
       });
       if (run.timedOut) {
         return outerTimeoutResult(request.ticket, request.timeoutSeconds, Date.now() - startedAt);
