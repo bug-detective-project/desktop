@@ -20,6 +20,9 @@ export const DEV_CONTAINERS_EXTENSION = 'ms-vscode-remote.remote-containers';
 export const VSCODE_MACHINE_SETTINGS: Readonly<Record<string, string | boolean>> = {
   'dev.containers.gitCredentialHelperConfigLocation': 'none',
   'dev.containers.copyGitConfig': false,
+  // The extension reads `dev.containers.x || remote.containers.x`, then `?? true`: a false new key
+  // alone is lost and the file is copied, so the deprecated key carries the false.
+  'remote.containers.copyGitConfig': false,
   'dev.containers.dockerCredentialHelper': false,
   'dev.containers.githubCLILoginWithToken': false,
   'remote.downloadExtensionsLocally': true,

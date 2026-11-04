@@ -39,6 +39,14 @@ describe('the attached-container configuration file', () => {
     expect(() => attachedContainerConfig('/etc')).toThrow(/Invalid workspace folder/);
   });
 
+  it('turns the .gitconfig copy off the way the extension reads it: a false new key falls back to the deprecated key', () => {
+    // Dev Containers 0.469.0: getConfiguration(key) { return settings['dev.containers.' + key] || settings['remote.containers.' + key]; }
+    // and the caller then does `?? isCopyGitConfigEnabled`, true by default: undefined would copy the file.
+    const read = (key: string) => VSCODE_MACHINE_SETTINGS[`dev.containers.${key}`] || VSCODE_MACHINE_SETTINGS[`remote.containers.${key}`];
+    expect(read('copyGitConfig')).toBe(false);
+    expect(read('gitCredentialHelperConfigLocation')).toBe('none');
+  });
+
   it('is written into the VS Code global storage of the CLI that will open the window, and merged over a damaged file', async () => {
     const cli = { source: 'path' as const, launcher: 'code', command: 'code', baseArgs: [], env: {}, globalStorage: dir };
     const vscode = new VSCode(cli, async () => ({ code: 0, stdout: Buffer.from(''), stderr: '', timedOut: false }));

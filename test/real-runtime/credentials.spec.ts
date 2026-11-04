@@ -104,7 +104,8 @@ function serverCount(): string {
 }
 
 /** The IPC socket of the live session, read from a vscode-server process (older sessions leave stale sockets in /tmp). */
-const LIVE_SOCKET = String.raw`P=$(pgrep -f server-main.js | head -1); S=$([ -n "$P" ] && tr '\0' '\n' < /proc/$P/environ | sed -n 's/^REMOTE_CONTAINERS_IPC=//p')`;
+const SERVER_PROCESSES = `pgrep -f 'vscode-server|vscode-remote-containers'`;
+const LIVE_SOCKET = String.raw`S=; for P in $(${SERVER_PROCESSES}); do S=$(tr '\0' '\n' < /proc/$P/environ 2>/dev/null | sed -n 's/^REMOTE_CONTAINERS_IPC=//p'); [ -n "$S" ] && break; done`;
 
 /** Attaches VS Code to the workspace container (the app's own button) and waits for its server. */
 async function attach(page: Page) {
@@ -176,7 +177,7 @@ function probe(): Record<string, string> {
     'SSH_AUTH_SOCK in the container environment': inside('printenv SSH_AUTH_SOCK || echo "(not set)"'),
     'forwarded sockets in /tmp': inside('ls -la /tmp/vscode-*.sock /tmp/vscode-ssh-auth-* 2>/dev/null || echo "(none)"'),
     'environment of the vscode-server processes (selected variables)': inside(
-      'for p in $(pgrep -f server-main.js | head -5); do tr "\\0" "\\n" < /proc/$p/environ 2>/dev/null | grep -E "^(SSH_AUTH_SOCK|REMOTE_CONTAINERS|REMOTE_CONTAINERS_IPC|REMOTE_CONTAINERS_DISPLAY_SOCK|DISPLAY|GPG_TTY|GIT_[A-Z_]+|GH_TOKEN|GITHUB_TOKEN)="; done | sort -u || echo "(none)"',
+      `for p in $(${SERVER_PROCESSES}); do tr "\\0" "\\n" < /proc/$p/environ 2>/dev/null | grep -E "^(SSH_AUTH_SOCK|REMOTE_CONTAINERS|REMOTE_CONTAINERS_IPC|REMOTE_CONTAINERS_DISPLAY_SOCK|DISPLAY|GPG_TTY|GIT_[A-Z_]+|GH_TOKEN|GITHUB_TOKEN)="; done | sort -u || echo "(none)"`,
     ),
     'GPG, Docker and GitHub CLI material': inside('command -v gpg docker gh 2>/dev/null || echo "(no gpg/docker/gh binaries)"; ls -la /home/node/.gnupg /home/node/.docker /home/node/.config/gh 2>/dev/null || echo "(no ~/.gnupg, ~/.docker, ~/.config/gh)"; ls /usr/local/bin 2>/dev/null | grep -i credential || echo "(no credential helper binary in /usr/local/bin)"'),
     'known_hosts copied by the extension': inside('ls -la /home/node/.ssh 2>/dev/null || echo "(no ~/.ssh)"'),
@@ -260,7 +261,7 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
     expect(after['GPG, Docker and GitHub CLI material']).toMatch(/no gpg\/docker\/gh binaries/);
     expect(existsSync(configFile)).toBe(true);
     expect(JSON.parse(await readFile(configFile, 'utf8'))).toMatchObject({ remoteUser: 'node', remoteEnv: { SSH_AUTH_SOCK: null }, workspaceFolder: WORKSPACE });
-    expect(JSON.parse(inside(`cat ${MACHINE_SETTINGS}`))).toMatchObject({ 'dev.containers.gitCredentialHelperConfigLocation': 'none', 'dev.containers.copyGitConfig': false });
+    expect(JSON.parse(inside(`cat ${MACHINE_SETTINGS}`))).toMatchObject({ 'dev.containers.gitCredentialHelperConfigLocation': 'none', 'dev.containers.copyGitConfig': false, 'remote.containers.copyGitConfig': false });
     log(`direct IPC call answered: ${after['the helper script called directly through the IPC socket, no git config involved (redacted)'].split('\n')[0]}`);
   } finally {
     removeProbeCredential(stored);

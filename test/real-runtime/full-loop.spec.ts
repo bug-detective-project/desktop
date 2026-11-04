@@ -70,7 +70,12 @@ function memoryInUse(nameFilter: string): number {
   const names = docker('ps', '--filter', `name=${nameFilter}`, '--format', '{{.Names}}').trim().split('\n').filter(Boolean);
   let total = 0;
   for (const name of names) {
-    const usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name).trim().split('/')[0].trim();
+    let usage: string;
+    try {
+      usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name).trim().split('/')[0].trim();
+    } catch {
+      continue; // The container ended between ps and stats: a QA run finishing.
+    }
     const match = /^([\d.]+)\s*([KMG]i?B|B)$/i.exec(usage);
     if (!match) continue;
     const unit = match[2].toUpperCase();
