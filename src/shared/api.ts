@@ -205,6 +205,8 @@ export interface Snapshot {
   versions: { electron: string; node: string; chrome: string };
   /** Development only: the board shows "Solve bug" (BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON). */
   devSolveBug: boolean;
+  /** The e2e build: the renderer listens for the test's crash trigger. */
+  e2e: boolean;
   /** Rafaela's onboarding opens on its own on the Dashboard (the first time, it cannot be skipped). */
   onboardingDue: boolean;
   /** Development only: the onboarding shows "Skip onboarding" (BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON). */
@@ -293,6 +295,8 @@ export interface BugDetectiveApi {
   discardSave(token: string): Promise<void>;
   /** Recreates the code of every unlocked ticket in a workspace whose repository was lost; the progress stays. */
   rebuildWorkspace(): Promise<void>;
+  /** A renderer error caught by the error boundary, for the log file. */
+  reportRendererError(message: string, stack: string): Promise<void>;
   /** Runs `npm run db:reset` again after a failed reset (the Dashboard's "Try again"). */
   retryDatabaseReset(): Promise<void>;
   /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */

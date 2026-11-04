@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Snapshot } from '@shared/api.ts';
 import { useSnapshot } from './api.ts';
 import { AppHeader } from './components/AppHeader.tsx';
+import { E2eThrow } from './components/ErrorBoundary.tsx';
 import { Onboarding } from './components/Onboarding.tsx';
 import type { OnboardingMode } from './components/Onboarding.tsx';
 import type { View } from './components/AppHeader.tsx';
@@ -102,6 +103,7 @@ export function App() {
           setOpenTicket(null);
         }}
       />
+      <E2eThrow enabled={snapshot.e2e} />
       <DockerBanner snapshot={snapshot} />
       <ReviewBanner snapshot={snapshot} />
       <main className="min-h-0 flex-1 overflow-y-auto">

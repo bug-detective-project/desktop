@@ -87,6 +87,8 @@ export interface GameOptions {
   devSkipOnboarding?: boolean;
   /** Development only: the Projects screen shows from the start (never set by the packaged app). */
   devShowProjects?: boolean;
+  /** The e2e build (never set by the packaged app): the renderer exposes the crash trigger of the tests. */
+  e2e?: boolean;
   /** False keeps the onboarding from opening on its own (the e2e tests, unless they test it). */
   autoOnboarding?: boolean;
   /** Every game project and how to reach each one's content and data (without it, the game has one project). */
@@ -537,6 +539,7 @@ export class Game {
       appVersion: this.options.appVersion,
       versions: this.options.versions,
       devSolveBug: this.options.devSolveBug ?? false,
+      e2e: this.options.e2e ?? false,
       onboardingDue: (this.options.autoOnboarding ?? true) && rules.onboardingDue(this.state),
       devSkipOnboarding: this.options.devSkipOnboarding ?? false,
       devCatalog: this.devCatalogView(),
@@ -737,6 +740,12 @@ export class Game {
       this.appendLog(`» npm run db:reset failed: ${(error as Error).message}`);
     }
     this.emit();
+  }
+
+  /** An error the renderer's error boundary caught: logged, so a diagnostics copy carries it. */
+  async reportRendererError(message: string, stack: string): Promise<void> {
+    this.appendLog(`» Renderer error: ${message}`);
+    this.options.logLine?.(stack);
   }
 
   /** "Try again" after a failed reset; fails with dbResetFailed when it fails again. */

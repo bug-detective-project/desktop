@@ -335,6 +335,7 @@
     "node": "24.22.0",
     "chrome": "156.0.8078.48"
   },
+  "e2e": false,
   "devSolveBug": false,
   "onboardingDue": false,
   "devSkipOnboarding": false,
