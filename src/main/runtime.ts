@@ -39,8 +39,8 @@ export interface GameRuntime {
 
   /** The QA tool of the project being played (its qa branch without the tickets), or null before it is downloaded. */
   setQaTool(files: ArchiveFile[] | null): void;
-  /** The project whose Docker resources are created from now on (they carry its label). */
-  setProject(project: string): void;
+  /** The project whose Docker resources are created from now on (they carry its label and its folder); the name is known once the manifest is. */
+  setProject(project: string, name?: string): void;
   /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
   removeProjects(projects: readonly string[]): Promise<CleanupTarget[]>;
   environment(): Promise<EnvironmentReport>;
@@ -136,6 +136,7 @@ export class DockerRuntime implements GameRuntime {
   private readonly qaRepository: string;
   private qaTool: ArchiveFile[] | null = null;
   private project: string | null = null;
+  private projectName: string | null = null;
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -165,8 +166,12 @@ export class DockerRuntime implements GameRuntime {
     this.qaTool = files;
   }
 
-  setProject(project: string): void {
+  setProject(project: string, name?: string): void {
+    if (project !== this.project) {
+      this.projectName = null;
+    }
     this.project = project;
+    this.projectName = name ?? this.projectName;
   }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
@@ -218,6 +223,7 @@ export class DockerRuntime implements GameRuntime {
       isPortFree: (port) => this.platform.isPortFree(port),
       names: this.names,
       project: this.project,
+      projectName: this.projectName,
     });
   }
 
@@ -437,7 +443,7 @@ export class DockerRuntime implements GameRuntime {
     if (!vscode) {
       throw new Error('VS Code was not found');
     }
-    await vscode.openAttached(workspace.containerName);
+    await vscode.openAttached(workspace.containerName, workspace.dir);
   }
 
   async testedFiles() {
@@ -501,7 +507,7 @@ export class DockerRuntime implements GameRuntime {
     if (!vscode) {
       throw new Error('VS Code was not found');
     }
-    await vscode.openAttached(workspace.containerName, { reuseWindow: true });
+    await vscode.openAttached(workspace.containerName, workspace.dir, { reuseWindow: true });
   }
 
   async runQa(request: QaRequest) {

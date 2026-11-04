@@ -1,8 +1,9 @@
 /**
  * The player's workspace: a Git repository in the `bugdetective-workspace` Docker volume, mounted
- * at /workspaces/supportdesk in a long-running container. All Git operations run in that
- * container with `docker exec`. Shell scripts below are constants; variable data is only ever
- * passed as positional arguments ("$1", "$2"), never interpolated into the script.
+ * at /workspaces in a long-running container, with the project's code in /workspaces/<project id>.
+ * All Git operations run in that container with `docker exec`. Shell scripts below are constants;
+ * variable data is only ever passed as positional arguments ("$1", "$2") or through the
+ * environment (WORKSPACE_DIR, PROJECT_ID, PROJECT_NAME), never interpolated into the script.
  */
 import { createHash } from 'node:crypto';
 import { MAX_SAVE_BYTES } from './backup.ts';
@@ -12,7 +13,18 @@ import { labelArgs, mountArg } from './docker.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
 
-export const WORKSPACE_DIR = '/workspaces/supportdesk';
+/** The volume's mount point; each project's repository is a folder in it. */
+export const WORKSPACES_ROOT = '/workspaces';
+/** A project id, as the catalog and the manifest define it. */
+export const PROJECT_ID = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** The folder of a project's repository inside the workspace container. */
+export function workspaceDir(project: string): string {
+  if (!PROJECT_ID.test(project)) {
+    throw new Error(`Invalid project id: ${project}`);
+  }
+  return `${WORKSPACES_ROOT}/${project}`;
+}
 export const CACHE_DIR = '/opt/bugdetective-cache';
 export interface ResourceNames {
   prefix: string;
@@ -59,18 +71,18 @@ const SCRIPTS = {
 stage="$1"; message="$2"; src="/tmp/bugdetective-import-$stage"
 rm -rf "$src" "$src.index"; mkdir -p "$src"
 tar -x -C "$src"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 if [ ! -d .git ]; then
   git init -q
   git config core.autocrlf false
   git config core.eol lf
-  git config user.name "SupportDesk Developer"
-  git config user.email "developer@supportdesk.invalid"
+  git config user.name "$PROJECT_NAME Developer"
+  git config user.email "developer@$PROJECT_ID.invalid"
 fi
 # The snapshot's tree, computed in a temporary index (the player's index is never touched).
 cd "$src"
-tree=$(GIT_DIR=${WORKSPACE_DIR}/.git GIT_WORK_TREE="$src" GIT_INDEX_FILE="$src.index" sh -c 'git add -A -f . && git write-tree')
-cd ${WORKSPACE_DIR}
+tree=$(GIT_DIR="$WORKSPACE_DIR/.git" GIT_WORK_TREE="$src" GIT_INDEX_FILE="$src.index" sh -c 'git add -A -f . && git write-tree')
+cd "$WORKSPACE_DIR"
 # Reuse the existing stage tag only if it holds exactly this snapshot (a retry, or the same content).
 existing=$(git rev-parse -q --verify "refs/tags/stage-$stage^{tree}" || true)
 if [ "$existing" != "$tree" ]; then
@@ -96,7 +108,7 @@ git rev-parse "refs/tags/stage-$stage^{commit}"`,
    */
   claimForGame: `set -eu
 game="$1"; stamp="$2"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 if [ ! -d .git ]; then echo 0; exit 0; fi
 if [ "$(git config --get bugdetective.game || true)" = "$game" ]; then echo 0; exit 0; fi
 if git rev-parse -q --verify HEAD >/dev/null && [ -n "$(git status --porcelain)" ]; then
@@ -128,7 +140,7 @@ echo "$count"`,
    */
   resetToStage: `set -eu
 stage="$1"; branch="player/ticket-$stage"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 git rev-parse -q --verify "refs/tags/stage-$stage" >/dev/null
 changes=$(git status --porcelain | wc -l)
 commits=0
@@ -142,7 +154,7 @@ echo "$changes $commits"`,
   /** Switches to player/ticket-N. Uncommitted work from the previous ticket is stashed, never lost. */
   checkoutPlayerBranch: `set -eu
 stage="$1"; branch="player/ticket-$stage"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 current=$(git symbolic-ref -q --short HEAD || true)
 if [ "$current" != "$branch" ]; then
   if git rev-parse -q --verify HEAD >/dev/null && [ -n "$(git status --porcelain)" ]; then
@@ -163,7 +175,7 @@ fi`,
   solveBug: `set -eu
 stage="$1"; patch="/tmp/bugdetective-solve-$stage.patch"
 cat > "$patch"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 git apply --numstat "$patch" | cut -f3- | while IFS= read -r file; do
   if git cat-file -e "refs/tags/stage-$stage:$file" 2>/dev/null; then
     git restore --source="refs/tags/stage-$stage" --worktree -- "$file"
@@ -178,7 +190,7 @@ rm -f "$patch"`,
   referenceTree: `set -eu
 stage="$1"; idx="/tmp/bugdetective-reference-$stage.index"; patch="/tmp/bugdetective-reference-$stage.patch"
 cat > "$patch"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 rm -f "$idx"
 GIT_INDEX_FILE="$idx" git read-tree "refs/tags/stage-$stage^{commit}"
 # An empty patch (an approved snapshot equal to the stage) leaves the stage tree as it is.
@@ -199,12 +211,12 @@ n="$1"; date="$2"; approvedMessage="$3"; referenceMessage="$4"; snapshotMessage=
 tmp="/tmp/bugdetective-review-$n"
 rm -rf "$tmp"; mkdir -p "$tmp/snapshot" "$tmp/reference"
 tar -x -C "$tmp"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 if [ "$(git symbolic-ref -q HEAD || true)" = "refs/heads/review/ticket-$n" ]; then
   echo "The review is checked out" >&2; exit 3
 fi
 base=$(git rev-parse "refs/tags/stage-$n^{commit}")
-export GIT_DIR=${WORKSPACE_DIR}/.git GIT_INDEX_FILE="$tmp/index"
+export GIT_DIR="$WORKSPACE_DIR/.git" GIT_INDEX_FILE="$tmp/index"
 export GIT_AUTHOR_NAME="Bug Detective" GIT_AUTHOR_EMAIL="review@bugdetective.invalid" GIT_AUTHOR_DATE="$date"
 export GIT_COMMITTER_NAME="Bug Detective" GIT_COMMITTER_EMAIL="review@bugdetective.invalid" GIT_COMMITTER_DATE="$date"
 cd "$tmp/snapshot"
@@ -224,13 +236,17 @@ git update-ref "refs/heads/review/ticket-$n" "$snapshot"
 cd /; rm -rf "$tmp"
 echo "$approved $reference $snapshot"`,
 
-  /** Where the player is before a review: "<branch or ->\n<HEAD>\n<index tree>\n<core.excludesFile or ->". */
+  /**
+   * Where the player is before a review: "<branch or ->\n<HEAD>\n<index tree>\n<core.excludesFile or ->".
+   * A file inside the repository is reported relative to it, so the state never holds the folder.
+   */
   reviewReturnPoint: `set -eu
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 branch=$(git symbolic-ref -q --short HEAD || echo -)
 head=$(git rev-parse HEAD)
 index=$(git write-tree)
 excludes=$(git config --get core.excludesFile || echo -)
+case "$excludes" in "$WORKSPACE_DIR"/*) excludes="\${excludes#"$WORKSPACE_DIR"/}";; esac
 printf '%s\n%s\n%s\n%s\n' "$branch" "$head" "$index" "$excludes"`,
 
   /**
@@ -239,7 +255,7 @@ printf '%s\n%s\n%s\n%s\n' "$branch" "$head" "$index" "$excludes"`,
    */
   reviewSaveWork: `set -eu
 message="$1"; shift
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 ${ADD_EXCEPT_EXCLUDED}
 if git diff --cached --quiet; then echo -; exit 0; fi
 git -c core.hooksPath=/dev/null commit -q --no-verify -m "$message"
@@ -248,9 +264,9 @@ git rev-parse HEAD`,
   /** Checks out the review; excluded files are hidden from Source Control meanwhile (stdin: the excludes file). */
   reviewSwitch: `set -eu
 n="$1"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 cat > .git/bugdetective-review-exclude
-git config core.excludesFile "${WORKSPACE_DIR}/.git/bugdetective-review-exclude"
+git config core.excludesFile "$WORKSPACE_DIR/.git/bugdetective-review-exclude"
 git checkout -q "review/ticket-$n"`,
 
   /**
@@ -262,7 +278,7 @@ git checkout -q "review/ticket-$n"`,
    */
   reviewReturn: `set -eu
 n="$1"; branch="$2"; head="$3"; wip="$4"; index="$5"; excludes="$6"; stamp="$7"; editsMessage="$8"; shift 8
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 current=$(git symbolic-ref -q --short HEAD || true)
 case "$current" in
   "review/ticket-$n"|"review-edits/ticket-$n-"*)
@@ -273,6 +289,7 @@ case "$current" in
       echo edits
     fi;;
 esac
+case "$excludes" in -|/*) ;; *) excludes="$WORKSPACE_DIR/$excludes";; esac
 if [ "$excludes" = - ]; then git config --unset core.excludesFile || true; else git config core.excludesFile "$excludes"; fi
 rm -f .git/bugdetective-review-exclude
 tip="$head"; if [ "$wip" != - ]; then tip="$wip"; fi
@@ -298,13 +315,13 @@ fi`,
 
   installDepsFromCache: `set -eu
 key="$1"
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 rm -rf node_modules client/node_modules server/node_modules
 tar -xf "${CACHE_DIR}/deps/$key.tar" -C .
 printf %s "$key" > node_modules/.bugdetective-deps`,
 
   bundle: `set -eu
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 rm -f /tmp/bugdetective.bundle
 git bundle create -q /tmp/bugdetective.bundle --all >/dev/null 2>&1
 cat /tmp/bugdetective.bundle
@@ -321,12 +338,12 @@ rm -rf /tmp/bugdetective-verify /tmp/bugdetective-verify.bundle`,
   restoreBundle: `set -eu
 branch="$1"
 cat > /tmp/bugdetective-restore.bundle
-cd ${WORKSPACE_DIR}
+cd "$WORKSPACE_DIR"
 git init -q
 git config core.autocrlf false
 git config core.eol lf
-git config user.name "SupportDesk Developer"
-git config user.email "developer@supportdesk.invalid"
+git config user.name "$PROJECT_NAME Developer"
+git config user.email "developer@$PROJECT_ID.invalid"
 git fetch -q /tmp/bugdetective-restore.bundle "refs/*:refs/*"
 git checkout -q -f "$branch"
 rm -f /tmp/bugdetective-restore.bundle`,
@@ -404,8 +421,10 @@ export interface WorkspaceOptions {
   image: string;
   isPortFree: (port: number) => Promise<boolean>;
   names?: ResourceNames;
-  /** The game project whose code the workspace holds (labels its container and volumes). */
+  /** The game project whose code the workspace holds (labels its container and volumes, names its folder). */
   project?: string | null;
+  /** The project's display name, for the git identity ("<name> Developer"). Defaults to the id. */
+  projectName?: string | null;
 }
 
 export class Workspace {
@@ -414,6 +433,7 @@ export class Workspace {
   private readonly isPortFree: (port: number) => Promise<boolean>;
   private readonly names: ResourceNames;
   private readonly project: string | null;
+  private readonly projectName: string | null;
   private runtimeKey: string | null = null;
 
   constructor(options: WorkspaceOptions) {
@@ -422,6 +442,20 @@ export class Workspace {
     this.isPortFree = options.isPortFree;
     this.names = options.names ?? resourceNames();
     this.project = options.project ?? null;
+    this.projectName = options.projectName ?? null;
+  }
+
+  /** The project's repository folder in the container. */
+  get dir(): string {
+    if (!this.project) {
+      throw new Error('The workspace has no project');
+    }
+    return workspaceDir(this.project);
+  }
+
+  /** What the scripts need: the folder and the identity of the project. */
+  private get env(): Record<string, string> {
+    return { WORKSPACE_DIR: this.dir, PROJECT_ID: this.project ?? '', PROJECT_NAME: this.projectName ?? this.project ?? '' };
   }
 
   get containerName(): string {
@@ -466,7 +500,7 @@ export class Workspace {
         this.names.container,
         ...labelArgs('workspace', this.project),
         '--mount',
-        mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACE_DIR }),
+        mountArg({ type: 'volume', src: this.names.volume, dst: WORKSPACES_ROOT }),
         '--mount',
         mountArg({ type: 'volume', src: this.names.vscodeVolume, dst: '/home/node/.vscode-server' }),
         '--mount',
@@ -515,11 +549,13 @@ export class Workspace {
     if (!running?.running) {
       throw new Error('The workspace container is not running');
     }
+    // The volume took the owner (node) of /workspaces from the image on its first mount.
+    await this.docker.execChecked(this.names.container, ['mkdir', '-p', this.dir], { user: 'node' });
     return running;
   }
 
   private exec(command: readonly string[], options: Parameters<Docker['exec']>[2] = {}) {
-    return this.docker.execChecked(this.names.container, command, { user: 'node', workdir: WORKSPACE_DIR, ...options });
+    return this.docker.execChecked(this.names.container, command, { user: 'node', workdir: this.dir, env: this.env, ...options });
   }
 
   private script(name: keyof typeof SCRIPTS, args: readonly string[] = [], options: Parameters<Docker['exec']>[2] = {}) {
@@ -531,7 +567,7 @@ export class Workspace {
   }
 
   async hasRepository(): Promise<boolean> {
-    const result = await this.docker.exec(this.names.container, ['test', '-d', `${WORKSPACE_DIR}/.git`], { user: 'node' });
+    const result = await this.docker.exec(this.names.container, ['test', '-d', `${this.dir}/.git`], { user: 'node' });
     return result.code === 0;
   }
 
@@ -539,7 +575,7 @@ export class Workspace {
   async currentBranch(): Promise<string | null> {
     const result = await this.docker.exec(this.names.container, ['git', 'symbolic-ref', '-q', '--short', 'HEAD'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: this.dir,
     });
     const branch = result.stdout.toString('utf8').trim();
     return result.code === 0 && branch ? branch : null;
@@ -570,7 +606,7 @@ export class Workspace {
   async gameId(): Promise<string | null> {
     const result = await this.docker.exec(this.names.container, ['git', 'config', '--get', 'bugdetective.game'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: this.dir,
     });
     return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
   }
@@ -623,7 +659,7 @@ export class Workspace {
     const resolve = async (ref: string) => {
       const result = await this.docker.exec(this.names.container, ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`], {
         user: 'node',
-        workdir: WORKSPACE_DIR,
+        workdir: this.dir,
       });
       return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
     };
@@ -698,7 +734,7 @@ export class Workspace {
   async dependencyKey(): Promise<string | null> {
     const result = await this.docker.exec(this.names.container, ['cat', 'package-lock.json'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: this.dir,
     });
     if (result.code !== 0) {
       return null;
@@ -709,7 +745,7 @@ export class Workspace {
   async installedDependencyKey(): Promise<string | null> {
     const result = await this.docker.exec(this.names.container, ['cat', 'node_modules/.bugdetective-deps'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: this.dir,
     });
     return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
   }
@@ -740,7 +776,7 @@ export class Workspace {
     return result.code === 0;
   }
 
-  /** Starts `npm run dev` in the background inside the container, logging to /tmp/supportdesk-dev.log. */
+  /** Starts `npm run dev` in the background inside the container, logging to /tmp/dev-server.log. */
   async startDevServer(): Promise<void> {
     await this.docker.checked([
       'exec',
@@ -748,11 +784,11 @@ export class Workspace {
       '--user',
       'node',
       '--workdir',
-      WORKSPACE_DIR,
+      this.dir,
       this.names.container,
       'sh',
       '-c',
-      'exec npm run dev > /tmp/supportdesk-dev.log 2>&1',
+      'exec npm run dev > /tmp/dev-server.log 2>&1',
     ]);
     await this.waitForDevServer(true, 30_000);
   }

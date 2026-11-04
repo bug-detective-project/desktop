@@ -209,7 +209,7 @@ export class FakeRuntime implements GameRuntime {
   /** Projects whose resources a test left behind, removed by removeProjects. */
   projectResources: Record<string, string[]> = {};
 
-  setProject(_project: string): void {}
+  setProject(_project: string, _name?: string): void {}
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
     for (const project of projects) {

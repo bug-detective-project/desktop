@@ -22,7 +22,7 @@ import type { QaRunner } from '../../src/main/services/qa.ts';
 import { parseReviewConfig, qaToolFiles } from '@bug-detective/catalog/contract';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
+import { Workspace, workspaceDir } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { projectStory, ticketFiles, writeFiles } from '../helpers/project-repo.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
@@ -56,7 +56,7 @@ let docker: Docker;
 let runtime: FixtureRuntime;
 
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: WORKSPACE_DIR })).stdout.toString('utf8');
+  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: workspaceDir('tasklist') })).stdout.toString('utf8');
 }
 
 const fingerprint = () =>

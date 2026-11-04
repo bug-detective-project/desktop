@@ -15,12 +15,14 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { dragCard, takeNextTicket } from '../e2e/fixtures.ts';
 import { finishOnboarding } from './onboarding.ts';
+import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
 const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
+const WORKSPACE = workspaceDir('supportdesk');
 
 const docker = (...args: string[]) => execFileSync(DOCKER, args, { encoding: 'utf8' });
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
@@ -104,7 +106,7 @@ test('the full game loop with real Docker and VS Code', async () => {
     await cardStatus(page, ticket, 'todo', 120_000);
     log(`ticket ${ticket}: unlocked`);
     await installEnvironment(page);
-    expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'branch', '--show-current').trim()).toBe(`player/ticket-${ticket}`);
+    expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--show-current').trim()).toBe(`player/ticket-${ticket}`);
 
     // Open in VS Code, attached to the workspace container.
     await page.getByTestId('nav-board').click();
@@ -172,7 +174,7 @@ test('the full game loop with real Docker and VS Code', async () => {
 
     // The player applies the fix in the workspace.
     const patch = await readFile(join(supportdeskQa, 'tickets', `front-${ticket}`, 'reference.patch'));
-    execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'apply', '-'], { input: patch });
+    execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'apply', '-'], { input: patch });
 
     await submitQa(page, ticket, 'codeReview');
     await page.getByTestId(`card-${ticket}`).click();
@@ -210,7 +212,7 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('settings-tab-backup').click();
   await page.getByTestId('export-progress').click();
   await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress saved' })).toBeVisible({ timeout: 120_000 });
-  const head = docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
+  const head = docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
   docker('rm', '--force', CONTAINER);
   docker('volume', 'rm', 'bugdetective-workspace');
   log('exported, then deleted the workspace container and volume');
@@ -219,8 +221,8 @@ test('the full game loop with real Docker and VS Code', async () => {
   await expect(page.getByTestId('restore-warning')).toBeVisible();
   await page.getByTestId('confirm-restore').click();
   await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress restored' })).toBeVisible({ timeout: 5 * 60_000 });
-  expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
-  expect(docker('exec', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
+  expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
+  expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
     /player\/ticket-1[\s\S]*player\/ticket-4/,
   );
   await page.getByTestId('nav-board').click();

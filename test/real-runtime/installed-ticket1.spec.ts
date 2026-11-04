@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import { finishOnboarding } from './onboarding.ts';
+import { workspaceDir } from '../../src/main/services/workspace.ts';
 import { takeNextTicket } from '../e2e/fixtures.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -21,6 +22,7 @@ const root = resolve(import.meta.dirname, '..', '..');
 const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
 const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
+const WORKSPACE = workspaceDir('supportdesk');
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
 
 test('the installed app plays ticket 1 end to end on a clean profile', async () => {
@@ -88,7 +90,7 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   log('QA on the buggy stage: Gate 2 failed');
 
   const patch = await readFile(join(supportdeskQa, 'tickets', 'front-1', 'reference.patch'));
-  execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', '/workspaces/supportdesk', CONTAINER, 'git', 'apply', '-'], { input: patch });
+  execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'apply', '-'], { input: patch });
   await card.dragTo(page.getByTestId('column-inQa'));
   await expect(card).toHaveAttribute('data-status', 'inQa');
   await expect(card).toHaveAttribute('data-status', 'codeReview', { timeout: 10 * 60_000 });
