@@ -22,7 +22,7 @@ import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
 import { CatalogService, chooseCatalogSource, parseLocalCatalog, readLocalCatalogFile, writeLocalCatalogFile } from './services/catalog.ts';
-import { isDevelopmentRun } from './services/dev-mode.ts';
+import { isDevelopmentRun, userDataOverride } from './services/dev-mode.ts';
 import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
 import { contentSourceFor } from './services/projects.ts';
 import { PackageStore } from './services/content/store.ts';
@@ -32,9 +32,18 @@ import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
 import { isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
 
+/** The installer's test build (pnpm run dist:win:test) says so in its package.json. */
+function isTestBuild(): boolean {
+  if (!app.isPackaged) {
+    return false;
+  }
+  return (JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as { bugDetective?: { testBuild?: boolean } }).bugDetective?.testBuild === true;
+}
+
 // Tests and the "clean profile" checks can point the app at another data folder.
-if (process.env.BUGDETECTIVE_USER_DATA) {
-  app.setPath('userData', resolve(process.env.BUGDETECTIVE_USER_DATA));
+const dataFolder = userDataOverride({ packaged: app.isPackaged, testBuild: isTestBuild(), env: process.env });
+if (dataFolder) {
+  app.setPath('userData', resolve(dataFolder));
 }
 
 const isE2E = process.env.BUGDETECTIVE_E2E === '1' && !app.isPackaged;

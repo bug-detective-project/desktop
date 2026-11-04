@@ -1,6 +1,8 @@
 /**
  * Runs ticket 1 end to end with the installed app (NSIS build) and a clean data folder:
  *
+ *   pnpm run dist:win:test (the test build: an installed app has fuses Playwright cannot drive, and
+ *   ignores BUGDETECTIVE_USER_DATA)
  *   dist\Bug-Detective-Setup-<version>.exe /S
  *   set BUGDETECTIVE_INSTALLED_EXE=%LOCALAPPDATA%\Programs\bug-detective\Bug Detective.exe
  *   pnpm run test:real-runtime installed-ticket1

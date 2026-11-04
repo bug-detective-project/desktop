@@ -30,6 +30,8 @@ extraResources:
     to: THIRD_PARTY_NOTICES.md
 asar: true
 npmRebuild: false
+# The Electron security fuses; the test build keeps them as they are.
+afterPack: tools/after-pack.mjs
 win:
   target:
     - target: nsis

@@ -14,3 +14,12 @@ export function isDevelopmentRun(options: { packaged: boolean; env: NodeJS.Proce
   }
   return env.ELECTRON_RENDERER_URL !== undefined;
 }
+
+/**
+ * BUGDETECTIVE_USER_DATA, the data folder of the tests and the clean-profile checks. An installed
+ * app ignores it, unless it is the installer's test build (pnpm run dist:win:test).
+ */
+export function userDataOverride(options: { packaged: boolean; testBuild: boolean; env: NodeJS.ProcessEnv | Record<string, string | undefined> }): string | undefined {
+  const { packaged, testBuild, env } = options;
+  return !packaged || testBuild ? env.BUGDETECTIVE_USER_DATA || undefined : undefined;
+}
