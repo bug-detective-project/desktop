@@ -548,6 +548,7 @@
     "copyDiagnostics": "Copiar diagnóstico",
     "openLogs": "Abrir pasta de logs",
     "diagnosticsCopied": "Diagnóstico copiado.",
+    "sendFeedback": "Enviar feedback",
     "runtimeParts": {
       "electron": "Host desktop",
       "node": "Processo principal",
