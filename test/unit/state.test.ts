@@ -21,7 +21,7 @@ describe('StateStore', () => {
   it('starts a new game when there is no saved state', async () => {
     const { state, recovered } = await new StateStore(dir).load(ctx, 'pt');
     expect(recovered).toBe(false);
-    expect(state.schemaVersion).toBe(7);
+    expect(state.schemaVersion).toBe(8);
     expect(state.settings.language).toBe('pt');
   });
 
@@ -68,11 +68,11 @@ describe('state validation', () => {
   });
 
   it('keeps a state of an older schema aside and starts a new game, without migrating it', async () => {
-    const old = { ...rules.createInitialState(ctx), schemaVersion: 6 };
+    const old = { ...rules.createInitialState(ctx), schemaVersion: 7 };
     await writeFile(join(dir, 'state.json'), JSON.stringify(old));
     const { state, recovered } = await new StateStore(dir).load(ctx);
     expect(recovered).toBe(true);
-    expect(state.schemaVersion).toBe(7);
+    expect(state.schemaVersion).toBe(8);
     expect((await readdir(dir)).some((name) => /^state\.corrupt-\d+\.json$/.test(name))).toBe(true);
   });
 

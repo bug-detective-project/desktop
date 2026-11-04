@@ -18,7 +18,7 @@ import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
+import { Workspace, workspaceDir } from '../../src/main/services/workspace.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
@@ -32,7 +32,7 @@ let game: Game;
 
 async function workspace(): Promise<Workspace> {
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names });
+  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
 }
 
 /** The dev server's processes still running in the container (npm, concurrently, Vite, the API's node --watch). */
@@ -79,6 +79,25 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+describe('the workspace layout', () => {
+  it("keeps the repository in /workspaces/<project> with the project's git identity", async () => {
+    const sh = async (script: string) =>
+      (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node' })).stdout.toString('utf8').trim();
+    expect(await sh('test -d /workspaces/notes/.git && echo yes')).toBe('yes');
+    expect(await sh('ls /workspaces')).toBe('notes');
+    expect(await sh('git -C /workspaces/notes config user.name')).toBe('Notes Developer');
+    expect(await sh('git -C /workspaces/notes config user.email')).toBe('developer@notes.invalid');
+    expect(await sh('stat -c %U /workspaces /workspaces/notes')).toBe('node\nnode');
+  });
+
+  it('logs the dev server to /tmp/dev-server.log', async () => {
+    await game.startDevServer();
+    const log = await docker.exec(runtime.names.container, ['test', '-s', '/tmp/dev-server.log'], { user: 'node' });
+    expect(log.code).toBe(0);
+    await game.stopDevServer();
+  });
+});
+
 describe('the dev server with real Docker', () => {
   it('starts with "Start server" and stops with "Stop server", leaving no process behind', async () => {
     expect((await game.workspaceStatus()).devServerUp).toBe(false);
@@ -95,7 +114,7 @@ describe('the dev server with real Docker', () => {
     // Like the VS Code terminal: npm run dev in the workspace, outside the app's own start.
     await docker.execChecked(runtime.names.container, ['sh', '-c', 'nohup npm run dev > /tmp/terminal-dev.log 2>&1 &'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: workspaceDir('notes'),
     });
     await expect.poll(async () => (await game.workspaceStatus()).devServerUp, { timeout: 30_000, interval: 500 }).toBe(true);
 

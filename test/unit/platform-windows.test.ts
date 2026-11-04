@@ -145,13 +145,13 @@ describe('WSL detection', () => {
 
 describe('attached-container URI', () => {
   it('hex-encodes the container name JSON', () => {
-    const uri = attachedContainerUri('bugdetective-workspace');
+    const uri = attachedContainerUri('bugdetective-workspace', '/workspaces/supportdesk');
     const hex = /^vscode-remote:\/\/attached-container\+([0-9a-f]+)\/workspaces\/supportdesk$/.exec(uri)![1];
     expect(JSON.parse(Buffer.from(hex, 'hex').toString())).toEqual({ containerName: '/bugdetective-workspace' });
   });
 
   it('only accepts valid container names', () => {
-    expect(() => attachedContainerUri('x" --evil')).toThrow();
-    expect(() => attachedContainerUri('../x')).toThrow();
+    expect(() => attachedContainerUri('x" --evil', '/workspaces/supportdesk')).toThrow();
+    expect(() => attachedContainerUri('../x', '/workspaces/supportdesk')).toThrow();
   });
 });

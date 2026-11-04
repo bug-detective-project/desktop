@@ -21,8 +21,9 @@ A project of someone outside the organization starts in the author's own reposit
 | Ticket branches | `front-1`, `front-2`, …, `back-1`, … | One single-commit branch per ticket: `main` with that ticket's bug. The desktop downloads the commit the manifest names, by digest |
 | Tags | `<id>-v<version>` per ticket, `qa-v<version>` per publication | Keep every published commit reachable after a ticket branch moves |
 
-The player's code runs in the workspace container (Node 26, the project mounted at
-`/workspaces/supportdesk`), and QA runs the project's QA CLI in its own container. The desktop never
+The player's code runs in the workspace container (Node 26, the project's repository at
+`/workspaces/<id>` in the workspaces volume, with the git identity `<name> Developer`), and QA runs
+the project's QA CLI in its own container. The desktop never
 assumes a project name or a ticket count: everything comes from the catalog, the manifest and the
 `tickets/` folders.
 

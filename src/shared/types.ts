@@ -158,12 +158,13 @@ export interface ReviewSession {
   phase: 'saving' | 'switching' | 'open' | 'returning';
   startedAt: string;
   /** Where the player was: their branch (null for a detached HEAD), HEAD, index and excludes file. */
+  /** excludesFile is relative to the repository when it is inside it (the review's own file), else as git reported it. */
   returnPoint: { branch: string | null; head: string; indexTree: string; excludesFile: string | null };
   /** The temporary commit with the player's uncommitted work, or null when there was none. */
   wipCommit: string | null;
 }
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** What a game keeps of a project that is not the active one: its progress and its PRs' history. */
 export interface ProjectProgress {

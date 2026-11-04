@@ -19,7 +19,7 @@ import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
+import { Workspace, workspaceDir } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
 import type { ProjectRepo } from '../helpers/project-repo.ts';
@@ -48,7 +48,7 @@ function createGame(stateDir = dir) {
 
 async function workspace(): Promise<Workspace> {
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names });
+  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
 }
 
 /** Samples memory of the QA and workspace containers every 2 s while `run` is pending. */
@@ -128,11 +128,11 @@ describe('QA with real Docker', () => {
     // Snapshot import keeps LF line endings.
     const crlf = await docker.exec(runtime.names.container, ['grep', '-rlI', '--exclude-dir=node_modules', '--exclude-dir=.git', '\r', '.'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: workspaceDir('notes'),
     });
     expect(crlf.stdout.toString('utf8').trim()).toBe('');
     // The package lives in the app data folder, not in the volume.
-    const listing = await docker.exec(runtime.names.container, ['ls', '-a', WORKSPACE_DIR], { user: 'node' });
+    const listing = await docker.exec(runtime.names.container, ['ls', '-a', workspaceDir('notes')], { user: 'node' });
     expect(listing.stdout.toString('utf8')).not.toMatch(/gate2|reference\.patch|hints/);
     expect(rules.findTicket(game.current, 1)!.stageCommit).toMatch(/^[0-9a-f]{40}$/);
   });
@@ -155,7 +155,7 @@ describe('QA with real Docker', () => {
     // A synchronous infinite loop when the module the ticket's test imports loads.
     await docker.execChecked(runtime.names.container, ['sh', '-c', 'printf "\\nwhile (true) {}\\n" >> client/notes.js'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: workspaceDir('notes'),
     });
     const { ticket, seconds } = await submit(game, 1);
     console.log(`timeout QA: ${seconds.toFixed(1)} s`);
@@ -205,7 +205,7 @@ describe('QA with real Docker', () => {
         '-c',
         'echo "// leftover commit" >> server/api.js && git commit -qam "leftover" && echo "// dirty" >> client/notes.js && echo junk > junk.txt && mkdir -p tmpdir && echo x > tmpdir/x.txt',
       ],
-      { user: 'node', workdir: WORKSPACE_DIR },
+      { user: 'node', workdir: workspaceDir('notes') },
     );
     expect((await ws.git(['status', '--porcelain'])).trim()).not.toBe('');
 
@@ -252,7 +252,7 @@ describe('QA with real Docker', () => {
     await docker.execChecked(
       runtime.names.container,
       ['sh', '-c', 'printf "\\nAtomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30000);\\n" >> client/sort.js'],
-      { user: 'node', workdir: WORKSPACE_DIR },
+      { user: 'node', workdir: workspaceDir('notes') },
     );
     await game.move(2, 'inQa');
     // Waits until the QA run's container runs (the 30 s pause keeps it running), not for a fixed
@@ -283,7 +283,7 @@ describe('QA with real Docker', () => {
     // Leftover work of the previous game on its current branch, as after quitting mid-ticket.
     await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo "// leftover" >> client/notes.js'], {
       user: 'node',
-      workdir: WORKSPACE_DIR,
+      workdir: workspaceDir('notes'),
     });
     const oldBranches = (await ws.git(['branch', '--list', 'player/*', '--format=%(refname:short)'])).trim().split('\n').sort();
     expect(oldBranches).toContain('player/ticket-1');

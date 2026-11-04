@@ -22,7 +22,7 @@ import { Docker } from '../../src/main/services/docker.ts';
 import { runCommand } from '../../src/main/services/process.ts';
 import { ReviewStore } from '../../src/main/services/review/store.ts';
 import { StateStore } from '../../src/main/services/state.ts';
-import { WORKSPACE_DIR, Workspace } from '../../src/main/services/workspace.ts';
+import { Workspace, workspaceDir } from '../../src/main/services/workspace.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { createNotesProject } from '../helpers/notes-project.ts';
 import type { ProjectRepo } from '../helpers/project-repo.ts';
@@ -60,11 +60,11 @@ function createGame(stateDir: string) {
 
 async function workspace(): Promise<Workspace> {
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names });
+  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
 }
 
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: WORKSPACE_DIR })).stdout.toString('utf8');
+  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: workspaceDir('notes') })).stdout.toString('utf8');
 }
 
 /** Branch, HEAD, index, status (with ignored files) and a hash of every file, node_modules included. */

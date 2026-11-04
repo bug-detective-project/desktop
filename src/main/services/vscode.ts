@@ -4,17 +4,20 @@
  */
 import type { VSCodeCli } from '../platform/types.ts';
 import type { CommandRunner, RunResult } from './process.ts';
-import { WORKSPACE_DIR } from './workspace.ts';
 
 export const DEV_CONTAINERS_EXTENSION = 'ms-vscode-remote.remote-containers';
 
 /**
  * vscode-remote://attached-container+<hex of {"containerName":"/<name>"}><folder>.
- * The container name is validated, so the URI can only point at our own container.
+ * The container name and the folder are validated, so the URI can only point at our own container
+ * and at a folder of the workspaces volume.
  */
-export function attachedContainerUri(containerName: string, folder = WORKSPACE_DIR): string {
+export function attachedContainerUri(containerName: string, folder: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(containerName)) {
     throw new Error(`Invalid container name: ${containerName}`);
+  }
+  if (!/^\/workspaces\/[a-z][a-z0-9-]{0,39}$/.test(folder)) {
+    throw new Error(`Invalid workspace folder: ${folder}`);
   }
   const hex = Buffer.from(JSON.stringify({ containerName: `/${containerName}` }), 'utf8').toString('hex');
   return `vscode-remote://attached-container+${hex}${folder}`;
@@ -70,9 +73,9 @@ export class VSCode {
    * Opens VS Code attached to the container, at the workspace folder: in a new window, or with
    * reuseWindow, in the window already open on that folder when there is one.
    */
-  async openAttached(containerName: string, options: { reuseWindow?: boolean } = {}): Promise<void> {
+  async openAttached(containerName: string, folder: string, options: { reuseWindow?: boolean } = {}): Promise<void> {
     const window = options.reuseWindow ? [] : ['--new-window'];
-    const result = await this.run([...window, '--folder-uri', attachedContainerUri(containerName)], 60_000);
+    const result = await this.run([...window, '--folder-uri', attachedContainerUri(containerName, folder)], 60_000);
     if (result.code !== 0) {
       throw new Error(`VS Code could not be opened: ${(result.stderr || result.stdout.toString('utf8')).trim()}`);
     }

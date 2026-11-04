@@ -433,6 +433,9 @@ export class Game {
     this.projectFiles = projectContentOf(content.qaFiles);
     this.content = content;
     this.options.runtime.setQaTool(qaToolFiles(content.qaFiles));
+    // The workspace folder is named after the project and its git identity after the project's
+    // name: both come from the manifest, with or without a catalog.
+    this.options.runtime.setProject(content.manifest.project.id, content.manifest.project.name);
     this.emit();
     const active = this.activeProject();
     if (active && this.withSource(this.state, active, content.manifest.version) !== this.state) {

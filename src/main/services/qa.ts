@@ -17,15 +17,18 @@ import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
 import type { Docker } from './docker.ts';
 import type { RunOptions } from './process.ts';
-import { resourceNames } from './workspace.ts';
+import { PROJECT_ID, resourceNames } from './workspace.ts';
 import type { ResourceNames } from './workspace.ts';
 
 const RESULT_PATH = '/tmp/qa-result.json';
 
-/** Replaces the QA input volume's content with the workspace files, as root (the fresh volume is root-owned). */
+/**
+ * Replaces the QA input volume's content with the project's files of the workspace volume
+ * (/source/<project id>: the volume holds one folder per project), as root (the fresh volume is root-owned).
+ */
 const COPY_SCRIPT = `set -eu
 find /input -mindepth 1 -delete
-tar -C /source --exclude=.git --exclude=node_modules -cf - . | tar -C /input -xpf -`;
+tar -C "/source/$PROJECT_ID" --exclude=.git --exclude=node_modules -cf - . | tar -C /input -xpf -`;
 /** Extra time on top of the CLI's own timeout for container start-up and cleanup. */
 const OUTER_GRACE_SECONDS = 90;
 
@@ -135,12 +138,36 @@ export class QaRunner {
     return args;
   }
 
+  /** The project whose workspace QA reads; its folder in the workspace volume is named after it. */
+  private projectId(): string {
+    if (!this.project || !PROJECT_ID.test(this.project)) {
+      throw new QaInfrastructureError('QA has no project');
+    }
+    return this.project;
+  }
+
   /** A short-lived root container from the QA image, with the given volumes, running `command`. */
   private async helper(mounts: string[], command: string[], timeoutMs: number) {
     const name = `${this.names.prefix}-qa-copy-${randomUUID().slice(0, 8)}`;
     try {
       return await this.docker.run(
-        ['run', '--name', name, ...labelArgs('qa', this.project), '--network', 'none', '--user', 'root', '--entrypoint', command[0], ...mounts, this.image, ...command.slice(1)],
+        [
+          'run',
+          '--name',
+          name,
+          ...labelArgs('qa', this.project),
+          '--network',
+          'none',
+          '--user',
+          'root',
+          '--env',
+          `PROJECT_ID=${this.projectId()}`,
+          '--entrypoint',
+          command[0],
+          ...mounts,
+          this.image,
+          ...command.slice(1),
+        ],
         { timeoutMs },
       );
     } finally {
@@ -239,7 +266,8 @@ export class QaRunner {
           '--ticket',
           String(ticket),
           '--workspace',
-          '/workspace',
+          // The workspace volume holds one folder per project (the QA input volume holds the copy of one).
+          `/workspace/${this.projectId()}`,
           '--deps-cache',
           '/cache/deps',
           '--deps-only',
