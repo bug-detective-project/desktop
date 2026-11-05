@@ -19,6 +19,8 @@ export function labelArgs(role: string, project?: string | null): string[] {
 export type { EngineState } from '../../shared/api.ts';
 
 export interface ContainerInfo {
+  /** Changes when the container is recreated under the same name. */
+  id: string;
   name: string;
   running: boolean;
   image: string;
@@ -173,6 +175,7 @@ export class Docker {
       return null;
     }
     const [raw] = JSON.parse(result.stdout.toString('utf8')) as {
+      Id: string;
       Name: string;
       State: { Running: boolean };
       Config: { Image: string; Labels: Record<string, string> | null };
@@ -187,6 +190,7 @@ export class Docker {
       }
     }
     return {
+      id: raw.Id,
       name: raw.Name.replace(/^\//, ''),
       running: raw.State.Running,
       image: raw.Config.Image,
