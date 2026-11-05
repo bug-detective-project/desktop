@@ -1,9 +1,10 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
+import { StaleVSCodeWindowError } from '../../src/main/services/attached-window.ts';
 import { createSave, readSave } from '../../src/main/services/backup.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { PackageStore } from '../../src/main/services/content/store.ts';
@@ -270,6 +271,16 @@ describe('code review in the game', () => {
     expect(game.current.reviewSession).toBeNull();
     expect(await runtime.currentBranch()).toBe('player/ticket-1');
     expect(runtime.returns[0]).toMatchObject({ ticket: 1, wipCommit: sha('d') });
+  });
+
+  it('brings the player code back and asks to close the window it could not close', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await passQa(game);
+    vi.spyOn(runtime, 'openVSCodeReview').mockRejectedValueOnce(new StaleVSCodeWindowError());
+    await expect(game.openReview(1)).rejects.toMatchObject({ code: 'vscodeStaleWindow' });
+    expect(game.current.reviewSession).toBeNull();
+    expect(await runtime.currentBranch()).toBe('player/ticket-1');
   });
 
   it('rolls back to the player code when the checkout fails', async () => {

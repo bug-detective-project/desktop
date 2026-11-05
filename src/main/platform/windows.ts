@@ -117,6 +117,43 @@ function resolveVSCodeLauncher(deps: WindowsDeps, launcher: string, source: VSCo
   return { source, launcher, command: exe, baseArgs: [cliJs], env, globalStorage: vscodeGlobalStorage(deps.env) };
 }
 
+/**
+ * Asks every top-level window whose title contains `title` to close (WM_CLOSE, as the X button does:
+ * VS Code still asks about unsaved files), waits up to 10 s and prints how many are left.
+ */
+function closeWindowsScript(title: string): string {
+  return `Add-Type @"
+using System; using System.Text; using System.Runtime.InteropServices;
+public class BugDetectiveWindows {
+  public delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc proc, IntPtr lParam);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int max);
+  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+  public static int Matching(string match, bool close) {
+    int count = 0;
+    EnumWindows((hwnd, lParam) => {
+      var text = new StringBuilder(512);
+      GetWindowText(hwnd, text, 512);
+      if (text.ToString().Contains(match)) {
+        count++;
+        if (close) { PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero); }
+      }
+      return true;
+    }, IntPtr.Zero);
+    return count;
+  }
+}
+"@
+$title = '${title}'
+$left = [BugDetectiveWindows]::Matching($title, $true)
+for ($try = 0; $try -lt 20 -and $left -gt 0; $try++) {
+  Start-Sleep -Milliseconds 500
+  $left = [BugDetectiveWindows]::Matching($title, $false)
+}
+Write-Output $left
+`;
+}
+
 export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Platform {
   const deps = { ...defaultDeps(), ...overrides };
   const { env, runner } = deps;
@@ -201,6 +238,15 @@ export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Pla
 
     browserCommand() {
       return null;
+    },
+
+    async closeContainerWindows(containerName) {
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(containerName)) {
+        return false;
+      }
+      const script = closeWindowsScript(`[Container ${containerName}`);
+      const result = await runner(path.join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { timeoutMs: 30_000 });
+      return result.code === 0 && result.stdout.toString('utf8').trim() === '0';
     },
 
     async hostCredentials(): Promise<HostCredentials> {
