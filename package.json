@@ -1,7 +1,7 @@
 {
   "name": "bug-detective",
   "productName": "Bug Detective",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A desktop game where developers practice debugging a real app.",
   "author": "Bug Detective",
   "license": "PolyForm-Noncommercial-1.0.0",
