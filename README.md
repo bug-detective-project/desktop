@@ -229,6 +229,8 @@ Docker is shared: `docker.exe` on Windows and the WSL integration talk to the sa
 | `pnpm run test:e2e:headless:linux` | Linux/WSL 2 | The same e2e tests inside a virtual display (`xvfb-run`; install it with `sudo apt install xvfb`): no window opens on the desktop and the tests never take the mouse or the keyboard. Extra Playwright arguments go at the end, e.g. `pnpm run test:e2e:headless:linux test/e2e/kanban.spec.ts`. |
 | `pnpm run test:real-runtime` | Windows or Linux/WSL 2, + Docker + VS Code | `test/real-runtime`: the full game loop through the real UI (all four tickets, VS Code attach, restart during QA, export/restore) and, with `BUGDETECTIVE_INSTALLED_EXE`, ticket 1 on the installed app. Opens VS Code windows. Runs locally as the pull request gate (`tools/open-pr.sh`, see "Continuous integration"). |
 
+Tests remove what they create in Docker after use, also when they fail. Each integration test removes its containers and volumes in `afterAll`. `test/integration/global-teardown.ts` then removes the BuildKit builders of test prefixes, which belong to no single test, and any container left under a test prefix. A new test uses a prefix like `bugdetective-<name>-test`, which this cleanup recognizes. The `bugdetective-builder` of the app stays. `pnpm run check:links` opens the pages of the project the app links to and checks the README sections they name.
+
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs on GitHub Actions:
