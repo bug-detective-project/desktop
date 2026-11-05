@@ -312,6 +312,8 @@ pnpm run dist:win    # dist\Bug-Detective-Setup-<version>.exe (not signed)
 
 The installer is per-user (no admin rights), lets the player choose the folder, and adds Start menu and desktop shortcuts. Uninstalling removes everything the app created in Docker (`resources/remove-docker-data.ps1`, run from `resources/installer.nsh`; nothing is done while Docker is not running) and the app data folder (`deleteAppDataOnUninstall`). An update keeps both: electron-builder runs the old uninstaller with `isUpdated`, and the cleanup step is skipped then. The script can also be run by hand: `powershell -ExecutionPolicy Bypass -File "<install folder>\resources\remove-docker-data.ps1"`. The packaged app carries `resources/docker/` (Dockerfiles, the QA CLI, `images.json`); images are built on the player's machine the first time, with the player's consent.
 
+**Tested in CI.** The `installer` job builds the real installer on a GitHub-hosted Windows runner, and `tools/check-installer.mjs` installs it silently, opens the app, updates over it and uninstalls it, checking the files, shortcuts, installed-programs entry, game state and a Docker volume with the app's label at each step. An update keeps the volume and the state, and an uninstall removes them. Because of that, the script refuses to run anywhere else.
+
 ### Building and installing on Windows from WSL 2
 
 When the code lives in WSL 2, the Windows installer is built with Windows Node.js on a Windows copy of the code (see [Windows development from WSL 2](#windows-development-from-wsl-2)), then installed on Windows like any other app. Every command below runs in a WSL terminal, from `desktop/`.
