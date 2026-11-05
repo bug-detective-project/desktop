@@ -31,6 +31,7 @@ import type { RuleContext } from '../shared/kanban.ts';
 import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS } from '../shared/types.ts';
 import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
+import { StaleVSCodeWindowError } from './services/attached-window.ts';
 import { createSave, readSave } from './services/backup.ts';
 import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry } from '@bug-detective/catalog/contract';
@@ -58,6 +59,11 @@ export class GameError extends Error {
     super(message ?? code);
     this.code = code;
   }
+}
+
+/** The window the app could not close has its own message; anything else is shown as it is. */
+function vscodeError(error: unknown): unknown {
+  return error instanceof StaleVSCodeWindowError ? new GameError('vscodeStaleWindow', error.message) : error;
 }
 
 /** Content errors the player can act on get their own code; anything else is shown as it is. */
@@ -1396,7 +1402,11 @@ export class Game {
     if (this.state.reviewSession) {
       await this.exclusive('closingReview', () => this.returnToPlayerCode());
     }
-    await this.options.runtime.openVSCode();
+    try {
+      await this.options.runtime.openVSCode();
+    } catch (error) {
+      throw vscodeError(error);
+    }
   }
 
   async startDevServer(): Promise<void> {
@@ -1546,7 +1556,8 @@ export class Game {
         await this.options.runtime.openVSCodeReview();
       } catch (error) {
         await this.returnToPlayerCode();
-        throw new GameError('vscodeFailed', (error as Error).message);
+        const stale = vscodeError(error);
+        throw stale instanceof GameError ? stale : new GameError('vscodeFailed', (error as Error).message);
       }
     });
   }

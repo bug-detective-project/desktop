@@ -660,6 +660,7 @@
     "noReview": "O review deste ticket não está disponível.",
     "reviewFailed": "Não foi possível abrir o review, e o seu código foi restaurado: {{message}}",
     "vscodeFailed": "Não foi possível abrir o VS Code, e o seu código foi restaurado: {{message}}",
+    "vscodeStaleWindow": "Uma janela do VS Code do workspace antigo ainda está aberta. Feche-a e tente de novo.",
     "solveBugNotAllowed": "Só o ticket em andamento pode ser resolvido.",
     "workspaceLost": "O código do seu workspace sumiu. Recrie-o no Painel, ou restaure um backup.",
     "noConnection": "Sem conexão com a internet. Conecte-se e tente de novo.",

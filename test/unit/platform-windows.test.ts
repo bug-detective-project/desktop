@@ -172,6 +172,42 @@ describe('VS Code global storage and host credentials on Windows', () => {
   });
 });
 
+describe('closing the VS Code windows of a container', () => {
+  const env = { SystemRoot: 'C:\\Windows' };
+  const platformAnswering = (result: RunResult) => {
+    const calls: { command: string; args: readonly string[] }[] = [];
+    const platform = createWindowsPlatform({
+      env,
+      ...fakeFs({}),
+      runner: async (command, args) => {
+        calls.push({ command, args });
+        return result;
+      },
+    });
+    return { platform, calls };
+  };
+  const scriptOf = (args: readonly string[]) => Buffer.from(args[args.indexOf('-EncodedCommand') + 1]!, 'base64').toString('utf16le');
+
+  it('asks the windows titled with that container to close, and says none is left', async () => {
+    const { platform, calls } = platformAnswering(ok('0\r\n'));
+    expect(await platform.closeContainerWindows('bugdetective-workspace')).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.command).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+    expect(scriptOf(calls[0]!.args)).toContain('[Container bugdetective-workspace');
+  });
+
+  it('reports a window that stayed open (unsaved files) or a script that failed', async () => {
+    expect(await platformAnswering(ok('1\r\n')).platform.closeContainerWindows('bugdetective-workspace')).toBe(false);
+    expect(await platformAnswering(ok('', 1)).platform.closeContainerWindows('bugdetective-workspace')).toBe(false);
+  });
+
+  it('never builds the script from a name Docker would refuse', async () => {
+    const { platform, calls } = platformAnswering(ok('0'));
+    expect(await platform.closeContainerWindows("x'; Remove-Item C:\\ #")).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('free disk space on Windows', () => {
   const env = { LOCALAPPDATA: 'C:\\Users\\João Silva\\AppData\\Local' };
   const dockerDisk = 'C:\\Users\\João Silva\\AppData\\Local\\Docker\\wsl';

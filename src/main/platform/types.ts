@@ -65,6 +65,8 @@ export interface Platform {
   freeDiskBytes(): Promise<number | null>;
   /** The credentials an attached VS Code could carry into the container from this computer (the checklist warns about them). */
   hostCredentials(): Promise<HostCredentials>;
+  /** Closes the VS Code windows attached to a container: true when none is left, false when it cannot tell (see attached-window.ts). */
+  closeContainerWindows(containerName: string): Promise<boolean>;
 }
 
 /** `sc query ssh-agent` says the Windows OpenSSH agent service is running. */

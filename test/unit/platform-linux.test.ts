@@ -118,6 +118,11 @@ describe('VS Code global storage and host credentials', () => {
     expect(await createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
   });
 
+  it('cannot close VS Code windows yet, so the player is asked to', async () => {
+    const platform = createLinuxPlatform({ env: { PATH: '/usr/bin', HOME: '/home/u' }, runner: async () => ok('', 1), ...fakeFs({}) });
+    expect(await platform.closeContainerWindows('bugdetective-workspace')).toBe(false);
+  });
+
   it('on plain Linux, uses ~/.config/Code (or XDG_CONFIG_HOME) and only the SSH_AUTH_SOCK of this session', async () => {
     const env = { PATH: '/usr/local/bin:/usr/bin', HOME: '/home/u', SSH_AUTH_SOCK: '/run/user/1000/keyring/ssh' };
     const files = { '/proc/version': 'Linux version 6.8.0-45-generic', '/usr/bin/docker': '', '/usr/bin/code': '' };

@@ -22,6 +22,7 @@ function fakePlatform(answer: Answer, wsl: WslStatus = { installed: true, versio
     browserCommand: () => null,
     freeDiskBytes: async () => null,
     hostCredentials: async () => ({ sshAgent: false, githubCredential: false }),
+    closeContainerWindows: async () => true,
   };
 }
 

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
 import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison, WorkspaceStatus } from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
+import { closeStaleWindow } from './services/attached-window.ts';
 import { planCleanup } from './services/cleanup.ts';
 import type { CleanupTarget } from './services/cleanup.ts';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
@@ -491,6 +492,15 @@ export class DockerRuntime implements GameRuntime {
    * drops the SSH agent socket). Nothing is written to the user's global VS Code settings.
    */
   private async prepareAttach(workspace: Workspace, vscode: VSCode): Promise<void> {
+    const container = await workspace.info();
+    if (container) {
+      await closeStaleWindow({
+        file: join(this.qaBuildRoot, 'attached-container'),
+        containerId: container.id,
+        containerName: workspace.containerName,
+        closeWindows: (name) => this.platform.closeContainerWindows(name),
+      });
+    }
     await workspace.seedVSCodeMachineSettings(VSCODE_MACHINE_SETTINGS);
     await vscode.writeAttachedConfig(workspace.containerName, workspace.dir);
   }

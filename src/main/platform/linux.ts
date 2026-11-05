@@ -209,6 +209,11 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       return wsl ? { command: '/mnt/c/Windows/explorer.exe', args: [url] } : null;
     },
 
+    // No way to list windows here yet, so the app asks the player to close it.
+    async closeContainerWindows() {
+      return false;
+    },
+
     async hostCredentials(): Promise<HostCredentials> {
       const side = await windows();
       if (!side) {

@@ -264,6 +264,15 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
     expect(JSON.parse(await readFile(configFile, 'utf8'))).toMatchObject({ remoteUser: 'node', remoteEnv: { SSH_AUTH_SOCK: null }, workspaceFolder: WORKSPACE });
     expect(JSON.parse(inside(`cat ${MACHINE_SETTINGS}`))).toMatchObject({ 'dev.containers.gitCredentialHelperConfigLocation': 'none', 'dev.containers.copyGitConfig': false, 'remote.containers.copyGitConfig': false });
     log(`direct IPC call answered: ${after['the helper script called directly through the IPC socket, no git config involved (redacted)'].split('\n')[0]}`);
+
+    // The container is recreated under the open window. VS Code gives up on that window, and opening the
+    // folder would only focus it: nothing attaches unless the app closes the window first.
+    const containerId = () => execFileSync(DOCKER, ['container', 'inspect', '--format', '{{.Id}}', CONTAINER], { encoding: 'utf8', timeout: 60_000 }).trim();
+    const removed = containerId();
+    execFileSync(DOCKER, ['rm', '-f', CONTAINER], { timeout: 60_000 });
+    await attach(page);
+    expect(containerId()).not.toBe(removed);
+    report.push('## 3. Container recreated under the open window', '', 'The app closed the old window and VS Code attached to the new container.', '');
   } finally {
     removeProbeCredential(stored);
     // The app's own log of this run goes with the report (the data folder is deleted below).

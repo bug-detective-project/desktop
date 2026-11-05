@@ -6,6 +6,7 @@ import { FakeRuntime } from '../../src/main/fake-runtime.ts';
 import { Game } from '../../src/main/game.ts';
 import type { DevCatalogOptions, GameOptions } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
+import { StaleVSCodeWindowError } from '../../src/main/services/attached-window.ts';
 import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import type { LocalCatalog, ResolvedProject } from '../../src/main/services/catalog.ts';
@@ -745,6 +746,16 @@ describe('Game', () => {
     await game.waitForQa();
     expect(status(game)).toBe('codeReview');
     expect(game.snapshot().busy).toBeNull();
+  });
+
+  it('tells the player to close a VS Code window it could not close, instead of a raw error', async () => {
+    const { game, runtime } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    vi.spyOn(runtime, 'openVSCode').mockRejectedValueOnce(new StaleVSCodeWindowError());
+    await expect(game.openVSCode()).rejects.toMatchObject({ code: 'vscodeStaleWindow' });
+    // The next click goes through: the app does not know when the player closed the window.
+    await expect(game.openVSCode()).resolves.toBeUndefined();
   });
 
   it('opens VS Code during QA but not during other tasks, and never brings the code back while another task runs', async () => {
