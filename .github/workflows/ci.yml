@@ -101,6 +101,25 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
 
+  installer:
+    # The real NSIS installer, on a disposable machine: uninstalling deletes the game state and the
+    # Docker data, which is why tools/check-installer.mjs refuses to run anywhere else.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run electron:install
+      - run: pnpm run dist:win
+      - run: node tools/check-fuses.mjs "dist/win-unpacked/Bug Detective.exe"
+      - run: node tools/check-installer.mjs
+
   coverage:
     # The full coverage floor over the unit tests, the stories and the integration tests, from the
     # blob reports of the two jobs above: nothing runs again here.
