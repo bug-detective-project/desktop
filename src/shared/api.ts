@@ -353,9 +353,9 @@ export const EXTERNAL_LINKS = {
   /** "Send feedback": the repository's discussions, until a feedback form exists. */
   feedback: 'https://github.com/bug-detective-project/desktop/discussions',
   /** Docker Desktop in Windows containers mode: how to switch back to Linux containers. */
-  linuxContainers: 'https://docs.docker.com/desktop/setup/install/windows-install/#switch-between-windows-and-linux-containers',
+  linuxContainers: 'https://docs.docker.com/desktop/setup/install/windows-install/',
   /** The memory WSL 2 (and so the Docker engine) may use: .wslconfig. */
-  wslConfig: 'https://learn.microsoft.com/windows/wsl/wsl-config#configuration-setting-for-wslconfig',
+  wslConfig: 'https://learn.microsoft.com/windows/wsl/wsl-config#configuration-settings-for-wslconfig',
   /** What the app does about the credentials VS Code could carry into the container, and what it cannot turn off. */
   credentialsHelp: 'https://github.com/bug-detective-project/desktop#vs-code-and-your-credentials',
 } as const;

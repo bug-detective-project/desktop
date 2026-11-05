@@ -40,6 +40,7 @@ jobs:
       - name: Chromium for the stories (vitest browser mode)
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run check:action-pins
+      - run: pnpm run check:links
       - run: pnpm run typecheck
       - run: pnpm run lint
       - name: Unit tests and stories, with the coverage floor of vitest.config.ts

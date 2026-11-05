@@ -54,6 +54,7 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['test/integration/**/*.test.ts'],
+          globalSetup: ['test/integration/global-teardown.ts'],
           environment: 'node',
           // Builds images, installs dependencies and runs QA twice in Docker.
           testTimeout: 30 * 60_000,
