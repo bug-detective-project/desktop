@@ -29,9 +29,12 @@ const root = resolve(import.meta.dirname, '..', '..');
 const PREFIX = 'bugdetective-services-test';
 const platform = currentPlatform();
 const REFERENCE = SERVICE_IMAGES['postgres:17']!.reference;
-const SERVICE = `${PREFIX}-svc-notes-db`;
-const DATA = `${PREFIX}-svcdata-notes-db-0`;
-const NETWORK = networkName(PREFIX, 'notes');
+// A project id of its own: the last test removes everything labelled with the project, and the
+// other test files play the notes fixture under its own id, sharing its QA image.
+const PROJECT = 'svcnotes';
+const SERVICE = `${PREFIX}-svc-${PROJECT}-db`;
+const DATA = `${PREFIX}-svcdata-${PROJECT}-db-0`;
+const NETWORK = networkName(PREFIX, PROJECT);
 const services = {
   db: {
     image: 'postgres:17',
@@ -61,7 +64,7 @@ const psql = (sql: string) => docker.exec(SERVICE, ['psql', '-U', 'postgres', '-
 
 async function workspace(): Promise<Workspace> {
   const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: PROJECT });
 }
 
 function newGame(): Game {
@@ -79,7 +82,7 @@ function newGame(): Game {
 
 /** Everything of this test that Docker still holds, by the project label and by name. */
 async function leftovers(): Promise<string[]> {
-  const found = await docker.ofProject('notes');
+  const found = await docker.ofProject(PROJECT);
   return [...found.containers, ...found.volumes, ...found.networks].filter((name) => name.startsWith(PREFIX));
 }
 
@@ -88,6 +91,7 @@ beforeAll(async () => {
   qaDir = (await createNotesProject(join(dir, 'project'))).qaDir;
   const file = join(qaDir, 'package.json');
   const json = JSON.parse(await readFile(file, 'utf8'));
+  json.bugDetective.project.id = PROJECT;
   json.bugDetective.project.services = services;
   await writeFile(file, `${JSON.stringify(json, null, 2)}\n`);
   execFileSync('git', ['commit', '-q', '-am', 'Declare the database'], { cwd: qaDir });
@@ -120,7 +124,7 @@ afterAll(async () => {
   for (const volume of [DATA, runtime.names.vscodeVolume, runtime.names.cacheVolume, runtime.names.qaInputVolume]) {
     await docker.removeVolume(volume).catch(() => {});
   }
-  await docker.removeContainer(`${PREFIX}-forward-notes`);
+  await docker.removeContainer(`${PREFIX}-forward-${PROJECT}`);
   await docker.removeNetwork(NETWORK).catch(() => {});
   for (const image of (await text(['image', 'ls', '--filter', `reference=${PREFIX}-qa-image`, '--format', '{{.Repository}}:{{.Tag}}'])).split('\n').filter(Boolean)) {
     await docker.removeImage(image, { force: true }).catch(() => {});
@@ -146,9 +150,9 @@ describe("a project's services with real Docker", () => {
 
   it('publishes the service on 127.0.0.1 of the computer when the project asks for it', async () => {
     const port = game.snapshot().services[0]!.hostPort!;
-    const forwarder = await docker.inspectContainer(`${PREFIX}-forward-notes`);
+    const forwarder = await docker.inspectContainer(`${PREFIX}-forward-${PROJECT}`);
     expect(Object.values(forwarder!.ports)).toContain(port);
-    expect(await text(['container', 'port', `${PREFIX}-forward-notes`])).toContain(`-> 127.0.0.1:${port}`);
+    expect(await text(['container', 'port', `${PREFIX}-forward-${PROJECT}`])).toContain(`-> 127.0.0.1:${port}`);
     const reached = await new Promise<boolean>((resolve) => {
       const socket = connect({ host: '127.0.0.1', port });
       socket.once('connect', () => (socket.destroy(), resolve(true)));
@@ -239,7 +243,7 @@ describe("a project's services with real Docker", () => {
   });
 
   it('removes everything of the project, and the image only when the app pulled it', async () => {
-    expect(await runtime.removeProjects(['notes'])).toEqual([]);
+    expect(await runtime.removeProjects([PROJECT])).toEqual([]);
     expect(await leftovers()).toEqual([]);
     expect(await docker.inspectContainer(SERVICE)).toBeNull();
     expect(await docker.volumeExists(DATA)).toBe(false);
