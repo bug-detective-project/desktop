@@ -135,6 +135,9 @@ describe("a project's services with real Docker", () => {
     );
     const connect = "require('node:net').connect(5432, 'db').once('connect', () => process.exit(0)).once('error', () => process.exit(1))";
     expect((await docker.exec(container, ['node', '-e', connect], { user: 'node', timeoutMs: 30_000 })).code).toBe(0);
+    // The workspace image carries the database's own client: the player looks at the data from the terminal.
+    const answer = await docker.exec(container, ['sh', '-c', 'psql "$DATABASE_URL" -tAc "select 1"'], { user: 'node', timeoutMs: 30_000 });
+    expect(answer.stdout.toString('utf8').trim()).toBe('1');
   });
 
   it('records the image as its own only when it pulled it', async () => {

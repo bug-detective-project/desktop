@@ -3,6 +3,16 @@
 # a port forwarder for the Vite dev server.
 FROM node:26.12.1-bookworm
 
+# The command-line client of each database on the catalog's list of service images (today
+# PostgreSQL), so the player can look at a service's data from the workspace's terminal:
+# psql "$DATABASE_URL". It comes from PostgreSQL's own package repository, to be the same major
+# version as the server. Installed before GnuPG is removed below.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-common ca-certificates \
+ && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+ && apt-get install -y --no-install-recommends postgresql-client-17 \
+ && rm -rf /var/lib/apt/lists/*
+
 # The snapshot imports and the player's work keep LF line endings, whatever the host settings are.
 # One user inside the container; the repository folder is created per project at run time.
 # Git reads its settings from a read-only file of the image (GIT_CONFIG_GLOBAL) and ignores
