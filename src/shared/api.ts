@@ -173,6 +173,20 @@ export interface ProjectCard {
 
 export type ProjectDifficulty = 'beginner' | 'intermediate' | 'advanced';
 
+/** Where a service of the project is: not up yet, accepting connections, stopped, or killed for lack of memory. */
+export type ServiceState = 'starting' | 'ready' | 'failed' | 'oom';
+
+/** One service the project declares (a database, a cache), as the Dashboard shows it. */
+export interface ServiceStatus {
+  /** The name the project gives it, which is also its address on the workspace's network. */
+  name: string;
+  /** The image name from the catalog's list, such as postgres:17. */
+  image: string;
+  state: ServiceState;
+  /** Docker's or the server's own last words when it failed. */
+  reason?: string;
+}
+
 export interface Snapshot {
   state: GameState;
   /** The number the next unlocked ticket gets, or null when none can be taken now (one open, or none left). */
