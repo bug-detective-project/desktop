@@ -14,6 +14,7 @@ import { useTicketContent } from '../components/useTicketContent.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { Button, Card, LogView, SectionTitle, StagePill, Tooltip } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
+import { metaOfEntry, referenceIntroKey } from '@shared/ticketMeta.ts';
 
 /** "Open Review in VS Code": starts Docker Desktop first when it is stopped. */
 function OpenReviewButton({ snapshot, ticketNumber }: { snapshot: Snapshot; ticketNumber: number }) {
@@ -216,7 +217,7 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
       {/* An identical solution already shows the same diff (original → your solution) above. */}
       {!(comparison && isIdentical(comparison, showWhitespace)) && (
         <DropdownCard title={t('review.referenceSection')} testId="review-reference">
-          <p className="mb-4 text-base text-muted-foreground">{t('review.referenceIntro', { name: company(language).people.senior.name })}</p>
+          <p className="mb-4 text-base text-muted-foreground" data-testid="review-reference-intro">{t(referenceIntroKey(metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type), { name: company(language).people.senior.name })}</p>
           {content?.referencePatch && (
             <SplitDiff
               diff={content.referencePatch}

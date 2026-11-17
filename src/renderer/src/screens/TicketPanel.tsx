@@ -320,7 +320,7 @@ export function TicketPanel({
               )}
               {ticket.comments.length === 0 && !qaRunning && <p className="text-base text-muted-foreground">{t('ticket.noComments')}</p>}
               {[...ticket.comments].reverse().map((comment, index) => (
-                <QaCommentView key={comment.id} comment={comment} defaultOpen={index === 0} />
+                <QaCommentView key={comment.id} comment={comment} ticketType={metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type} defaultOpen={index === 0} />
               ))}
             </div>
           )}

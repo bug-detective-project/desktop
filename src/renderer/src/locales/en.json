@@ -325,8 +325,8 @@
     },
     "testing": "Testing",
     "trackBadge": "{{track}} track",
-    "solveBug": "Solve bug",
-    "solvedBug": "The reference fix is now in your code. Move the card to In QA to test it.",
+    "solveBug": "Solve ticket",
+    "solvedBug": "The reference solution is now in your code. Move the card to In QA to test it.",
     "move": "Move",
     "review": "Review"
   },
@@ -393,7 +393,14 @@
   "qa": {
     "comment": {
       "gate1Failed": "Existing functionality broke. Your change made project tests fail. Fix them before resubmitting.",
-      "gate2Failed": "The reported bug is still unresolved. The app still shows the behavior described in the ticket.",
+      "gate2FailedByType": {
+        "fix": "The reported bug is still unresolved. The app still shows the behavior described in the ticket.",
+        "build": "The ticket is not delivered yet. Part of what it asks for is still missing or does not work.",
+        "test": "Your test does not prove the bug yet. It must fail on the code with the bug and pass on the fixed code.",
+        "refactor": "The refactoring is not there yet. The behavior is intact, but the code has not reached the goal of the ticket.",
+        "optimize": "The goal of the ticket is not reached yet.",
+        "upgrade": "The upgrade is not complete yet. Part of the code still depends on the old version."
+      },
       "timeout": "Timeout: QA exceeded the time limit of {{seconds}} seconds, possibly because of a hang or infinite loop.",
       "passed": "Passed: ready for code review.",
       "outOfMemory": "QA stopped because the app used too much memory. That is usually a loop or a leak in the code.",
@@ -444,7 +451,14 @@
       "workKept": "Your code was restored. Your work in progress was kept as a commit, because new commits were made while the review of ticket {{ticket}} was open."
     },
     "referenceSection": "Diff: proposed solution with the original code",
-    "referenceIntro": "What {{name}} changed in the code the ticket started from to fix the bug.",
+    "referenceIntroByType": {
+      "fix": "What {{name}} changed in the code the ticket started from to fix the bug.",
+      "build": "What {{name}} changed in the code the ticket started from to deliver what the ticket asks.",
+      "test": "What {{name}} changed in the code the ticket started from to prove the bug with a test.",
+      "refactor": "What {{name}} changed in the code the ticket started from to reach the goal of the ticket without changing the behavior.",
+      "optimize": "What {{name}} changed in the code the ticket started from to reach the goal of the ticket.",
+      "upgrade": "What {{name}} changed in the code the ticket started from to complete the upgrade."
+    },
     "removedByReference": "Removed by the reference",
     "addedByReference": "Added by the reference",
     "doneNext": "Ticket done! Go to the Dashboard to get your next task.",
@@ -550,7 +564,7 @@
         "restoring": "restoring",
         "cleaningDocker": "Docker is being cleaned up",
         "removingDocker": "everything is being removed from Docker",
-        "solvingBug": "the bug is being solved (development)",
+        "solvingBug": "the ticket is being solved (development)",
         "switchingProject": "the project is being switched",
         "applyingCatalog": "the development settings are being applied",
         "rebuilding": "the workspace code is being recreated"
