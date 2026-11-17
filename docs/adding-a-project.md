@@ -185,9 +185,12 @@ A project whose code needs a database declares it in the same `bugDetective.proj
   variables. `db:reset` must reset every service the project declares, not only its main database.
 - The data of a service lives in a volume of its own and survives closing the app; it goes away
   with the project (a project switch, "Remove everything from Docker").
-- A project with services needs `minAppVersion` 1.2.0 in the catalog. Until that desktop version
-  is out, QA runs do not get their own services yet: the declaration can be developed and checked
-  with `bd verify`, but the project is not playable end to end.
+- Every QA run gets its own copy of each service, empty, on a network of that run alone, with
+  the same variables; it never sees the player's data. The QA CLI must therefore prepare the data
+  it needs (run the project's `db:reset`) before it tests.
+- When `db:reset` fails, "Try again" on the Dashboard recreates the services first; "Recreate
+  services" does the same for a service that does not start or ran out of memory.
+- A project with services needs `minAppVersion` 1.2.0 in the catalog.
 
 ### The QA CLI (`run.ts`)
 

@@ -48,6 +48,23 @@ const { values } = parseArgs({
   },
 });
 const ticket = Number(values.ticket);
+
+// A project with services: QA must reach the database it was given before it tests anything.
+if (process.env.DATABASE_URL && !values['deps-only']) {
+  const { connect } = await import('node:net');
+  const url = new URL(process.env.DATABASE_URL);
+  const reached = await new Promise<boolean>((resolve) => {
+    const socket = connect({ host: url.hostname, port: Number(url.port) });
+    socket.once('connect', () => (socket.destroy(), resolve(true)));
+    socket.once('error', () => resolve(false));
+    socket.setTimeout(10_000, () => (socket.destroy(), resolve(false)));
+  });
+  if (!reached) {
+    console.error(`The database of this QA run is not reachable at ${url.hostname}:${url.port}`);
+    process.exit(3);
+  }
+  console.log(`QA database reachable at ${url.hostname}:${url.port}`);
+}
 const timeoutSeconds = Number(values.timeout);
 const depsOnly = values['deps-only'] === true;
 if (!Number.isInteger(ticket) || !values.workspace || !(depsOnly ? values['deps-cache'] : values.package) || !(timeoutSeconds > 0)) {

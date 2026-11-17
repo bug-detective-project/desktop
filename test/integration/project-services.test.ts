@@ -43,6 +43,8 @@ let game: Game;
 /** The computer already had the image: then it is the player's and the app must leave it. */
 let hadImage = false;
 let imagesFile: string;
+/** Every line the game logged, QA output included. */
+const logLines: string[] = [];
 
 const text = async (args: string[]): Promise<string> => (await docker.run(args)).stdout.toString('utf8').trim();
 const psql = (sql: string) => docker.exec(SERVICE, ['psql', '-U', 'postgres', '-tAc', sql]);
@@ -61,6 +63,7 @@ function newGame(): Game {
     runtime,
     appVersion: '0.1.0-test',
     versions: { electron: 'none', node: process.versions.node, chrome: 'none' },
+    logLine: (line) => logLines.push(line),
   });
 }
 
@@ -137,6 +140,22 @@ describe("a project's services with real Docker", () => {
   it('records the image as its own only when it pulled it', async () => {
     const recorded = JSON.parse(await readFile(imagesFile, 'utf8').catch(() => '{"pulled":[]}')) as { pulled: string[] };
     expect(recorded.pulled).toEqual(hadImage ? [] : [REFERENCE]);
+  });
+
+  it('gives a QA run its own service, which QA reaches, and leaves no QA service or network behind', async () => {
+    await psql('create table player_only (id int)');
+    await game.move(1, 'inProgress');
+    await game.move(1, 'inQa');
+    await game.waitForQa();
+
+    const ticket = game.snapshot().state.tickets.find((item) => item.ticket === 1)!;
+    // The bug is still there: Gate 2 fails, which means QA ran to the end with its database.
+    expect(ticket.attempts.at(-1)!.result).toMatchObject({ gate: 2, status: 'failed' });
+    expect(logLines.join('\n')).toContain('QA database reachable at db:5432');
+    expect(await text(['container', 'ls', '--all', '--filter', 'label=bugdetective.role=qa-service', '--filter', `name=${PREFIX}`, '--format', '{{.Names}}'])).toBe('');
+    expect(await text(['network', 'ls', '--filter', 'label=bugdetective.role=qa-network', '--filter', `name=${PREFIX}`, '--format', '{{.Name}}'])).toBe('');
+    // The player's own database was not the one QA used.
+    expect((await psql("select count(*) from pg_tables where tablename = 'player_only'")).stdout.toString('utf8').trim()).toBe('1');
   });
 
   it('keeps the data when the app closes, and starts the service again with the next action', async () => {
