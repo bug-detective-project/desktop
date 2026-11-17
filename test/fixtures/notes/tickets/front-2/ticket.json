@@ -1,0 +1,8 @@
+{
+  "type": "build",
+  "bothSides": true,
+  "skills": {
+    "en": ["Building components", "Routes and navigation"],
+    "pt": ["Criação de componentes", "Criação de rotas e navegação"]
+  }
+}

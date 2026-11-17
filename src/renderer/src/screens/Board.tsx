@@ -10,6 +10,9 @@ import { ticketTitle } from '../components/ticketTitle.ts';
 import { STAGE } from '../components/stage.ts';
 import { Badge, Button, Spinner, TrackBadge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
+import { TicketTypeBadge } from '../components/TicketTypeBadge.tsx';
+import { metaOfEntry } from '@shared/ticketMeta.ts';
+import type { TicketMetaView } from '@shared/ticketMeta.ts';
 
 const DRAG_TYPE = 'application/x-bugdetective-ticket';
 
@@ -28,6 +31,7 @@ interface CardAction {
 
 function TicketCard({
   ticket,
+  meta,
   title,
   ticketKey,
   active,
@@ -42,6 +46,8 @@ function TicketCard({
   action,
 }: {
   ticket: TicketState;
+  /** The kind of work the ticket asks for, and whether it touches both sides. */
+  meta: TicketMetaView;
   title: string;
   ticketKey: string;
   /** The ticket the player is working on (In Progress). */
@@ -79,6 +85,7 @@ function TicketCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <TrackBadge track={ticket.track} />
+          <TicketTypeBadge type={meta.type} bothSides={meta.bothSides} />
           <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
         </div>
         {action && (
@@ -286,6 +293,7 @@ export function Board({
                   <TicketCard
                     key={ticket.ticket}
                     ticket={ticket}
+                    meta={metaOfEntry(snapshot.ticketMeta[ticket.ticket])}
                     title={ticketTitle(snapshot, ticket.ticket, language).text}
                     ticketKey={ticketTitle(snapshot, ticket.ticket, language).key}
                     active={ticket.ticket === state.currentTicket && ticket.status === 'inProgress'}

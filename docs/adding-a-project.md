@@ -101,7 +101,7 @@ on:
     branches: [main]
 jobs:
   app:
-    uses: bug-detective-project/catalog/.github/workflows/app.yml@190a406f36624dd65dfcfad88cb7a7e67677fda0 # v1.2.0
+    uses: bug-detective-project/catalog/.github/workflows/app.yml@cdbf7edfc3032ba6b34ddf36741c44cf8d2b369a # v1.3.0
 ```
 
 Protect `main` like `qa`: changes only through a pull request with the `app` check green.
@@ -149,7 +149,7 @@ manifest.json          written by bd publish (step 7)
     }
   },
   "devDependencies": {
-    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.2.0"
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.3.0"
   }
 }
 ```
@@ -202,8 +202,10 @@ tests use, [`test/fixtures/notes/qa/run.ts`](../test/fixtures/notes/qa/run.ts) (
 }
 ```
 
-`skills` are the **3 skills** the project trains (1 to 5 are accepted), shown under "You'll
-practice"; English and Portuguese need the same count. Assignment messages are keyed by ticket id
+`skills` are what the project trains (1 to 12), shown under "You'll practice": the card shows the
+first 5 and opens the rest with "See all", so put the main ones first. English and Portuguese need
+the same count. Skills are free text: write them with the names of the skills list in the product
+requirements (section 11.2), so every project speaks of a skill with the same words. Assignment messages are keyed by ticket id
 and never mention another ticket (tickets are played in any order).
 
 ### `review.json` (optional)
@@ -222,7 +224,7 @@ on:
     branches: [qa]
 jobs:
   project:
-    uses: bug-detective-project/catalog/.github/workflows/project.yml@190a406f36624dd65dfcfad88cb7a7e67677fda0 # v1.2.0
+    uses: bug-detective-project/catalog/.github/workflows/project.yml@cdbf7edfc3032ba6b34ddf36741c44cf8d2b369a # v1.3.0
     permissions:
       contents: write
 ```
@@ -254,6 +256,37 @@ picks a track for every ticket, so:
 | `hints.en.json`, `hints.pt.json` | `{ "hints": ["…", "…", "…"] }`, revealed one at a time |
 | `review.en.md`, `review.pt.md` | What the senior developer says in the code review |
 | `solution.en.md`, `solution.pt.md` | The explained solution |
+| `ticket.json` (optional) | The kind of work, the both-sides mark and the skills the ticket trains (below) |
+
+### `ticket.json`
+
+```json
+{
+  "type": "build",
+  "bothSides": false,
+  "skills": { "en": ["Building components"], "pt": ["Criação de componentes"] }
+}
+```
+
+| Field | Values | Without it |
+| --- | --- | --- |
+| `type` | `fix`, `build`, `complete`, `test`, `refactor`, `optimize`, `upgrade` or `investigate` | `fix` |
+| `bothSides` | `true` when the ticket needs changes in the front end and in the back end; it still belongs to one track, the one where the symptom shows | `false` |
+| `skills` | 1 to 5 skills per language, up to 60 characters each, the same count in `en` and `pt` | none |
+
+- The card and the "Get next assignment" menu show the type and the "Front + back" mark, so the
+  player knows what a ticket asks for before taking it.
+- The comment of a failed Gate 2 and the introduction of the reference in Code Review follow the
+  type: a `build` ticket is "not delivered yet", an `optimize` ticket has "a goal not reached".
+  Word the project's own QA messages (`run.ts`) the same way.
+- **The skills show only when the ticket is Done** ("You practiced"): before that they would hint
+  at the cause. Never name a skill in the ticket text either.
+- A ticket that is not a fix uses the same files: `bug.patch` is the diff from `main` that removes
+  the feature (`build`, `complete`), slows it down (`optimize`), leaves the old dependency
+  (`upgrade`) and so on; `gate2/` holds the acceptance tests or the measurement; `reference.patch`
+  is the reference solution. With the patch applied, Gate 1 must still pass.
+- A project with a ticket of a type other than `fix` needs `minAppVersion` 1.1.0 or newer in the
+  catalog (step 8): `bd catalog-check` requires it.
 
 ## 5. Build and verify the tickets
 
@@ -324,7 +357,8 @@ Open a pull request into the catalog's `main` adding the project to `projects.js
 - `hidden: true` keeps it off the Projects screen of players who never played it: useful for a
   first test with the installed app. Remove it to release the project.
 - `minAppVersion` keeps it from apps that cannot play it yet.
-- The array's order is the order of the cards; exactly one project is the `starter`.
+- The array's order is the order of the cards: the `starter` (exactly one) first, then the projects
+  from beginner to advanced. `bd catalog-check` refuses a project listed after a higher level.
 
 The catalog's check validates the file and every listed project before the merge. Players get the
 new list the next time the app refreshes the catalog (`raw.githubusercontent.com` may cache it for
@@ -363,8 +397,8 @@ the approval of a code owner of the organization.
 
 - [ ] Name and id agreed; repository created with `main` (dev on 5173 and 3001, `db:reset`, tests, ESLint and Prettier, `.npmrc`, the `Host` check, `ci.yml` calling `app.yml`).
 - [ ] The rules above: offline, dependencies from the registry and at least 7 days old, `.vscode/` and texts within the allowed lists.
-- [ ] `qa` worktree with `package.json` (`bugDetective.project` with `difficulty` and `stack`), `run.ts`, both stories (with 3 `skills`), `review.json`, `publication.yml`.
-- [ ] Every ticket folder complete; `bd build`, `bd verify` and `bd validate` pass.
+- [ ] `qa` worktree with `package.json` (`bugDetective.project` with `difficulty` and `stack`), `run.ts`, both stories (with their `skills`, the main ones first), `review.json`, `publication.yml`.
+- [ ] Every ticket folder complete, with its `ticket.json` when the ticket is not a plain fix or names skills; `bd build`, `bd verify` and `bd validate` pass.
 - [ ] Played end to end locally through `catalog.local.json`.
 - [ ] `qa` protected; `bd publish` and the pull request merged (`qa-v1.0.0`).
 - [ ] Catalog pull request merged (first `hidden`), checked in the installed app, then released.

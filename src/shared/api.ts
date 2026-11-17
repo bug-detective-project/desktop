@@ -1,5 +1,6 @@
 /** The typed contract between the renderer and the main process (exposed by the preload script). */
 import type { Column, GameState, Language, Settings, Track, TrackChoice } from './types.ts';
+import type { TicketMetaView, TicketType } from './ticketMeta.ts';
 
 export type EngineState = 'notInstalled' | 'notRunning' | 'starting' | 'running';
 export type CheckId = 'docker' | 'wsl' | 'vscode' | 'devcontainers';
@@ -141,7 +142,8 @@ export interface ProjectStory {
 
 /** A track's queue: its next ticket (or null when it is finished), and how many of its tickets are Done. */
 export interface TrackQueue {
-  next: { id: string; track: Track; title: Record<Language, string> } | null;
+  /** type and bothSides come from the ticket's entry in the manifest (a fix ticket, one side, without them). */
+  next: { id: string; track: Track; title: Record<Language, string>; type: TicketType; bothSides: boolean } | null;
   done: number;
   total: number;
 }
@@ -188,6 +190,13 @@ export interface Snapshot {
   /** While a project switch is pending: what Docker still holds of other projects. */
   projectSwitchLeft: { kind: 'container' | 'volume' | 'network' | 'image'; name: string }[] | null;
   titles: Record<number, Record<Language, string>>;
+  /** By ticket number: the kind of work of every unlocked ticket, and whether it touches the front end and the back end. */
+  ticketMeta: Record<number, TicketMetaView>;
+  /**
+   * By ticket number: the skills a ticket trained, only for Done tickets that name them. They hint at
+   * the cause, so the main process never sends them for a ticket that is not Done.
+   */
+  practiced: Record<number, Record<Language, string[]>>;
   hintsTotal: Record<number, number>;
   busy: BusyTask;
   /** Tickets were unlocked but the workspace holds no repository (its volume was removed outside the game): the code can be recreated. */

@@ -1676,3 +1676,71 @@ describe('Game with several projects', () => {
     expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first']);
   });
 });
+
+describe('ticket type and practiced skills', () => {
+  // The notes project: front-1 has no ticket.json (a fix ticket); front-2 is a build ticket that
+  // touches both sides and names two skills.
+  async function finish(game: Game, ticket: number) {
+    await game.move(ticket, 'inProgress');
+    await game.move(ticket, 'inQa');
+    await game.waitForQa();
+    await game.acceptReview(ticket);
+  }
+
+  it('says the type and the both-sides mark of every unlocked ticket, and of the next one', async () => {
+    const { game } = createGame({ scenario: { qa: ['passed', 'passed'] } });
+    await game.init();
+    expect(game.snapshot().queues!.front.next).toMatchObject({ id: 'front-1', type: 'fix', bothSides: false });
+    await game.nextAssignment();
+    expect(game.snapshot().ticketMeta).toEqual({ 1: { type: 'fix', bothSides: false } });
+    expect(game.snapshot().queues!.front.next).toMatchObject({ id: 'front-2', type: 'build', bothSides: true });
+
+    await finish(game, 1);
+    await game.nextAssignment();
+    expect(game.snapshot().ticketMeta[2]).toEqual({ type: 'build', bothSides: true });
+  });
+
+  it('keeps the skills of a ticket away from the screen until it is Done', async () => {
+    const { game } = createGame({ scenario: { qa: ['passed', 'passed'] } });
+    await game.init();
+    await game.nextAssignment();
+    await finish(game, 1);
+    await game.nextAssignment();
+    expect(game.snapshot().practiced).toEqual({});
+
+    await game.move(2, 'inProgress');
+    expect(game.snapshot().practiced).toEqual({});
+    await game.move(2, 'inQa');
+    await game.waitForQa();
+    expect(status(game, 2)).toBe('codeReview');
+    expect(game.snapshot().practiced).toEqual({});
+
+    await game.acceptReview(2);
+    expect(game.snapshot().practiced).toEqual({
+      2: { en: ['Building components', 'Routes and navigation'], pt: ['Criação de componentes', 'Criação de rotas e navegação'] },
+    });
+  });
+
+  it('shows nothing practiced for a Done ticket without skills', async () => {
+    const { game } = createGame({ scenario: { qa: ['passed'] } });
+    await game.init();
+    await game.nextAssignment();
+    await finish(game, 1);
+    expect(status(game)).toBe('done');
+    expect(game.snapshot().practiced).toEqual({});
+  });
+
+  it('knows the type and the skills again after a restart', async () => {
+    const first = createGame({ scenario: { qa: ['passed', 'passed'] } });
+    await first.game.init();
+    await first.game.nextAssignment();
+    await finish(first.game, 1);
+    await first.game.nextAssignment();
+    await finish(first.game, 2);
+
+    const { game } = createGame();
+    await game.init();
+    expect(game.snapshot().ticketMeta[2]).toEqual({ type: 'build', bothSides: true });
+    expect(game.snapshot().practiced[2].en).toEqual(['Building components', 'Routes and navigation']);
+  });
+});

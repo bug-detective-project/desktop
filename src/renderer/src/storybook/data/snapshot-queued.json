@@ -40,7 +40,9 @@
         "title": {
           "en": "An empty title shows nothing",
           "pt": "Um título vazio não mostra nada"
-        }
+        },
+        "type": "fix",
+        "bothSides": false
       },
       "done": 0,
       "total": 2
@@ -52,7 +54,9 @@
         "title": {
           "en": "Search is case-sensitive",
           "pt": "A busca diferencia maiúsculas"
-        }
+        },
+        "type": "fix",
+        "bothSides": false
       },
       "done": 0,
       "total": 1
@@ -64,7 +68,9 @@
         "title": {
           "en": "An empty title shows nothing",
           "pt": "Um título vazio não mostra nada"
-        }
+        },
+        "type": "fix",
+        "bothSides": false
       },
       "done": 0,
       "total": 3
@@ -118,6 +124,8 @@
   "starterNeedsUpdate": false,
   "projectSwitchLeft": null,
   "titles": {},
+  "ticketMeta": {},
+  "practiced": {},
   "hintsTotal": {},
   "busy": null,
   "workspaceLost": false,

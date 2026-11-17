@@ -4,12 +4,14 @@ import type { Snapshot } from '@shared/api.ts';
 import { TRACK_CHOICES } from '@shared/types.ts';
 import type { TrackChoice } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
+import { TicketTypeBadge } from './TicketTypeBadge.tsx';
 import { Button } from './ui.tsx';
 
 /**
  * "Get next assignment ▾": the player picks the track of the next ticket. Each item shows the
  * track's next ticket and progress; a finished track is disabled, a track without tickets is not
- * shown, and fullstack (offered when both tracks have tickets) says which track comes next.
+ * shown, and fullstack (offered when both tracks have tickets) says which track comes next. Each
+ * item also says the kind of work of that next ticket, and whether it touches both sides.
  */
 export function NextAssignmentMenu({
   snapshot,
@@ -100,7 +102,8 @@ export function NextAssignmentMenu({
               // A track without tickets is not offered; fullstack needs both tracks, and a ticket left.
               return choice === 'fullstack' ? queues.front.total > 0 && queues.back.total > 0 && queues.fullstack.next : queues[choice].total > 0;
             }).map((choice) => {
-              const finished = !snapshot.queues![choice].next;
+              const { next } = snapshot.queues![choice];
+              const finished = !next;
               return (
                 <button
                   key={choice}
@@ -111,7 +114,11 @@ export function NextAssignmentMenu({
                   className="flex flex-col items-start rounded-md px-3 py-2 text-left transition-colors enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   data-testid={`next-assignment-${choice}`}
                 >
-                  <span className="text-sm font-semibold text-foreground">{t(`dashboard.track.${choice}`)}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">{t(`dashboard.track.${choice}`)}</span>
+                    {/* What the next ticket of this track asks for, before the player takes it. */}
+                    {next && <TicketTypeBadge type={next.type} bothSides={next.bothSides} />}
+                  </span>
                   <span className="text-xs text-muted-foreground">{detail(choice)}</span>
                 </button>
               );

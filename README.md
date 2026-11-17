@@ -25,7 +25,7 @@ src/preload/           the typed window.bugDetective bridge
 src/renderer/          React UI (Tailwind): app header + Dashboard, Board, Settings, ticket panel, code review
 docs/                  design-system.md (tokens, components and screen layout)
 resources/icon.png     app icon (executable, installer, window); the header logo is src/renderer/src/assets/logo.png
-src/shared/            types, the Kanban state machine, QA message selection
+src/shared/            types, the Kanban state machine, QA message selection, ticket types
 docker/workspace/      the player's workspace image (+ the port forwarder)
 docker/qa/             the base of the QA image (Node 26, plus Playwright Chromium when the QA CLI uses Playwright); the app adds the project's QA CLI at run time
 content/               company.en.json, company.pt.json (the company, its people, and the texts shown before a
@@ -378,6 +378,8 @@ Each game project is one public repository in the `bug-detective-project` organi
 Tickets are named `<track>-<order>`, with the tracks `front` and `back` (`front-1`, `front-2`, …, `back-1`, …). The same name is the ticket's branch, its folder `tickets/<id>/` on `qa`, and its `id` in the manifest. The number of tickets comes from those folders; nothing in the app or the scripts assumes a count. The player picks the track of each ticket in **Get next assignment ▾** (front, back, or fullstack, which alternates), so tickets are played in any order; `bd build` makes each ticket's `gate1/` cover every other ticket.
 
 Projects publish with `bd`, the CLI of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) (see its README): on a work branch of `qa`, `npx bd build`, `npx bd verify` and `npx bd publish --version X.Y.Z`, then a pull request into the protected `qa`, whose `project / validate` check runs `bd validate` and `bd verify`; the merge publishes and is tagged `qa-vX.Y.Z`. Adding, hiding or reordering projects is a pull request to the catalog's `projects.json`; neither needs a new build of the app.
+
+A ticket may say what it is in `tickets/<id>/ticket.json`: its `type` (`fix` without the file, or `build`, `complete`, `test`, `refactor`, `optimize`, `upgrade`, `investigate`), whether it touches the front end and the back end (`bothSides`), and the skills it trains, as free text in English and Portuguese. The board, the ticket panel and the "Get next assignment" menu show the type and the "Front + back" mark; the comment of a failed Gate 2 and the introduction of the reference in Code Review are worded by type; and the skills appear only when the ticket is Done ("You practiced"), because before that they hint at the cause: the main process does not send them to the screen until then. A project lists up to 12 skills in its story; its card shows the first 5 and opens the rest with "See all".
 
 **Adding a new project:** the whole process, from an empty repository to the Projects screen (the `main` and `qa` requirements, the QA CLI contract, the story, the tickets, playing it locally, publishing and listing it in the catalog), is in [docs/adding-a-project.md](docs/adding-a-project.md).
 

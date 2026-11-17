@@ -353,12 +353,14 @@ test('the columns are framed cards with a placeholder when empty, in English and
   }
 });
 
-test('a card shows only its key and title, and "Test failed" only after a failed QA run', async () => {
+test('a card shows only its track, type, key and title, and "Test failed" only after a failed QA run', async () => {
   const { page, close } = await launch({ qa: ['gate2', 'passed'], qaDelayMs: 1500 });
   try {
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
-    await expect(card).toHaveText(new RegExp(`^Front${supportdesk.key('front-1')}`));
+    // SupportDesk's tickets are fix tickets: the type tag sits between the track and the key.
+    await expect(card).toHaveText(new RegExp(`^FrontFix${supportdesk.key('front-1')}`));
+    await expect(card.getByTestId('ticket-both-sides')).toHaveCount(0);
     await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await expect(page.getByTestId('board').getByRole('button', { name: /VS Code|Browser/ })).toHaveCount(0);
@@ -495,7 +497,7 @@ test('an unread message that is shown open counts as read, without clicking it',
   }
 });
 
-test('"Solve bug" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON is on', async () => {
+test('"Solve ticket" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON is on', async () => {
   const off = await launch();
   try {
     await startFirstTicket(off.page);
@@ -511,7 +513,7 @@ test('"Solve bug" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE
     await expect(page.getByTestId('solve-bug')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await page.getByTestId('solve-bug').click();
-    await expect(page.getByTestId('toast-info').last()).toContainText('reference fix is now in your code');
+    await expect(page.getByTestId('toast-info').last()).toContainText('reference solution is now in your code');
     // The click stays on the button: the ticket panel does not open.
     await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
   } finally {

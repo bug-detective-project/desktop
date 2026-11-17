@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { qaMessage } from '@shared/qaMessages.ts';
+import { gate2FailedKey } from '@shared/ticketMeta.ts';
+import type { TicketType } from '@shared/ticketMeta.ts';
 import type { QaComment as Comment } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
 import { Badge } from './ui.tsx';
@@ -15,8 +17,8 @@ const TONE = {
   branchWarning: 'warn',
 } as const;
 
-/** One QA comment; with defaultOpen, the dropdown of that run's errors starts expanded (the latest run). */
-export function QaCommentView({ comment, defaultOpen = false }: { comment: Comment; defaultOpen?: boolean }) {
+/** One QA comment, worded for the kind of ticket it is about; with defaultOpen, the dropdown of that run's errors starts expanded (the latest run). */
+export function QaCommentView({ comment, ticketType, defaultOpen = false }: { comment: Comment; ticketType: TicketType; defaultOpen?: boolean }) {
   const { t, i18n } = useTranslation();
   const message = qaMessage(comment);
   return (
@@ -28,7 +30,10 @@ export function QaCommentView({ comment, defaultOpen = false }: { comment: Comme
         </Badge>
         <time>{new Date(comment.at).toLocaleString(i18n.language === 'pt' ? 'pt-BR' : 'en-US')}</time>
       </header>
-      <p className="text-base">{t(`qa.comment.${message.key}`, message.params)}</p>
+      {/* A failed Gate 2 means something else for each kind of ticket: a bug still there, a goal not reached… */}
+      <p className="text-base" data-testid="qa-comment-text">
+        {t(message.key === 'gate2Failed' ? gate2FailedKey(ticketType) : `qa.comment.${message.key}`, message.params)}
+      </p>
       {(message.failing.length > 0 || message.unfinished.length > 0) && (
         // The errors of one QA run, grouped in a dropdown under that run's comment.
         <details className="group mt-3 rounded-lg border border-border" open={defaultOpen} data-testid="qa-errors">

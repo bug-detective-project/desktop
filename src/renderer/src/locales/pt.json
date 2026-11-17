@@ -325,10 +325,23 @@
     },
     "testing": "Em teste",
     "trackBadge": "Trilha {{track}}",
-    "solveBug": "Resolver bug",
-    "solvedBug": "A correção de referência está no seu código. Mova o card para Em QA para testá-la.",
+    "solveBug": "Resolver ticket",
+    "solvedBug": "A solução de referência está no seu código. Mova o card para Em QA para testá-la.",
     "move": "Mover",
     "review": "Revisão"
+  },
+  "ticketType": {
+    "title": "O tipo de trabalho que este ticket pede",
+    "fix": "Consertar",
+    "build": "Construir",
+    "complete": "Completar",
+    "test": "Escrever o teste",
+    "refactor": "Refatorar",
+    "optimize": "Otimizar",
+    "upgrade": "Atualizar",
+    "investigate": "Investigar",
+    "bothSides": "Front + back",
+    "bothSidesTitle": "Este ticket pede mudanças no front-end e no back-end"
   },
   "ticket": {
     "tabs": {
@@ -375,12 +388,20 @@
       "onlyInProgress": "Mova o card para Em andamento para pedir ajuda.",
       "noMoreHints": "Não há mais dicas. Você pode pedir a solução completa."
     },
-    "vscodeHint": "O VS Code abre conectado ao container do workspace. Se já houver uma janela do VS Code deste workspace aberta e desconectada (depois de uma atualização ou restauração), feche-a ou rode \"Developer: Reload Window\" nela."
+    "vscodeHint": "O VS Code abre conectado ao container do workspace. Se já houver uma janela do VS Code deste workspace aberta e desconectada (depois de uma atualização ou restauração), feche-a ou rode \"Developer: Reload Window\" nela.",
+    "practiced": "Você praticou"
   },
   "qa": {
     "comment": {
       "gate1Failed": "Uma funcionalidade existente quebrou. Sua alteração fez testes do projeto falharem. Corrija-os antes de reenviar.",
-      "gate2Failed": "O bug reportado ainda não foi resolvido. A aplicação ainda apresenta o comportamento descrito no ticket.",
+      "gate2FailedByType": {
+        "fix": "O bug reportado ainda não foi resolvido. A aplicação ainda apresenta o comportamento descrito no ticket.",
+        "build": "O ticket ainda não foi entregue. Parte do que ele pede ainda falta ou não funciona.",
+        "test": "Seu teste ainda não prova o bug. Ele precisa falhar no código com o bug e passar no código corrigido.",
+        "refactor": "A refatoração ainda não chegou lá. O comportamento está intacto, mas o código não atingiu a meta do ticket.",
+        "optimize": "A meta do ticket ainda não foi atingida.",
+        "upgrade": "A atualização ainda não está completa. Parte do código ainda depende da versão antiga."
+      },
       "timeout": "Timeout: o QA excedeu o limite de {{seconds}} segundos, possivelmente por causa de um travamento ou loop infinito.",
       "passed": "Aprovado: pronto para code review.",
       "outOfMemory": "O QA parou porque a aplicação usou memória demais. Em geral é um loop ou um vazamento no código.",
@@ -431,7 +452,14 @@
       "workKept": "Seu código foi restaurado. O seu trabalho em andamento ficou guardado como um commit, porque houve novos commits enquanto o review do ticket {{ticket}} estava aberto."
     },
     "referenceSection": "Diff solução proposta com o código original",
-    "referenceIntro": "O que {{name}} mudou no código com que o ticket começou para corrigir o bug.",
+    "referenceIntroByType": {
+      "fix": "O que {{name}} mudou no código com que o ticket começou para corrigir o bug.",
+      "build": "O que {{name}} mudou no código com que o ticket começou para entregar o que o ticket pede.",
+      "test": "O que {{name}} mudou no código com que o ticket começou para provar o bug com um teste.",
+      "refactor": "O que {{name}} mudou no código com que o ticket começou para atingir a meta do ticket sem mudar o comportamento.",
+      "optimize": "O que {{name}} mudou no código com que o ticket começou para atingir a meta do ticket.",
+      "upgrade": "O que {{name}} mudou no código com que o ticket começou para completar a atualização."
+    },
     "removedByReference": "Removido pela referência",
     "addedByReference": "Adicionado pela referência",
     "doneNext": "Ticket concluído! Vá para o Painel para pegar a próxima tarefa.",
@@ -537,7 +565,7 @@
         "restoring": "restaurando",
         "cleaningDocker": "o Docker está sendo limpo",
         "removingDocker": "tudo está sendo removido do Docker",
-        "solvingBug": "o bug está sendo resolvido (desenvolvimento)",
+        "solvingBug": "o ticket está sendo resolvido (desenvolvimento)",
         "switchingProject": "o projeto está sendo trocado",
         "rebuilding": "o código do workspace está sendo recriado",
         "applyingCatalog": "as configurações de desenvolvimento estão sendo aplicadas"
@@ -718,7 +746,10 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Banco de dados",
+    "briefRegion": "Especificações do projeto",
     "practice": "Você vai praticar",
+    "seeAllSkills": "Ver todas ({{count}})",
+    "fewerSkills": "Mostrar menos",
     "search": {
       "label": "Buscar projetos",
       "placeholder": "Buscar por nome, stack ou habilidade",

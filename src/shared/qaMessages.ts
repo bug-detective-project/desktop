@@ -5,7 +5,7 @@
 import type { QaComment } from './types.ts';
 
 export interface QaMessage {
-  /** i18n key under "qa.comment". */
+  /** i18n key under "qa.comment"; gate2Failed is worded by ticket type (gate2FailedKey in ticketMeta.ts). */
   key: 'gate1Failed' | 'gate2Failed' | 'timeout' | 'outOfMemory' | 'passed' | 'interrupted' | 'error' | 'branchWarning';
   params: Record<string, string | number>;
   /** Failing tests to list under the message, with their errors. */

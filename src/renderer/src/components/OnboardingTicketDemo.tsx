@@ -89,7 +89,7 @@ export function OnboardingTicketDemo({ tab }: { tab: DemoTab }) {
       </div>
       <div className="min-h-0 flex-1 overflow-hidden p-5" data-onboarding-demo="content">
         {tab === 'ticket' && <Markdown>{t('onboarding.demo.ticketMarkdown')}</Markdown>}
-        {tab === 'qa' && <QaCommentView comment={failed} defaultOpen />}
+        {tab === 'qa' && <QaCommentView comment={failed} ticketType="fix" defaultOpen />}
         {tab === 'history' && (
           <div className="space-y-6">
             <section>
