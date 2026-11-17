@@ -101,6 +101,9 @@ beforeAll(async () => {
     contextRoot: join(root, 'build', 'docker'),
     qaBuildRoot: join(root, 'build', 'qa-contexts'),
     prefix: PREFIX,
+    // Its own QA image: the last test removes everything of the project, and the other test files
+    // share the default repository.
+    qaRepository: `${PREFIX}-qa-image`,
     serviceImagesFile: imagesFile,
   });
   await (await workspace()).destroy();
@@ -119,7 +122,10 @@ afterAll(async () => {
   }
   await docker.removeContainer(`${PREFIX}-forward-notes`);
   await docker.removeNetwork(NETWORK).catch(() => {});
-  // The image goes only when this test brought it.
+  for (const image of (await text(['image', 'ls', '--filter', `reference=${PREFIX}-qa-image`, '--format', '{{.Repository}}:{{.Tag}}'])).split('\n').filter(Boolean)) {
+    await docker.removeImage(image, { force: true }).catch(() => {});
+  }
+  // The service image goes only when this test brought it.
   if (!hadImage && (await docker.imageExists(REFERENCE))) {
     await docker.removeImage(REFERENCE, { force: true }).catch(() => {});
   }
