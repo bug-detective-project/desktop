@@ -2,9 +2,11 @@
  * The notes fixture (test/fixtures/notes) laid out like a published project, in a temporary
  * folder: `main` from main/, the `qa` worktree from qa/ plus tickets/<id>/, and one single-commit
  * branch per ticket (main with the file from tickets/<id>/buggy/). Each ticket's bug.patch and
- * reference.patch are made here with git, and its gate1/ is main's test/ folder.
+ * reference.patch are made here with git, and its gate1/ is main's test/ folder. front-2 has a
+ * ticket.json (a build ticket that touches both sides); the others have none, so they are fix tickets.
  */
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { cp, readdir, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import type { ProjectRepo } from './project-repo.ts';
@@ -64,6 +66,10 @@ export async function createNotesProject(dir: string): Promise<ProjectRepo> {
     const to = join(qaDir, 'tickets', id);
     for (const file of TICKET_TEXTS) {
       await cp(join(from, file), join(to, file));
+    }
+    // Optional: the ticket's type, both-sides mark and skills.
+    if (existsSync(join(from, 'ticket.json'))) {
+      await cp(join(from, 'ticket.json'), join(to, 'ticket.json'));
     }
     await cp(join(from, 'gate2'), join(to, 'gate2'), { recursive: true });
     await cp(join(NOTES_FIXTURE, 'main', 'test'), join(to, 'gate1', 'test'), { recursive: true });

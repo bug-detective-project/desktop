@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectStackSchema, treeDigest } from '@bug-detective/catalog/contract';
+import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectStackSchema, ticketMetaOf, treeDigest } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectManifest, TicketEntry } from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
 
@@ -184,6 +184,8 @@ export async function buildManifest(options: BuildManifestOptions): Promise<Proj
       codeDigest: treeDigest(codeFiles),
       codeFiles: codeFiles.length,
       package: { path: `tickets/${id}`, files: packageFiles.length, digest: treeDigest(packageFiles) },
+      // tickets/<id>/ticket.json: the type, the both-sides mark and the skills, when the ticket declares them.
+      ...ticketMetaOf(packageFiles, id),
     });
   }
 
