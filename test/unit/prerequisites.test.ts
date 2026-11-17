@@ -57,7 +57,7 @@ describe('prerequisite check', () => {
   it('shows the engine version without Docker Desktop, and never fails a check because a version is unreadable', async () => {
     const engineOnly: Answer = (command, args) =>
       command === 'docker' && args.includes('{{.Server.Version}}|{{.Server.Platform.Name}}') ? ok('27.3.1|Docker Engine - Community\n') : healthy(command, args);
-    expect((await new Prerequisites(fakePlatform(engineOnly)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '27.3.1' });
+    expect((await new Prerequisites(fakePlatform(engineOnly)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '27.3.1', memoryBytes: 16777216000 });
 
     const noVersions: Answer = (command, args) => (args.includes('--version') && command !== 'docker' ? ok('', 1) : healthy(command, args));
     const report = await new Prerequisites(fakePlatform(noVersions, { installed: true, version2: true, detail: '' })).check();
@@ -136,18 +136,19 @@ describe('Docker state and the other checks when something is missing', () => {
   it('refuses Docker Desktop in Windows containers mode, and warns when the engine has little memory', async () => {
     const windowsContainers: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('windows 16777216000\n') : healthy(command, args));
     const refused = await new Prerequisites(fakePlatform(windowsContainers)).check();
-    expect(refused.checks[0]).toEqual({ id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' });
+    expect(refused.checks[0]).toEqual({ id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1', memoryBytes: 16777216000 });
     expect(refused.allOk).toBe(false);
     expect(refused.dockerState).toBe('running');
 
     const lowMemory: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('linux 3221225472\n') : healthy(command, args));
     const warned = await new Prerequisites(fakePlatform(lowMemory)).check();
-    expect(warned.checks[0]).toEqual({ id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1' });
+    expect(warned.checks[0]).toEqual({ id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1', memoryBytes: 3221225472 });
     expect(warned.allOk).toBe(true);
 
     // Exactly 4 GiB is enough; an unreadable `docker info` never fails the check.
     const enough: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('linux 4294967296\n') : healthy(command, args));
-    expect((await new Prerequisites(fakePlatform(enough)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
+    // The check carries the engine's memory, which the project switch compares with what a project needs.
+    expect((await new Prerequisites(fakePlatform(enough)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1', memoryBytes: 4294967296 });
     const noInfo: Answer = (command, args) => (command === 'docker' && args[0] === 'info' ? ok('', 1) : healthy(command, args));
     expect((await new Prerequisites(fakePlatform(noInfo)).check()).checks[0]).toEqual({ id: 'docker', status: 'ok', version: '4.37.1' });
   });
