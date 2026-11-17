@@ -137,6 +137,7 @@
       "serviceImages": "Imagens dos serviços"
     },
     "retryReset": "Tentar de novo",
+    "workspaceOutOfMemory": "O workspace foi parado porque ficou sem memória, e já está rodando de novo. Se continuar acontecendo, aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory).",
     "recreateServices": {
       "button": "Recriar serviços",
       "title": "Recriar os serviços?",
@@ -755,6 +756,8 @@
     "confirmTitle": "Trocar para {{name}}?",
     "confirmRemoved": "O projeto atual sai do seu computador: o código dele no Docker, as imagens e as dependências são removidos.",
     "confirmKept": "O seu progresso, os tickets concluídos e os PRs ficam guardados, e você pode voltar depois (ele é baixado de novo). Exporte um backup antes se quiser uma cópia do seu código.",
+    "memory": "Memória",
+    "memoryWarning": "Este projeto precisa de cerca de {{needed}} de memória no pico e o Docker tem {{available}}. Ele pode ficar lento ou parar por falta de memória. Você pode trocar mesmo assim e aumentar a memória do Docker depois (Docker Desktop: Settings, Resources, Memory).",
     "exportFirst": "Exportar backup",
     "confirm": "Trocar de projeto",
     "switched": "{{name}} é o seu projeto agora.",

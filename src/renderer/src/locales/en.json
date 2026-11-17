@@ -137,6 +137,7 @@
       "serviceImages": "Service images"
     },
     "retryReset": "Try again",
+    "workspaceOutOfMemory": "The workspace was stopped because it ran out of memory, and it is running again. If it keeps happening, increase Docker's memory (Docker Desktop: Settings, Resources, Memory).",
     "recreateServices": {
       "button": "Recreate services",
       "title": "Recreate the services?",
@@ -755,6 +756,8 @@
     "confirmTitle": "Switch to {{name}}?",
     "confirmRemoved": "The current project leaves your computer: its code in Docker, its images and its dependencies are removed.",
     "confirmKept": "Your progress, completed tickets and PRs are kept, and you can come back later (it is downloaded again). Export a backup first if you want a copy of your code.",
+    "memory": "Memory",
+    "memoryWarning": "This project needs about {{needed}} of memory at its peak and Docker has {{available}}. It may run slowly or stop for lack of memory. You can switch anyway and raise Docker's memory later (Docker Desktop: Settings, Resources, Memory).",
     "exportFirst": "Export backup",
     "confirm": "Switch project",
     "switched": "{{name}} is your project now.",

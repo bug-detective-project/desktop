@@ -260,7 +260,8 @@
         "counts": {
           "front": 2,
           "back": 1
-        }
+        },
+        "memoryBytes": null
       },
       "progress": {
         "front": {
@@ -297,6 +298,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "workspaceOutOfMemoryAt": null,
   "services": [],
   "workspaceInternet": false,
   "catalogRefresh": null,
@@ -306,7 +308,8 @@
       {
         "id": "docker",
         "status": "ok",
-        "version": "4.37.1"
+        "version": "4.37.1",
+        "memoryBytes": 8589934592
       },
       {
         "id": "wsl",

@@ -1268,11 +1268,21 @@ describe('Game with several projects', () => {
     });
   });
 
-  it('a project without a stack or skills gets null and empty lists', async () => {
+  it('a project card says how much memory a project with services needs at its peak', async () => {
+    const services = { db: { image: 'postgres:17', variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+    const { make } = await twoProjects(undefined, 1, { services });
+    const game = make();
+    await game.init();
+    const cards = game.snapshot().projects!;
+    // Workspace 3 GB, the service 256 MB, QA 2 GB and the service of QA 256 MB.
+    expect(cards.find((card) => card.id === 'first')?.details?.memoryBytes).toBe(5.5 * 1024 ** 3);
+  });
+
+  it('a project without a stack, skills or services gets null and empty lists', async () => {
     const { make } = await twoProjects();
     const game = make();
     await game.init();
-    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] } });
+    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] }, memoryBytes: null });
   });
 
   it('fetches the next ticket of a project that moved from the repository the catalog now names', async () => {
@@ -1742,6 +1752,24 @@ describe('ticket type and practiced skills', () => {
     await game.init();
     expect(game.snapshot().ticketMeta[2]).toEqual({ type: 'build', bothSides: true });
     expect(game.snapshot().practiced[2].en).toEqual(['Building components', 'Routes and navigation']);
+  });
+});
+
+describe('a workspace stopped for lack of memory', () => {
+  it('is logged and shown on the Dashboard with when it happened, and stays shown after the workspace is back', async () => {
+    const { game, runtime } = createGame({ clock: () => new Date('2026-11-17T12:00:00.000Z') });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBeNull();
+
+    runtime.simulate({ workspaceOutOfMemory: true });
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
+    expect(game.snapshot().log.join('\n')).toContain('» The workspace was stopped because it ran out of memory');
+
+    // The next check finds the workspace running again: the notice stays until the app restarts.
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
   });
 });
 

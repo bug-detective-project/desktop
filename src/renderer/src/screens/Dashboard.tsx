@@ -636,6 +636,9 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
     }
   }
   const outOfMemory = (snapshot.services ?? []).some((service) => service.state === 'oom')
+  // Shown until closed; a later occurrence (another time) shows it again.
+  const [dismissedOom, setDismissedOom] = useState<string | null>(null)
+  const workspaceOom = snapshot.workspaceOutOfMemoryAt && snapshot.workspaceOutOfMemoryAt !== dismissedOom ? snapshot.workspaceOutOfMemoryAt : null
   const docker = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState
   // The report is only made after an unlock or a restore: ask for it as soon as Docker runs.
   const unchecked = docker === 'running' && snapshot.environment === null
@@ -703,6 +706,21 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
         {snapshot.state.tickets.length > 0 && <InternetRow snapshot={snapshot} />}
       </ul>
+      {workspaceOom && (
+        <div
+          className="flex items-start gap-2"
+          data-testid="workspace-out-of-memory"
+        >
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t('dashboard.workspaceOutOfMemory')}</p>
+          <Button
+            size="xs"
+            onClick={() => setDismissedOom(workspaceOom)}
+            data-testid="workspace-out-of-memory-dismiss"
+          >
+            {t('common.close')}
+          </Button>
+        </div>
+      )}
       {outOfMemory && (
         <p
           className="text-xs text-muted-foreground"

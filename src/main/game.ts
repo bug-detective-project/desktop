@@ -36,7 +36,7 @@ import { StaleVSCodeWindowError } from './services/attached-window.ts';
 import { createSave, readSave } from './services/backup.ts';
 import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry, TicketMeta } from '@bug-detective/catalog/contract';
-import { TICKET_META_FILE, parseTicketMeta } from '@bug-detective/catalog/contract';
+import { TICKET_META_FILE, parseTicketMeta, peakMemory } from '@bug-detective/catalog/contract';
 import { metaOfEntry } from '../shared/ticketMeta.ts';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
@@ -181,6 +181,7 @@ export class Game {
   private dbResetFailed = false;
   /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
   private services: ServiceStatus[] = [];
+  private workspaceOutOfMemoryAt: string | null = null;
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
   private readonly unavailableProjects = new Set<string>();
   /** When the last catalog refresh failed, or null after one that succeeded. */
@@ -585,6 +586,7 @@ export class Game {
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
       services: this.services,
+      workspaceOutOfMemoryAt: this.workspaceOutOfMemoryAt,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
       dockerState: this.dockerState,
@@ -786,6 +788,11 @@ export class Game {
 
   async refreshEnvironment(): Promise<EnvironmentReport> {
     await this.requireDocker();
+    // Asked first: the environment check below starts a stopped workspace again, and the reason is then gone.
+    if (await this.options.runtime.workspaceOutOfMemory().catch(() => false)) {
+      this.workspaceOutOfMemoryAt = (this.options.clock?.() ?? new Date()).toISOString();
+      this.appendLog('» The workspace was stopped because it ran out of memory');
+    }
     this.environment = await this.options.runtime.environment();
     if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
       await this.checkWorkspace();
@@ -1079,6 +1086,7 @@ export class Game {
           skills: { en: story.en.project.skills ?? [], pt: story.pt.project.skills ?? [] },
           difficulty: content.manifest.project.difficulty ?? null,
           counts: countsOf(content.manifest),
+          memoryBytes: Object.keys(content.manifest.project.services ?? {}).length > 0 ? peakMemory(content.manifest.project) : null,
         };
       }
       const progress = item.id === active ? { tickets: this.state.tickets, tracks: this.state.tracks } : (this.state.otherProjects[item.id] ?? null);

@@ -14,6 +14,8 @@ export interface CheckResult {
   detail?: string;
   /** Version of the tool, when it could be read (Docker Desktop or engine, VS Code, the extension, WSL). */
   version?: string;
+  /** The memory the Docker engine has, in bytes (only on the docker check, when Docker answers). */
+  memoryBytes?: number;
 }
 
 export interface PrerequisiteReport {
@@ -167,6 +169,8 @@ export interface ProjectCard {
     skills: Record<Language, string[]>;
     difficulty: ProjectDifficulty | null;
     counts: Record<Track, number>;
+    /** The memory the project needs at its peak (workspace, services, a QA run and its services), in bytes; null for a project without services. */
+    memoryBytes: number | null;
   } | null;
   progress: Record<Track, { done: number; total: number }> | null;
   /** appTooOld: the project needs a newer Bug Detective (its minAppVersion, or a newer content format); projectUnavailable: its repository or qa ref could not be found. */
@@ -219,6 +223,8 @@ export interface Snapshot {
   workspaceLost: boolean;
   /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
   dbResetFailed: boolean;
+  /** When the workspace container was last found stopped for lack of memory (ISO time), or null; kept until the app restarts. */
+  workspaceOutOfMemoryAt: string | null;
   /** The services the active project declares and where each one is; empty for a project without services. */
   services: ServiceStatus[];
   /** The player opened the workspace to the internet (it also reaches the computer and the local network); the game closes it on the next ticket. */

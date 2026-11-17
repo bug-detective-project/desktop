@@ -58,6 +58,16 @@ export const RecreateServices: Story = {
     await expect(recreateServices).toHaveBeenCalledTimes(1);
   },
 };
+/** The workspace was killed for lack of memory: said once, with what to do, until the player closes it. */
+export const WorkspaceOutOfMemory: Story = {
+  render: show(() => snapshotFixture('active', { workspaceOutOfMemoryAt: '2026-11-17T12:00:00.000Z' })),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('workspace-out-of-memory')).toHaveTextContent("increase Docker's memory");
+    await userEvent.click(canvas.getByTestId('workspace-out-of-memory-dismiss'));
+    await expect(canvas.queryByTestId('workspace-out-of-memory')).toBeNull();
+  },
+};
 export const ProjectServicesInPortuguese: Story = {
   ...ProjectServices,
   globals: { locale: 'pt' },

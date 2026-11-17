@@ -51,6 +51,8 @@ export interface GameRuntime {
   setProject(project: string, name?: string): void;
   /** The services and the memory the project declares in its manifest; null until its content is known. */
   setResources(resources: ProjectResources | null): void;
+  /** True when the workspace container is stopped because the kernel killed it for exceeding its memory limit. Asked before the container is started again. */
+  workspaceOutOfMemory(): Promise<boolean>;
   /** Removes the project's service containers and their data, and creates them again, empty. The code and the progress are not touched. */
   recreateServices(): Promise<void>;
   /** Where each service of the project is, creating and starting nothing; empty without services. */
@@ -207,6 +209,12 @@ export class DockerRuntime implements GameRuntime {
       network: networkName(this.names.prefix, this.project),
       services: this.declared,
     });
+  }
+
+  async workspaceOutOfMemory(): Promise<boolean> {
+    const docker = await this.docker();
+    const info = await docker.inspectContainer(this.names.container);
+    return info !== null && !info.running && (await docker.oomKilled(this.names.container));
   }
 
   async recreateServices(): Promise<void> {

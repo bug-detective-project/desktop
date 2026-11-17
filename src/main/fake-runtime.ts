@@ -189,6 +189,7 @@ export class FakeRuntime implements GameRuntime {
   private stages = new Map<number, string>();
   private devServerUp = false;
   private resources: ProjectResources | null = null;
+  private workspaceOom = false;
 
   constructor(json?: string) {
     this.scenario = { ...DEFAULT_SCENARIO, ...(json ? (JSON.parse(json) as Partial<Scenario>) : {}) };
@@ -200,8 +201,8 @@ export class FakeRuntime implements GameRuntime {
     const dockerCheck = (): PrerequisiteReport['checks'][number] => {
       if (docker !== 'running') return { id: 'docker', status: 'missing', reason: docker };
       if (dockerOs !== 'linux') return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
-      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1' };
-      return { id: 'docker', status: 'ok', version: '4.37.1' };
+      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1', memoryBytes: dockerMemoryBytes };
+      return { id: 'docker', status: 'ok', version: '4.37.1', memoryBytes: dockerMemoryBytes };
     };
     const checks: PrerequisiteReport['checks'] = [
       dockerCheck(),
@@ -242,6 +243,13 @@ export class FakeRuntime implements GameRuntime {
 
   setResources(resources: ProjectResources | null): void {
     this.resources = resources;
+  }
+
+  /** Reported once: the next check finds the workspace started again. */
+  async workspaceOutOfMemory(): Promise<boolean> {
+    const killed = this.workspaceOom;
+    this.workspaceOom = false;
+    return killed;
   }
 
   /** How many times the services were recreated (for the tests). */
@@ -472,6 +480,7 @@ export class FakeRuntime implements GameRuntime {
     devServerUp?: boolean;
     workspaceLost?: boolean;
     dbResetFails?: boolean;
+    workspaceOutOfMemory?: boolean;
     dockerOs?: 'linux' | 'windows';
     dockerMemoryBytes?: number;
     freeDiskBytes?: number | null;
@@ -486,6 +495,7 @@ export class FakeRuntime implements GameRuntime {
     if (change.freeDiskBytes !== undefined) this.scenario.freeDiskBytes = change.freeDiskBytes;
     if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
+    if (change.workspaceOutOfMemory !== undefined) this.workspaceOom = change.workspaceOutOfMemory;
     if (change.workspaceLost) {
       // The volume went: no stages, no branch, as a fresh repository-less workspace.
       this.stages.clear();
