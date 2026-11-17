@@ -34,7 +34,9 @@ import type { GameRuntime } from './runtime.ts';
 import { StaleVSCodeWindowError } from './services/attached-window.ts';
 import { createSave, readSave } from './services/backup.ts';
 import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry, TicketMeta } from '@bug-detective/catalog/contract';
+import { TICKET_META_FILE, parseTicketMeta } from '@bug-detective/catalog/contract';
+import { metaOfEntry } from '../shared/ticketMeta.ts';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './services/content/source.ts';
@@ -164,6 +166,8 @@ export class Game {
   private log: string[] = [];
   private titles: Snapshot['titles'] = {};
   private hintsTotal: Record<number, number> = {};
+  /** By ticket number: the ticket.json of each unlocked ticket's package ({} without one). */
+  private ticketMeta: Record<number, TicketMeta> = {};
   private qaRun: Promise<void> | null = null;
   /** The app is quitting: a QA run killed by the shutdown is recorded as interrupted, not as an error. */
   private shuttingDown = false;
@@ -516,12 +520,28 @@ export class Game {
       const id = rules.nextIdFor(this.state, counts, choice);
       const track = choice === 'fullstack' ? undefined : choice;
       return {
-        next: id ? { id, track: id.split('-')[0] as Track, title: this.titleOf(id) } : null,
+        next: id ? { id, track: id.split('-')[0] as Track, title: this.titleOf(id), ...metaOfEntry(this.content?.manifest.entries.find((entry) => entry.id === id)) } : null,
         done: done(track),
         total: track ? counts[track] : counts.front + counts.back,
       };
     };
     return { front: queue('front'), back: queue('back'), fullstack: queue('fullstack') };
+  }
+
+  private ticketMetaView(): Snapshot['ticketMeta'] {
+    return Object.fromEntries(this.state.tickets.map((ticket) => [ticket.ticket, metaOfEntry(this.ticketMeta[ticket.ticket])]));
+  }
+
+  /** The skills of the Done tickets that name them. The skills of any other ticket stay in the main process. */
+  private practiced(): Snapshot['practiced'] {
+    const practiced: Snapshot['practiced'] = {};
+    for (const ticket of this.state.tickets) {
+      const skills = this.ticketMeta[ticket.ticket]?.skills;
+      if (ticket.status === 'done' && skills) {
+        practiced[ticket.ticket] = skills;
+      }
+    }
+    return practiced;
   }
 
   /** The number of the next ticket, when one can be taken now. */
@@ -551,6 +571,8 @@ export class Game {
       starterNeedsUpdate: this.state.tickets.length === 0 && Object.keys(this.state.otherProjects).length === 0 && this.activeProjectNeedsUpdate(),
       projectSwitchLeft: this.state.projectSwitch ? this.leftovers : null,
       titles: this.titles,
+      ticketMeta: this.ticketMetaView(),
+      practiced: this.practiced(),
       hintsTotal: this.hintsTotal,
       busy: this.busy,
       workspaceLost: this.workspaceLost,
@@ -663,6 +685,9 @@ export class Game {
       this.titles[ticket.ticket] = titles;
       const hints = await this.packages.readText(ticket.ticket, 'hints.en.json');
       this.hintsTotal[ticket.ticket] = hints ? (JSON.parse(hints) as { hints: string[] }).hints.length : HINTS_PER_TICKET;
+      // The package was verified against the manifest, whose entry repeats this file.
+      const meta = await this.packages.readText(ticket.ticket, TICKET_META_FILE);
+      this.ticketMeta[ticket.ticket] = meta ? parseTicketMeta(JSON.parse(meta), `tickets/${ticket.id}/${TICKET_META_FILE}`) : {};
     }
   }
 
@@ -933,6 +958,7 @@ export class Game {
       await this.useContent(content);
       this.titles = {};
       this.hintsTotal = {};
+      this.ticketMeta = {};
       await this.loadTicketMeta();
       this.appendLog(`» Removing ${from} from Docker`);
       const left = await this.cleanOtherProjects();
