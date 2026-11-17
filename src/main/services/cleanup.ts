@@ -47,8 +47,9 @@ export function isQaContainer(name: string, prefix: string): boolean {
 /**
  * The resources to remove, containers first (they hold volumes, networks and images), then
  * volumes, networks and images.
- * leftovers: QA containers, the QA input volume, images of other app versions and the forwarder
- * and network of a project that is not the active one; the player's work stays.
+ * leftovers: QA containers, the QA input volume, images of other app versions and the forwarder,
+ * the network, the services and the service data of a project that is not the active one; the
+ * player's work stays.
  * everything: every container, volume, network and image of the app, including the player's code.
  */
 export function planCleanup(found: LabelledResources, options: CleanupPlanOptions): CleanupTarget[] {
@@ -62,8 +63,16 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
     return Boolean(options.activeProject) && name.startsWith(stem) && name !== `${stem}${options.activeProject}`;
   };
 
-  const containers = found.containers.filter((name) => ours(name) && (everything || isQaContainer(name, options.prefix) || orphan(name, 'forward')));
-  const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume));
+  // A service or its data is named <prefix>-svc-<project>-<service> and <prefix>-svcdata-<project>-<service>-<n>:
+  // one that does not start with the active project's stem belongs to a project that was left. A
+  // project whose id starts with the active one's (shop, shop-two) is kept: when in doubt, stay.
+  const orphanService = (name: string, kind: 'svc' | 'svcdata') =>
+    Boolean(options.activeProject) && name.startsWith(`${options.prefix}-${kind}-`) && !name.startsWith(`${options.prefix}-${kind}-${options.activeProject}-`);
+
+  const containers = found.containers.filter(
+    (name) => ours(name) && (everything || isQaContainer(name, options.prefix) || orphan(name, 'forward') || orphanService(name, 'svc')),
+  );
+  const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume || orphanService(name, 'svcdata')));
   const networks = found.networks.filter((name) => ours(name) && (everything || orphan(name, 'net')));
   const images = found.images.filter(({ ref }) => {
     // Untagged images with the app's label ("<none>:<none>", or "repository:<none>") are what a rebuild leaves behind.

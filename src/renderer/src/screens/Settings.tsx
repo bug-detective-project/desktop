@@ -274,6 +274,9 @@ function formatBytes(bytes: number, language: string): string {
   return `${new Intl.NumberFormat(locale(language), { maximumFractionDigits: 1 }).format(value)} ${unit}`;
 }
 
+const DISK_ITEMS = ['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const;
+const SERVICE_DISK_ITEMS = ['serviceData', 'serviceImages'] as const;
+
 function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number }) {
   const { t, i18n } = useTranslation();
   const [items, setItems] = useState<DiskUsageItem[] | null>(null);
@@ -302,7 +305,8 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
         <p className="text-base text-muted-foreground">{t('settings.diskNeedsDocker')}</p>
       ) : (
         <div className="grid grid-cols-4 gap-3">
-          {(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache'] as const).map((id) => {
+          {/* The four items every project has, then the two of a project with services, when the runtime lists them. */}
+          {[...DISK_ITEMS, ...SERVICE_DISK_ITEMS.filter((id) => items?.some((entry) => entry.id === id))].map((id) => {
             const item = items?.find((entry) => entry.id === id);
             return (
               <div key={id} className="min-w-0 rounded-lg border border-border/60 bg-card p-3" data-testid={`disk-${id}`}>

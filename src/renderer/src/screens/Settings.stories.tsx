@@ -18,6 +18,38 @@ export const DeveloperTools: Story = tab('environment');
 export const ProgressAndBackup: Story = tab('backup');
 export const About: Story = tab('about');
 export const Development: Story = tab('development');
+/** A project with services: their data and their images are two more items of the disk usage. */
+export const DiskUsageWithServices: Story = {
+  parameters: {
+    api: {
+      diskUsage: async () => [
+        { id: 'workspaceVolume', bytes: 1_120_000_000 },
+        { id: 'workspaceImage', bytes: 1_240_000_000 },
+        { id: 'qaImage', bytes: 3_010_000_000 },
+        { id: 'qaCache', bytes: 412_000_000 },
+        { id: 'serviceData', bytes: 118_000_000 },
+        { id: 'serviceImages', bytes: 471_000_000 },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('settings-tab-environment'));
+    await expect(await canvas.findByTestId('disk-serviceData')).toHaveTextContent('Service data');
+    await expect(canvas.getByTestId('disk-serviceData')).toHaveTextContent('118 MB');
+    await expect(canvas.getByTestId('disk-serviceImages')).toHaveTextContent('Service images');
+    await expect(canvas.getByTestId('disk-serviceImages')).toHaveTextContent('471 MB');
+  },
+};
+/** A project without services shows the four items it always had. */
+export const DiskUsageWithoutServices: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('settings-tab-environment'));
+    await expect(await canvas.findByTestId('disk-qaCache')).toBeVisible();
+    await expect(canvas.queryByTestId('disk-serviceData')).toBeNull();
+  },
+};
 const foreignSave = { token: '00000000-0000-4000-8000-000000000001', summary: { fileName: 'bug-detective-2026-11-04.bdsave', createdAt: '2026-11-04T10:00:00.000Z', appVersion: '0.1.0', ticketsDone: 2, currentTicket: 3, overwritesProgress: true, fromThisInstall: false } };
 
 /** Restoring a save made on another computer: the dialog warns that it brings code that will run in the workspace. */
