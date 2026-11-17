@@ -80,3 +80,16 @@ export const NotDoneNeverShowsSkills: Story = {
     await expect(body.queryByTestId('ticket-practiced')).toBeNull();
   },
 };
+
+/** A skill may be 60 characters long: the tag wraps inside the header instead of widening the panel. */
+export const DoneWithALongSkill: Story = {
+  render: () => {
+    const long = { en: ['Tracing a request across services and message queues, end to'], pt: ['Rastrear uma requisição entre serviços e filas de mensagens'] };
+    return <TicketPanel snapshot={withTicket('done', { 1: long })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />;
+  },
+  play: async ({ canvasElement }) => {
+    const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');
+    await expect(within(practiced).getByRole('listitem').textContent).toHaveLength(60);
+    await expect(practiced.scrollWidth).toBeLessThanOrEqual(practiced.clientWidth);
+  },
+};
