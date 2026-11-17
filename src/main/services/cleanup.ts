@@ -44,6 +44,11 @@ export function isQaContainer(name: string, prefix: string): boolean {
   return name.startsWith(`${prefix}-qa-`);
 }
 
+/** A service or a network of a QA run: they live only while the run does, so one that is listed between runs is a leftover. */
+export function isQaService(name: string, prefix: string): boolean {
+  return name.startsWith(`${prefix}-qasvc-`) || name.startsWith(`${prefix}-qanet-`);
+}
+
 /**
  * The resources to remove, containers first (they hold volumes, networks and images), then
  * volumes, networks and images.
@@ -70,10 +75,10 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
     Boolean(options.activeProject) && name.startsWith(`${options.prefix}-${kind}-`) && !name.startsWith(`${options.prefix}-${kind}-${options.activeProject}-`);
 
   const containers = found.containers.filter(
-    (name) => ours(name) && (everything || isQaContainer(name, options.prefix) || orphan(name, 'forward') || orphanService(name, 'svc')),
+    (name) => ours(name) && (everything || isQaContainer(name, options.prefix) || isQaService(name, options.prefix) || orphan(name, 'forward') || orphanService(name, 'svc')),
   );
   const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume || orphanService(name, 'svcdata')));
-  const networks = found.networks.filter((name) => ours(name) && (everything || orphan(name, 'net')));
+  const networks = found.networks.filter((name) => ours(name) && (everything || orphan(name, 'net') || isQaService(name, options.prefix)));
   const images = found.images.filter(({ ref }) => {
     // Untagged images with the app's label ("<none>:<none>", or "repository:<none>") are what a rebuild leaves behind.
     if (untagged(ref)) {

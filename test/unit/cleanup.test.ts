@@ -108,6 +108,18 @@ describe('Docker cleanup plan', () => {
     expect(plan.indexOf('container bugdetective-svc-second-db')).toBeLessThan(plan.indexOf('volume bugdetective-svcdata-second-db-0'));
   });
 
+  it('leftovers: the services and the network of a QA run go, whichever the project', () => {
+    const withQaRun: LabelledResources = {
+      ...found,
+      containers: [...found.containers, 'bugdetective-qasvc-first-db-1a2b3c4d'],
+      networks: [...found.networks, 'bugdetective-qanet-first-1a2b3c4d'],
+    };
+    const plan = planCleanup(withQaRun, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    expect(plan).toContain('container bugdetective-qasvc-first-db-1a2b3c4d');
+    expect(plan).toContain('network bugdetective-qanet-first-1a2b3c4d');
+    expect(plan.indexOf('container bugdetective-qasvc-first-db-1a2b3c4d')).toBeLessThan(plan.indexOf('network bugdetective-qanet-first-1a2b3c4d'));
+  });
+
   it('leftovers: without a known active project, no service is taken', () => {
     const withServices: LabelledResources = { ...found, containers: [...found.containers, 'bugdetective-svc-second-db'], volumes: [...found.volumes, 'bugdetective-svcdata-second-db-0'] };
     const plan = planCleanup(withServices, { ...options, scope: 'leftovers' }).map((target) => target.name).join('\n');

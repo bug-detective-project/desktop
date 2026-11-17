@@ -334,6 +334,7 @@ export class DockerRuntime implements GameRuntime {
       dockerHostPath: (path) => this.platform.dockerHostPath(path),
       names: this.names,
       project: this.project,
+      services: this.declared,
     });
   }
 
