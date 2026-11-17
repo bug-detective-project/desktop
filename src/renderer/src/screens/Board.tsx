@@ -82,12 +82,15 @@ function TicketCard({
         active ? 'border-primary/40' : 'border-border'
       } ${movable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <TrackBadge track={ticket.track} />
-          <TicketTypeBadge type={meta.type} bothSides={meta.bothSides} />
-          <p className="font-mono text-sm font-medium text-primary">{ticketKey}</p>
-        </div>
+      {/* The tags have a line of their own and wrap inside it; the key starts the line below. */}
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="card-tags">
+        <TrackBadge track={ticket.track} />
+        <TicketTypeBadge type={meta.type} bothSides={meta.bothSides} />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate font-mono text-sm font-medium text-primary" data-testid="card-key">
+          {ticketKey}
+        </p>
         {action && (
           // A click on the card opens the ticket; this button keeps its own click to itself.
           <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
