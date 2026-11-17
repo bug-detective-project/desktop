@@ -495,7 +495,7 @@ test('an unread message that is shown open counts as read, without clicking it',
   }
 });
 
-test('"Solve bug" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON is on', async () => {
+test('"Solve ticket" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON is on', async () => {
   const off = await launch();
   try {
     await startFirstTicket(off.page);
@@ -511,7 +511,7 @@ test('"Solve bug" shows on the card in progress only when BUGDETECTIVE_DEV_SOLVE
     await expect(page.getByTestId('solve-bug')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await page.getByTestId('solve-bug').click();
-    await expect(page.getByTestId('toast-info').last()).toContainText('reference fix is now in your code');
+    await expect(page.getByTestId('toast-info').last()).toContainText('reference solution is now in your code');
     // The click stays on the button: the ticket panel does not open.
     await expect(page.getByTestId('ticket-panel')).toHaveCount(0);
   } finally {
