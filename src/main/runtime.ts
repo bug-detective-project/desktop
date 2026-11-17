@@ -212,9 +212,9 @@ export class DockerRuntime implements GameRuntime {
   }
 
   /**
-   * The services come up before the workspace, on the same internal network. A missing image is
-   * pulled first (and recorded as the app's); a service that fails does not stop the workspace:
-   * servicesStatus() says which one and why.
+   * The services come up before the workspace, on the same internal network, once their images
+   * are on this computer. A service that fails does not stop the workspace: servicesStatus() says
+   * which one and why.
    */
   private async ensureServices(): Promise<void> {
     const services = await this.projectServices();
@@ -223,10 +223,10 @@ export class DockerRuntime implements GameRuntime {
     }
     const docker = await this.docker();
     await docker.createInternalNetwork(networkName(this.names.prefix, this.project), 'network', this.project);
-    try {
-      await (await this.serviceImages()).ensure(this.declared, () => {});
-    } catch {
-      // Offline or the registry refused: each service then fails to start and reports it.
+    // Nothing is downloaded here: the images come with "Download and install", which needs the
+    // internet and says so. Until then the services are simply not up yet.
+    if ((await (await this.serviceImages()).missing(this.declared)).length > 0) {
+      return;
     }
     await services.ensureRunning();
   }

@@ -72,3 +72,19 @@ describe('removing other projects from Docker', () => {
     expect(await runtimeWith(stubborn).removeProjects(['old'])).toEqual([{ kind: 'volume', name: 'bugdetective-workspace' }]);
   });
 });
+
+describe("a project's services and the internet", () => {
+  const services = { db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'shop' } } };
+
+  it('never downloads a service image, nor starts the service, outside "Download and install"', async () => {
+    const { docker, calls } = recordingDocker({ containers: {}, volumes: {}, images: {} });
+    const withoutImage = Object.assign(Object.create(docker), { imageExists: async () => false }) as Docker;
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    (runtime as unknown as Record<string, unknown>).docker = async () => withoutImage;
+    runtime.setProject('shop');
+    runtime.setResources({ services });
+
+    await (runtime as unknown as { ensureServices: () => Promise<void> }).ensureServices();
+    expect(calls.filter((call) => call[0] === 'pull' || call[0] === 'run')).toEqual([]);
+  });
+});
