@@ -494,7 +494,14 @@ export interface WorkspaceOptions {
   project?: string | null;
   /** The project's display name, for the git identity ("<name> Developer"). Defaults to the id. */
   projectName?: string | null;
+  /** The variables of the project's services (their addresses), set on the container: the dev server, the terminals and VS Code all see them. */
+  variables?: Record<string, string>;
+  /** The workspace memory the project asks for; the app's default when it asks for none. */
+  memory?: string;
 }
+
+/** Changes when the variables or the memory of the workspace do: the container is then recreated, its volumes kept. */
+export const ENV_KEY_LABEL = 'bugdetective.env-key';
 
 export class Workspace {
   private readonly docker: Docker;
@@ -504,6 +511,8 @@ export class Workspace {
   private readonly project: string | null;
   private readonly projectName: string | null;
   private runtimeKey: string | null = null;
+  private readonly variables: Record<string, string>;
+  private readonly memory: string | undefined;
 
   constructor(options: WorkspaceOptions) {
     this.docker = options.docker;
@@ -512,6 +521,17 @@ export class Workspace {
     this.names = options.names ?? resourceNames();
     this.project = options.project ?? null;
     this.projectName = options.projectName ?? null;
+    this.variables = options.variables ?? {};
+    this.memory = options.memory;
+  }
+
+  /** A short hash of the variables and the memory the container is created with; empty when the project declares neither. */
+  private get envKey(): string {
+    const variables = Object.entries(this.variables).sort(([a], [b]) => a.localeCompare(b));
+    if (variables.length === 0 && this.memory === undefined) {
+      return '';
+    }
+    return createHash('sha256').update(JSON.stringify([variables, this.memory ?? null])).digest('hex').slice(0, 16);
   }
 
   /** The project's repository folder in the container. */
@@ -632,7 +652,9 @@ export class Workspace {
       '--name',
       this.names.container,
       ...labelArgs('workspace', this.project),
-      ...limitArgs(containerLimits('workspace')),
+      ...(this.envKey ? ['--label', `${ENV_KEY_LABEL}=${this.envKey}`] : []),
+      ...limitArgs(containerLimits('workspace', process.env, this.memory ? { memory: this.memory } : {})),
+      ...Object.entries(this.variables).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
       '--network',
       this.network,
       '--mount',
@@ -676,8 +698,9 @@ export class Workspace {
     await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
     await this.docker.createInternalNetwork(this.network, 'network', this.project);
     let info = await this.info();
-    if (info && (info.image !== this.image || !info.networks.includes(this.network))) {
-      // A newer app version ships a newer image, or the container is of another project's network: recreate it, keep the volumes.
+    if (info && (info.image !== this.image || !info.networks.includes(this.network) || (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey)) {
+      // A newer app version ships a newer image, the container is of another project's network, or the
+      // project's services or memory changed: recreate it, keep the volumes.
       await this.docker.removeContainer(this.names.container);
       info = null;
     }
