@@ -137,6 +137,13 @@
       "serviceImages": "Imagens dos serviços"
     },
     "retryReset": "Tentar de novo",
+    "recreateServices": {
+      "button": "Recriar serviços",
+      "title": "Recriar os serviços?",
+      "text": "Os serviços do projeto, como o banco de dados, são removidos e criados de novo, vazios, e os dados da aplicação são gravados outra vez. O que você salvou neles é apagado. O seu código e o seu progresso ficam.",
+      "confirm": "Recriar serviços",
+      "outOfMemory": "Um serviço foi parado porque ficou sem memória. Aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory) e depois recrie os serviços."
+    },
     "envStatus": {
       "ready": "Pronto",
       "missing": "Faltando",
@@ -706,6 +713,7 @@
     "githubRateLimited": "O GitHub limitou os downloads temporariamente (comum em redes compartilhadas). Tente de novo em alguns minutos.",
     "projectUnavailable": "O projeto não está disponível agora: o repositório ou a publicação não foram encontrados.",
     "dbResetFailed": "Os dados da aplicação não puderam ser reiniciados. Veja o log do Docker e tente de novo.",
+    "noServices": "Este projeto não tem serviços para recriar.",
     "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
     "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",

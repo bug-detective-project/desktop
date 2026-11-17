@@ -101,6 +101,23 @@ describe('environmentRows, the services of the project', () => {
     expect([row.tone, row.status, row.busy]).toEqual(['neutral', 'dashboard.envStatus.notYet', false]);
   });
 
+  it('offers to recreate the services once, on the first service that stopped', () => {
+    const rows = environmentRows(
+      snapshot({
+        environment: ready,
+        services: [
+          { name: 'db', image: 'postgres:17', state: 'ready' },
+          { name: 'audit', image: 'postgres:17', state: 'failed' },
+          { name: 'queue', image: 'postgres:17', state: 'oom' },
+        ],
+      }),
+      t,
+    );
+    expect(rows.filter((row) => row.action === 'recreateServices').map((row) => row.id)).toEqual(['service-audit']);
+    const healthy = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready' }] }), t);
+    expect(healthy.some((row) => row.action === 'recreateServices')).toBe(false);
+  });
+
   it('a failed service makes the summary a danger', () => {
     const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }), t);
     expect(environmentSummary(rows)).toBe('danger');

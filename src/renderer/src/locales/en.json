@@ -137,6 +137,13 @@
       "serviceImages": "Service images"
     },
     "retryReset": "Try again",
+    "recreateServices": {
+      "button": "Recreate services",
+      "title": "Recreate the services?",
+      "text": "The project's services, such as its database, are removed and created again, empty, and the app data is seeded again. Whatever you saved in them is erased. Your code and your progress stay.",
+      "confirm": "Recreate services",
+      "outOfMemory": "A service was stopped because it ran out of memory. Increase Docker's memory (Docker Desktop: Settings, Resources, Memory), then recreate the services."
+    },
     "envStatus": {
       "ready": "Ready",
       "missing": "Missing",
@@ -706,6 +713,7 @@
     "githubRateLimited": "GitHub temporarily limited the downloads (common on shared networks). Try again in a few minutes.",
     "projectUnavailable": "The project is not available right now: its repository or publication could not be found.",
     "dbResetFailed": "The app data could not be reset. Check the Docker log and try again.",
+    "noServices": "This project has no services to recreate.",
     "incompletePublication": "The project's publication is incomplete. Try again later.",
     "switchIncomplete": "The project switch is not finished: {{message}}",
     "otherProjectsLeft": "Docker still has another project: {{message}}",

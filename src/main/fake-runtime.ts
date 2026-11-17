@@ -244,6 +244,15 @@ export class FakeRuntime implements GameRuntime {
     this.resources = resources;
   }
 
+  /** How many times the services were recreated (for the tests). */
+  recreateCalls = 0;
+
+  /** A recreation fixes whatever the scenario had broken. */
+  async recreateServices(): Promise<void> {
+    this.recreateCalls += 1;
+    delete this.scenario.serviceFailure;
+  }
+
   /** Every declared service is ready once the environment is installed, except the one the scenario breaks. */
   async servicesStatus(): Promise<ServiceStatus[]> {
     const failure = this.scenario.serviceFailure;

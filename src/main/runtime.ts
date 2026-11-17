@@ -51,6 +51,8 @@ export interface GameRuntime {
   setProject(project: string, name?: string): void;
   /** The services and the memory the project declares in its manifest; null until its content is known. */
   setResources(resources: ProjectResources | null): void;
+  /** Removes the project's service containers and their data, and creates them again, empty. The code and the progress are not touched. */
+  recreateServices(): Promise<void>;
   /** Where each service of the project is, creating and starting nothing; empty without services. */
   servicesStatus(): Promise<ServiceStatus[]>;
   /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
@@ -205,6 +207,15 @@ export class DockerRuntime implements GameRuntime {
       network: networkName(this.names.prefix, this.project),
       services: this.declared,
     });
+  }
+
+  async recreateServices(): Promise<void> {
+    const services = await this.projectServices();
+    if (!services) {
+      return;
+    }
+    await services.removeAll();
+    await this.ensureServices();
   }
 
   async servicesStatus(): Promise<ServiceStatus[]> {

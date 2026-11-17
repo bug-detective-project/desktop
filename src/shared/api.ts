@@ -340,6 +340,8 @@ export interface BugDetectiveApi {
   reportRendererError(message: string, stack: string): Promise<void>;
   /** Runs `npm run db:reset` again after a failed reset (the Dashboard's "Try again"). */
   retryDatabaseReset(): Promise<void>;
+  /** Removes and recreates the project's services, with empty data, and reseeds them; the code and the progress stay. */
+  recreateServices(): Promise<void>;
   /** Opens the workspace container to the internet, or closes it again. */
   setWorkspaceInternet(on: boolean): Promise<void>;
   /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */

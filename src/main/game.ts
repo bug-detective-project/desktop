@@ -849,16 +849,47 @@ export class Game {
     }
   }
 
+  private async recreateProjectServices(): Promise<void> {
+    this.appendLog("» Recreating the project's services (their data is erased)");
+    await this.options.runtime.recreateServices();
+  }
+
+  /**
+   * "Recreate services" on the Dashboard, for a service that does not start or died: new
+   * containers and empty data, then the reset script seeds them. The code and the progress stay.
+   */
+  async recreateServices(): Promise<void> {
+    if (this.busy) {
+      throw new GameError('busy', `Busy: ${this.busy}`);
+    }
+    await this.requireDocker();
+    this.requireWorkspace();
+    if (this.services.length === 0) {
+      throw new GameError('noServices');
+    }
+    await this.recreateProjectServices();
+    await this.resetDatabase();
+    if (this.dbResetFailed) {
+      throw new GameError('dbResetFailed');
+    }
+  }
+
   /** An error the renderer's error boundary caught: logged, so a diagnostics copy carries it. */
   async reportRendererError(message: string, stack: string): Promise<void> {
     this.appendLog(`» Renderer error: ${message}`);
     this.options.logLine?.(stack);
   }
 
-  /** "Try again" after a failed reset; fails with dbResetFailed when it fails again. */
+  /**
+   * "Try again" after a failed reset; fails with dbResetFailed when it fails again. A project with
+   * services gets them recreated first: the reset script cannot fix a server that is broken.
+   */
   async retryDatabaseReset(): Promise<void> {
     await this.requireDocker();
     this.requireWorkspace();
+    if (this.services.length > 0) {
+      await this.recreateProjectServices();
+    }
     await this.resetDatabase();
     if (this.dbResetFailed) {
       throw new GameError('dbResetFailed');

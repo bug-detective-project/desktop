@@ -41,6 +41,23 @@ export const ProjectServices: Story = {
     await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Stopped: out of memory');
   },
 };
+/** A stopped service offers "Recreate services", which says first what is erased and what stays. */
+const recreateServices = fn(async () => {});
+export const RecreateServices: Story = {
+  ...ProjectServices,
+  parameters: { api: { recreateServices } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByTestId('recreate-services')).toHaveLength(1);
+    await expect(canvas.getByTestId('services-out-of-memory')).toHaveTextContent("Increase Docker's memory");
+    await userEvent.click(canvas.getByTestId('recreate-services'));
+    const dialog = within(canvasElement.ownerDocument.body);
+    await expect(dialog.getByTestId('recreate-services-warning')).toHaveTextContent('Your code and your progress stay.');
+    await expect(recreateServices).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByTestId('recreate-services-confirm'));
+    await expect(recreateServices).toHaveBeenCalledTimes(1);
+  },
+};
 export const ProjectServicesInPortuguese: Story = {
   ...ProjectServices,
   globals: { locale: 'pt' },

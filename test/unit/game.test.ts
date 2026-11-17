@@ -1809,6 +1809,50 @@ describe('the services of a project', () => {
     expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
   });
 
+  it('"Recreate services" recreates them, reseeds the data and clears a failed service', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'data directory is corrupted' } } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services[0]!.state).toBe('failed');
+    const reset = vi.spyOn(runtime, 'resetDatabase');
+
+    await game.recreateServices();
+    expect(runtime.recreateCalls).toBe(1);
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+    expect(game.snapshot().log.join('\n')).toContain("» Recreating the project's services (their data is erased)");
+  });
+
+  it('retrying a failed database reset recreates the services first, when the project has any', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().dbResetFailed).toBe(true);
+
+    runtime.simulate({ dbResetFails: false });
+    await game.retryDatabaseReset();
+    expect(runtime.recreateCalls).toBe(1);
+    expect(game.snapshot().dbResetFailed).toBe(false);
+  });
+
+  it('retrying a failed database reset of a project without services recreates nothing', async () => {
+    const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
+    await game.init();
+    await game.nextAssignment();
+    runtime.simulate({ dbResetFails: false });
+    await game.retryDatabaseReset();
+    expect(runtime.recreateCalls).toBe(0);
+  });
+
+  it('refuses to recreate services while another task runs, and for a project without services', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    await expect(game.recreateServices()).rejects.toMatchObject({ code: 'noServices' });
+  });
+
   it('refuses an invalid declaration, naming the field', async () => {
     await declare({ services: { db: { image: 'mysql:8' } } });
     const { game } = createGame();

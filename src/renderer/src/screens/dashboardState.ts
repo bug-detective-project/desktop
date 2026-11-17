@@ -31,8 +31,8 @@ export interface EnvRow {
   status: string
   /** A spinner replaces the icon. */
   busy: boolean
-  /** The row offers an action ("Try again" after a failed database reset). */
-  action?: 'retryDatabaseReset'
+  /** The row offers an action: "Try again" after a failed database reset, "Recreate services" on the first service that stopped. */
+  action?: 'retryDatabaseReset' | 'recreateServices'
 }
 
 /** Approximate download sizes, shown next to the environment items. */
@@ -97,6 +97,13 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
   if (snapshot.environment?.items.some((entry) => entry.id === 'serviceImages')) {
     rows.push(itemRow({ id: 'serviceImages', icon: 'package' }))
   }
+  // One button recreates every service: it goes on the first one that stopped.
+  let offered = false
+  const recreate = (): { action?: 'recreateServices' } => {
+    if (offered) return {}
+    offered = true
+    return { action: 'recreateServices' }
+  }
   for (const service of snapshot.services ?? []) {
     const base = { id: `service-${service.name}` as const, icon: 'hardDrive' as const, name: `${service.name} · ${service.image}` }
     if (service.state === 'ready') {
@@ -109,11 +116,11 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
           : { ...base, tone: 'neutral', status: t('dashboard.envStatus.notYet'), busy: false },
       )
     } else if (service.state === 'oom') {
-      rows.push({ ...base, tone: 'danger', status: t('dashboard.envStatus.serviceOutOfMemory'), busy: false })
+      rows.push({ ...base, tone: 'danger', status: t('dashboard.envStatus.serviceOutOfMemory'), busy: false, ...recreate() })
     } else {
       // Docker's or the server's own words are not translated: they are what a search will find.
       const stopped = t('dashboard.envStatus.serviceStopped')
-      rows.push({ ...base, tone: 'danger', status: service.reason ? `${stopped}: ${service.reason}` : stopped, busy: false })
+      rows.push({ ...base, tone: 'danger', status: service.reason ? `${stopped}: ${service.reason}` : stopped, busy: false, ...recreate() })
     }
   }
   if (snapshot.dbResetFailed) {

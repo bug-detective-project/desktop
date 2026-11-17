@@ -622,6 +622,20 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
       setRetrying(false)
     }
   }
+  const [confirmingRecreate, setConfirmingRecreate] = useState(false)
+  const [recreating, setRecreating] = useState(false)
+  const recreateServices = async () => {
+    setConfirmingRecreate(false)
+    setRecreating(true)
+    try {
+      await api.recreateServices()
+    } catch (error) {
+      toast.error(error)
+    } finally {
+      setRecreating(false)
+    }
+  }
+  const outOfMemory = (snapshot.services ?? []).some((service) => service.state === 'oom')
   const docker = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState
   // The report is only made after an unlock or a restore: ask for it as soon as Docker runs.
   const unchecked = docker === 'running' && snapshot.environment === null
@@ -673,11 +687,54 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
                 {t('dashboard.retryReset')}
               </Button>
             )}
+            {row.action === 'recreateServices' && (
+              <Button
+                size="sm"
+                busy={recreating}
+                disabled={recreating || snapshot.busy !== null || snapshot.dockerState !== 'running'}
+                onClick={() => setConfirmingRecreate(true)}
+                data-testid="recreate-services"
+              >
+                {t('dashboard.recreateServices.button')}
+              </Button>
+            )}
           </li>
         ))}
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
         {snapshot.state.tickets.length > 0 && <InternetRow snapshot={snapshot} />}
       </ul>
+      {outOfMemory && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="services-out-of-memory"
+        >
+          {t('dashboard.recreateServices.outOfMemory')}
+        </p>
+      )}
+      {confirmingRecreate && (
+        <Modal
+          title={t('dashboard.recreateServices.title')}
+          onClose={() => setConfirmingRecreate(false)}
+          data-testid="recreate-services-dialog"
+        >
+          <Notice data-testid="recreate-services-warning">{t('dashboard.recreateServices.text')}</Notice>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button
+              onClick={() => setConfirmingRecreate(false)}
+              data-testid="recreate-services-cancel"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void recreateServices()}
+              data-testid="recreate-services-confirm"
+            >
+              {t('dashboard.recreateServices.confirm')}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </section>
   )
 }
