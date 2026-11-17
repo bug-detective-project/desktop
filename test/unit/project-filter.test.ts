@@ -66,6 +66,14 @@ describe('filterProjects', () => {
     expect(ids(filterProjects(cards, { query: '', level }, 'en'))).toEqual(expected);
   });
 
+  it('finds a project by a skill the card only shows under "See all"', () => {
+    const en = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Caching', 'Eight', 'Nine', 'Ten', 'Eleven', 'Text search'];
+    const pt = ['Um', 'Dois', 'Três', 'Quatro', 'Cinco', 'Seis', 'Cache', 'Oito', 'Nove', 'Dez', 'Onze', 'Busca textual'];
+    const many = [...cards, card('Catalog', { skills: { en, pt } })];
+    expect(ids(filterProjects(many, { query: 'caching', level: 'all' }, 'en'))).toEqual(['Catalog']);
+    expect(ids(filterProjects(many, { query: 'busca textual', level: 'all' }, 'pt'))).toEqual(['Catalog']);
+  });
+
   it('combines the search and the level', () => {
     expect(ids(filterProjects(cards, { query: 'a', level: 'advanced' }, 'en'))).toEqual(['Payments']);
     expect(ids(filterProjects(cards, { query: 'support', level: 'advanced' }, 'en'))).toEqual([]);

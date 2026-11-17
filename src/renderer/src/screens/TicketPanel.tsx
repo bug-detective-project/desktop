@@ -228,6 +228,8 @@ export function TicketPanel({
   const { t } = useTranslation();
   const ticket = findTicket(snapshot.state, ticketNumber)!;
   const language = snapshot.state.settings.language;
+  // The main process sends the skills only of Done tickets; the status is checked here too.
+  const practiced = ticket.status === 'done' ? snapshot.practiced[ticket.ticket]?.[language] : undefined;
   const { content, failed, retry } = useTicketContent(ticket, language);
   const [tab, setTab] = useState<Tab>('ticket');
   const senior = company(language).people.senior.name;
@@ -276,6 +278,19 @@ export function TicketPanel({
               <Icon name="checkCircle" />
               {t('ticket.openReview')}
             </Button>
+          )}
+          {practiced && (
+            // Only a Done ticket says what it trained: before that, the skills would hint at the cause.
+            <div data-testid="ticket-practiced">
+              <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{t('ticket.practiced')}</p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {practiced.map((skill) => (
+                  <li key={skill} className="max-w-full rounded-full border border-border bg-muted px-2.5 py-0.5 text-sm break-words text-foreground">
+                    {skill}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </header>
         <div className="px-5 pt-3">

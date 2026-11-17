@@ -388,7 +388,8 @@
       "onlyInProgress": "Move the card to In Progress to ask for help.",
       "noMoreHints": "No more hints. You can ask for the full solution."
     },
-    "vscodeHint": "VS Code opens attached to the workspace container. If a VS Code window for this workspace is already open but disconnected (after an update or a restore), close it or run \"Developer: Reload Window\" in it."
+    "vscodeHint": "VS Code opens attached to the workspace container. If a VS Code window for this workspace is already open but disconnected (after an update or a restore), close it or run \"Developer: Reload Window\" in it.",
+    "practiced": "You practiced"
   },
   "qa": {
     "comment": {
@@ -745,7 +746,10 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Database",
+    "briefRegion": "Project specifications",
     "practice": "You'll practice",
+    "seeAllSkills": "See all ({{count}})",
+    "fewerSkills": "Show fewer",
     "search": {
       "label": "Search projects",
       "placeholder": "Search by name, stack or skill",

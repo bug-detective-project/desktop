@@ -33,3 +33,50 @@ export const TicketOfAnotherType: Story = {
     await expect(header.getByTestId('ticket-both-sides')).toBeVisible();
   },
 };
+
+const skills = { en: ['Building components', 'Routes and navigation'], pt: ['Criação de componentes', 'Criação de rotas e navegação'] };
+/** The review snapshot with its ticket in another column, and the skills the main process sent for it (none unless Done). */
+const withTicket = (status: 'inProgress' | 'codeReview' | 'done', practiced: Record<number, typeof skills>) => {
+  const snapshot = snapshotFixture('review', { practiced });
+  snapshot.state.tickets[0].status = status;
+  return snapshot;
+};
+
+/** A Done ticket says what it trained. */
+export const DoneWithPracticedSkills: Story = {
+  render: () => <TicketPanel snapshot={withTicket('done', { 1: skills })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  play: async ({ canvasElement }) => {
+    const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');
+    await expect(practiced).toHaveTextContent('You practiced');
+    await expect(within(practiced).getAllByRole('listitem').map((item) => item.textContent)).toEqual(skills.en);
+  },
+};
+export const DoneWithPracticedSkillsInPortuguese: Story = {
+  ...DoneWithPracticedSkills,
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');
+    await expect(practiced).toHaveTextContent('Você praticou');
+    await expect(within(practiced).getAllByRole('listitem').map((item) => item.textContent)).toEqual(skills.pt);
+  },
+};
+
+/** A Done ticket that names no skills shows nothing. */
+export const DoneWithoutSkills: Story = {
+  render: () => <TicketPanel snapshot={withTicket('done', {})} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByTestId('ticket-panel');
+    await expect(body.queryByTestId('ticket-practiced')).toBeNull();
+  },
+};
+
+/** The skills hint at the cause: a ticket that is not Done never shows them, whatever the snapshot holds. */
+export const NotDoneNeverShowsSkills: Story = {
+  render: () => <TicketPanel snapshot={withTicket('codeReview', { 1: skills })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByTestId('ticket-panel');
+    await expect(body.queryByTestId('ticket-practiced')).toBeNull();
+  },
+};

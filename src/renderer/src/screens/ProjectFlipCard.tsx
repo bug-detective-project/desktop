@@ -18,6 +18,8 @@ const LEVELS = {
 
 const face = 'absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm [backface-visibility:hidden]';
 const label = 'text-xs font-semibold tracking-wider text-muted-foreground uppercase';
+/** How many of the project's skills (up to 12, in the author's order) the brief shows before "See all". */
+const SKILLS_SHOWN = 5;
 
 /**
  * A project of the Projects screen as a card that flips: the front shows the project at a glance
@@ -28,6 +30,8 @@ const label = 'text-xs font-semibold tracking-wider text-muted-foreground upperc
 export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: ProjectCard; language: Language; blocked: string | null; onPlay: (card: ProjectCard) => void }) {
   const { t } = useTranslation();
   const [flipped, setFlipped] = useState(false);
+  // The brief shows the first skills of the project; the rest opens on request, inside the card.
+  const [allSkills, setAllSkills] = useState(false);
   const briefButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const { details } = card;
@@ -40,6 +44,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
   };
 
   // "Front 4/4 · Back 0/4" while played here, "Front 4 · Back 4" otherwise.
+  const skills = details?.skills[language] ?? [];
   const tickets = details
     ? TRACKS.filter((track) => details.counts[track] > 0)
         .map((track) => {
@@ -131,7 +136,13 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             </Button>
           </div>
           {details && (
-            <div className="flex min-h-0 flex-1 flex-col px-6 pt-7 pb-6">
+            // With many skills the brief is taller than the card: it scrolls, and the keyboard reaches it.
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pt-7 pb-6 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
+              role="region"
+              aria-label={t('projects.briefRegion')}
+              tabIndex={0}
+            >
               {/* The label column is at least 76px and as wide as the longest label ("Banco de dados"), so values line up. */}
               <dl className="grid grid-cols-[auto_minmax(76px,auto)_1fr] items-center gap-x-2 gap-y-2 text-sm">
                 {details.stack?.frontend && <Row icon={<Monitor />} label={t('projects.frontend')} value={details.stack.frontend} testId="project-stack-frontend" />}
@@ -139,14 +150,27 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 {details.stack?.database && <Row icon={<Database />} label={t('projects.database')} value={details.stack.database} testId="project-stack-database" />}
                 {tickets && <Row icon={<Ticket />} label={t('projects.tickets')} value={tickets} testId="project-tickets" />}
               </dl>
-              {details.skills[language].length > 0 && (
+              {skills.length > 0 && (
                 <div className="mt-3 border-t border-border pt-4">
-                  <p className={label}>{t('projects.practice')}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className={label}>{t('projects.practice')}</p>
+                    {skills.length > SKILLS_SHOWN && (
+                      <button
+                        type="button"
+                        className="rounded text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                        onClick={() => setAllSkills(!allSkills)}
+                        aria-expanded={allSkills}
+                        data-testid="project-skills-all"
+                      >
+                        {allSkills ? t('projects.fewerSkills') : t('projects.seeAllSkills', { count: skills.length })}
+                      </button>
+                    )}
+                  </div>
                   <ul className="mt-2 space-y-1.5" data-testid="project-skills">
-                    {details.skills[language].map((skill) => (
-                      <li key={skill} className="flex items-center gap-2 text-sm text-foreground">
-                        <Icon name="check" className="size-3.5 text-primary" />
-                        {skill}
+                    {(allSkills ? skills : skills.slice(0, SKILLS_SHOWN)).map((skill) => (
+                      <li key={skill} className="flex items-start gap-2 text-sm text-foreground">
+                        <Icon name="check" className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                        <span className="min-w-0 break-words">{skill}</span>
                       </li>
                     ))}
                   </ul>

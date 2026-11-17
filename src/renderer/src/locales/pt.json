@@ -388,7 +388,8 @@
       "onlyInProgress": "Mova o card para Em andamento para pedir ajuda.",
       "noMoreHints": "Não há mais dicas. Você pode pedir a solução completa."
     },
-    "vscodeHint": "O VS Code abre conectado ao container do workspace. Se já houver uma janela do VS Code deste workspace aberta e desconectada (depois de uma atualização ou restauração), feche-a ou rode \"Developer: Reload Window\" nela."
+    "vscodeHint": "O VS Code abre conectado ao container do workspace. Se já houver uma janela do VS Code deste workspace aberta e desconectada (depois de uma atualização ou restauração), feche-a ou rode \"Developer: Reload Window\" nela.",
+    "practiced": "Você praticou"
   },
   "qa": {
     "comment": {
@@ -745,7 +746,10 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Banco de dados",
+    "briefRegion": "Especificações do projeto",
     "practice": "Você vai praticar",
+    "seeAllSkills": "Ver todas ({{count}})",
+    "fewerSkills": "Mostrar menos",
     "search": {
       "label": "Buscar projetos",
       "placeholder": "Buscar por nome, stack ou habilidade",
