@@ -1832,6 +1832,21 @@ describe('the services of a project', () => {
     expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
   });
 
+  it('says when a process of a service ran out of memory while the service stays up, until the services are recreated', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ clock: () => new Date('2026-11-17T12:00:00.000Z') });
+    await game.init();
+    await game.nextAssignment();
+
+    runtime.simulate({ servicesOutOfMemory: ['db'] });
+    await game.workspaceStatus();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', memoryKillAt: '2026-11-17T12:00:00.000Z' }]);
+    expect(game.snapshot().log.join('\n')).toContain('» Service db ran out of memory: the kernel stopped a process in it');
+
+    await game.recreateServices();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+  });
+
   it('shows the port of a service the project asks to publish', async () => {
     await declare({ services: { db: { ...services.db, publish: true } } });
     const { game } = createGame();

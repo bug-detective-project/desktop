@@ -182,6 +182,8 @@ export class Game {
   /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
   private services: ServiceStatus[] = [];
   private workspaceOutOfMemoryAt: string | null = null;
+  /** When each service last had a process killed for lack of memory while it stayed up. */
+  private serviceMemoryKills: Record<string, string> = {};
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
   private readonly unavailableProjects = new Set<string>();
   /** When the last catalog refresh failed, or null after one that succeeded. */
@@ -411,6 +413,7 @@ export class Game {
     this.options.runtime.setProject(id);
     this.options.runtime.setResources(null);
     this.services = [];
+    this.serviceMemoryKills = {};
     this.content = null;
     this.projectFiles = null;
   }
@@ -585,7 +588,7 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
-      services: this.services,
+      services: this.services.map((service) => (this.serviceMemoryKills[service.name] ? { ...service, memoryKillAt: this.serviceMemoryKills[service.name] } : service)),
       workspaceOutOfMemoryAt: this.workspaceOutOfMemoryAt,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
@@ -842,11 +845,15 @@ export class Game {
     this.emit();
   }
 
-  /** Records, logs and shows that the workspace ran out of memory since the last check. */
+  /** Records, logs and shows that the workspace or a service ran out of memory since the last check. */
   private async checkWorkspaceMemory(): Promise<void> {
     if (await this.options.runtime.workspaceOutOfMemory().catch(() => false)) {
       this.workspaceOutOfMemoryAt = (this.options.clock?.() ?? new Date()).toISOString();
       this.appendLog('» The workspace ran out of memory: the kernel stopped a process in it');
+    }
+    for (const name of await this.options.runtime.servicesOutOfMemory().catch(() => [] as string[])) {
+      this.serviceMemoryKills = { ...this.serviceMemoryKills, [name]: (this.options.clock?.() ?? new Date()).toISOString() };
+      this.appendLog(`» Service ${name} ran out of memory: the kernel stopped a process in it`);
     }
   }
 
@@ -864,6 +871,7 @@ export class Game {
   private async recreateProjectServices(): Promise<void> {
     this.appendLog("» Recreating the project's services (their data is erased)");
     await this.options.runtime.recreateServices();
+    this.serviceMemoryKills = {};
   }
 
   /**

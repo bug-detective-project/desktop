@@ -138,3 +138,54 @@ describe('a workspace that runs out of memory', () => {
     expect(await unreadable.runtime.workspaceOutOfMemory()).toBe(false);
   });
 });
+
+describe('a service that runs out of memory and stays up', () => {
+  const services = { db: { image: 'postgres:17' }, cache: { image: 'postgres:17' } };
+
+  /** A docker CLI where every service container runs and has its own kernel counter of memory kills. */
+  function servicesWith(kills: Record<string, number | null>, ids: Record<string, string> = {}) {
+    const out = (text: string, code = 0) => ({ code, stdout: Buffer.from(text), stderr: '', timedOut: false });
+    const docker = new Docker('docker', async (_cli, args) => {
+      const name = args[0] === 'exec' ? args[1]! : args.at(-1)!;
+      const service = name.split('-').at(-1)!;
+      if (args[0] === 'container' && args[1] === 'inspect') {
+        if (!(service in kills)) return out('', 1);
+        return out(JSON.stringify([{ Id: ids[service] ?? `id-${service}`, Name: `/${name}`, State: { Running: true }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+      }
+      if (args[0] === 'exec') return kills[service] === null || kills[service] === undefined ? out('', 1) : out(`oom_kill ${kills[service]}\n`);
+      return out('');
+    });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    (runtime as unknown as Record<string, unknown>).docker = async () => docker;
+    runtime.setProject('shop');
+    runtime.setResources({ services });
+    return { runtime, kills, ids };
+  }
+
+  it('names the services where the kernel killed a process since the last time, once per kill', async () => {
+    const { runtime, kills } = servicesWith({ db: 0, cache: 0 });
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+    kills.db = 1;
+    expect(await runtime.servicesOutOfMemory()).toEqual(['db']);
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+    kills.db = 2;
+    kills.cache = 1;
+    expect(await runtime.servicesOutOfMemory()).toEqual(['db', 'cache']);
+  });
+
+  it('starts counting again for a recreated service, and skips one that is missing or unreadable', async () => {
+    const { runtime, kills, ids } = servicesWith({ db: 3, cache: null });
+    expect(await runtime.servicesOutOfMemory()).toEqual(['db']);
+    ids.db = 'another-container';
+    kills.db = 0;
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+    delete kills.db;
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+  });
+
+  it('asks nothing for a project without services', async () => {
+    const { runtime } = servicesWith({});
+    runtime.setResources({});
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+  });
+});

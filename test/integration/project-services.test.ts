@@ -181,6 +181,19 @@ describe("a project's services with real Docker", () => {
     expect(recorded.pulled).toEqual(hadImage ? [] : [REFERENCE]);
   });
 
+  it('notices a process killed for lack of memory inside a service, which stays up', async () => {
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+    // tail keeps everything it reads in memory: it outgrows the service's 256 MB and the kernel kills it.
+    const killed = await docker.run(['exec', SERVICE, 'sh', '-c', 'tail /dev/zero'], { timeoutMs: 120_000 });
+    expect(killed.code).toBe(137);
+    expect((await docker.inspectContainer(SERVICE))?.running).toBe(true);
+
+    expect(await runtime.servicesOutOfMemory()).toEqual(['db']);
+    expect(await runtime.servicesOutOfMemory()).toEqual([]);
+    // The server itself survived.
+    expect((await psql('select 1')).stdout.toString('utf8').trim()).toBe('1');
+  });
+
   it('gives a QA run its own service, which QA reaches, and leaves no QA service or network behind', async () => {
     await psql('create table player_only (id int)');
     await game.move(1, 'inProgress');

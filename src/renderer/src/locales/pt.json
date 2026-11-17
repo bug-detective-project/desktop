@@ -143,7 +143,7 @@
       "title": "Recriar os serviços?",
       "text": "Os serviços do projeto, como o banco de dados, são removidos e criados de novo, vazios, e os dados da aplicação são gravados outra vez. O que você salvou neles é apagado. O seu código e o seu progresso ficam.",
       "confirm": "Recriar serviços",
-      "outOfMemory": "Um serviço foi parado porque ficou sem memória. Aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory) e depois recrie os serviços."
+      "outOfMemory": "Um serviço ficou sem memória. Aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory). Se o serviço parou, recrie os serviços depois."
     },
     "envStatus": {
       "ready": "Pronto",
@@ -158,7 +158,8 @@
       "notYet": "Ainda não instalado",
       "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior",
       "serviceStopped": "Parado",
-      "serviceOutOfMemory": "Parado: faltou memória"
+      "serviceOutOfMemory": "Parado: faltou memória",
+      "serviceMemoryKill": "um processo ficou sem memória"
     },
     "desk": "Sua mesa",
     "projectAndContacts": "Projeto e contatos",

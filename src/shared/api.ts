@@ -193,6 +193,8 @@ export interface ServiceStatus {
   reason?: string;
   /** The port on this computer (127.0.0.1) where the service answers, when the project asks to publish it. */
   hostPort?: number;
+  /** When the kernel last killed a process of the service for lack of memory while the service stayed up (ISO time); gone once the services are recreated. */
+  memoryKillAt?: string;
 }
 
 export interface Snapshot {

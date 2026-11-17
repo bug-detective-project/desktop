@@ -123,6 +123,13 @@ describe('environmentRows, the services of the project', () => {
     expect(rows.find((row) => row.id === 'service-db')!.status).toBe('dashboard.envStatus.ready · localhost:5433');
   });
 
+  it('warns on a service that is up but had a process killed for lack of memory', () => {
+    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5432, memoryKillAt: '2026-11-17T12:00:00.000Z' }] }), t);
+    const row = rows.find((item) => item.id === 'service-db')!;
+    expect([row.tone, row.status, row.busy]).toEqual(['warn', 'dashboard.envStatus.ready · localhost:5432 · dashboard.envStatus.serviceMemoryKill', false]);
+    expect(row.action).toBeUndefined();
+  });
+
   it('a failed service makes the summary a danger', () => {
     const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }), t);
     expect(environmentSummary(rows)).toBe('danger');

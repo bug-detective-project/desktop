@@ -143,7 +143,7 @@
       "title": "Recreate the services?",
       "text": "The project's services, such as its database, are removed and created again, empty, and the app data is seeded again. Whatever you saved in them is erased. Your code and your progress stay.",
       "confirm": "Recreate services",
-      "outOfMemory": "A service was stopped because it ran out of memory. Increase Docker's memory (Docker Desktop: Settings, Resources, Memory), then recreate the services."
+      "outOfMemory": "A service ran out of memory. Increase Docker's memory (Docker Desktop: Settings, Resources, Memory). If the service stopped, recreate the services afterwards."
     },
     "envStatus": {
       "ready": "Ready",
@@ -158,7 +158,8 @@
       "notYet": "Not installed yet",
       "resetFailed": "Could not be reset; they may be the previous ticket's",
       "serviceStopped": "Stopped",
-      "serviceOutOfMemory": "Stopped: out of memory"
+      "serviceOutOfMemory": "Stopped: out of memory",
+      "serviceMemoryKill": "a process ran out of memory"
     },
     "desk": "Your desk",
     "projectAndContacts": "Project & contacts",

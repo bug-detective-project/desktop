@@ -53,6 +53,8 @@ export interface GameRuntime {
   setResources(resources: ProjectResources | null): void;
   /** True when the workspace ran out of memory since the last time this was asked: the container stopped for it, or the kernel killed a process inside it and it stays up. */
   workspaceOutOfMemory(): Promise<boolean>;
+  /** The services where the kernel killed a process for lack of memory since the last time this was asked, while the service stayed up. */
+  servicesOutOfMemory(): Promise<string[]>;
   /** Removes the project's service containers and their data, and creates them again, empty. The code and the progress are not touched. */
   recreateServices(): Promise<void>;
   /** Where each service of the project is, creating and starting nothing; empty without services. */
@@ -171,6 +173,8 @@ export class DockerRuntime implements GameRuntime {
   private resources: ProjectResources | null = null;
   /** The memory kills already reported for the workspace container with this id. */
   private oomSeen: { id: string; kills: number } | null = null;
+  /** The same, per service of the project. */
+  private readonly serviceOomSeen = new Map<string, { id: string; kills: number }>();
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -231,6 +235,30 @@ export class DockerRuntime implements GameRuntime {
     const before = this.oomSeen?.id === info.id ? this.oomSeen.kills : 0;
     this.oomSeen = { id: info.id, kills };
     return kills > before;
+  }
+
+  async servicesOutOfMemory(): Promise<string[]> {
+    if (!this.project || !this.hasServices) {
+      return [];
+    }
+    const docker = await this.docker();
+    const killed: string[] = [];
+    for (const [name, service] of Object.entries(this.declared)) {
+      const { container } = serviceNames(this.names.prefix, this.project, name, serviceImageOf(service));
+      const info = await docker.inspectContainer(container);
+      // A service that stopped says so through its state; this is for the one that stays up.
+      const kills = info?.running ? await docker.oomKills(container) : null;
+      if (!info || kills === null) {
+        continue;
+      }
+      const seen = this.serviceOomSeen.get(name);
+      const before = seen?.id === info.id ? seen.kills : 0;
+      this.serviceOomSeen.set(name, { id: info.id, kills });
+      if (kills > before) {
+        killed.push(name);
+      }
+    }
+    return killed;
   }
 
   async recreateServices(): Promise<void> {

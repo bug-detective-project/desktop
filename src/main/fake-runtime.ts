@@ -191,6 +191,7 @@ export class FakeRuntime implements GameRuntime {
   private devServerUp = false;
   private resources: ProjectResources | null = null;
   private workspaceOom = false;
+  private servicesOom: string[] = [];
 
   constructor(json?: string) {
     this.scenario = { ...DEFAULT_SCENARIO, ...(json ? (JSON.parse(json) as Partial<Scenario>) : {}) };
@@ -250,6 +251,13 @@ export class FakeRuntime implements GameRuntime {
   async workspaceOutOfMemory(): Promise<boolean> {
     const killed = this.workspaceOom;
     this.workspaceOom = false;
+    return killed;
+  }
+
+  /** Reported once, like the real counter. */
+  async servicesOutOfMemory(): Promise<string[]> {
+    const killed = this.servicesOom;
+    this.servicesOom = [];
     return killed;
   }
 
@@ -483,6 +491,7 @@ export class FakeRuntime implements GameRuntime {
     workspaceLost?: boolean;
     dbResetFails?: boolean;
     workspaceOutOfMemory?: boolean;
+    servicesOutOfMemory?: string[];
     dockerOs?: 'linux' | 'windows';
     dockerMemoryBytes?: number;
     freeDiskBytes?: number | null;
@@ -498,6 +507,7 @@ export class FakeRuntime implements GameRuntime {
     if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
     if (change.workspaceOutOfMemory !== undefined) this.workspaceOom = change.workspaceOutOfMemory;
+    if (change.servicesOutOfMemory !== undefined) this.servicesOom = change.servicesOutOfMemory;
     if (change.workspaceLost) {
       // The volume went: no stages, no branch, as a fresh repository-less workspace.
       this.stages.clear();

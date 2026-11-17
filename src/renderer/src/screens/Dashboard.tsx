@@ -635,7 +635,7 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
       setRecreating(false)
     }
   }
-  const outOfMemory = (snapshot.services ?? []).some((service) => service.state === 'oom')
+  const outOfMemory = (snapshot.services ?? []).some((service) => service.state === 'oom' || service.memoryKillAt !== undefined)
   // Shown until closed; a later occurrence (another time) shows it again.
   const [dismissedOom, setDismissedOom] = useState<string | null>(null)
   const workspaceOom = snapshot.workspaceOutOfMemoryAt && snapshot.workspaceOutOfMemoryAt !== dismissedOom ? snapshot.workspaceOutOfMemoryAt : null
