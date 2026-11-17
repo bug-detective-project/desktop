@@ -206,6 +206,18 @@ export class Docker {
     return result.code === 0 && result.stdout.toString('utf8').trim() === 'true';
   }
 
+  /**
+   * How many processes the kernel killed inside a running container for exceeding its memory
+   * limit, since the container started (cgroup v2 memory.events, or v1 memory.oom_control). The
+   * container itself stays up when the killed process is not its first one. Null when unreadable.
+   */
+  async oomKills(name: string): Promise<number | null> {
+    const read = 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null';
+    const result = await this.run(['exec', name, 'sh', '-c', read], { timeoutMs: 30_000 });
+    const count = /^oom_kill (\d+)$/m.exec(result.stdout.toString('utf8'))?.[1];
+    return result.code === 0 && count !== undefined ? Number(count) : null;
+  }
+
   async removeContainer(name: string): Promise<void> {
     await this.run(['container', 'rm', '--force', '--volumes=false', name], { timeoutMs: 60_000 });
   }

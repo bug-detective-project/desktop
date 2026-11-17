@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       '@bug-detective/catalog':
-        specifier: github:bug-detective-project/catalog#v1.4.0
-        version: https://codeload.github.com/bug-detective-project/catalog/tar.gz/2185a1799c7b6bd6f11617078be787f55b76b171
+        specifier: github:bug-detective-project/catalog#v1.5.0
+        version: https://codeload.github.com/bug-detective-project/catalog/tar.gz/9d4b057d50ea437c9cc15e4e1f74facf49481f44
       electron-log:
         specifier: 5.4.4
         version: 5.4.4
@@ -402,9 +402,9 @@ packages:
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
 
-  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/2185a1799c7b6bd6f11617078be787f55b76b171':
-    resolution: {gitHosted: true, integrity: sha512-pJjBYY+J2bRbcuLG7WgOEJz09/goBjUZIMQ+3eJ0dzCzaRW1gjsYLcNicFTKP9VoEsHvMXJ4fBfatXfRJj1fqA==, tarball: https://codeload.github.com/bug-detective-project/catalog/tar.gz/2185a1799c7b6bd6f11617078be787f55b76b171}
-    version: 1.4.0
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/9d4b057d50ea437c9cc15e4e1f74facf49481f44':
+    resolution: {gitHosted: true, integrity: sha512-PN4YBCGmLRRotJ9jB5+UTeRQHnDrXX0QryzVx6gaV81naMWtdJuzClFN2Lv9Xc0F6nR+fpnZmNTdsuZg8OQrKA==, tarball: https://codeload.github.com/bug-detective-project/catalog/tar.gz/9d4b057d50ea437c9cc15e4e1f74facf49481f44}
+    version: 1.5.0
     engines: {node: '>=26.12.1'}
     hasBin: true
 
@@ -4032,7 +4032,7 @@ snapshots:
 
   '@blazediff/core@1.10.0': {}
 
-  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/2185a1799c7b6bd6f11617078be787f55b76b171':
+  '@bug-detective/catalog@https://codeload.github.com/bug-detective-project/catalog/tar.gz/9d4b057d50ea437c9cc15e4e1f74facf49481f44':
     dependencies:
       fflate: 0.8.3
       tar-stream: 3.2.2

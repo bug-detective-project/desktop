@@ -88,3 +88,53 @@ describe("a project's services and the internet", () => {
     expect(calls.filter((call) => call[0] === 'pull' || call[0] === 'run')).toEqual([]);
   });
 });
+
+describe('a workspace that runs out of memory', () => {
+  /** A docker CLI whose workspace container has the given state and kernel counter of processes killed for lack of memory. */
+  function workspaceWith(state: { id: string; running: boolean; kills: number | null; oomKilled?: boolean }) {
+    const out = (text: string, code = 0) => ({ code, stdout: Buffer.from(text), stderr: '', timedOut: false });
+    const docker = new Docker('docker', async (_cli, args) => {
+      if (args[0] === 'container' && args[1] === 'inspect') {
+        if (args.includes('--format')) return out(String(state.oomKilled ?? false));
+        return out(JSON.stringify([{ Id: state.id, Name: '/bugdetective-workspace', State: { Running: state.running }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+      }
+      if (args[0] === 'exec') return state.kills === null ? out('', 1) : out(`oom_kill_disable 0\nunder_oom 0\noom_kill ${state.kills}\n`);
+      return out('');
+    });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    (runtime as unknown as Record<string, unknown>).docker = async () => docker;
+    return { runtime, state };
+  }
+
+  it('notices a process killed inside a workspace that stays up, once per kill', async () => {
+    const { runtime, state } = workspaceWith({ id: 'a', running: true, kills: 0 });
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+    state.kills = 1;
+    expect(await runtime.workspaceOutOfMemory()).toBe(true);
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+    state.kills = 3;
+    expect(await runtime.workspaceOutOfMemory()).toBe(true);
+  });
+
+  it('notices a kill that happened before the first look at a container', async () => {
+    const { runtime } = workspaceWith({ id: 'a', running: true, kills: 2 });
+    expect(await runtime.workspaceOutOfMemory()).toBe(true);
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+  });
+
+  it('starts counting again for a recreated container', async () => {
+    const { runtime, state } = workspaceWith({ id: 'a', running: true, kills: 4 });
+    await runtime.workspaceOutOfMemory();
+    Object.assign(state, { id: 'b', kills: 0 });
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+    state.kills = 1;
+    expect(await runtime.workspaceOutOfMemory()).toBe(true);
+  });
+
+  it('still notices a container that stopped for lack of memory, and says nothing when the counter cannot be read', async () => {
+    const stopped = workspaceWith({ id: 'a', running: false, kills: null, oomKilled: true });
+    expect(await stopped.runtime.workspaceOutOfMemory()).toBe(true);
+    const unreadable = workspaceWith({ id: 'a', running: true, kills: null });
+    expect(await unreadable.runtime.workspaceOutOfMemory()).toBe(false);
+  });
+});

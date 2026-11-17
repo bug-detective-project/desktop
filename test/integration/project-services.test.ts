@@ -7,6 +7,7 @@
  *   pnpm run build && pnpm run test:integration
  */
 import { execFileSync } from 'node:child_process';
+import { connect } from 'node:net';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -32,8 +33,17 @@ const SERVICE = `${PREFIX}-svc-notes-db`;
 const DATA = `${PREFIX}-svcdata-notes-db-0`;
 const NETWORK = networkName(PREFIX, 'notes');
 const services = {
-  db: { image: 'postgres:17', memory: '256m', env: { POSTGRES_PASSWORD: 'notes' }, variables: { DATABASE_URL: 'postgres://postgres:notes@{{host}}:{{port}}/postgres' } },
+  db: {
+    image: 'postgres:17',
+    memory: '256m',
+    env: { POSTGRES_PASSWORD: 'notes' },
+    variables: { DATABASE_URL: 'postgres://postgres:notes@{{host}}:{{port}}/postgres' },
+    // Also on the computer, for the player's own database tools.
+    publish: true,
+  },
 };
+// A small workspace, so a process that outgrows it is killed at once (read when the container is created).
+process.env.BUGDETECTIVE_WORKSPACE_MEMORY = '512m';
 
 let dir: string;
 let qaDir: string;
@@ -125,7 +135,33 @@ describe("a project's services with real Docker", () => {
     expect(info?.image).toBe(REFERENCE);
     expect(await text(['container', 'inspect', '--format', '{{range .Mounts}}{{.Type}}:{{.Name}} {{end}}', SERVICE])).toBe(`volume:${DATA}`);
     expect(await text(['container', 'inspect', '--format', '{{.HostConfig.RestartPolicy.Name}}', SERVICE])).toMatch(/^(no)?$/);
-    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: expect.any(Number) }]);
+  });
+
+  it('publishes the service on 127.0.0.1 of the computer when the project asks for it', async () => {
+    const port = game.snapshot().services[0]!.hostPort!;
+    const forwarder = await docker.inspectContainer(`${PREFIX}-forward-notes`);
+    expect(Object.values(forwarder!.ports)).toContain(port);
+    expect(await text(['container', 'port', `${PREFIX}-forward-notes`])).toContain(`-> 127.0.0.1:${port}`);
+    const reached = await new Promise<boolean>((resolve) => {
+      const socket = connect({ host: '127.0.0.1', port });
+      socket.once('connect', () => (socket.destroy(), resolve(true)));
+      socket.once('error', () => resolve(false));
+    });
+    expect(reached).toBe(true);
+  });
+
+  it('notices a process killed for lack of memory inside the workspace, which stays up', async () => {
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+    const hungry = 'const kept = []; for (;;) kept.push(Buffer.alloc(16 * 1024 * 1024, 1));';
+    const killed = await docker.exec(runtime.names.container, ['node', '-e', hungry], { user: 'node', timeoutMs: 120_000 });
+    expect(killed.code).toBe(137);
+    expect((await docker.inspectContainer(runtime.names.container))?.running).toBe(true);
+
+    expect(await runtime.workspaceOutOfMemory()).toBe(true);
+    expect(await runtime.workspaceOutOfMemory()).toBe(false);
+    await game.workspaceStatus();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBeNull();
   });
 
   it("gives the workspace the service's address, and the workspace reaches it", async () => {

@@ -101,7 +101,7 @@ on:
     branches: [main]
 jobs:
   app:
-    uses: bug-detective-project/catalog/.github/workflows/app.yml@2185a1799c7b6bd6f11617078be787f55b76b171 # v1.4.0
+    uses: bug-detective-project/catalog/.github/workflows/app.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
 ```
 
 Protect `main` like `qa`: changes only through a pull request with the `app` check green.
@@ -149,7 +149,7 @@ manifest.json          written by bd publish (step 7)
     }
   },
   "devDependencies": {
-    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.4.0"
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.5.0"
   }
 }
 ```
@@ -190,6 +190,14 @@ A project whose code needs a database declares it in the same `bugDetective.proj
   it needs (run the project's `db:reset`) before it tests.
 - When `db:reset` fails, "Try again" on the Dashboard recreates the services first; "Recreate
   services" does the same for a service that does not start or ran out of memory.
+- **Looking at the data.** Three ways, all optional for the player:
+  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`;
+  - `"publish": true` on a service also publishes its port on the player's computer, on
+    `127.0.0.1` only and on a free port (the service's own when it is free); the Dashboard shows
+    it next to the service (`localhost:5432`), for the player's own database tools;
+  - the project may recommend SQLTools and its PostgreSQL driver in `.vscode/extensions.json`
+    (`mtxr.sqltools`, `mtxr.sqltools-driver-pg`), which connect from inside the workspace to
+    the service by its name.
 - A project with services needs `minAppVersion` 1.2.0 in the catalog.
 
 ### The QA CLI (`run.ts`)
@@ -258,7 +266,7 @@ on:
     branches: [qa]
 jobs:
   project:
-    uses: bug-detective-project/catalog/.github/workflows/project.yml@2185a1799c7b6bd6f11617078be787f55b76b171 # v1.4.0
+    uses: bug-detective-project/catalog/.github/workflows/project.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
     permissions:
       contents: write
 ```

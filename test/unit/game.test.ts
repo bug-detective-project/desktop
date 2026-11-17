@@ -1765,7 +1765,14 @@ describe('a workspace stopped for lack of memory', () => {
     runtime.simulate({ workspaceOutOfMemory: true });
     await game.refreshEnvironment();
     expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
-    expect(game.snapshot().log.join('\n')).toContain('» The workspace was stopped because it ran out of memory');
+    expect(game.snapshot().log.join('\n')).toContain('» The workspace ran out of memory: the kernel stopped a process in it');
+
+    // The check the screen repeats while it is open notices it too.
+    const later = createGame({ clock: () => new Date('2026-11-17T13:00:00.000Z') });
+    await later.game.init();
+    later.runtime.simulate({ workspaceOutOfMemory: true });
+    await later.game.workspaceStatus();
+    expect(later.game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T13:00:00.000Z');
 
     // The next check finds the workspace running again: the notice stays until the app restarts.
     await game.refreshEnvironment();
@@ -1823,6 +1830,14 @@ describe('the services of a project', () => {
     expect(game.snapshot().services).toEqual([]);
     await game.nextAssignment();
     expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+  });
+
+  it('shows the port of a service the project asks to publish', async () => {
+    await declare({ services: { db: { ...services.db, publish: true } } });
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5432 }]);
   });
 
   it('shows a service that failed, with the reason, and lets the game go on', async () => {

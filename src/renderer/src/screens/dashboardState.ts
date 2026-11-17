@@ -107,7 +107,9 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
   for (const service of snapshot.services ?? []) {
     const base = { id: `service-${service.name}` as const, icon: 'hardDrive' as const, name: `${service.name} · ${service.image}` }
     if (service.state === 'ready') {
-      rows.push({ ...base, tone: 'ok', status: t('dashboard.envStatus.ready'), busy: false })
+      // A published service says where the player's own tools reach it.
+      const status = service.hostPort ? `${t('dashboard.envStatus.ready')} · localhost:${service.hostPort}` : t('dashboard.envStatus.ready')
+      rows.push({ ...base, tone: 'ok', status, busy: false })
     } else if (service.state === 'starting') {
       // Before the environment is downloaded there is no container yet: nothing is starting.
       rows.push(

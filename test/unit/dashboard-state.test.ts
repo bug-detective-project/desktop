@@ -118,6 +118,11 @@ describe('environmentRows, the services of the project', () => {
     expect(healthy.some((row) => row.action === 'recreateServices')).toBe(false);
   });
 
+  it('says where a published service answers on the computer', () => {
+    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5433 }] }), t);
+    expect(rows.find((row) => row.id === 'service-db')!.status).toBe('dashboard.envStatus.ready · localhost:5433');
+  });
+
   it('a failed service makes the summary a danger', () => {
     const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }), t);
     expect(environmentSummary(rows)).toBe('danger');

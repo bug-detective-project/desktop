@@ -51,7 +51,7 @@ export interface GameRuntime {
   setProject(project: string, name?: string): void;
   /** The services and the memory the project declares in its manifest; null until its content is known. */
   setResources(resources: ProjectResources | null): void;
-  /** True when the workspace container is stopped because the kernel killed it for exceeding its memory limit. Asked before the container is started again. */
+  /** True when the workspace ran out of memory since the last time this was asked: the container stopped for it, or the kernel killed a process inside it and it stays up. */
   workspaceOutOfMemory(): Promise<boolean>;
   /** Removes the project's service containers and their data, and creates them again, empty. The code and the progress are not touched. */
   recreateServices(): Promise<void>;
@@ -169,6 +169,8 @@ export class DockerRuntime implements GameRuntime {
   private project: string | null = null;
   private projectName: string | null = null;
   private resources: ProjectResources | null = null;
+  /** The memory kills already reported for the workspace container with this id. */
+  private oomSeen: { id: string; kills: number } | null = null;
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -214,7 +216,21 @@ export class DockerRuntime implements GameRuntime {
   async workspaceOutOfMemory(): Promise<boolean> {
     const docker = await this.docker();
     const info = await docker.inspectContainer(this.names.container);
-    return info !== null && !info.running && (await docker.oomKilled(this.names.container));
+    if (!info) {
+      return false;
+    }
+    if (!info.running) {
+      return docker.oomKilled(this.names.container);
+    }
+    // Usually the kernel kills one process (the dev server, a test run) and the container stays
+    // up: its counter of such kills says so. It starts at zero with every container start.
+    const kills = await docker.oomKills(this.names.container);
+    if (kills === null) {
+      return false;
+    }
+    const before = this.oomSeen?.id === info.id ? this.oomSeen.kills : 0;
+    this.oomSeen = { id: info.id, kills };
+    return kills > before;
   }
 
   async recreateServices(): Promise<void> {
@@ -227,7 +243,12 @@ export class DockerRuntime implements GameRuntime {
   }
 
   async servicesStatus(): Promise<ServiceStatus[]> {
-    return (await (await this.projectServices())?.status()) ?? [];
+    const statuses = (await (await this.projectServices())?.status()) ?? [];
+    if (statuses.length === 0) {
+      return statuses;
+    }
+    const ports = await (await this.workspace()).servicePorts();
+    return statuses.map((status) => (status.state === 'ready' && ports[status.name] ? { ...status, hostPort: ports[status.name] } : status));
   }
 
   /**
@@ -335,6 +356,9 @@ export class DockerRuntime implements GameRuntime {
       projectName: this.projectName,
       variables: (await this.projectServices())?.variables() ?? {},
       memory: this.resources?.memory?.workspace,
+      publishedServices: Object.entries(this.declared)
+        .filter(([, service]) => service.publish)
+        .map(([name, service]) => ({ name, port: serviceImageOf(service).port })),
     });
   }
 

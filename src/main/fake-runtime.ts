@@ -8,6 +8,7 @@ import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, Env
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
+import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
@@ -270,6 +271,7 @@ export class FakeRuntime implements GameRuntime {
       ...(failure?.name === name
         ? { state: 'failed' as const, reason: failure.reason }
         : { state: this.scenario.environmentReady ? ('ready' as const) : ('starting' as const) }),
+      ...(service.publish && this.scenario.environmentReady && failure?.name !== name && { hostPort: SERVICE_IMAGES[service.image]?.port }),
     }));
   }
 

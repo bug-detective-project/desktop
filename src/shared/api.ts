@@ -191,6 +191,8 @@ export interface ServiceStatus {
   state: ServiceState;
   /** Docker's or the server's own last words when it failed. */
   reason?: string;
+  /** The port on this computer (127.0.0.1) where the service answers, when the project asks to publish it. */
+  hostPort?: number;
 }
 
 export interface Snapshot {

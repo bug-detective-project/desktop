@@ -789,10 +789,7 @@ export class Game {
   async refreshEnvironment(): Promise<EnvironmentReport> {
     await this.requireDocker();
     // Asked first: the environment check below starts a stopped workspace again, and the reason is then gone.
-    if (await this.options.runtime.workspaceOutOfMemory().catch(() => false)) {
-      this.workspaceOutOfMemoryAt = (this.options.clock?.() ?? new Date()).toISOString();
-      this.appendLog('» The workspace was stopped because it ran out of memory');
-    }
+    await this.checkWorkspaceMemory();
     this.environment = await this.options.runtime.environment();
     if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
       await this.checkWorkspace();
@@ -843,6 +840,14 @@ export class Game {
     }
     await this.refreshServices();
     this.emit();
+  }
+
+  /** Records, logs and shows that the workspace ran out of memory since the last check. */
+  private async checkWorkspaceMemory(): Promise<void> {
+    if (await this.options.runtime.workspaceOutOfMemory().catch(() => false)) {
+      this.workspaceOutOfMemoryAt = (this.options.clock?.() ?? new Date()).toISOString();
+      this.appendLog('» The workspace ran out of memory: the kernel stopped a process in it');
+    }
   }
 
   /** Asks Docker where each service is; a service that stopped is logged once, with its reason. */
@@ -1476,6 +1481,8 @@ export class Game {
     }
     await this.requireDocker();
     this.lastWorkspaceStatus = await this.options.runtime.workspaceStatus();
+    // The screen repeats this call while it is open: the moment to notice a process the kernel killed.
+    await this.checkWorkspaceMemory();
     return this.lastWorkspaceStatus;
   }
 
