@@ -215,7 +215,7 @@ test('Docker cleanup: leftovers keep the game, removing everything starts a new 
     await page.getByTestId('remove-docker').click();
     const dialog = page.getByTestId('remove-docker-dialog');
     await expect(dialog).toContainText('This deletes the code in your workspace and starts a new game.');
-    await expect(dialog).toContainText('Volumes: your code, the VS Code server, the dependency cache and the QA copy');
+    await expect(dialog).toContainText("Volumes: your code, the data of the project's services, the VS Code server, the dependency cache and the QA copy");
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
 
