@@ -405,6 +405,7 @@ export class Game {
     this.packages = projects.packages(id);
     this.reviews = projects.reviews(id);
     this.options.runtime.setProject(id);
+    this.options.runtime.setResources(null);
     this.content = null;
     this.projectFiles = null;
   }
@@ -490,6 +491,8 @@ export class Game {
     // The workspace folder is named after the project and its git identity after the project's
     // name: both come from the manifest, with or without a catalog.
     this.options.runtime.setProject(content.manifest.project.id, content.manifest.project.name);
+    const { services, memory } = content.manifest.project;
+    this.options.runtime.setResources({ ...(services && { services }), ...(memory && { memory }) });
     this.emit();
     const active = this.activeProject();
     if (active && this.withSource(this.state, active, content.manifest.version) !== this.state) {

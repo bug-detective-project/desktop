@@ -1744,3 +1744,47 @@ describe('ticket type and practiced skills', () => {
     expect(game.snapshot().practiced[2].en).toEqual(['Building components', 'Routes and navigation']);
   });
 });
+
+describe('the services of a project', () => {
+  const services = { db: { image: 'postgres:17', variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+  let original: string;
+  const packageFile = () => join(notesQaDir, 'package.json');
+
+  beforeEach(async () => {
+    original = await readFile(packageFile(), 'utf8');
+  });
+
+  afterEach(async () => {
+    await writeFile(packageFile(), original);
+  });
+
+  async function declare(project: Record<string, unknown>) {
+    const json = JSON.parse(original);
+    Object.assign(json.bugDetective.project, project);
+    await writeFile(packageFile(), JSON.stringify(json));
+  }
+
+  it('hands the declared services and memory to the runtime', async () => {
+    await declare({ services, memory: { workspace: '4g' } });
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({ services, memory: { workspace: '4g' } });
+  });
+
+  it('hands nothing for a project that declares no services', async () => {
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({});
+  });
+
+  it('refuses an invalid declaration, naming the field', async () => {
+    await declare({ services: { db: { image: 'mysql:8' } } });
+    const { game } = createGame();
+    await game.init();
+    await expect(game.nextAssignment()).rejects.toThrow(/services\.db\.image/);
+  });
+});

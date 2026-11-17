@@ -8,7 +8,7 @@ import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, Env
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 
@@ -186,6 +186,7 @@ export class FakeRuntime implements GameRuntime {
   private branch: string | null = null;
   private stages = new Map<number, string>();
   private devServerUp = false;
+  private resources: ProjectResources | null = null;
 
   constructor(json?: string) {
     this.scenario = { ...DEFAULT_SCENARIO, ...(json ? (JSON.parse(json) as Partial<Scenario>) : {}) };
@@ -236,6 +237,10 @@ export class FakeRuntime implements GameRuntime {
   projectResources: Record<string, string[]> = {};
 
   setProject(_project: string, _name?: string): void {}
+
+  setResources(resources: ProjectResources | null): void {
+    this.resources = resources;
+  }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
     for (const project of projects) {

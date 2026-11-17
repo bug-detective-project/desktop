@@ -7,8 +7,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectStackSchema, ticketMetaOf, treeDigest } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectManifest, TicketEntry } from '@bug-detective/catalog/contract';
+import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectServicesProblems, projectStackSchema, ticketMetaOf, treeDigest } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectManifest, ProjectResources, TicketEntry } from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
 
 /** Files and folders every tickets/<id>/ must have. */
@@ -50,7 +50,7 @@ function gitIn(runner: CommandRunner, git: string, dir: string): Git {
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
 
 async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
-  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown; stack?: unknown } } };
+  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown; stack?: unknown; services?: unknown; memory?: unknown } } };
   try {
     json = JSON.parse(await readFile(join(qaDir, 'package.json'), 'utf8'));
   } catch {
@@ -73,11 +73,18 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
     }
     stack = parsed.data;
   }
+  const { services, memory } = project;
+  const problem = projectServicesProblems({ services, memory })[0];
+  if (problem) {
+    throw new Error(`${qaDir}/package.json: bugDetective.project.${problem}`);
+  }
   return {
     id: project.id,
     name: project.name,
     ...(difficulty !== undefined && { difficulty: difficulty as (typeof DIFFICULTIES)[number] }),
     ...(stack !== undefined && { stack }),
+    ...(services !== undefined && { services: services as ProjectResources['services'] }),
+    ...(memory !== undefined && { memory: memory as ProjectResources['memory'] }),
   };
 }
 

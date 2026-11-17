@@ -10,7 +10,7 @@ import type { Platform } from './platform/types.ts';
 import { closeStaleWindow } from './services/attached-window.ts';
 import { planCleanup } from './services/cleanup.ts';
 import type { CleanupTarget } from './services/cleanup.ts';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
 import type { EngineState , Docker} from './services/docker.ts';
@@ -44,6 +44,8 @@ export interface GameRuntime {
   setQaTool(files: ArchiveFile[] | null): void;
   /** The project whose Docker resources are created from now on (they carry its label and its folder); the name is known once the manifest is. */
   setProject(project: string, name?: string): void;
+  /** The services and the memory the project declares in its manifest; null until its content is known. */
+  setResources(resources: ProjectResources | null): void;
   /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
   removeProjects(projects: readonly string[]): Promise<CleanupTarget[]>;
   environment(): Promise<EnvironmentReport>;
@@ -152,6 +154,7 @@ export class DockerRuntime implements GameRuntime {
   private qaTool: ArchiveFile[] | null = null;
   private project: string | null = null;
   private projectName: string | null = null;
+  private resources: ProjectResources | null = null;
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -189,6 +192,10 @@ export class DockerRuntime implements GameRuntime {
     }
     this.project = project;
     this.projectName = name ?? this.projectName;
+  }
+
+  setResources(resources: ProjectResources | null): void {
+    this.resources = resources;
   }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
