@@ -330,6 +330,19 @@
     "move": "Move",
     "review": "Review"
   },
+  "ticketType": {
+    "title": "The kind of work this ticket asks for",
+    "fix": "Fix",
+    "build": "Build",
+    "complete": "Complete",
+    "test": "Write the test",
+    "refactor": "Refactor",
+    "optimize": "Optimize",
+    "upgrade": "Upgrade",
+    "investigate": "Investigate",
+    "bothSides": "Front + back",
+    "bothSidesTitle": "This ticket needs changes in the front end and in the back end"
+  },
   "ticket": {
     "tabs": {
       "ticket": "Ticket",

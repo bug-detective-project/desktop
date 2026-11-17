@@ -16,6 +16,8 @@ import { useTicketContent } from '../components/useTicketContent.ts';
 import { ticketTitle } from '../components/ticketTitle.ts';
 import { Badge, Button, LogView, StagePill, Tabs, Tooltip, TrackBadge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
+import { TicketTypeBadge } from '../components/TicketTypeBadge.tsx';
+import { metaOfEntry } from '@shared/ticketMeta.ts';
 
 type Tab = 'ticket' | 'qa' | 'history' | 'senior';
 
@@ -253,6 +255,7 @@ export function TicketPanel({
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm font-bold text-primary">{ticketTitle(snapshot, ticket.ticket, language).key}</span>
                 <StagePill status={ticket.status} />
+                <TicketTypeBadge {...metaOfEntry(snapshot.ticketMeta[ticket.ticket])} />
               </div>
               <h2 className="mt-2 text-xl font-bold tracking-tight" data-testid="ticket-title">
                 {snapshot.titles[ticket.ticket]?.[language]}

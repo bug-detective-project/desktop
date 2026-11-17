@@ -186,7 +186,9 @@
         "title": {
           "en": "Long previews are not cut",
           "pt": "Prévias longas não são cortadas"
-        }
+        },
+        "type": "build",
+        "bothSides": true
       },
       "done": 0,
       "total": 2
@@ -198,7 +200,9 @@
         "title": {
           "en": "Search is case-sensitive",
           "pt": "A busca diferencia maiúsculas"
-        }
+        },
+        "type": "fix",
+        "bothSides": false
       },
       "done": 0,
       "total": 1
@@ -210,7 +214,9 @@
         "title": {
           "en": "Search is case-sensitive",
           "pt": "A busca diferencia maiúsculas"
-        }
+        },
+        "type": "fix",
+        "bothSides": false
       },
       "done": 0,
       "total": 3
@@ -278,6 +284,13 @@
       "pt": "Um título vazio não mostra nada"
     }
   },
+  "ticketMeta": {
+    "1": {
+      "type": "fix",
+      "bothSides": false
+    }
+  },
+  "practiced": {},
   "hintsTotal": {
     "1": 3
   },
