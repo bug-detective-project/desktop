@@ -20,6 +20,36 @@ export const TicketInProgress: Story = { render: show(() => snapshotFixture('act
 export const TicketInCodeReview: Story = { render: show(() => snapshotFixture('review')) };
 export const DockerStopped: Story = { render: show(() => snapshotFixture('queued', { dockerState: 'notRunning' })) };
 export const DatabaseResetFailed: Story = { render: show(() => snapshotFixture('active', { dbResetFailed: true })) };
+/** A project with services: each one is a row with its state as a word, and Docker's own reason when it stopped. */
+export const ProjectServices: Story = {
+  render: show(() =>
+    snapshotFixture('active', {
+      services: [
+        { name: 'db', image: 'postgres:17', state: 'ready' },
+        { name: 'audit', image: 'postgres:17', state: 'failed', reason: 'Error: superuser password is not specified.' },
+        { name: 'cache', image: 'postgres:17', state: 'oom' },
+      ],
+    }),
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('db · postgres:17');
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('Ready');
+    await expect(canvas.getByTestId('env-service-db')).toHaveAttribute('data-tone', 'ok');
+    await expect(canvas.getByTestId('env-service-audit')).toHaveTextContent('Stopped: Error: superuser password is not specified.');
+    await expect(canvas.getByTestId('env-service-audit')).toHaveAttribute('data-tone', 'danger');
+    await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Stopped: out of memory');
+  },
+};
+export const ProjectServicesInPortuguese: Story = {
+  ...ProjectServices,
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('Pronto');
+    await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Parado: faltou memória');
+  },
+};
 export const WorkspaceInternetOn: Story = { render: show(() => snapshotFixture('active', { workspaceInternet: true })) };
 export const WorkspaceInternetOnInPortuguese: Story = { ...WorkspaceInternetOn, globals: { locale: 'pt' } };
 /** Opening asks first: the warning says what else the project's code reaches. */

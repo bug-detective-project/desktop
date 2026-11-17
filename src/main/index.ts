@@ -144,7 +144,12 @@ function runtime(): GameRuntime {
     return fake;
   }
   const contextRoot = app.isPackaged ? join(process.resourcesPath, 'docker') : join(appRoot, 'build', 'docker');
-  return new DockerRuntime(platform, { contextRoot, qaBuildRoot: join(app.getPath('userData'), 'docker') });
+  return new DockerRuntime(platform, {
+    contextRoot,
+    qaBuildRoot: join(app.getPath('userData'), 'docker'),
+    // Beside the game state, not in it: it describes this computer's Docker and outlives a new game or a restore.
+    serviceImagesFile: join(app.getPath('userData'), 'service-images.json'),
+  });
 }
 
 /**

@@ -133,7 +133,8 @@
       "projectDependencies": "Dependências",
       "devServer": "Servidor de desenvolvimento",
       "database": "Dados da aplicação",
-      "internet": "Internet do workspace"
+      "internet": "Internet do workspace",
+      "serviceImages": "Imagens dos serviços"
     },
     "retryReset": "Tentar de novo",
     "envStatus": {
@@ -147,7 +148,9 @@
       "checking": "Verificando…",
       "needsDocker": "Precisa do Docker",
       "notYet": "Ainda não instalado",
-      "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior"
+      "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior",
+      "serviceStopped": "Parado",
+      "serviceOutOfMemory": "Parado: faltou memória"
     },
     "desk": "Sua mesa",
     "projectAndContacts": "Projeto e contatos",
@@ -533,6 +536,14 @@
       "qaCache": {
         "name": "Cache de dependências do QA",
         "help": "Pacotes npm para o QA rodar offline"
+      },
+      "serviceData": {
+        "name": "Dados dos serviços",
+        "help": "Os bancos de dados dos serviços do projeto"
+      },
+      "serviceImages": {
+        "name": "Imagens dos serviços",
+        "help": "Os servidores de banco de dados que o projeto usa"
       }
     },
     "diskNotCreated": "Ainda não criado",

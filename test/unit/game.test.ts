@@ -1781,6 +1781,34 @@ describe('the services of a project', () => {
     expect(handed).toHaveBeenLastCalledWith({});
   });
 
+  it('shows no services for a project without any', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([]);
+  });
+
+  it('shows each declared service and its state once the ticket is unlocked', async () => {
+    await declare({ services });
+    const { game } = createGame();
+    await game.init();
+    expect(game.snapshot().services).toEqual([]);
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+  });
+
+  it('shows a service that failed, with the reason, and lets the game go on', async () => {
+    await declare({ services });
+    const { game } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'superuser password is not specified' } } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([
+      { name: 'db', image: 'postgres:17', state: 'failed', reason: 'superuser password is not specified' },
+    ]);
+    await game.move(1, 'inProgress');
+    expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
+  });
+
   it('refuses an invalid declaration, naming the field', async () => {
     await declare({ services: { db: { image: 'mysql:8' } } });
     const { game } = createGame();

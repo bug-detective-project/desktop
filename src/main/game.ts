@@ -23,6 +23,7 @@ import type {
   WorkspaceStatus,
   DevCatalogView,
   LocalCatalog,
+  ServiceStatus,
 } from '../shared/api.ts';
 import { INSTALL_DISK_BYTES } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
@@ -178,6 +179,8 @@ export class Game {
   private workspaceInternet = false;
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
   private dbResetFailed = false;
+  /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
+  private services: ServiceStatus[] = [];
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
   private readonly unavailableProjects = new Set<string>();
   /** When the last catalog refresh failed, or null after one that succeeded. */
@@ -406,6 +409,7 @@ export class Game {
     this.reviews = projects.reviews(id);
     this.options.runtime.setProject(id);
     this.options.runtime.setResources(null);
+    this.services = [];
     this.content = null;
     this.projectFiles = null;
   }
@@ -580,6 +584,7 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
+      services: this.services,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
       dockerState: this.dockerState,
@@ -785,6 +790,7 @@ export class Game {
     if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
       await this.checkWorkspace();
     }
+    await this.refreshServices();
     // What Docker says wins: a recreated container is closed again.
     this.workspaceInternet = await this.options.runtime.workspaceInternet().catch(() => false);
     this.emit();
@@ -828,7 +834,19 @@ export class Game {
       this.dbResetFailed = true;
       this.appendLog(`» npm run db:reset failed: ${(error as Error).message}`);
     }
+    await this.refreshServices();
     this.emit();
+  }
+
+  /** Asks Docker where each service is; a service that stopped is logged once, with its reason. */
+  private async refreshServices(): Promise<void> {
+    const before = new Map(this.services.map((service) => [service.name, service.state]));
+    this.services = await this.options.runtime.servicesStatus().catch(() => []);
+    for (const service of this.services) {
+      if ((service.state === 'failed' || service.state === 'oom') && before.get(service.name) !== service.state) {
+        this.appendLog(`» Service ${service.name} (${service.image}): ${service.state === 'oom' ? 'killed for lack of memory' : (service.reason ?? 'stopped')}`);
+      }
+    }
   }
 
   /** An error the renderer's error boundary caught: logged, so a diagnostics copy carries it. */

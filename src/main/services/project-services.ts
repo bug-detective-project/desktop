@@ -138,6 +138,9 @@ export class ProjectServices {
         [
           'run',
           '--detach',
+          // Never a silent download: the image is pulled, and recorded, before the service is created.
+          '--pull',
+          'never',
           ...serviceRunArgs(declared, {
             name: container,
             labels: { [LABEL]: SERVICE_ROLE, [PROJECT_LABEL]: this.project, [SERVICE_KEY_LABEL]: key },

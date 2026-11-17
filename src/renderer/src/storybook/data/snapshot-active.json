@@ -196,6 +196,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "services": [],
   "workspaceInternet": false,
   "catalogRefresh": null,
   "dockerState": "running",

@@ -55,6 +55,58 @@ describe('deskState', () => {
   });
 });
 
+describe('environmentRows, the services of the project', () => {
+  const ready = { items: [{ id: 'workspaceImage' as const, ready: true }, { id: 'qaImage' as const, ready: true }, { id: 'projectDependencies' as const, ready: true }], ready: true };
+
+  it('adds no row for a project without services', () => {
+    const rows = environmentRows(snapshot({ environment: ready, services: [] }), t);
+    expect(rows.map((row) => row.id)).toEqual(['docker', 'workspaceImage', 'qaImage', 'projectDependencies']);
+  });
+
+  it('lists each service by name and image, with its state as a word', () => {
+    const rows = environmentRows(
+      snapshot({
+        environment: ready,
+        services: [
+          { name: 'db', image: 'postgres:17', state: 'ready' },
+          { name: 'cache', image: 'postgres:17', state: 'starting' },
+          { name: 'audit', image: 'postgres:17', state: 'failed', reason: 'superuser password is not specified' },
+          { name: 'search', image: 'postgres:17', state: 'failed' },
+          { name: 'queue', image: 'postgres:17', state: 'oom' },
+        ],
+      }),
+      t,
+    ).filter((row) => row.id.startsWith('service-'));
+    expect(rows.map((row) => [row.id, row.name, row.tone, row.status, row.busy])).toEqual([
+      ['service-db', 'db · postgres:17', 'ok', 'dashboard.envStatus.ready', false],
+      ['service-cache', 'cache · postgres:17', 'warn', 'dashboard.envStatus.starting', true],
+      ['service-audit', 'audit · postgres:17', 'danger', 'dashboard.envStatus.serviceStopped: superuser password is not specified', false],
+      ['service-search', 'search · postgres:17', 'danger', 'dashboard.envStatus.serviceStopped', false],
+      ['service-queue', 'queue · postgres:17', 'danger', 'dashboard.envStatus.serviceOutOfMemory', false],
+    ]);
+  });
+
+  it('lists the service images among the downloads only when the project needs them', () => {
+    const environment = { items: [...ready.items, { id: 'serviceImages' as const, ready: false }], ready: false };
+    const rows = environmentRows(snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }), t);
+    const row = rows.find((item) => item.id === 'serviceImages')!;
+    expect([row.name, row.tone, row.status]).toEqual(['dashboard.env.serviceImages', 'danger', 'dashboard.envStatus.missing']);
+    expect(environmentSummary(rows)).toBe('danger');
+  });
+
+  it('says a service is not installed yet, without a spinner, while the downloads are missing', () => {
+    const environment = { items: [...ready.items, { id: 'serviceImages' as const, ready: false }], ready: false };
+    const rows = environmentRows(snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }), t);
+    const row = rows.find((item) => item.id === 'service-db')!;
+    expect([row.tone, row.status, row.busy]).toEqual(['neutral', 'dashboard.envStatus.notYet', false]);
+  });
+
+  it('a failed service makes the summary a danger', () => {
+    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }), t);
+    expect(environmentSummary(rows)).toBe('danger');
+  });
+});
+
 describe('environmentRows', () => {
   const tones = (rows: ReturnType<typeof environmentRows>) => Object.fromEntries(rows.map((row) => [row.id, row.tone]));
 

@@ -101,6 +101,7 @@ describe('ProjectServices.ensureRunning', () => {
     const [run] = of('run');
     const text = run!.join(' ');
     expect(run).toContain('--detach');
+    expect(text).toContain('--pull never');
     expect(text).toContain(`--name ${CONTAINER}`);
     expect(text).toContain('--network bugdetective-net-shop --network-alias db');
     expect(text).toContain('--label bugdetective.role=service');

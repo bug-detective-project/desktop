@@ -22,7 +22,8 @@ export interface PrerequisiteReport {
   dockerState: EngineState;
 }
 
-export type EnvironmentItemId = 'workspaceImage' | 'qaImage' | 'projectDependencies';
+/** `serviceImages` is listed only for a project that declares services. */
+export type EnvironmentItemId = 'workspaceImage' | 'qaImage' | 'projectDependencies' | 'serviceImages';
 
 export interface EnvironmentItem {
   id: EnvironmentItemId;
@@ -34,7 +35,8 @@ export interface EnvironmentReport {
   ready: boolean;
 }
 
-export type DiskItemId = 'workspaceVolume' | 'workspaceImage' | 'qaImage' | 'qaCache';
+/** `serviceData` and `serviceImages` are listed only for a project that declares services. */
+export type DiskItemId = 'workspaceVolume' | 'workspaceImage' | 'qaImage' | 'qaCache' | 'serviceData' | 'serviceImages';
 
 export interface DiskUsageItem {
   id: DiskItemId;
@@ -217,6 +219,8 @@ export interface Snapshot {
   workspaceLost: boolean;
   /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
   dbResetFailed: boolean;
+  /** The services the active project declares and where each one is; empty for a project without services. */
+  services: ServiceStatus[];
   /** The player opened the workspace to the internet (it also reaches the computer and the local network); the game closes it on the next ticket. */
   workspaceInternet: boolean;
   /** The last catalog refresh failed (offline, or an invalid catalog): the Projects screen shows the last saved list. */

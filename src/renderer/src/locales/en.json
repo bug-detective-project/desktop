@@ -133,7 +133,8 @@
       "projectDependencies": "Dependencies",
       "devServer": "Dev server",
       "database": "App data",
-      "internet": "Workspace internet"
+      "internet": "Workspace internet",
+      "serviceImages": "Service images"
     },
     "retryReset": "Try again",
     "envStatus": {
@@ -147,7 +148,9 @@
       "checking": "Checking…",
       "needsDocker": "Needs Docker",
       "notYet": "Not installed yet",
-      "resetFailed": "Could not be reset; they may be the previous ticket's"
+      "resetFailed": "Could not be reset; they may be the previous ticket's",
+      "serviceStopped": "Stopped",
+      "serviceOutOfMemory": "Stopped: out of memory"
     },
     "desk": "Your desk",
     "projectAndContacts": "Project & contacts",
@@ -533,6 +536,14 @@
       "qaCache": {
         "name": "QA dependency cache",
         "help": "npm packages for offline QA runs"
+      },
+      "serviceData": {
+        "name": "Service data",
+        "help": "The databases of the project's services"
+      },
+      "serviceImages": {
+        "name": "Service images",
+        "help": "The database servers the project uses"
       }
     },
     "diskNotCreated": "Not created yet",

@@ -4,7 +4,7 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
+import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison, ServiceStatus } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
@@ -15,6 +15,8 @@ import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/works
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
 
 interface Scenario {
+  /** A service of the project that does not start, with what its log says. */
+  serviceFailure?: { name: string; reason: string };
   docker: EngineState;
   wsl: boolean;
   vscode: boolean;
@@ -240,6 +242,18 @@ export class FakeRuntime implements GameRuntime {
 
   setResources(resources: ProjectResources | null): void {
     this.resources = resources;
+  }
+
+  /** Every declared service is ready once the environment is installed, except the one the scenario breaks. */
+  async servicesStatus(): Promise<ServiceStatus[]> {
+    const failure = this.scenario.serviceFailure;
+    return Object.entries(this.resources?.services ?? {}).map(([name, service]) => ({
+      name,
+      image: service.image,
+      ...(failure?.name === name
+        ? { state: 'failed' as const, reason: failure.reason }
+        : { state: this.scenario.environmentReady ? ('ready' as const) : ('starting' as const) }),
+    }));
   }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
