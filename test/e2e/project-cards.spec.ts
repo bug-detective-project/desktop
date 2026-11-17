@@ -107,6 +107,24 @@ test('the brief shows the client, the stack that exists, the tickets and the ski
   }
 });
 
+test('the SupportDesk publication lists its seven skills: five on the card, all of them after "See all"', async () => {
+  const { page, close } = await openProjects();
+  try {
+    await page.getByTestId('project-supportdesk-brief').click();
+    const back = page.getByTestId('project-supportdesk-back');
+    const skills = back.getByTestId('project-skills').getByRole('listitem');
+    await expect(skills).toHaveCount(5);
+    await expect(skills.first()).toHaveText('Async and state');
+    await expect(back.getByTestId('project-skills-all')).toHaveText('See all (7)');
+
+    await back.getByTestId('project-skills-all').click();
+    await expect(skills).toHaveCount(7);
+    await expect(skills.last()).toHaveText('Server security');
+  } finally {
+    await close();
+  }
+});
+
 test('the front shows the monogram, the difficulty in its color, the badge only on the current project and Play only on the others', async () => {
   const { page, close } = await openProjects();
   try {
