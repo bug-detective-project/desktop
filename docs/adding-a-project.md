@@ -50,7 +50,10 @@ a third-party project reads the rest.
   (`better-sqlite3` today; a change is a pull request to the catalog); every version has been on the
   registry for at least 7 days; `.npmrc` on `main` and on every ticket branch sets `allow-git=none`,
   `allow-remote=none` and `min-release-age=7`, so the author's own `npm install` follows the same
-  rules. `bd validate --offline` skips the release ages when there is no network.
+  rules. `bd validate --offline` skips the release ages when there is no network. A package bundled
+  inside a registry package (Tailwind 4's `@tailwindcss/oxide-wasm32-wasi` carries six) is accepted
+  since catalog 1.5.1, but npm refuses to write the lockfile for it under `allow-remote=none`:
+  create or update the lockfile with `npm install --allow-remote=all`; `npm ci` needs nothing.
 - **The QA CLI installs the same way.** `--deps-only` runs `npm ci --ignore-scripts` and then
   `npm rebuild <the packages of allowScripts>`, and refuses a lockfile with a `resolved` outside the
   registry: a dependency never runs a script on the player's machine that the rules do not allow.
@@ -101,8 +104,22 @@ on:
     branches: [main]
 jobs:
   app:
-    uses: bug-detective-project/catalog/.github/workflows/app.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
+    uses: bug-detective-project/catalog/.github/workflows/app.yml@8547e2d39458d5aa575696d376b3637fb5a1f9a5 # v1.6.0
 ```
+
+A project with [services](#services-a-database-for-the-project) also passes the two inputs below, so
+`npm test` runs with its services up. `services.json` is a file on `main` with the same `services`
+object the `qa` declares (the workflow sees only `main`):
+
+```yaml
+    with:
+      services-file: services.json
+      catalog-ref: 8547e2d39458d5aa575696d376b3637fb5a1f9a5
+```
+
+The job runs `bd with-services --file services.json -- npm test`: `bd` starts each service in Docker
+on a free port, sets the declared variables for the command and removes the containers afterwards.
+The same command runs the tests on your machine.
 
 Protect `main` like `qa`: changes only through a pull request with the `app` check green.
 
@@ -198,6 +215,8 @@ A project whose code needs a database declares it in the same `bugDetective.proj
   - the project may recommend SQLTools and its PostgreSQL driver in `.vscode/extensions.json`
     (`mtxr.sqltools`, `mtxr.sqltools-driver-pg`), which connect from inside the workspace to
     the service by its name.
+- The tests of `main` that need a service run through `bd with-services` (see the `ci.yml` of
+  step 1), against a database of their own, never the one the dev server uses.
 - A project with services needs `minAppVersion` 1.2.0 in the catalog.
 
 ### The QA CLI (`run.ts`)
@@ -283,7 +302,11 @@ Tickets are `<track>-<order>` with the tracks `front` and `back`: `front-1`, `fr
 picks a track for every ticket, so:
 
 - a bug must not break any test of `main` (each ticket's `gate1/` covers every other ticket);
-- a ticket's regression test is a **new test file** in its `reference.patch`;
+- a ticket's regression test is a **new test file** in its `reference.patch`, never a file of
+  `main`;
+- a regression test becomes part of every other ticket's `gate1/`, so it must pass on every other
+  ticket's buggy branch: it may not depend on behavior another ticket breaks (`bd verify` shows it
+  as a Gate 1 failure on the buggy branch);
 - texts never mention another ticket.
 
 ## 4. Write each ticket (`tickets/<id>/`)
