@@ -8,7 +8,7 @@ import type { TicketType as ContractTicketType } from '@bug-detective/catalog/co
  * The same list as the contract's TICKET_TYPES. Repeated here because this module also runs in the
  * renderer, which must not bundle the contract's code; the type below fails to compile if they differ.
  */
-export const TICKET_TYPES = ['fix', 'build', 'complete', 'test', 'refactor', 'optimize', 'upgrade', 'investigate'] as const;
+export const TICKET_TYPES = ['fix', 'build', 'complete', 'refactor', 'optimize', 'upgrade', 'investigate'] as const;
 export type TicketType = (typeof TICKET_TYPES)[number];
 
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
@@ -25,12 +25,11 @@ export function metaOfEntry(entry: { type?: TicketType; bothSides?: boolean } | 
 }
 
 /** Ticket types that share their QA and review texts. */
-const TEXT_GROUP: Record<TicketType, 'fix' | 'build' | 'test' | 'refactor' | 'optimize' | 'upgrade'> = {
+const TEXT_GROUP: Record<TicketType, 'fix' | 'build' | 'refactor' | 'optimize' | 'upgrade'> = {
   fix: 'fix',
   investigate: 'fix',
   build: 'build',
   complete: 'build',
-  test: 'test',
   refactor: 'refactor',
   optimize: 'optimize',
   upgrade: 'upgrade',

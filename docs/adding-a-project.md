@@ -166,7 +166,7 @@ manifest.json          written by bd publish (step 7)
     }
   },
   "devDependencies": {
-    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.5.0"
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.7.0"
   }
 }
 ```
@@ -285,7 +285,7 @@ on:
     branches: [qa]
 jobs:
   project:
-    uses: bug-detective-project/catalog/.github/workflows/project.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
+    uses: bug-detective-project/catalog/.github/workflows/project.yml@18a025975eff16c50cb3c7c6b2eb38147a941da3 # v1.7.0
     permissions:
       contents: write
 ```
@@ -335,7 +335,7 @@ picks a track for every ticket, so:
 
 | Field | Values | Without it |
 | --- | --- | --- |
-| `type` | `fix`, `build`, `complete`, `test`, `refactor`, `optimize`, `upgrade` or `investigate` | `fix` |
+| `type` | `fix`, `build`, `complete`, `refactor`, `optimize`, `upgrade` or `investigate` | `fix` |
 | `bothSides` | `true` when the ticket needs changes in the front end and in the back end; it still belongs to one track, the one where the symptom shows | `false` |
 | `skills` | 1 to 5 skills per language, up to 60 characters each, the same count in `en` and `pt` | none |
 

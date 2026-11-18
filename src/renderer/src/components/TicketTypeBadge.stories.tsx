@@ -29,7 +29,6 @@ export const Fix: Story = {
 };
 export const Build: Story = { args: { type: 'build' } };
 export const Complete: Story = { args: { type: 'complete' } };
-export const WriteTheTest: Story = { args: { type: 'test' } };
 export const Refactor: Story = { args: { type: 'refactor' } };
 export const Optimize: Story = { args: { type: 'optimize' } };
 export const Upgrade: Story = { args: { type: 'upgrade' } };

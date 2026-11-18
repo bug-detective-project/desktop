@@ -28,7 +28,7 @@ describe.each([
   it('speaks of a bug only for fix and investigate tickets', () => {
     for (const type of TICKET_TYPES) {
       const speaksOfBug = /\bbug\b/i.test(String(at(texts, gate2FailedKey(type))));
-      expect(speaksOfBug, type).toBe(type === 'fix' || type === 'investigate' || type === 'test');
+      expect(speaksOfBug, type).toBe(type === 'fix' || type === 'investigate');
     }
   });
 });
