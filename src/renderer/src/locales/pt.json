@@ -347,7 +347,6 @@
     "fix": "Consertar",
     "build": "Construir",
     "complete": "Completar",
-    "test": "Escrever o teste",
     "refactor": "Refatorar",
     "optimize": "Otimizar",
     "upgrade": "Atualizar",
@@ -409,7 +408,6 @@
       "gate2FailedByType": {
         "fix": "O bug reportado ainda não foi resolvido. A aplicação ainda apresenta o comportamento descrito no ticket.",
         "build": "O ticket ainda não foi entregue. Parte do que ele pede ainda falta ou não funciona.",
-        "test": "Seu teste ainda não prova o bug. Ele precisa falhar no código com o bug e passar no código corrigido.",
         "refactor": "A refatoração ainda não chegou lá. O comportamento está intacto, mas o código não atingiu a meta do ticket.",
         "optimize": "A meta do ticket ainda não foi atingida.",
         "upgrade": "A atualização ainda não está completa. Parte do código ainda depende da versão antiga."
@@ -467,7 +465,6 @@
     "referenceIntroByType": {
       "fix": "O que {{name}} mudou no código com que o ticket começou para corrigir o bug.",
       "build": "O que {{name}} mudou no código com que o ticket começou para entregar o que o ticket pede.",
-      "test": "O que {{name}} mudou no código com que o ticket começou para provar o bug com um teste.",
       "refactor": "O que {{name}} mudou no código com que o ticket começou para atingir a meta do ticket sem mudar o comportamento.",
       "optimize": "O que {{name}} mudou no código com que o ticket começou para atingir a meta do ticket.",
       "upgrade": "O que {{name}} mudou no código com que o ticket começou para completar a atualização."

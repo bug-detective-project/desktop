@@ -347,7 +347,6 @@
     "fix": "Fix",
     "build": "Build",
     "complete": "Complete",
-    "test": "Write the test",
     "refactor": "Refactor",
     "optimize": "Optimize",
     "upgrade": "Upgrade",
@@ -409,7 +408,6 @@
       "gate2FailedByType": {
         "fix": "The reported bug is still unresolved. The app still shows the behavior described in the ticket.",
         "build": "The ticket is not delivered yet. Part of what it asks for is still missing or does not work.",
-        "test": "Your test does not prove the bug yet. It must fail on the code with the bug and pass on the fixed code.",
         "refactor": "The refactoring is not there yet. The behavior is intact, but the code has not reached the goal of the ticket.",
         "optimize": "The goal of the ticket is not reached yet.",
         "upgrade": "The upgrade is not complete yet. Part of the code still depends on the old version."
@@ -467,7 +465,6 @@
     "referenceIntroByType": {
       "fix": "What {{name}} changed in the code the ticket started from to fix the bug.",
       "build": "What {{name}} changed in the code the ticket started from to deliver what the ticket asks.",
-      "test": "What {{name}} changed in the code the ticket started from to prove the bug with a test.",
       "refactor": "What {{name}} changed in the code the ticket started from to reach the goal of the ticket without changing the behavior.",
       "optimize": "What {{name}} changed in the code the ticket started from to reach the goal of the ticket.",
       "upgrade": "What {{name}} changed in the code the ticket started from to complete the upgrade."

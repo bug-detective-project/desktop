@@ -12,8 +12,8 @@ describe('ticket metadata', () => {
     expect(metaOfEntry({ type: 'build', bothSides: true })).toEqual({ type: 'build', bothSides: true });
   });
 
-  it('knows the eight ticket types', () => {
-    expect(TICKET_TYPES).toEqual(['fix', 'build', 'complete', 'test', 'refactor', 'optimize', 'upgrade', 'investigate']);
+  it('knows the seven ticket types', () => {
+    expect(TICKET_TYPES).toEqual(['fix', 'build', 'complete', 'refactor', 'optimize', 'upgrade', 'investigate']);
   });
 
   it.each([
@@ -21,7 +21,6 @@ describe('ticket metadata', () => {
     ['investigate', 'fix'],
     ['build', 'build'],
     ['complete', 'build'],
-    ['test', 'test'],
     ['refactor', 'refactor'],
     ['optimize', 'optimize'],
     ['upgrade', 'upgrade'],
