@@ -55,6 +55,6 @@ export const AllTypes: Story = {
     const labels = within(canvasElement)
       .getAllByTestId('ticket-type')
       .map((tag) => tag.textContent);
-    await expect(labels).toEqual(['Fix', 'Build', 'Complete', 'Write the test', 'Refactor', 'Optimize', 'Upgrade', 'Investigate']);
+    await expect(labels).toEqual(['Fix', 'Build', 'Complete', 'Refactor', 'Optimize', 'Upgrade', 'Investigate']);
   },
 };
