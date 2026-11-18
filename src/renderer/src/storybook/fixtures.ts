@@ -61,6 +61,7 @@ export function projectCardFixture(overrides: Partial<ProjectCard> = {}): Projec
       skills: { en: ['Async and state', 'Reading errors'], pt: ['Assincronia e estado', 'Ler erros'] },
       difficulty: 'beginner',
       counts: { front: 2, back: 1 },
+      memoryBytes: null,
     },
     progress: null,
     unavailable: null,

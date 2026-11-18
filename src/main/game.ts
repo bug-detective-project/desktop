@@ -23,6 +23,7 @@ import type {
   WorkspaceStatus,
   DevCatalogView,
   LocalCatalog,
+  ServiceStatus,
 } from '../shared/api.ts';
 import { INSTALL_DISK_BYTES } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
@@ -35,7 +36,7 @@ import { StaleVSCodeWindowError } from './services/attached-window.ts';
 import { createSave, readSave } from './services/backup.ts';
 import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry, TicketMeta } from '@bug-detective/catalog/contract';
-import { TICKET_META_FILE, parseTicketMeta } from '@bug-detective/catalog/contract';
+import { TICKET_META_FILE, parseTicketMeta, peakMemory } from '@bug-detective/catalog/contract';
 import { metaOfEntry } from '../shared/ticketMeta.ts';
 import type { ValidatedSave } from './services/backup.ts';
 import { FirstDownloadError } from './services/content/cache.ts';
@@ -178,6 +179,11 @@ export class Game {
   private workspaceInternet = false;
   /** The last `npm run db:reset` failed (the Dashboard says so and offers a retry). */
   private dbResetFailed = false;
+  /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
+  private services: ServiceStatus[] = [];
+  private workspaceOutOfMemoryAt: string | null = null;
+  /** When each service last had a process killed for lack of memory while it stayed up. */
+  private serviceMemoryKills: Record<string, string> = {};
   /** Projects whose qa ref the last Projects refresh could not find (the repository or branch is gone). */
   private readonly unavailableProjects = new Set<string>();
   /** When the last catalog refresh failed, or null after one that succeeded. */
@@ -405,6 +411,9 @@ export class Game {
     this.packages = projects.packages(id);
     this.reviews = projects.reviews(id);
     this.options.runtime.setProject(id);
+    this.options.runtime.setResources(null);
+    this.services = [];
+    this.serviceMemoryKills = {};
     this.content = null;
     this.projectFiles = null;
   }
@@ -490,6 +499,8 @@ export class Game {
     // The workspace folder is named after the project and its git identity after the project's
     // name: both come from the manifest, with or without a catalog.
     this.options.runtime.setProject(content.manifest.project.id, content.manifest.project.name);
+    const { services, memory } = content.manifest.project;
+    this.options.runtime.setResources({ ...(services && { services }), ...(memory && { memory }) });
     this.emit();
     const active = this.activeProject();
     if (active && this.withSource(this.state, active, content.manifest.version) !== this.state) {
@@ -577,6 +588,8 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
+      services: this.services.map((service) => (this.serviceMemoryKills[service.name] ? { ...service, memoryKillAt: this.serviceMemoryKills[service.name] } : service)),
+      workspaceOutOfMemoryAt: this.workspaceOutOfMemoryAt,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
       dockerState: this.dockerState,
@@ -778,10 +791,13 @@ export class Game {
 
   async refreshEnvironment(): Promise<EnvironmentReport> {
     await this.requireDocker();
+    // Asked first: the environment check below starts a stopped workspace again, and the reason is then gone.
+    await this.checkWorkspaceMemory();
     this.environment = await this.options.runtime.environment();
     if (this.environment.items.find((item) => item.id === 'workspaceImage')?.ready) {
       await this.checkWorkspace();
     }
+    await this.refreshServices();
     // What Docker says wins: a recreated container is closed again.
     this.workspaceInternet = await this.options.runtime.workspaceInternet().catch(() => false);
     this.emit();
@@ -825,7 +841,57 @@ export class Game {
       this.dbResetFailed = true;
       this.appendLog(`» npm run db:reset failed: ${(error as Error).message}`);
     }
+    await this.refreshServices();
     this.emit();
+  }
+
+  /** Records, logs and shows that the workspace or a service ran out of memory since the last check. */
+  private async checkWorkspaceMemory(): Promise<void> {
+    if (await this.options.runtime.workspaceOutOfMemory().catch(() => false)) {
+      this.workspaceOutOfMemoryAt = (this.options.clock?.() ?? new Date()).toISOString();
+      this.appendLog('» The workspace ran out of memory: the kernel stopped a process in it');
+    }
+    for (const name of await this.options.runtime.servicesOutOfMemory().catch(() => [] as string[])) {
+      this.serviceMemoryKills = { ...this.serviceMemoryKills, [name]: (this.options.clock?.() ?? new Date()).toISOString() };
+      this.appendLog(`» Service ${name} ran out of memory: the kernel stopped a process in it`);
+    }
+  }
+
+  /** Asks Docker where each service is; a service that stopped is logged once, with its reason. */
+  private async refreshServices(): Promise<void> {
+    const before = new Map(this.services.map((service) => [service.name, service.state]));
+    this.services = await this.options.runtime.servicesStatus().catch(() => []);
+    for (const service of this.services) {
+      if ((service.state === 'failed' || service.state === 'oom') && before.get(service.name) !== service.state) {
+        this.appendLog(`» Service ${service.name} (${service.image}): ${service.state === 'oom' ? 'killed for lack of memory' : (service.reason ?? 'stopped')}`);
+      }
+    }
+  }
+
+  private async recreateProjectServices(): Promise<void> {
+    this.appendLog("» Recreating the project's services (their data is erased)");
+    await this.options.runtime.recreateServices();
+    this.serviceMemoryKills = {};
+  }
+
+  /**
+   * "Recreate services" on the Dashboard, for a service that does not start or died: new
+   * containers and empty data, then the reset script seeds them. The code and the progress stay.
+   */
+  async recreateServices(): Promise<void> {
+    if (this.busy) {
+      throw new GameError('busy', `Busy: ${this.busy}`);
+    }
+    await this.requireDocker();
+    this.requireWorkspace();
+    if (this.services.length === 0) {
+      throw new GameError('noServices');
+    }
+    await this.recreateProjectServices();
+    await this.resetDatabase();
+    if (this.dbResetFailed) {
+      throw new GameError('dbResetFailed');
+    }
   }
 
   /** An error the renderer's error boundary caught: logged, so a diagnostics copy carries it. */
@@ -834,10 +900,16 @@ export class Game {
     this.options.logLine?.(stack);
   }
 
-  /** "Try again" after a failed reset; fails with dbResetFailed when it fails again. */
+  /**
+   * "Try again" after a failed reset; fails with dbResetFailed when it fails again. A project with
+   * services gets them recreated first: the reset script cannot fix a server that is broken.
+   */
   async retryDatabaseReset(): Promise<void> {
     await this.requireDocker();
     this.requireWorkspace();
+    if (this.services.length > 0) {
+      await this.recreateProjectServices();
+    }
     await this.resetDatabase();
     if (this.dbResetFailed) {
       throw new GameError('dbResetFailed');
@@ -1027,6 +1099,7 @@ export class Game {
           skills: { en: story.en.project.skills ?? [], pt: story.pt.project.skills ?? [] },
           difficulty: content.manifest.project.difficulty ?? null,
           counts: countsOf(content.manifest),
+          memoryBytes: Object.keys(content.manifest.project.services ?? {}).length > 0 ? peakMemory(content.manifest.project) : null,
         };
       }
       const progress = item.id === active ? { tickets: this.state.tickets, tracks: this.state.tracks } : (this.state.otherProjects[item.id] ?? null);
@@ -1416,6 +1489,8 @@ export class Game {
     }
     await this.requireDocker();
     this.lastWorkspaceStatus = await this.options.runtime.workspaceStatus();
+    // The screen repeats this call while it is open: the moment to notice a process the kernel killed.
+    await this.checkWorkspaceMemory();
     return this.lastWorkspaceStatus;
   }
 

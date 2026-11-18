@@ -101,7 +101,7 @@ on:
     branches: [main]
 jobs:
   app:
-    uses: bug-detective-project/catalog/.github/workflows/app.yml@cdbf7edfc3032ba6b34ddf36741c44cf8d2b369a # v1.3.0
+    uses: bug-detective-project/catalog/.github/workflows/app.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
 ```
 
 Protect `main` like `qa`: changes only through a pull request with the `app` check green.
@@ -149,7 +149,7 @@ manifest.json          written by bd publish (step 7)
     }
   },
   "devDependencies": {
-    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.3.0"
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.5.0"
   }
 }
 ```
@@ -157,6 +157,48 @@ manifest.json          written by bd publish (step 7)
 `difficulty` (`beginner`, `intermediate` or `advanced`) and `stack` (any of `frontend`, `backend` and
 `database`, up to 60 characters each) are optional; the Projects card leaves out what is missing.
 `bd` copies them into `manifest.json`.
+
+#### Services (a database for the project)
+
+A project whose code needs a database declares it in the same `bugDetective.project`:
+
+```json
+"services": {
+  "db": {
+    "image": "postgres:17",
+    "memory": "256m",
+    "env": { "POSTGRES_PASSWORD": "shop", "POSTGRES_DB": "shop" },
+    "variables": { "DATABASE_URL": "postgres://postgres:shop@{{host}}:{{port}}/shop" }
+  }
+}
+```
+
+- `image` comes from the catalog's list of allowed images (today only `postgres:17`); a new image
+  enters by pull request to the catalog. The rules and the limits (up to 4 services, 64 MB to 1 GB
+  each, a memory peak of 8 GB) are in the catalog's README, "Project services".
+- The app starts each service in its own container next to the workspace, on the project's
+  internal network (no internet, no published port), and sets the `variables` on the workspace
+  with the service name as `{{host}}`: the dev server, the terminals and VS Code all see
+  `DATABASE_URL=postgres://postgres:shop@db:5432/shop`. `bd verify` fills them with `127.0.0.1` and
+  a free port.
+- **The code never uses a fixed address.** The app, the QA CLI and `npm run db:reset` read the
+  variables. `db:reset` must reset every service the project declares, not only its main database.
+- The data of a service lives in a volume of its own and survives closing the app; it goes away
+  with the project (a project switch, "Remove everything from Docker").
+- Every QA run gets its own copy of each service, empty, on a network of that run alone, with
+  the same variables; it never sees the player's data. The QA CLI must therefore prepare the data
+  it needs (run the project's `db:reset`) before it tests.
+- When `db:reset` fails, "Try again" on the Dashboard recreates the services first; "Recreate
+  services" does the same for a service that does not start or ran out of memory.
+- **Looking at the data.** Three ways, all optional for the player:
+  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`;
+  - `"publish": true` on a service also publishes its port on the player's computer, on
+    `127.0.0.1` only and on a free port (the service's own when it is free); the Dashboard shows
+    it next to the service (`localhost:5432`), for the player's own database tools;
+  - the project may recommend SQLTools and its PostgreSQL driver in `.vscode/extensions.json`
+    (`mtxr.sqltools`, `mtxr.sqltools-driver-pg`), which connect from inside the workspace to
+    the service by its name.
+- A project with services needs `minAppVersion` 1.2.0 in the catalog.
 
 ### The QA CLI (`run.ts`)
 
@@ -224,7 +266,7 @@ on:
     branches: [qa]
 jobs:
   project:
-    uses: bug-detective-project/catalog/.github/workflows/project.yml@cdbf7edfc3032ba6b34ddf36741c44cf8d2b369a # v1.3.0
+    uses: bug-detective-project/catalog/.github/workflows/project.yml@9d4b057d50ea437c9cc15e4e1f74facf49481f44 # v1.5.0
     permissions:
       contents: write
 ```

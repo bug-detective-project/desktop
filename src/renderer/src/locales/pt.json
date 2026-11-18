@@ -133,9 +133,18 @@
       "projectDependencies": "Dependências",
       "devServer": "Servidor de desenvolvimento",
       "database": "Dados da aplicação",
-      "internet": "Internet do workspace"
+      "internet": "Internet do workspace",
+      "serviceImages": "Imagens dos serviços"
     },
     "retryReset": "Tentar de novo",
+    "workspaceOutOfMemory": "O workspace ficou sem memória e um processo dele foi parado (o servidor de desenvolvimento ou uma execução de testes, por exemplo). Inicie-o de novo. Se continuar acontecendo, aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory).",
+    "recreateServices": {
+      "button": "Recriar serviços",
+      "title": "Recriar os serviços?",
+      "text": "Os serviços do projeto, como o banco de dados, são removidos e criados de novo, vazios, e os dados da aplicação são gravados outra vez. O que você salvou neles é apagado. O seu código e o seu progresso ficam.",
+      "confirm": "Recriar serviços",
+      "outOfMemory": "Um serviço ficou sem memória. Aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory). Se o serviço parou, recrie os serviços depois."
+    },
     "envStatus": {
       "ready": "Pronto",
       "missing": "Faltando",
@@ -147,7 +156,10 @@
       "checking": "Verificando…",
       "needsDocker": "Precisa do Docker",
       "notYet": "Ainda não instalado",
-      "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior"
+      "resetFailed": "Não puderam ser reiniciados; podem ser do ticket anterior",
+      "serviceStopped": "Parado",
+      "serviceOutOfMemory": "Parado: faltou memória",
+      "serviceMemoryKill": "um processo ficou sem memória"
     },
     "desk": "Sua mesa",
     "projectAndContacts": "Projeto e contatos",
@@ -533,6 +545,14 @@
       "qaCache": {
         "name": "Cache de dependências do QA",
         "help": "Pacotes npm para o QA rodar offline"
+      },
+      "serviceData": {
+        "name": "Dados dos serviços",
+        "help": "Os bancos de dados dos serviços do projeto"
+      },
+      "serviceImages": {
+        "name": "Imagens dos serviços",
+        "help": "Os servidores de banco de dados que o projeto usa"
       }
     },
     "diskNotCreated": "Ainda não criado",
@@ -606,7 +626,7 @@
     },
     "cleanup": {
       "leftoversTitle": "Limpeza do Docker",
-      "leftoversHelp": "Remove o que o jogo deixa para trás no Docker: containers de QA, a cópia do seu código que o QA testou e imagens de versões antigas. Seu código e seu progresso continuam.",
+      "leftoversHelp": "Remove o que o jogo deixa para trás no Docker: containers de QA e os serviços das rodadas de QA, a cópia do seu código que o QA testou, imagens de versões antigas e os serviços de um projeto que você deixou. Seu código e seu progresso continuam.",
       "leftovers": "Limpar sobras",
       "leftoversDone_one": "Limpeza do Docker concluída: 1 item removido.",
       "leftoversDone_other": "Limpeza do Docker concluída: {{count}} itens removidos.",
@@ -616,9 +636,9 @@
       "everything": "Remover tudo do Docker…",
       "confirmTitle": "Remover tudo do Docker?",
       "confirmWarning": "Isso apaga o código do seu workspace e começa um novo jogo. Não dá para desfazer.",
-      "confirmContainers": "Containers: seu workspace e qualquer rodada de QA que tenha ficado para trás",
-      "confirmVolumes": "Volumes: seu código, o servidor do VS Code, o cache de dependências e a cópia do QA",
-      "confirmImages": "Imagens: as imagens do workspace e do QA (cerca de 4 GB, construídas de novo no próximo download)",
+      "confirmContainers": "Containers: seu workspace, os serviços do projeto (como o banco de dados) e qualquer rodada de QA que tenha ficado para trás",
+      "confirmVolumes": "Volumes: seu código, os dados dos serviços do projeto, o servidor do VS Code, o cache de dependências e a cópia do QA",
+      "confirmImages": "Imagens: as imagens do workspace e do QA (cerca de 4 GB, construídas de novo no próximo download) e as imagens de serviço que o jogo baixou",
       "confirmBackup": "Para manter seu progresso, cancele e exporte-o antes; depois você pode restaurá-lo.",
       "confirm": "Remover tudo",
       "everythingDone": "Tudo o que o Bug Detective criou no Docker foi removido. Um novo jogo começou.",
@@ -695,6 +715,7 @@
     "githubRateLimited": "O GitHub limitou os downloads temporariamente (comum em redes compartilhadas). Tente de novo em alguns minutos.",
     "projectUnavailable": "O projeto não está disponível agora: o repositório ou a publicação não foram encontrados.",
     "dbResetFailed": "Os dados da aplicação não puderam ser reiniciados. Veja o log do Docker e tente de novo.",
+    "noServices": "Este projeto não tem serviços para recriar.",
     "incompletePublication": "A publicação do projeto está incompleta. Tente de novo mais tarde.",
     "switchIncomplete": "A troca de projeto não terminou: {{message}}",
     "otherProjectsLeft": "O Docker ainda tem outro projeto: {{message}}",
@@ -736,6 +757,8 @@
     "confirmTitle": "Trocar para {{name}}?",
     "confirmRemoved": "O projeto atual sai do seu computador: o código dele no Docker, as imagens e as dependências são removidos.",
     "confirmKept": "O seu progresso, os tickets concluídos e os PRs ficam guardados, e você pode voltar depois (ele é baixado de novo). Exporte um backup antes se quiser uma cópia do seu código.",
+    "memory": "Memória",
+    "memoryWarning": "Este projeto precisa de cerca de {{needed}} de memória no pico e o Docker tem {{available}}. Ele pode ficar lento ou parar por falta de memória. Você pode trocar mesmo assim e aumentar a memória do Docker depois (Docker Desktop: Settings, Resources, Memory).",
     "exportFirst": "Exportar backup",
     "confirm": "Trocar de projeto",
     "switched": "{{name}} é o seu projeto agora.",

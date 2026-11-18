@@ -67,7 +67,7 @@ export class Prerequisites {
       if (dockerState !== 'running') {
         return { id: 'docker', status: dockerState === 'starting' ? 'pending' : 'missing', reason: dockerState };
       }
-      const docker = version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine));
+      const docker = { ...version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine)), ...(dockerInfo && { memoryBytes: dockerInfo.memTotalBytes }) };
       // Docker Desktop switched to Windows containers: the Linux images cannot be built or run.
       if (dockerInfo && dockerInfo.osType !== 'linux') {
         return { id: 'docker', status: 'missing', reason: 'windowsContainers', ...docker };

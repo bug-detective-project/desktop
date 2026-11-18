@@ -12,6 +12,7 @@ function card(id: string, details: Partial<NonNullable<ProjectCard['details']>> 
     details: details && {
       name: both(id),
       about: both(''),
+      memoryBytes: null,
       client: both('Client'),
       stack: null,
       skills: { en: [], pt: [] },

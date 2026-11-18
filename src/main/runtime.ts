@@ -10,7 +10,12 @@ import type { Platform } from './platform/types.ts';
 import { closeStaleWindow } from './services/attached-window.ts';
 import { planCleanup } from './services/cleanup.ts';
 import type { CleanupTarget } from './services/cleanup.ts';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import { serviceImageOf } from '@bug-detective/catalog/contract';
+import type { ProjectServices as Declared } from '@bug-detective/catalog/contract';
+import { ProjectServices, serviceNames } from './services/project-services.ts';
+import { ServiceImages, serviceImageReferences } from './services/service-images.ts';
+import type { ServiceStatus } from '../shared/api.ts';
+import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
 import type { EngineState , Docker} from './services/docker.ts';
@@ -21,7 +26,7 @@ import { QaRunner } from './services/qa.ts';
 import { qaImageTag, writeQaContext } from './services/qa-image.ts';
 import { VSCODE_MACHINE_SETTINGS } from './services/vscode.ts';
 import type { VSCode } from './services/vscode.ts';
-import { Workspace, resourceNames } from './services/workspace.ts';
+import { Workspace, networkName, resourceNames } from './services/workspace.ts';
 import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 export type LineHandler = (line: string) => void;
@@ -44,6 +49,16 @@ export interface GameRuntime {
   setQaTool(files: ArchiveFile[] | null): void;
   /** The project whose Docker resources are created from now on (they carry its label and its folder); the name is known once the manifest is. */
   setProject(project: string, name?: string): void;
+  /** The services and the memory the project declares in its manifest; null until its content is known. */
+  setResources(resources: ProjectResources | null): void;
+  /** True when the workspace ran out of memory since the last time this was asked: the container stopped for it, or the kernel killed a process inside it and it stays up. */
+  workspaceOutOfMemory(): Promise<boolean>;
+  /** The services where the kernel killed a process for lack of memory since the last time this was asked, while the service stayed up. */
+  servicesOutOfMemory(): Promise<string[]>;
+  /** Removes the project's service containers and their data, and creates them again, empty. The code and the progress are not touched. */
+  recreateServices(): Promise<void>;
+  /** Where each service of the project is, creating and starting nothing; empty without services. */
+  servicesStatus(): Promise<ServiceStatus[]>;
   /** Removes every Docker resource of these projects; returns what could not be removed (empty when clean). */
   removeProjects(projects: readonly string[]): Promise<CleanupTarget[]>;
   environment(): Promise<EnvironmentReport>;
@@ -123,6 +138,8 @@ export interface ImageConfig {
   qaRepository?: string;
   /** Prefix of every Docker resource name (tests use their own). */
   prefix?: string;
+  /** Where the app records which service images it pulled; next to the QA contexts by default. */
+  serviceImagesFile?: string;
 }
 
 interface ImageTags {
@@ -149,9 +166,15 @@ export class DockerRuntime implements GameRuntime {
   private readonly contextRoot: string;
   private readonly qaBuildRoot: string;
   private readonly qaRepository: string;
+  private readonly serviceImagesFile: string;
   private qaTool: ArchiveFile[] | null = null;
   private project: string | null = null;
   private projectName: string | null = null;
+  private resources: ProjectResources | null = null;
+  /** The memory kills already reported for the workspace container with this id. */
+  private oomSeen: { id: string; kills: number } | null = null;
+  /** The same, per service of the project. */
+  private readonly serviceOomSeen = new Map<string, { id: string; kills: number }>();
   readonly names: ResourceNames;
   private located: Environment | null = null;
   private tags: ImageTags | null = null;
@@ -165,6 +188,115 @@ export class DockerRuntime implements GameRuntime {
     this.qaBuildRoot = images.qaBuildRoot;
     this.qaRepository = images.qaRepository ?? 'bugdetective-qa';
     this.names = resourceNames(images.prefix);
+    this.serviceImagesFile = images.serviceImagesFile ?? join(this.qaBuildRoot, 'service-images.json');
+  }
+
+  /** The services the project declares; empty before its content is known and for a project without any. */
+  private get declared(): Declared {
+    return this.resources?.services ?? {};
+  }
+
+  private get hasServices(): boolean {
+    return Object.keys(this.declared).length > 0;
+  }
+
+  private async serviceImages(): Promise<ServiceImages> {
+    return new ServiceImages({ docker: await this.docker(), file: this.serviceImagesFile });
+  }
+
+  private async projectServices(): Promise<ProjectServices | null> {
+    if (!this.project || !this.hasServices) {
+      return null;
+    }
+    return new ProjectServices({
+      docker: await this.docker(),
+      prefix: this.names.prefix,
+      project: this.project,
+      network: networkName(this.names.prefix, this.project),
+      services: this.declared,
+    });
+  }
+
+  async workspaceOutOfMemory(): Promise<boolean> {
+    const docker = await this.docker();
+    const info = await docker.inspectContainer(this.names.container);
+    if (!info) {
+      return false;
+    }
+    if (!info.running) {
+      return docker.oomKilled(this.names.container);
+    }
+    // Usually the kernel kills one process (the dev server, a test run) and the container stays
+    // up: its counter of such kills says so. It starts at zero with every container start.
+    const kills = await docker.oomKills(this.names.container);
+    if (kills === null) {
+      return false;
+    }
+    const before = this.oomSeen?.id === info.id ? this.oomSeen.kills : 0;
+    this.oomSeen = { id: info.id, kills };
+    return kills > before;
+  }
+
+  async servicesOutOfMemory(): Promise<string[]> {
+    if (!this.project || !this.hasServices) {
+      return [];
+    }
+    const docker = await this.docker();
+    const killed: string[] = [];
+    for (const [name, service] of Object.entries(this.declared)) {
+      const { container } = serviceNames(this.names.prefix, this.project, name, serviceImageOf(service));
+      const info = await docker.inspectContainer(container);
+      // A service that stopped says so through its state; this is for the one that stays up.
+      const kills = info?.running ? await docker.oomKills(container) : null;
+      if (!info || kills === null) {
+        continue;
+      }
+      const seen = this.serviceOomSeen.get(name);
+      const before = seen?.id === info.id ? seen.kills : 0;
+      this.serviceOomSeen.set(name, { id: info.id, kills });
+      if (kills > before) {
+        killed.push(name);
+      }
+    }
+    return killed;
+  }
+
+  async recreateServices(): Promise<void> {
+    const services = await this.projectServices();
+    if (!services) {
+      return;
+    }
+    await services.removeAll();
+    await this.ensureServices();
+  }
+
+  async servicesStatus(): Promise<ServiceStatus[]> {
+    const statuses = (await (await this.projectServices())?.status()) ?? [];
+    if (statuses.length === 0) {
+      return statuses;
+    }
+    const ports = await (await this.workspace()).servicePorts();
+    return statuses.map((status) => (status.state === 'ready' && ports[status.name] ? { ...status, hostPort: ports[status.name] } : status));
+  }
+
+  /**
+   * The services come up before the workspace, on the same internal network, once their images
+   * are on this computer. A service that fails does not stop the workspace: servicesStatus() says
+   * which one and why.
+   */
+  private async ensureServices(): Promise<void> {
+    const services = await this.projectServices();
+    if (!services || !this.project) {
+      return;
+    }
+    const docker = await this.docker();
+    await docker.createInternalNetwork(networkName(this.names.prefix, this.project), 'network', this.project);
+    // Nothing is downloaded here: the images come with "Download and install", which needs the
+    // internet and says so. Until then the services are simply not up yet.
+    if ((await (await this.serviceImages()).missing(this.declared)).length > 0) {
+      return;
+    }
+    await services.ensureRunning();
   }
 
   private async env(refresh = false): Promise<Environment> {
@@ -189,6 +321,10 @@ export class DockerRuntime implements GameRuntime {
     }
     this.project = project;
     this.projectName = name ?? this.projectName;
+  }
+
+  setResources(resources: ProjectResources | null): void {
+    this.resources = resources;
   }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
@@ -217,7 +353,10 @@ export class DockerRuntime implements GameRuntime {
         // Reported below, by what is still there.
       }
     }
-    return left();
+    // The service images the app pulled for those projects; what the active project still uses stays.
+    const keep = this.project && !projects.includes(this.project) ? serviceImageReferences(this.declared) : [];
+    const stuck = await (await this.serviceImages()).removePulled(keep);
+    return [...(await left()), ...stuck.map((name) => ({ kind: 'image' as const, name }))];
   }
 
   /** The QA image of the current QA tool, or null before the project's content is downloaded. */
@@ -243,11 +382,17 @@ export class DockerRuntime implements GameRuntime {
       names: this.names,
       project: this.project,
       projectName: this.projectName,
+      variables: (await this.projectServices())?.variables() ?? {},
+      memory: this.resources?.memory?.workspace,
+      publishedServices: Object.entries(this.declared)
+        .filter(([, service]) => service.publish)
+        .map(([name, service]) => ({ name, port: serviceImageOf(service).port })),
     });
   }
 
   /** The workspace, with its container running. */
   private async runningWorkspace(): Promise<Workspace> {
+    await this.ensureServices();
     const workspace = await this.workspace();
     await workspace.ensureRunning();
     return workspace;
@@ -260,6 +405,7 @@ export class DockerRuntime implements GameRuntime {
       dockerHostPath: (path) => this.platform.dockerHostPath(path),
       names: this.names,
       project: this.project,
+      services: this.declared,
     });
   }
 
@@ -299,6 +445,9 @@ export class DockerRuntime implements GameRuntime {
       { id: 'workspaceImage', ready: await docker.imageExists(tags.workspace) },
       { id: 'qaImage', ready: qa !== null && (await docker.imageExists(qa)) },
     ];
+    if (this.hasServices) {
+      items.push({ id: 'serviceImages', ready: (await (await this.serviceImages()).missing(this.declared)).length === 0 });
+    }
     if (items[0].ready && (await docker.volumeExists(this.names.volume))) {
       const workspace = await this.runningWorkspace();
       const key = (await workspace.hasRepository()) ? await workspace.dependencyKey() : null;
@@ -326,6 +475,9 @@ export class DockerRuntime implements GameRuntime {
       const context = await writeQaContext(join(this.contextRoot, 'qa'), tags.qaBase, this.qaTool!, this.qaBuildRoot);
       onLine(`» docker build ${qa}`);
       await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line), undefined, this.project, this.names.prefix);
+    }
+    if (this.hasServices) {
+      await (await this.serviceImages()).ensure(this.declared, (line) => onLine(line));
     }
     // The workspace container moves to the new image first: the image of an older version is then
     // free and goes away with the other leftovers (an image a container still uses stays).
@@ -364,12 +516,26 @@ export class DockerRuntime implements GameRuntime {
       qa ? docker.imageSize(qa) : Promise.resolve(null),
       docker.volumeSizes([this.names.volume, this.names.cacheVolume]),
     ]);
-    return [
+    const items: DiskUsageItem[] = [
       { id: 'workspaceVolume', bytes: volumes[this.names.volume] ?? null },
       { id: 'workspaceImage', bytes: workspaceImage },
       { id: 'qaImage', bytes: qaImage },
       { id: 'qaCache', bytes: volumes[this.names.cacheVolume] ?? null },
     ];
+    if (this.project && this.hasServices) {
+      const sum = (sizes: (number | null | undefined)[]): number | null => {
+        const known = sizes.filter((size): size is number => typeof size === 'number');
+        return known.length > 0 ? known.reduce((total, size) => total + size, 0) : null;
+      };
+      const project = this.project;
+      const dataVolumes = Object.entries(this.declared).flatMap(([name, service]) =>
+        Object.values(serviceNames(this.names.prefix, project, name, serviceImageOf(service)).volumes),
+      );
+      const dataSizes = await docker.volumeSizes(dataVolumes);
+      const imageSizes = await Promise.all(serviceImageReferences(this.declared).map((reference) => docker.imageSize(reference)));
+      items.push({ id: 'serviceData', bytes: sum(dataVolumes.map((volume) => dataSizes[volume])) }, { id: 'serviceImages', bytes: sum(imageSizes) });
+    }
+    return items;
   }
 
   async cleanDocker(scope: DockerCleanupScope): Promise<DockerCleanup> {
@@ -404,6 +570,12 @@ export class DockerRuntime implements GameRuntime {
       }
     }
     if (scope === 'everything') {
+      // The service images the app pulled itself; one the computer already had stays.
+      const images = await this.serviceImages();
+      const before = (await images.pulled()).length;
+      const stuck = await images.removePulled([]);
+      result.removed += before - stuck.length;
+      result.failed.push(...stuck.map((name) => ({ kind: 'image' as const, name, reason: 'Docker did not remove the image' })));
       result.workspaceKept = await docker.volumeExists(this.names.volume);
       // The builder (its BuildKit container and cache) goes with the app's data.
       await docker.removeBuilder(this.names.prefix);
@@ -621,6 +793,8 @@ export class DockerRuntime implements GameRuntime {
     // The workspace always comes back closed.
     await workspace?.setInternet(false).catch(() => {});
     await docker.run(['container', 'stop', '--time', '5', this.names.container], { timeoutMs: 15_000, signal });
+    // The services stop after the code that uses them; their volumes (the data) stay.
+    await (await this.projectServices().catch(() => null))?.stop(signal).catch(() => {});
     await workspace?.stopForwarder(signal).catch(() => {});
   }
 

@@ -22,7 +22,8 @@ export function deskState(snapshot: Snapshot, active: TicketState | undefined): 
 export type Tone = 'ok' | 'warn' | 'danger' | 'neutral'
 
 export interface EnvRow {
-  id: 'docker' | EnvironmentItemId | 'database'
+  /** `service-<name>` is one service the project declares. */
+  id: 'docker' | EnvironmentItemId | 'database' | `service-${string}`
   icon: 'server' | 'package' | 'download' | 'hardDrive'
   name: string
   tone: Tone
@@ -30,12 +31,12 @@ export interface EnvRow {
   status: string
   /** A spinner replaces the icon. */
   busy: boolean
-  /** The row offers an action ("Try again" after a failed database reset). */
-  action?: 'retryDatabaseReset'
+  /** The row offers an action: "Try again" after a failed database reset, "Recreate services" on the first service that stopped. */
+  action?: 'retryDatabaseReset' | 'recreateServices'
 }
 
 /** Approximate download sizes, shown next to the environment items. */
-const ENVIRONMENT_SIZES: Record<EnvironmentItemId, string> = {
+const ENVIRONMENT_SIZES: Partial<Record<EnvironmentItemId, string>> = {
   workspaceImage: '1.1 GB',
   qaImage: '3 GB',
   projectDependencies: '160 MB',
@@ -72,7 +73,8 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
     const base = { id, icon, name: t(`dashboard.env.${id}`) }
     const item = snapshot.environment?.items.find((entry) => entry.id === id)
     if (item?.ready) {
-      return { ...base, tone: 'ok', status: `${t('dashboard.envStatus.ready')} · ${localSize(ENVIRONMENT_SIZES[id], language)}`, busy: false }
+      const size = ENVIRONMENT_SIZES[id]
+      return { ...base, tone: 'ok', status: size ? `${t('dashboard.envStatus.ready')} · ${localSize(size, language)}` : t('dashboard.envStatus.ready'), busy: false }
     }
     if (installing) {
       return { ...base, tone: 'warn', status: t('dashboard.envStatus.installing'), busy: true }
@@ -91,6 +93,39 @@ export function environmentRows(snapshot: Snapshot, t: (key: string) => string):
       : { ...base, tone: 'danger', status: t('dashboard.envStatus.missing'), busy: false }
   }
   const rows = [dockerRow, ...ENVIRONMENT_ITEMS.map(itemRow)]
+  // Only a project that declares services has their images among its downloads.
+  if (snapshot.environment?.items.some((entry) => entry.id === 'serviceImages')) {
+    rows.push(itemRow({ id: 'serviceImages', icon: 'package' }))
+  }
+  // One button recreates every service: it goes on the first one that stopped.
+  let offered = false
+  const recreate = (): { action?: 'recreateServices' } => {
+    if (offered) return {}
+    offered = true
+    return { action: 'recreateServices' }
+  }
+  for (const service of snapshot.services ?? []) {
+    const base = { id: `service-${service.name}` as const, icon: 'hardDrive' as const, name: `${service.name} · ${service.image}` }
+    if (service.state === 'ready') {
+      // A published service says where the player's own tools reach it.
+      const ready = service.hostPort ? `${t('dashboard.envStatus.ready')} · localhost:${service.hostPort}` : t('dashboard.envStatus.ready')
+      // Up, but the kernel killed one of its processes for lack of memory: it works, and it is a warning.
+      rows.push(service.memoryKillAt ? { ...base, tone: 'warn', status: `${ready} · ${t('dashboard.envStatus.serviceMemoryKill')}`, busy: false } : { ...base, tone: 'ok', status: ready, busy: false })
+    } else if (service.state === 'starting') {
+      // Before the environment is downloaded there is no container yet: nothing is starting.
+      rows.push(
+        snapshot.environment?.ready
+          ? { ...base, tone: 'warn', status: t('dashboard.envStatus.starting'), busy: true }
+          : { ...base, tone: 'neutral', status: t('dashboard.envStatus.notYet'), busy: false },
+      )
+    } else if (service.state === 'oom') {
+      rows.push({ ...base, tone: 'danger', status: t('dashboard.envStatus.serviceOutOfMemory'), busy: false, ...recreate() })
+    } else {
+      // Docker's or the server's own words are not translated: they are what a search will find.
+      const stopped = t('dashboard.envStatus.serviceStopped')
+      rows.push({ ...base, tone: 'danger', status: service.reason ? `${stopped}: ${service.reason}` : stopped, busy: false, ...recreate() })
+    }
+  }
   if (snapshot.dbResetFailed) {
     // The data may be the previous ticket's: shown until a retry succeeds.
     rows.push({ id: 'database', icon: 'hardDrive', name: t('dashboard.env.database'), tone: 'danger', status: t('dashboard.envStatus.resetFailed'), busy: false, action: 'retryDatabaseReset' })

@@ -92,6 +92,47 @@ describe('Docker cleanup plan', () => {
     expect(plan).toEqual([{ kind: 'image', name: 'ggg' }]);
   });
 
+  it('leftovers: the services and the service data of a project that is not the active one go; the active one keeps its own', () => {
+    const withServices: LabelledResources = {
+      ...found,
+      containers: [...found.containers, 'bugdetective-svc-first-db', 'bugdetective-svc-second-db', 'bugdetective-svc-second-cache'],
+      volumes: [...found.volumes, 'bugdetective-svcdata-first-db-0', 'bugdetective-svcdata-second-db-0'],
+    };
+    const plan = planCleanup(withServices, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    expect(plan).toContain('container bugdetective-svc-second-db');
+    expect(plan).toContain('container bugdetective-svc-second-cache');
+    expect(plan).toContain('volume bugdetective-svcdata-second-db-0');
+    expect(plan).not.toContain('container bugdetective-svc-first-db');
+    expect(plan).not.toContain('volume bugdetective-svcdata-first-db-0');
+    // Containers before the volumes they hold.
+    expect(plan.indexOf('container bugdetective-svc-second-db')).toBeLessThan(plan.indexOf('volume bugdetective-svcdata-second-db-0'));
+  });
+
+  it('leftovers: the services and the network of a QA run go, whichever the project', () => {
+    const withQaRun: LabelledResources = {
+      ...found,
+      containers: [...found.containers, 'bugdetective-qasvc-first-db-1a2b3c4d'],
+      networks: [...found.networks, 'bugdetective-qanet-first-1a2b3c4d'],
+    };
+    const plan = planCleanup(withQaRun, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    expect(plan).toContain('container bugdetective-qasvc-first-db-1a2b3c4d');
+    expect(plan).toContain('network bugdetective-qanet-first-1a2b3c4d');
+    expect(plan.indexOf('container bugdetective-qasvc-first-db-1a2b3c4d')).toBeLessThan(plan.indexOf('network bugdetective-qanet-first-1a2b3c4d'));
+  });
+
+  it('leftovers: without a known active project, no service is taken', () => {
+    const withServices: LabelledResources = { ...found, containers: [...found.containers, 'bugdetective-svc-second-db'], volumes: [...found.volumes, 'bugdetective-svcdata-second-db-0'] };
+    const plan = planCleanup(withServices, { ...options, scope: 'leftovers' }).map((target) => target.name).join('\n');
+    expect(plan).not.toContain('svc');
+  });
+
+  it('everything: the services and their data go with the rest', () => {
+    const withServices: LabelledResources = { ...found, containers: [...found.containers, 'bugdetective-svc-first-db'], volumes: [...found.volumes, 'bugdetective-svcdata-first-db-0'] };
+    const plan = planCleanup(withServices, { ...options, scope: 'everything', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    expect(plan).toContain('container bugdetective-svc-first-db');
+    expect(plan).toContain('volume bugdetective-svcdata-first-db-0');
+  });
+
   it('a cleanup of leftovers never touches another project (new projects arrive as resources of their own)', () => {
     const withAnotherProject: LabelledResources = {
       containers: [...found.containers, 'bugdetective-tasklist-workspace', 'bugdetective-tasklist-qa-1a2b3c4d'],

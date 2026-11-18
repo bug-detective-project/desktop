@@ -133,9 +133,18 @@
       "projectDependencies": "Dependencies",
       "devServer": "Dev server",
       "database": "App data",
-      "internet": "Workspace internet"
+      "internet": "Workspace internet",
+      "serviceImages": "Service images"
     },
     "retryReset": "Try again",
+    "workspaceOutOfMemory": "The workspace ran out of memory and a process in it was stopped (the dev server or a test run, for example). Start it again. If it keeps happening, increase Docker's memory (Docker Desktop: Settings, Resources, Memory).",
+    "recreateServices": {
+      "button": "Recreate services",
+      "title": "Recreate the services?",
+      "text": "The project's services, such as its database, are removed and created again, empty, and the app data is seeded again. Whatever you saved in them is erased. Your code and your progress stay.",
+      "confirm": "Recreate services",
+      "outOfMemory": "A service ran out of memory. Increase Docker's memory (Docker Desktop: Settings, Resources, Memory). If the service stopped, recreate the services afterwards."
+    },
     "envStatus": {
       "ready": "Ready",
       "missing": "Missing",
@@ -147,7 +156,10 @@
       "checking": "Checking…",
       "needsDocker": "Needs Docker",
       "notYet": "Not installed yet",
-      "resetFailed": "Could not be reset; they may be the previous ticket's"
+      "resetFailed": "Could not be reset; they may be the previous ticket's",
+      "serviceStopped": "Stopped",
+      "serviceOutOfMemory": "Stopped: out of memory",
+      "serviceMemoryKill": "a process ran out of memory"
     },
     "desk": "Your desk",
     "projectAndContacts": "Project & contacts",
@@ -533,6 +545,14 @@
       "qaCache": {
         "name": "QA dependency cache",
         "help": "npm packages for offline QA runs"
+      },
+      "serviceData": {
+        "name": "Service data",
+        "help": "The databases of the project's services"
+      },
+      "serviceImages": {
+        "name": "Service images",
+        "help": "The database servers the project uses"
       }
     },
     "diskNotCreated": "Not created yet",
@@ -606,7 +626,7 @@
     },
     "cleanup": {
       "leftoversTitle": "Docker cleanup",
-      "leftoversHelp": "Removes what the game leaves behind in Docker: QA containers, the copy of your code that QA tested and images of older versions. Your code and progress stay.",
+      "leftoversHelp": "Removes what the game leaves behind in Docker: QA containers and the services of QA runs, the copy of your code that QA tested, images of older versions and the services of a project you left. Your code and progress stay.",
       "leftovers": "Clean up leftovers",
       "leftoversDone_one": "Docker cleanup done: 1 item removed.",
       "leftoversDone_other": "Docker cleanup done: {{count}} items removed.",
@@ -616,9 +636,9 @@
       "everything": "Remove everything from Docker…",
       "confirmTitle": "Remove everything from Docker?",
       "confirmWarning": "This deletes the code in your workspace and starts a new game. It cannot be undone.",
-      "confirmContainers": "Containers: your workspace and any QA run left behind",
-      "confirmVolumes": "Volumes: your code, the VS Code server, the dependency cache and the QA copy",
-      "confirmImages": "Images: the workspace and QA images (about 4 GB, built again on the next download)",
+      "confirmContainers": "Containers: your workspace, the project's services (such as its database) and any QA run left behind",
+      "confirmVolumes": "Volumes: your code, the data of the project's services, the VS Code server, the dependency cache and the QA copy",
+      "confirmImages": "Images: the workspace and QA images (about 4 GB, built again on the next download) and the service images the game downloaded",
       "confirmBackup": "To keep your progress, cancel and export it first; you can restore it afterwards.",
       "confirm": "Remove everything",
       "everythingDone": "Everything Bug Detective created in Docker was removed. A new game has started.",
@@ -695,6 +715,7 @@
     "githubRateLimited": "GitHub temporarily limited the downloads (common on shared networks). Try again in a few minutes.",
     "projectUnavailable": "The project is not available right now: its repository or publication could not be found.",
     "dbResetFailed": "The app data could not be reset. Check the Docker log and try again.",
+    "noServices": "This project has no services to recreate.",
     "incompletePublication": "The project's publication is incomplete. Try again later.",
     "switchIncomplete": "The project switch is not finished: {{message}}",
     "otherProjectsLeft": "Docker still has another project: {{message}}",
@@ -736,6 +757,8 @@
     "confirmTitle": "Switch to {{name}}?",
     "confirmRemoved": "The current project leaves your computer: its code in Docker, its images and its dependencies are removed.",
     "confirmKept": "Your progress, completed tickets and PRs are kept, and you can come back later (it is downloaded again). Export a backup first if you want a copy of your code.",
+    "memory": "Memory",
+    "memoryWarning": "This project needs about {{needed}} of memory at its peak and Docker has {{available}}. It may run slowly or stop for lack of memory. You can switch anyway and raise Docker's memory later (Docker Desktop: Settings, Resources, Memory).",
     "exportFirst": "Export backup",
     "confirm": "Switch project",
     "switched": "{{name}} is your project now.",

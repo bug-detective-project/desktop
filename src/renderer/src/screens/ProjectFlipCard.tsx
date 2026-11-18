@@ -1,4 +1,4 @@
-import { Database, FileText, Monitor, Ticket } from 'lucide-react';
+import { Database, FileText, MemoryStick, Monitor, Ticket } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,7 @@ import type { ProjectCard } from '@shared/api.ts';
 import { TRACKS } from '@shared/types.ts';
 import type { Language } from '@shared/types.ts';
 import { Icon } from '../components/icons.tsx';
+import { gigabytes } from './memory.ts';
 import { Button } from '../components/ui.tsx';
 import { monogram } from './monogram.ts';
 
@@ -149,6 +150,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 {details.stack?.backend && <Row icon={<Icon name="server" />} label={t('projects.backend')} value={details.stack.backend} testId="project-stack-backend" />}
                 {details.stack?.database && <Row icon={<Database />} label={t('projects.database')} value={details.stack.database} testId="project-stack-database" />}
                 {tickets && <Row icon={<Ticket />} label={t('projects.tickets')} value={tickets} testId="project-tickets" />}
+                {details.memoryBytes !== null && <Row icon={<MemoryStick />} label={t('projects.memory')} value={gigabytes(details.memoryBytes, language)} testId="project-memory" />}
               </dl>
               {skills.length > 0 && (
                 <div className="mt-3 border-t border-border pt-4">

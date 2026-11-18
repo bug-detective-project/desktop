@@ -14,6 +14,8 @@ export interface CheckResult {
   detail?: string;
   /** Version of the tool, when it could be read (Docker Desktop or engine, VS Code, the extension, WSL). */
   version?: string;
+  /** The memory the Docker engine has, in bytes (only on the docker check, when Docker answers). */
+  memoryBytes?: number;
 }
 
 export interface PrerequisiteReport {
@@ -22,7 +24,8 @@ export interface PrerequisiteReport {
   dockerState: EngineState;
 }
 
-export type EnvironmentItemId = 'workspaceImage' | 'qaImage' | 'projectDependencies';
+/** `serviceImages` is listed only for a project that declares services. */
+export type EnvironmentItemId = 'workspaceImage' | 'qaImage' | 'projectDependencies' | 'serviceImages';
 
 export interface EnvironmentItem {
   id: EnvironmentItemId;
@@ -34,7 +37,8 @@ export interface EnvironmentReport {
   ready: boolean;
 }
 
-export type DiskItemId = 'workspaceVolume' | 'workspaceImage' | 'qaImage' | 'qaCache';
+/** `serviceData` and `serviceImages` are listed only for a project that declares services. */
+export type DiskItemId = 'workspaceVolume' | 'workspaceImage' | 'qaImage' | 'qaCache' | 'serviceData' | 'serviceImages';
 
 export interface DiskUsageItem {
   id: DiskItemId;
@@ -165,6 +169,8 @@ export interface ProjectCard {
     skills: Record<Language, string[]>;
     difficulty: ProjectDifficulty | null;
     counts: Record<Track, number>;
+    /** The memory the project needs at its peak (workspace, services, a QA run and its services), in bytes; null for a project without services. */
+    memoryBytes: number | null;
   } | null;
   progress: Record<Track, { done: number; total: number }> | null;
   /** appTooOld: the project needs a newer Bug Detective (its minAppVersion, or a newer content format); projectUnavailable: its repository or qa ref could not be found. */
@@ -172,6 +178,24 @@ export interface ProjectCard {
 }
 
 export type ProjectDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
+/** Where a service of the project is: not up yet, accepting connections, stopped, or killed for lack of memory. */
+export type ServiceState = 'starting' | 'ready' | 'failed' | 'oom';
+
+/** One service the project declares (a database, a cache), as the Dashboard shows it. */
+export interface ServiceStatus {
+  /** The name the project gives it, which is also its address on the workspace's network. */
+  name: string;
+  /** The image name from the catalog's list, such as postgres:17. */
+  image: string;
+  state: ServiceState;
+  /** Docker's or the server's own last words when it failed. */
+  reason?: string;
+  /** The port on this computer (127.0.0.1) where the service answers, when the project asks to publish it. */
+  hostPort?: number;
+  /** When the kernel last killed a process of the service for lack of memory while the service stayed up (ISO time); gone once the services are recreated. */
+  memoryKillAt?: string;
+}
 
 export interface Snapshot {
   state: GameState;
@@ -203,6 +227,10 @@ export interface Snapshot {
   workspaceLost: boolean;
   /** The last `npm run db:reset` failed: the app's data may be the previous ticket's until a retry succeeds. */
   dbResetFailed: boolean;
+  /** When the workspace container was last found stopped for lack of memory (ISO time), or null; kept until the app restarts. */
+  workspaceOutOfMemoryAt: string | null;
+  /** The services the active project declares and where each one is; empty for a project without services. */
+  services: ServiceStatus[];
   /** The player opened the workspace to the internet (it also reaches the computer and the local network); the game closes it on the next ticket. */
   workspaceInternet: boolean;
   /** The last catalog refresh failed (offline, or an invalid catalog): the Projects screen shows the last saved list. */
@@ -322,6 +350,8 @@ export interface BugDetectiveApi {
   reportRendererError(message: string, stack: string): Promise<void>;
   /** Runs `npm run db:reset` again after a failed reset (the Dashboard's "Try again"). */
   retryDatabaseReset(): Promise<void>;
+  /** Removes and recreates the project's services, with empty data, and reseeds them; the code and the progress stay. */
+  recreateServices(): Promise<void>;
   /** Opens the workspace container to the internet, or closes it again. */
   setWorkspaceInternet(on: boolean): Promise<void>;
   /** The diagnostics text (versions, environment, the recent log with paths redacted) for "Copy diagnostics". */

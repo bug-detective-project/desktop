@@ -1,3 +1,4 @@
+import { gigabytes } from './memory.ts';
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation();
   const toast = useToast();
   const language = snapshot.state.settings.language;
+  const dockerMemory = snapshot.prerequisites?.checks.find((check) => check.id === 'docker')?.memoryBytes;
   const [confirm, setConfirm] = useState<ProjectCard | null>(null);
   const [exporting, setExporting] = useState(false);
   // Search and difficulty: they only hide cards, and reset when the player leaves the screen.
@@ -71,6 +73,7 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
       .catch(toast.error);
   };
 
+  const neededMemory = confirm?.details?.memoryBytes ?? null;
   return (
     <main className="mx-auto w-full max-w-10xl px-6 py-8" data-testid="projects">
       <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('projects.title')}</h1>
@@ -164,6 +167,12 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
             <p className="text-base leading-relaxed">{t('projects.confirmRemoved')}</p>
             <p className="mt-2 text-base leading-relaxed">{t('projects.confirmKept')}</p>
           </Notice>
+          {/* Less memory than the project needs: said, never blocked. */}
+          {neededMemory !== null && dockerMemory !== undefined && dockerMemory < neededMemory && (
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground" data-testid="switch-memory-warning">
+              {t('projects.memoryWarning', { needed: gigabytes(neededMemory, language), available: gigabytes(dockerMemory, language) })}
+            </p>
+          )}
           <div className="mt-5 flex justify-end gap-2 whitespace-nowrap" data-testid="switch-actions">
             <Button onClick={() => setConfirm(null)}>{t('common.cancel')}</Button>
             <Button

@@ -20,6 +20,63 @@ export const TicketInProgress: Story = { render: show(() => snapshotFixture('act
 export const TicketInCodeReview: Story = { render: show(() => snapshotFixture('review')) };
 export const DockerStopped: Story = { render: show(() => snapshotFixture('queued', { dockerState: 'notRunning' })) };
 export const DatabaseResetFailed: Story = { render: show(() => snapshotFixture('active', { dbResetFailed: true })) };
+/** A project with services: each one is a row with its state as a word, and Docker's own reason when it stopped. */
+export const ProjectServices: Story = {
+  render: show(() =>
+    snapshotFixture('active', {
+      services: [
+        { name: 'db', image: 'postgres:17', state: 'ready' },
+        { name: 'audit', image: 'postgres:17', state: 'failed', reason: 'Error: superuser password is not specified.' },
+        { name: 'cache', image: 'postgres:17', state: 'oom' },
+      ],
+    }),
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('db · postgres:17');
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('Ready');
+    await expect(canvas.getByTestId('env-service-db')).toHaveAttribute('data-tone', 'ok');
+    await expect(canvas.getByTestId('env-service-audit')).toHaveTextContent('Stopped: Error: superuser password is not specified.');
+    await expect(canvas.getByTestId('env-service-audit')).toHaveAttribute('data-tone', 'danger');
+    await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Stopped: out of memory');
+  },
+};
+/** A stopped service offers "Recreate services", which says first what is erased and what stays. */
+const recreateServices = fn(async () => {});
+export const RecreateServices: Story = {
+  ...ProjectServices,
+  parameters: { api: { recreateServices } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByTestId('recreate-services')).toHaveLength(1);
+    await expect(canvas.getByTestId('services-out-of-memory')).toHaveTextContent("Increase Docker's memory");
+    await userEvent.click(canvas.getByTestId('recreate-services'));
+    const dialog = within(canvasElement.ownerDocument.body);
+    await expect(dialog.getByTestId('recreate-services-warning')).toHaveTextContent('Your code and your progress stay.');
+    await expect(recreateServices).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByTestId('recreate-services-confirm'));
+    await expect(recreateServices).toHaveBeenCalledTimes(1);
+  },
+};
+/** The workspace was killed for lack of memory: said once, with what to do, until the player closes it. */
+export const WorkspaceOutOfMemory: Story = {
+  render: show(() => snapshotFixture('active', { workspaceOutOfMemoryAt: '2026-11-17T12:00:00.000Z' })),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('workspace-out-of-memory')).toHaveTextContent("increase Docker's memory");
+    await userEvent.click(canvas.getByTestId('workspace-out-of-memory-dismiss'));
+    await expect(canvas.queryByTestId('workspace-out-of-memory')).toBeNull();
+  },
+};
+export const ProjectServicesInPortuguese: Story = {
+  ...ProjectServices,
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('Pronto');
+    await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Parado: faltou memória');
+  },
+};
 export const WorkspaceInternetOn: Story = { render: show(() => snapshotFixture('active', { workspaceInternet: true })) };
 export const WorkspaceInternetOnInPortuguese: Story = { ...WorkspaceInternetOn, globals: { locale: 'pt' } };
 /** Opening asks first: the warning says what else the project's code reaches. */

@@ -107,3 +107,22 @@ export const BriefWithTwelveSkillsInPortuguese: Story = {
     await expect(canvas.getByTestId('project-skills-all')).toHaveTextContent('Ver todas (12)');
   },
 };
+
+/** A project with services says how much memory it needs at its peak; one without says nothing. */
+export const MemoryRequirement: Story = {
+  render: card({ details: { ...details, memoryBytes: 5.5 * 1024 ** 3 } }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('project-notes-brief'));
+    await expect(canvas.getByTestId('project-memory')).toHaveTextContent('Memory');
+    await expect(canvas.getByTestId('project-memory')).toHaveTextContent('5.5 GB');
+  },
+};
+export const NoMemoryRequirement: Story = {
+  render: card(),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('project-notes-brief'));
+    await expect(canvas.queryByTestId('project-memory')).toBeNull();
+  },
+};

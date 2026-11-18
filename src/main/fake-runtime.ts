@@ -4,17 +4,20 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison } from '../shared/api.ts';
+import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison, ServiceStatus } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
 import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
 
 interface Scenario {
+  /** A service of the project that does not start, with what its log says. */
+  serviceFailure?: { name: string; reason: string };
   docker: EngineState;
   wsl: boolean;
   vscode: boolean;
@@ -186,6 +189,9 @@ export class FakeRuntime implements GameRuntime {
   private branch: string | null = null;
   private stages = new Map<number, string>();
   private devServerUp = false;
+  private resources: ProjectResources | null = null;
+  private workspaceOom = false;
+  private servicesOom: string[] = [];
 
   constructor(json?: string) {
     this.scenario = { ...DEFAULT_SCENARIO, ...(json ? (JSON.parse(json) as Partial<Scenario>) : {}) };
@@ -197,8 +203,8 @@ export class FakeRuntime implements GameRuntime {
     const dockerCheck = (): PrerequisiteReport['checks'][number] => {
       if (docker !== 'running') return { id: 'docker', status: 'missing', reason: docker };
       if (dockerOs !== 'linux') return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
-      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1' };
-      return { id: 'docker', status: 'ok', version: '4.37.1' };
+      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1', memoryBytes: dockerMemoryBytes };
+      return { id: 'docker', status: 'ok', version: '4.37.1', memoryBytes: dockerMemoryBytes };
     };
     const checks: PrerequisiteReport['checks'] = [
       dockerCheck(),
@@ -236,6 +242,46 @@ export class FakeRuntime implements GameRuntime {
   projectResources: Record<string, string[]> = {};
 
   setProject(_project: string, _name?: string): void {}
+
+  setResources(resources: ProjectResources | null): void {
+    this.resources = resources;
+  }
+
+  /** Reported once: the next check finds the workspace started again. */
+  async workspaceOutOfMemory(): Promise<boolean> {
+    const killed = this.workspaceOom;
+    this.workspaceOom = false;
+    return killed;
+  }
+
+  /** Reported once, like the real counter. */
+  async servicesOutOfMemory(): Promise<string[]> {
+    const killed = this.servicesOom;
+    this.servicesOom = [];
+    return killed;
+  }
+
+  /** How many times the services were recreated (for the tests). */
+  recreateCalls = 0;
+
+  /** A recreation fixes whatever the scenario had broken. */
+  async recreateServices(): Promise<void> {
+    this.recreateCalls += 1;
+    delete this.scenario.serviceFailure;
+  }
+
+  /** Every declared service is ready once the environment is installed, except the one the scenario breaks. */
+  async servicesStatus(): Promise<ServiceStatus[]> {
+    const failure = this.scenario.serviceFailure;
+    return Object.entries(this.resources?.services ?? {}).map(([name, service]) => ({
+      name,
+      image: service.image,
+      ...(failure?.name === name
+        ? { state: 'failed' as const, reason: failure.reason }
+        : { state: this.scenario.environmentReady ? ('ready' as const) : ('starting' as const) }),
+      ...(service.publish && this.scenario.environmentReady && failure?.name !== name && { hostPort: SERVICE_IMAGES[service.image]?.port }),
+    }));
+  }
 
   async removeProjects(projects: readonly string[]): Promise<CleanupTarget[]> {
     for (const project of projects) {
@@ -444,6 +490,8 @@ export class FakeRuntime implements GameRuntime {
     devServerUp?: boolean;
     workspaceLost?: boolean;
     dbResetFails?: boolean;
+    workspaceOutOfMemory?: boolean;
+    servicesOutOfMemory?: string[];
     dockerOs?: 'linux' | 'windows';
     dockerMemoryBytes?: number;
     freeDiskBytes?: number | null;
@@ -458,6 +506,8 @@ export class FakeRuntime implements GameRuntime {
     if (change.freeDiskBytes !== undefined) this.scenario.freeDiskBytes = change.freeDiskBytes;
     if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
+    if (change.workspaceOutOfMemory !== undefined) this.workspaceOom = change.workspaceOutOfMemory;
+    if (change.servicesOutOfMemory !== undefined) this.servicesOom = change.servicesOutOfMemory;
     if (change.workspaceLost) {
       // The volume went: no stages, no branch, as a fresh repository-less workspace.
       this.stages.clear();

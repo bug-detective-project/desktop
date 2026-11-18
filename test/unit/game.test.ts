@@ -1268,11 +1268,21 @@ describe('Game with several projects', () => {
     });
   });
 
-  it('a project without a stack or skills gets null and empty lists', async () => {
+  it('a project card says how much memory a project with services needs at its peak', async () => {
+    const services = { db: { image: 'postgres:17', variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+    const { make } = await twoProjects(undefined, 1, { services });
+    const game = make();
+    await game.init();
+    const cards = game.snapshot().projects!;
+    // Workspace 3 GB, the service 256 MB, QA 2 GB and the service of QA 256 MB.
+    expect(cards.find((card) => card.id === 'first')?.details?.memoryBytes).toBe(5.5 * 1024 ** 3);
+  });
+
+  it('a project without a stack, skills or services gets null and empty lists', async () => {
     const { make } = await twoProjects();
     const game = make();
     await game.init();
-    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] } });
+    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] }, memoryBytes: null });
   });
 
   it('fetches the next ticket of a project that moved from the repository the catalog now names', async () => {
@@ -1742,5 +1752,169 @@ describe('ticket type and practiced skills', () => {
     await game.init();
     expect(game.snapshot().ticketMeta[2]).toEqual({ type: 'build', bothSides: true });
     expect(game.snapshot().practiced[2].en).toEqual(['Building components', 'Routes and navigation']);
+  });
+});
+
+describe('a workspace stopped for lack of memory', () => {
+  it('is logged and shown on the Dashboard with when it happened, and stays shown after the workspace is back', async () => {
+    const { game, runtime } = createGame({ clock: () => new Date('2026-11-17T12:00:00.000Z') });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBeNull();
+
+    runtime.simulate({ workspaceOutOfMemory: true });
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
+    expect(game.snapshot().log.join('\n')).toContain('» The workspace ran out of memory: the kernel stopped a process in it');
+
+    // The check the screen repeats while it is open notices it too.
+    const later = createGame({ clock: () => new Date('2026-11-17T13:00:00.000Z') });
+    await later.game.init();
+    later.runtime.simulate({ workspaceOutOfMemory: true });
+    await later.game.workspaceStatus();
+    expect(later.game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T13:00:00.000Z');
+
+    // The next check finds the workspace running again: the notice stays until the app restarts.
+    await game.refreshEnvironment();
+    expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
+  });
+});
+
+describe('the services of a project', () => {
+  const services = { db: { image: 'postgres:17', variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+  let original: string;
+  const packageFile = () => join(notesQaDir, 'package.json');
+
+  beforeEach(async () => {
+    original = await readFile(packageFile(), 'utf8');
+  });
+
+  afterEach(async () => {
+    await writeFile(packageFile(), original);
+  });
+
+  async function declare(project: Record<string, unknown>) {
+    const json = JSON.parse(original);
+    Object.assign(json.bugDetective.project, project);
+    await writeFile(packageFile(), JSON.stringify(json));
+  }
+
+  it('hands the declared services and memory to the runtime', async () => {
+    await declare({ services, memory: { workspace: '4g' } });
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({ services, memory: { workspace: '4g' } });
+  });
+
+  it('hands nothing for a project that declares no services', async () => {
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({});
+  });
+
+  it('shows no services for a project without any', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([]);
+  });
+
+  it('shows each declared service and its state once the ticket is unlocked', async () => {
+    await declare({ services });
+    const { game } = createGame();
+    await game.init();
+    expect(game.snapshot().services).toEqual([]);
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+  });
+
+  it('says when a process of a service ran out of memory while the service stays up, until the services are recreated', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ clock: () => new Date('2026-11-17T12:00:00.000Z') });
+    await game.init();
+    await game.nextAssignment();
+
+    runtime.simulate({ servicesOutOfMemory: ['db'] });
+    await game.workspaceStatus();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', memoryKillAt: '2026-11-17T12:00:00.000Z' }]);
+    expect(game.snapshot().log.join('\n')).toContain('» Service db ran out of memory: the kernel stopped a process in it');
+
+    await game.recreateServices();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+  });
+
+  it('shows the port of a service the project asks to publish', async () => {
+    await declare({ services: { db: { ...services.db, publish: true } } });
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5432 }]);
+  });
+
+  it('shows a service that failed, with the reason, and lets the game go on', async () => {
+    await declare({ services });
+    const { game } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'superuser password is not specified' } } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services).toEqual([
+      { name: 'db', image: 'postgres:17', state: 'failed', reason: 'superuser password is not specified' },
+    ]);
+    await game.move(1, 'inProgress');
+    expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
+  });
+
+  it('"Recreate services" recreates them, reseeds the data and clears a failed service', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'data directory is corrupted' } } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().services[0]!.state).toBe('failed');
+    const reset = vi.spyOn(runtime, 'resetDatabase');
+
+    await game.recreateServices();
+    expect(runtime.recreateCalls).toBe(1);
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
+    expect(game.snapshot().log.join('\n')).toContain("» Recreating the project's services (their data is erased)");
+  });
+
+  it('retrying a failed database reset recreates the services first, when the project has any', async () => {
+    await declare({ services });
+    const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
+    await game.init();
+    await game.nextAssignment();
+    expect(game.snapshot().dbResetFailed).toBe(true);
+
+    runtime.simulate({ dbResetFails: false });
+    await game.retryDatabaseReset();
+    expect(runtime.recreateCalls).toBe(1);
+    expect(game.snapshot().dbResetFailed).toBe(false);
+  });
+
+  it('retrying a failed database reset of a project without services recreates nothing', async () => {
+    const { game, runtime } = createGame({ scenario: { dbResetFails: true } });
+    await game.init();
+    await game.nextAssignment();
+    runtime.simulate({ dbResetFails: false });
+    await game.retryDatabaseReset();
+    expect(runtime.recreateCalls).toBe(0);
+  });
+
+  it('refuses to recreate services while another task runs, and for a project without services', async () => {
+    const { game } = createGame();
+    await game.init();
+    await game.nextAssignment();
+    await expect(game.recreateServices()).rejects.toMatchObject({ code: 'noServices' });
+  });
+
+  it('refuses an invalid declaration, naming the field', async () => {
+    await declare({ services: { db: { image: 'mysql:8' } } });
+    const { game } = createGame();
+    await game.init();
+    await expect(game.nextAssignment()).rejects.toThrow(/services\.db\.image/);
   });
 });

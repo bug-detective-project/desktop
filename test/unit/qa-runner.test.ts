@@ -118,3 +118,90 @@ describe('QaRunner', () => {
     expect(deps[deps.indexOf('--workspace') + 1]).toBe('/workspace/notes');
   });
 });
+
+describe('a QA run of a project with services', () => {
+  const services = { db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'notes' }, variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+  const RESULT = JSON.stringify({ ticket: 1, gate: 2, status: 'passed', message: 'ok', tests: [], durationMs: 5 });
+
+  /** A docker CLI where containers and networks exist once created; the QA run answers with a result file. */
+  async function world(options: { serviceDies?: boolean } = {}) {
+    const { textFile, writeTar } = await import('@bug-detective/catalog/contract');
+    const resultTar = await writeTar([textFile('qa-result.json', RESULT)]);
+    const containers = new Map<string, boolean>();
+    const networks = new Set<string>();
+    const calls: string[][] = [];
+    const docker = new Docker('docker', async (_command, args) => {
+      calls.push([...args]);
+      const [a, b] = args;
+      const last = args.at(-1)!;
+      if (a === 'network' && b === 'inspect') return { ...ok(), code: networks.has(last) ? 0 : 1 };
+      if (a === 'network' && b === 'create') return (networks.add(last), ok());
+      if (a === 'network' && b === 'rm') return (networks.delete(last), ok());
+      if (a === 'container' && b === 'rm') return (containers.delete(last), ok());
+      if (a === 'container' && b === 'inspect') {
+        if (!containers.has(last)) return { ...ok(), code: 1 };
+        if (args.includes('--format')) return ok('false\n');
+        return ok(JSON.stringify([{ Id: 'id', Name: `/${last}`, State: { Running: containers.get(last) }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+      }
+      if (a === 'run') {
+        const name = args[args.indexOf('--name') + 1]!;
+        const service = args.includes('--detach');
+        containers.set(name, service ? !options.serviceDies : false);
+        return ok();
+      }
+      if (a === 'exec') return { ...ok(), code: containers.get(args[1]!) ? 0 : 1 };
+      if (a === 'logs') return { ...ok(), stderr: 'Error: superuser password is not specified.\n' };
+      if (a === 'container' && b === 'cp') return { code: 0, stdout: resultTar, stderr: '', timedOut: false };
+      return ok();
+    });
+    const qaRun = () => calls.find((call) => call[0] === 'run' && call.includes('--json'));
+    return { docker, calls, containers, networks, qaRun };
+  }
+
+  const request = { ticket: 1, language: 'en' as const, timeoutSeconds: 60, packageDir: '/pkg' };
+  const withServices = (docker: Docker) =>
+    new QaRunner({ docker, image: 'qa:test', dockerHostPath: (path) => path, names: resourceNames('bugdetective-unit'), project: 'notes', services, servicePollMs: 1 });
+
+  it('puts the QA container on the network of its own services, with their variables, and removes everything after the run', async () => {
+    const { docker, containers, networks, qaRun, calls } = await world();
+    const result = await withServices(docker).run(request);
+    expect(result.status).toBe('passed');
+
+    const run = qaRun()!;
+    const network = run[run.indexOf('--network') + 1]!;
+    expect(network).toMatch(/^bugdetective-unit-qanet-notes-[0-9a-f]{8}$/);
+    expect(run).not.toContain('none');
+    expect(run[run.indexOf('--env') + 1]).toBe('DATABASE_URL=pg://db:5432');
+    const service = calls.find((call) => call[0] === 'run' && call.includes('--detach'))!;
+    expect(service.join(' ')).toContain(`--network ${network} --network-alias db`);
+    // The service is ready before the QA container exists.
+    expect(calls.indexOf(service)).toBeLessThan(calls.indexOf(run));
+    expect([...containers.keys()]).toEqual([]);
+    expect([...networks]).toEqual([]);
+  });
+
+  it('keeps a project without services on no network at all', async () => {
+    const { docker, qaRun, networks, calls } = await world();
+    await runner(docker).run(request);
+    const run = qaRun()!;
+    expect(run[run.indexOf('--network') + 1]).toBe('none');
+    expect(run).not.toContain('--env');
+    expect(networks.size).toBe(0);
+    expect(calls.some((call) => call[0] === 'network' && call[1] === 'create')).toBe(false);
+  });
+
+  it('does not run QA when a service does not start, says which one and why, and leaves nothing', async () => {
+    const { docker, containers, networks, qaRun } = await world({ serviceDies: true });
+    await expect(withServices(docker).run(request)).rejects.toThrow(/The service db \(postgres:17\) for QA did not start: it stopped: Error: superuser password is not specified\./);
+    expect(qaRun()).toBeUndefined();
+    expect([...containers.keys()]).toEqual([]);
+    expect([...networks]).toEqual([]);
+  });
+
+  it('the leftover cleanup also sweeps QA services and networks', async () => {
+    const { docker, calls } = await world();
+    await withServices(docker).cleanupLeftovers();
+    expect(calls.some((call) => call.join(' ').includes('label=bugdetective.role=qa-service'))).toBe(true);
+    expect(calls.some((call) => call.join(' ').includes('label=bugdetective.role=qa-network'))).toBe(true);
+  });
+});

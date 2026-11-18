@@ -8,6 +8,8 @@
  * then the SupportDesk QA CLI runs with --json. The container is always removed afterward.
  * The player's container, dev server, database and files are never touched.
  */
+import type { ProjectServices as Declared } from '@bug-detective/catalog/contract';
+import { QaServiceError, QaServices, sweepQaServices } from './qa-services.ts';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Language, QaResult } from '../../shared/types.ts';
@@ -111,6 +113,10 @@ export interface QaRunnerOptions {
   names?: ResourceNames;
   /** The game project being tested (labels the QA containers and the input volume). */
   project?: string | null;
+  /** The services the project declares: every run gets its own, on a network of its own. */
+  services?: Declared;
+  /** How often a service's readiness is asked (tests use a short one). */
+  servicePollMs?: number;
 }
 
 export class QaRunner {
@@ -119,6 +125,8 @@ export class QaRunner {
   private readonly dockerHostPath: (path: string) => string;
   private readonly names: ResourceNames;
   private readonly project: string | null;
+  private readonly services: Declared;
+  private readonly servicePollMs: number | undefined;
 
   constructor(options: QaRunnerOptions) {
     this.docker = options.docker;
@@ -126,6 +134,8 @@ export class QaRunner {
     this.dockerHostPath = options.dockerHostPath;
     this.names = options.names ?? resourceNames();
     this.project = options.project ?? null;
+    this.services = options.services ?? {};
+    this.servicePollMs = options.servicePollMs;
   }
 
   /**
@@ -139,7 +149,10 @@ export class QaRunner {
    * package read-only at /package. Only the dependency preparation, which has the network, may
    * write to the cache: a test run cannot plant anything the next workspace install would pick up.
    */
-  containerArgs(name: string, options: { packageDir?: string; network: boolean; source?: string }): string[] {
+  containerArgs(
+    name: string,
+    options: { packageDir?: string; network: boolean; source?: string; services?: { network: string; variables: Record<string, string> } },
+  ): string[] {
     const args = [
       'run',
       '--name',
@@ -148,7 +161,9 @@ export class QaRunner {
       '--init',
       ...limitArgs(containerLimits('qa')),
       '--network',
-      options.network ? 'bridge' : 'none',
+      // A run with services is on the internal network of those services alone: still no internet.
+      options.network ? 'bridge' : (options.services?.network ?? 'none'),
+      ...Object.entries(options.services?.variables ?? {}).flatMap(([variable, value]) => ['--env', `${variable}=${value}`]),
       '--mount',
       mountArg({ type: 'volume', src: options.source ?? this.names.volume, dst: '/workspace', readonly: true }),
       '--mount',
@@ -234,10 +249,25 @@ export class QaRunner {
   async run(request: QaRunRequest): Promise<QaResult> {
     await this.copyWorkspace(request.signal);
     request.signal?.throwIfAborted();
-    const name = `${this.names.prefix}-qa-${randomUUID().slice(0, 8)}`;
+    const run = randomUUID().slice(0, 8);
+    const name = `${this.names.prefix}-qa-${run}`;
+    // The services of this run come up first; that wait is not part of the QA time limit.
+    const qaServices = new QaServices({ docker: this.docker, prefix: this.names.prefix, project: this.projectId(), services: this.services, pollMs: this.servicePollMs });
+    let services: { network: string; variables: Record<string, string> } | undefined;
+    if (qaServices.declared) {
+      request.onLine?.('» Starting the services of this QA run', 'stdout');
+      try {
+        services = await qaServices.start(run, request.signal);
+      } catch (error) {
+        if (error instanceof QaServiceError) {
+          throw new QaInfrastructureError(error.message);
+        }
+        throw error;
+      }
+    }
     const startedAt = Date.now();
     const args = [
-      ...this.containerArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume }),
+      ...this.containerArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume, services }),
       this.image,
       '--ticket',
       String(request.ticket),
@@ -280,6 +310,9 @@ export class QaRunner {
       return parseQaResult(Buffer.from(file.data).toString('utf8'), request.ticket);
     } finally {
       await this.docker.removeContainer(name);
+      if (services) {
+        await qaServices.remove(run).catch(() => {});
+      }
     }
   }
 
@@ -317,12 +350,13 @@ export class QaRunner {
     }
   }
 
-  /** Removes QA containers left behind by a crash. */
+  /** Removes QA containers, and the services and networks of QA runs, left behind by a crash. */
   async cleanupLeftovers(): Promise<void> {
     for (const name of await this.docker.containersWithRole('qa')) {
       if (isQaContainer(name, this.names.prefix)) {
         await this.docker.removeContainer(name);
       }
     }
+    await sweepQaServices(this.docker, this.names.prefix);
   }
 }

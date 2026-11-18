@@ -33,8 +33,13 @@ export const LIMIT_ENV = {
 
 const MEMORY = /^[1-9]\d*[kmg]?b?$/i;
 
-export function containerLimits(kind: keyof typeof LIMIT_ENV, env: Record<string, string | undefined> = process.env): ContainerLimits {
-  const defaults = DEFAULT_LIMITS[kind];
+export function containerLimits(
+  kind: keyof typeof LIMIT_ENV,
+  env: Record<string, string | undefined> = process.env,
+  /** What the project asks for (its manifest), between the app's default and the developer's override. */
+  project: Partial<ContainerLimits> = {},
+): ContainerLimits {
+  const defaults = { ...DEFAULT_LIMITS[kind], ...project };
   const memory = env[LIMIT_ENV[kind].memory]?.trim();
   const pids = env[LIMIT_ENV[kind].pids]?.trim();
   return {
