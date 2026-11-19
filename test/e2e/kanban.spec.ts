@@ -359,7 +359,7 @@ test('a card shows only its track, type, key and title, and "Test failed" only a
     await startFirstTicket(page);
     const card = page.getByTestId('card-1');
     // SupportDesk's tickets are fix tickets: the type tag sits between the track and the key.
-    await expect(card).toHaveText(new RegExp(`^FrontFix${supportdesk.key('front-1')}`));
+    await expect(card).toHaveText(new RegExp(`^FrontBug${supportdesk.key('front-1')}`));
     await expect(card.getByTestId('ticket-both-sides')).toHaveCount(0);
     await expect(card.getByTestId('card-qa-failed')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
