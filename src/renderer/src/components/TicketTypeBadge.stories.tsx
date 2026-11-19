@@ -23,7 +23,7 @@ export const Fix: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId('ticket-type')).toHaveAttribute('data-type', 'fix');
-    await expect(canvas.getByTestId('ticket-type')).toHaveTextContent('Fix');
+    await expect(canvas.getByTestId('ticket-type')).toHaveTextContent('Bug');
     await expect(canvas.queryByTestId('ticket-both-sides')).toBeNull();
   },
 };
@@ -37,7 +37,7 @@ export const BothSides: Story = {
   args: { type: 'build', bothSides: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId('ticket-type')).toHaveTextContent('Build');
+    await expect(canvas.getByTestId('ticket-type')).toHaveTextContent('Feature');
     await expect(canvas.getByTestId('ticket-both-sides')).toHaveTextContent('Front + back');
   },
 };
@@ -55,6 +55,6 @@ export const AllTypes: Story = {
     const labels = within(canvasElement)
       .getAllByTestId('ticket-type')
       .map((tag) => tag.textContent);
-    await expect(labels).toEqual(['Fix', 'Build', 'Complete', 'Refactor', 'Optimize', 'Upgrade', 'Investigate']);
+    await expect(labels).toEqual(['Bug', 'Feature', 'Complete', 'Refactor', 'Optimize', 'Upgrade', 'Investigate']);
   },
 };

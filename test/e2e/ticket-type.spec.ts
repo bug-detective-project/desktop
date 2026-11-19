@@ -30,7 +30,7 @@ test('a ticket says its type and its both-sides mark, words QA by type and shows
     await firstNext.click();
 
     const first = page.getByTestId('card-1');
-    await expect(first.getByTestId('ticket-type')).toHaveText('Fix');
+    await expect(first.getByTestId('ticket-type')).toHaveText('Bug');
     await expect(first.getByTestId('ticket-both-sides')).toHaveCount(0);
     await dragCard(page, 1, 'inProgress');
     await dragCard(page, 1, 'inQa');
@@ -51,7 +51,7 @@ test('a ticket says its type and its both-sides mark, words QA by type and shows
     await secondNext.click();
 
     const second = page.getByTestId('card-2');
-    await expect(second.getByTestId('ticket-type')).toHaveText('Build');
+    await expect(second.getByTestId('ticket-type')).toHaveText('Feature');
     await expect(second.getByTestId('ticket-both-sides')).toBeVisible();
 
     // A failed Gate 2 on a build ticket is not a bug still there, and the skills stay hidden.

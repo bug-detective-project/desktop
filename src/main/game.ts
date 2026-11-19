@@ -53,7 +53,7 @@ import type { DiagnosticsInput } from './services/logs.ts';
 import { WIP_MESSAGE, editsStamp, readOnlySettings, reviewMessages } from './services/review/review.ts';
 import type { ReviewMeta, ReviewStore } from './services/review/store.ts';
 import type { StateStore } from './services/state.ts';
-import { playerBranch } from './services/workspace.ts';
+import { DependenciesMissingError, DevServerFailedError, playerBranch } from './services/workspace.ts';
 
 export class GameError extends Error {
   readonly code: string;
@@ -67,6 +67,17 @@ export class GameError extends Error {
 /** The window the app could not close has its own message; anything else is shown as it is. */
 function vscodeError(error: unknown): unknown {
   return error instanceof StaleVSCodeWindowError ? new GameError('vscodeStaleWindow', error.message) : error;
+}
+
+/** A dev server that cannot start says why in the player's language: no dependencies yet, or the end of its log. */
+function devServerError(error: unknown): unknown {
+  if (error instanceof DependenciesMissingError) {
+    return new GameError('dependenciesMissing', error.message);
+  }
+  if (error instanceof DevServerFailedError) {
+    return new GameError('devServerFailed', error.message);
+  }
+  return error;
 }
 
 /** Content errors the player can act on get their own code; anything else is shown as it is. */
@@ -1513,7 +1524,11 @@ export class Game {
   async startDevServer(): Promise<void> {
     await this.requireDocker();
     this.requireWorkspace();
-    await this.options.runtime.startDevServer();
+    try {
+      await this.options.runtime.startDevServer();
+    } catch (error) {
+      throw devServerError(error);
+    }
   }
 
   async stopDevServer(): Promise<void> {

@@ -436,6 +436,8 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
   const toast = useToast()
   const dockerUp = snapshot.dockerState === 'running'
   const [up, setUp] = useState<boolean | null>(null)
+  // Without node_modules `npm run dev` cannot start: the button waits for the install.
+  const [dependenciesReady, setDependenciesReady] = useState(true)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -446,7 +448,12 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
     const check = () =>
       void api
         .workspaceStatus()
-        .then((status) => !ignore && setUp(status.devServerUp))
+        .then((status) => {
+          if (!ignore) {
+            setUp(status.devServerUp)
+            setDependenciesReady(status.dependenciesReady)
+          }
+        })
         .catch(() => !ignore && setUp(null))
     check()
     const timer = setInterval(check, 5000)
@@ -477,7 +484,8 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
       : up
         ? t('dashboard.envStatus.running')
         : t('dashboard.envStatus.notRunning')
-  const label = up ? t('dashboard.stopServer') : t('dashboard.startServer')
+  const blocked = !up && !dependenciesReady
+  const label = up ? t('dashboard.stopServer') : blocked ? t('ticket.dependenciesMissing') : t('dashboard.startServer')
   return (
     <li
       className="flex min-w-0 items-center gap-2.5"
@@ -510,7 +518,7 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400'
                 : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400'
             }`}
-            disabled={busy}
+            disabled={busy || blocked}
             onClick={() => void toggle()}
             aria-label={label}
             data-testid={up ? 'desk-stop-server' : 'desk-start-server'}

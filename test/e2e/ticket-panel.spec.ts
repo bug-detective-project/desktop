@@ -2,11 +2,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { dragCard, launch, startFirstTicket } from './fixtures.ts';
+import { dragCard, launch, simulate, startFirstTicket } from './fixtures.ts';
 import { supportdesk } from './content.ts';
 
 test('the ticket panel shows the ticket, QA comments, history and the senior-dev conversation', async () => {
-  const { page, close } = await launch({ qa: ['gate2'] });
+  const { app, page, close } = await launch({ qa: ['gate2'] });
   try {
     await startFirstTicket(page);
     await page.getByTestId('card-1').click();
@@ -17,11 +17,15 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await expect(panel.getByTestId('ticket-track')).toHaveAttribute('data-track', 'front');
     await expect(panel.getByTestId('ticket-track')).toHaveText('Front-end');
     await expect(panel.getByTestId('open-vscode')).toBeEnabled();
-    await expect(panel.getByTestId('open-browser')).toContainText(':5173');
-    // The dev server button is always there: it starts the server, then stops it.
+    // One button for the app, next to VS Code: it starts the server, then opens the app in the browser.
+    await expect(panel.getByTestId('open-browser')).toHaveCount(0);
     await panel.getByTestId('start-dev-server').click();
-    await panel.getByTestId('stop-dev-server').click();
-    await expect(panel.getByTestId('start-dev-server')).toBeVisible();
+    await expect(panel.getByTestId('open-browser')).toContainText(':5173');
+    await expect(panel.getByTestId('start-dev-server')).toHaveCount(0);
+    // Stopped somewhere else (the Dashboard, the VS Code terminal), the button is "start" again.
+    await simulate(app, { devServerUp: false });
+    await expect(panel.getByTestId('start-dev-server')).toBeVisible({ timeout: 8000 });
+    await expect(panel.getByTestId('open-browser')).toHaveCount(0);
     // The workspace is on player/ticket-1, but git branch names are never shown.
     await expect(panel).not.toContainText('player/');
 
@@ -167,5 +171,30 @@ test('a ticket whose texts cannot be loaded says so, and loads after "Try again"
   } finally {
     await close();
     await rm(userData, { recursive: true, force: true });
+  }
+});
+
+test('without the project dependencies the dev server cannot be started, on the board or on the Dashboard, and the button says why', async () => {
+  const { app, page, close } = await launch({ dependenciesMissing: true });
+  try {
+    await startFirstTicket(page);
+    await page.getByTestId('card-1').click();
+    const panel = page.getByTestId('ticket-panel');
+    const start = panel.getByTestId('start-dev-server');
+    await expect(start).toBeDisabled();
+    await start.hover({ force: true });
+    await expect(panel.getByRole('tooltip').filter({ hasText: 'check the state of the local environment' })).toBeVisible();
+    await panel.getByTestId('close-panel').click();
+
+    await page.getByTestId('nav-dashboard').click();
+    await expect(page.getByTestId('desk-start-server')).toBeDisabled();
+
+    // Once the dependencies are there, the button works.
+    await simulate(app, { dependenciesMissing: false });
+    await expect(page.getByTestId('desk-start-server')).toBeEnabled({ timeout: 8000 });
+    await page.getByTestId('desk-start-server').click();
+    await expect(page.getByTestId('desk-stop-server')).toBeVisible();
+  } finally {
+    await close();
   }
 });

@@ -643,10 +643,10 @@ export class DockerRuntime implements GameRuntime {
     const workspace = await this.workspace();
     const info = await workspace.info();
     if (!info?.running) {
-      return { ports: null, devServerUp: false, branch: null };
+      return { ports: null, devServerUp: false, branch: null, dependenciesReady: false };
     }
-    const [devServerUp, branch, ports] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch(), workspace.ports()]);
-    return { ports, devServerUp, branch };
+    const [devServerUp, branch, ports, dependenciesReady] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch(), workspace.ports(), workspace.dependenciesReady()]);
+    return { ports, devServerUp, branch, dependenciesReady };
   }
 
   async startDevServer() {

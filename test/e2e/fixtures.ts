@@ -74,6 +74,7 @@ export async function simulate(
     devServerUp?: boolean;
     workspaceLost?: boolean;
     dbResetFails?: boolean;
+    dependenciesMissing?: boolean;
     dockerOs?: 'linux' | 'windows';
     dockerMemoryBytes?: number;
     freeDiskBytes?: number | null;

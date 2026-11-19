@@ -93,7 +93,7 @@ test('the app shows a banner and pauses Docker actions when Docker stops mid-ses
 
     await page.getByTestId('card-1').click();
     await expect(page.getByTestId('open-vscode')).toBeDisabled();
-    await expect(page.getByTestId('open-browser')).toBeDisabled();
+    await expect(page.getByTestId('start-dev-server')).toBeDisabled();
     await page.getByTestId('close-panel').click();
 
     // Starting a ticket resets the workspace in Docker, so it is refused while Docker is down.

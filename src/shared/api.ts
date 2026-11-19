@@ -274,6 +274,8 @@ export interface WorkspaceStatus {
   ports: { client: number; api: number } | null;
   devServerUp: boolean;
   branch: string | null;
+  /** False while the project's node_modules are not in the workspace: the dev server cannot start. */
+  dependenciesReady: boolean;
 }
 
 /** What the images, the dependency cache and the workspace need on the Docker disk (10 GB). */

@@ -21,6 +21,9 @@ import { metaOfEntry } from '@shared/ticketMeta.ts';
 
 type Tab = 'ticket' | 'qa' | 'history' | 'senior';
 
+/** How often the panel asks whether the dev server is up. */
+const STATUS_POLL_MS = 5000;
+
 // Rows of the ticket's field table that show live data or a colored badge, in both languages.
 const STATUS_FIELDS = new Set(['Status']);
 const TYPE_FIELDS = new Set(['Issue type', 'Tipo de item']);
@@ -38,7 +41,12 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
       void api.workspaceStatus().then(setStatus).catch(() => setStatus(null));
     }
   }, [dockerUp]);
-  useEffect(refresh, [refresh]);
+  // Asked again every few seconds: the server may be started in the VS Code terminal or stopped on the Dashboard.
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, STATUS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [refresh]);
 
   const run = async (id: string, action: () => Promise<unknown>) => {
     setBusy(id);
@@ -55,31 +63,26 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   if (ticket.status === 'done') {
     return <p className="text-base text-muted-foreground">{t('ticket.readOnly')}</p>;
   }
+  const blocked = status !== null && !status.dependenciesReady;
+  // One place for the app: "Start dev server" while it is down, "Open app in browser" once it is up.
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Tooltip content={t('ticket.vscodeHint')} hoverOnly>
-          <Button variant="primary" className="w-full" disabled={!dockerUp || blocksVSCode(snapshot.busy)} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
-            {busy !== 'vscode' && <Icon name="code" />}
-            {t('ticket.openVSCode')}
-          </Button>
-        </Tooltip>
+    <div className="grid grid-cols-2 gap-2">
+      <Tooltip content={t('ticket.vscodeHint')} hoverOnly>
+        <Button variant="primary" className="w-full" disabled={!dockerUp || blocksVSCode(snapshot.busy)} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
+          {busy !== 'vscode' && <Icon name="code" />}
+          {t('ticket.openVSCode')}
+        </Button>
+      </Tooltip>
+      {status?.devServerUp ? (
         <Button className="w-full" disabled={!dockerUp} busy={busy === 'browser'} onClick={() => run('browser', () => api.openAppInBrowser())} data-testid="open-browser">
           {busy !== 'browser' && <Icon name="externalLink" />}
           {t('ticket.openBrowser')}
-          {status?.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
+          {status.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
         </Button>
-      </div>
-      {status?.devServerUp ? (
-        <Tooltip content={t('ticket.devServerUp')} className="w-full" hoverOnly>
-          <Button className="w-full" disabled={!dockerUp} busy={busy === 'dev'} onClick={() => run('dev', () => api.stopDevServer())} data-testid="stop-dev-server">
-            {busy !== 'dev' && <Icon name="pause" />}
-            {t('ticket.stopDevServer')}
-          </Button>
-        </Tooltip>
       ) : (
-        <Tooltip content={t('ticket.devServerDown')} className="w-full" hoverOnly>
-          <Button className="w-full" disabled={!dockerUp || !status} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
+        // Without node_modules `npm run dev` cannot start: the button says where to look.
+        <Tooltip content={blocked ? t('ticket.dependenciesMissing') : t('ticket.devServerDown')} className="w-full" hoverOnly>
+          <Button className="w-full" disabled={!dockerUp || !status || blocked} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
             {busy !== 'dev' && <Icon name="play" />}
             {t('ticket.startDevServer')}
           </Button>

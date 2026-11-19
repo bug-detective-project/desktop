@@ -64,15 +64,10 @@ export function OnboardingTicketDemo({ tab }: { tab: DemoTab }) {
               {t('ticket.openVSCode')}
             </Button>
             <Button className="w-full">
-              <Icon name="externalLink" />
-              {t('ticket.openBrowser')}
-              <span className="font-mono text-sm text-muted-foreground">:5173</span>
+              <Icon name="play" />
+              {t('ticket.startDevServer')}
             </Button>
           </div>
-          <Button className="w-full">
-            <Icon name="play" />
-            {t('ticket.startDevServer')}
-          </Button>
         </div>
       </header>
       <div className="px-5 pt-3">

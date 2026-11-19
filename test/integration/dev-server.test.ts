@@ -123,6 +123,43 @@ describe('the dev server with real Docker', () => {
     expect(await devProcesses()).toEqual([]);
   });
 
+  it('refuses to start without the project dependencies, and starts again once they are installed', async () => {
+    const dir = workspaceDir('notes');
+    // What a workspace looks like before "Install": no node_modules.
+    await docker.execChecked(runtime.names.container, ['rm', '-rf', 'node_modules'], { user: 'node', workdir: dir });
+    expect((await game.workspaceStatus()).dependenciesReady).toBe(false);
+
+    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'dependenciesMissing' });
+    expect(await devProcesses()).toEqual([]);
+
+    await game.installEnvironment();
+    expect((await game.workspaceStatus()).dependenciesReady).toBe(true);
+    await game.startDevServer();
+    expect((await game.workspaceStatus()).devServerUp).toBe(true);
+    await game.stopDevServer();
+  });
+
+  it('fails with the end of the log when npm run dev dies, instead of waiting in silence', async () => {
+    const dir = workspaceDir('notes');
+    // A dev script that dies at once, like a missing command would.
+    await docker.execChecked(runtime.names.container, ['npm', 'pkg', 'set', 'scripts.dev=echo boom-from-the-dev-script && exit 3'], { user: 'node', workdir: dir });
+    try {
+      const startedAt = Date.now();
+      const failure = await game.startDevServer().then(
+        () => null,
+        (error: { code?: string; message?: string }) => error,
+      );
+
+      expect(failure).toMatchObject({ code: 'devServerFailed' });
+      expect(failure!.message).toContain('boom-from-the-dev-script');
+      // It does not wait the whole start time for a command that already ended.
+      expect(Date.now() - startedAt).toBeLessThan(30_000);
+      expect((await game.workspaceStatus()).devServerUp).toBe(false);
+    } finally {
+      await docker.execChecked(runtime.names.container, ['git', 'checkout', '--', 'package.json'], { user: 'node', workdir: dir });
+    }
+  });
+
   it('stopping a server that is not running does nothing and does not fail', async () => {
     await game.stopDevServer();
     expect((await game.workspaceStatus()).devServerUp).toBe(false);
