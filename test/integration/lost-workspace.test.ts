@@ -93,6 +93,10 @@ describe('a workspace volume removed outside the game', () => {
     expect(await git('config', '--get', 'bugdetective.game')).toBe(game.snapshot().state.createdAt);
     expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
 
+    // The new volume has the code but not the dependencies: the dev server waits for them, as on
+    // the Dashboard, where the player installs them again.
+    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'dependenciesMissing' });
+    await game.installEnvironment();
     await game.startDevServer();
     expect((await game.workspaceStatus()).devServerUp).toBe(true);
     await game.stopDevServer();
