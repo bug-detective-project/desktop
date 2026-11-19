@@ -766,7 +766,6 @@
     "frontend": "Frontend",
     "backend": "Backend",
     "database": "Database",
-    "briefRegion": "Project specifications",
     "practice": "You'll practice",
     "seeAllSkills": "See all ({{count}})",
     "fewerSkills": "Show fewer",

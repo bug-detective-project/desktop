@@ -137,13 +137,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             </Button>
           </div>
           {details && (
-            // With many skills the brief is taller than the card: it scrolls, and the keyboard reaches it.
-            <div
-              className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pt-7 pb-6 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
-              role="region"
-              aria-label={t('projects.briefRegion')}
-              tabIndex={0}
-            >
+            <div className="flex min-h-0 flex-1 flex-col px-6 pt-7 pb-6">
               {/* The label column is at least 76px and as wide as the longest label ("Banco de dados"), so values line up. */}
               <dl className="grid grid-cols-[auto_minmax(76px,auto)_1fr] items-center gap-x-2 gap-y-2 text-sm">
                 {details.stack?.frontend && <Row icon={<Monitor />} label={t('projects.frontend')} value={details.stack.frontend} testId="project-stack-frontend" />}
@@ -153,7 +147,7 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 {details.memoryBytes !== null && <Row icon={<MemoryStick />} label={t('projects.memory')} value={gigabytes(details.memoryBytes, language)} testId="project-memory" />}
               </dl>
               {skills.length > 0 && (
-                <div className="mt-3 border-t border-border pt-4">
+                <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-border pt-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className={label}>{t('projects.practice')}</p>
                     {skills.length > SKILLS_SHOWN && (
@@ -168,7 +162,13 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                       </button>
                     )}
                   </div>
-                  <ul className="mt-2 space-y-1.5" data-testid="project-skills">
+                  {/* With many skills the list is taller than the card: only the list scrolls, and the keyboard reaches it. */}
+                  <ul
+                    className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto rounded pr-1 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    aria-label={t('projects.practice')}
+                    tabIndex={0}
+                    data-testid="project-skills"
+                  >
                     {(allSkills ? skills : skills.slice(0, SKILLS_SHOWN)).map((skill) => (
                       <li key={skill} className="flex items-start gap-2 text-sm text-foreground">
                         <Icon name="check" className="mt-0.5 size-3.5 shrink-0 text-primary" />
