@@ -34,6 +34,49 @@ export const TicketOfAnotherType: Story = {
   },
 };
 
+/**
+ * The "Issue type" row of the ticket shows the name and the hue of the ticket's type, like the tag
+ * of the header, whatever the ticket's own file says there ("Story" in the fixture).
+ */
+export const IssueTypeOfABug: Story = {
+  ...InProgress,
+  play: async ({ canvasElement }) => {
+    const panel = await within(canvasElement.ownerDocument.body).findByTestId('ticket-panel');
+    const row = await within(panel).findByTestId('ticket-issue-type');
+    await expect(row).toHaveAttribute('data-type', 'fix');
+    await expect(row).toHaveTextContent('Bug');
+    await expect(within(panel.querySelector('header')!).getByTestId('ticket-type')).toHaveTextContent('Bug');
+  },
+};
+export const IssueTypeOfAFeature: Story = {
+  ...TicketOfAnotherType,
+  play: async ({ canvasElement }) => {
+    const panel = await within(canvasElement.ownerDocument.body).findByTestId('ticket-panel');
+    const row = await within(panel).findByTestId('ticket-issue-type');
+    const tag = within(panel.querySelector('header')!).getByTestId('ticket-type');
+    await expect(row).toHaveAttribute('data-type', 'build');
+    await expect(row).toHaveTextContent('Feature');
+    await expect(tag).toHaveTextContent('Feature');
+    // The same hue in both places.
+    await expect(getComputedStyle(row.firstElementChild!).color).toBe(getComputedStyle(tag).color);
+  },
+};
+export const IssueTypeInPortuguese: Story = {
+  render: () => (
+    <TicketPanel
+      snapshot={snapshotFixture('active', { ticketMeta: { 1: { type: 'complete', bothSides: false } } })}
+      ticketNumber={1}
+      onClose={fn()}
+      onOpenReview={fn()}
+    />
+  ),
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    const panel = await within(canvasElement.ownerDocument.body).findByTestId('ticket-panel');
+    await expect(await within(panel).findByTestId('ticket-issue-type')).toHaveTextContent('Completar');
+  },
+};
+
 const skills = { en: ['Building components', 'Routes and navigation'], pt: ['Criação de componentes', 'Criação de rotas e navegação'] };
 /** The review snapshot with its ticket in another column, and the skills the main process sent for it (none unless Done). */
 const withTicket = (status: 'inProgress' | 'codeReview' | 'done', practiced: Record<number, typeof skills>) => {

@@ -58,3 +58,34 @@ export const AllTypes: Story = {
     await expect(labels).toEqual(['Bug', 'Feature', 'Complete', 'Refactor', 'Optimize', 'Upgrade', 'Investigate']);
   },
 };
+
+/** Each type has a hue of its own: seven tags, seven text colors and seven backgrounds. */
+export const OneHuePerType: Story = {
+  ...AllTypes,
+  render: () => (
+    <div className="flex flex-wrap items-center gap-2">
+      {TICKET_TYPES.map((type) => (
+        <TicketTypeBadge key={type} type={type} bothSides={false} />
+      ))}
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const tags = within(canvasElement).getAllByTestId('ticket-type');
+    await expect(tags.map((tag) => tag.dataset.type)).toEqual([...TICKET_TYPES]);
+    const styles = tags.map((tag) => getComputedStyle(tag));
+    await expect(new Set(styles.map((style) => style.color)).size).toBe(TICKET_TYPES.length);
+    await expect(new Set(styles.map((style) => style.backgroundColor)).size).toBe(TICKET_TYPES.length);
+  },
+};
+
+/** The names in Portuguese: a fix ticket is a "Bug" and a build ticket a "Feature" there too. */
+export const AllTypesInPortuguese: Story = {
+  ...AllTypes,
+  globals: { locale: 'pt' },
+  play: async ({ canvasElement }) => {
+    const labels = within(canvasElement)
+      .getAllByTestId('ticket-type')
+      .map((tag) => tag.textContent);
+    await expect(labels).toEqual(['Bug', 'Feature', 'Completar', 'Refatorar', 'Otimizar', 'Atualizar', 'Investigar']);
+  },
+};
