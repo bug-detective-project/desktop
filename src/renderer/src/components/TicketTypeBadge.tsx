@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { TicketType } from '@shared/ticketMeta.ts';
+import { TONES } from './tones.ts';
 
 const TAG = 'inline-flex shrink-0 items-center rounded-sm border px-1.5 py-0.5 text-[10px] leading-none font-bold tracking-wider uppercase';
 
@@ -11,7 +12,8 @@ export function TicketTypeBadge({ type, bothSides }: { type: TicketType; bothSid
   const { t } = useTranslation();
   return (
     <>
-      <span className={`${TAG} border-border bg-muted text-muted-foreground`} title={t('ticketType.title')} data-testid="ticket-type" data-type={type}>
+      {/* The colors of the "Issue type" row of the ticket: a bug in the danger tone, the rest neutral. */}
+      <span className={`${TAG} ${TONES[type === 'fix' ? 'danger' : 'neutral']}`} title={t('ticketType.title')} data-testid="ticket-type" data-type={type}>
         {t(`ticketType.${type}`)}
       </span>
       {bothSides && (

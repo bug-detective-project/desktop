@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Column, Track } from '@shared/types.ts';
 import { Icon } from './icons.tsx';
+import { TONES } from './tones.ts';
 import { STAGE } from './stage.ts';
 
 type Variant = 'primary' | 'secondary' | 'card' | 'ghost' | 'danger' | 'dangerOutline' | 'review';
@@ -71,14 +72,6 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
 }
 
 // Pill and badge text uses the -800 tone in the light theme: they often sit on another tint (4.5:1).
-const TONES = {
-  neutral: 'border-border bg-secondary text-secondary-foreground',
-  ok: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400',
-  warn: 'border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-400',
-  danger: 'border-destructive/20 bg-destructive/10 text-red-800 dark:text-destructive',
-  brand: 'border-primary/20 bg-primary/10 text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary',
-};
-
 export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}>{children}</span>;
 }
