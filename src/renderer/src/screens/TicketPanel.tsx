@@ -17,6 +17,7 @@ import { ticketTitle } from '../components/ticketTitle.ts';
 import { Badge, Button, LogView, StagePill, Tabs, Tooltip, TrackBadge } from '../components/ui.tsx';
 import { useToast } from '../toast-context.ts';
 import { TicketTypeBadge } from '../components/TicketTypeBadge.tsx';
+import { TYPE_TONES } from '../components/tones.ts';
 import { metaOfEntry } from '@shared/ticketMeta.ts';
 
 type Tab = 'ticket' | 'qa' | 'history' | 'senior';
@@ -316,7 +317,15 @@ export function TicketPanel({
               fieldValue={(field, value) => {
                 // The file is written when the ticket is created, so the status comes from the board instead.
                 if (STATUS_FIELDS.has(field)) return <StagePill status={ticket.status} />;
-                if (TYPE_FIELDS.has(field)) return <Badge tone={value.toLowerCase() === 'bug' ? 'danger' : 'neutral'}>{value}</Badge>;
+                // The name and the hue of the ticket's type, like the tag of the card (the file may say "Story").
+                if (TYPE_FIELDS.has(field)) {
+                  const { type } = metaOfEntry(snapshot.ticketMeta[ticket.ticket]);
+                  return (
+                    <span data-testid="ticket-issue-type" data-type={type}>
+                      <Badge toneClass={TYPE_TONES[type]}>{t(`ticketType.${type}`)}</Badge>
+                    </span>
+                  );
+                }
                 // The card's tag, in the hue of the ticket's track, with the card's wording ("Front-end").
                 if (TRACK_FIELDS.has(field)) return <TrackBadge track={ticket.track} label={value} testId="ticket-track" />;
                 return undefined;

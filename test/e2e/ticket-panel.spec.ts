@@ -16,6 +16,9 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     // The Track row shows the card's tag, with the card's wording.
     await expect(panel.getByTestId('ticket-track')).toHaveAttribute('data-track', 'front');
     await expect(panel.getByTestId('ticket-track')).toHaveText('Front-end');
+    // The Issue type row shows the name and the hue of the ticket's type, like the tag of the card.
+    await expect(panel.getByTestId('ticket-issue-type')).toHaveAttribute('data-type', 'fix');
+    await expect(panel.getByTestId('ticket-issue-type')).toHaveText('Bug');
     await expect(panel.getByTestId('open-vscode')).toBeEnabled();
     // One button for the app, next to VS Code: it starts the server, then opens the app in the browser.
     await expect(panel.getByTestId('open-browser')).toHaveCount(0);

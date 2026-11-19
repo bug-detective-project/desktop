@@ -72,8 +72,8 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
 }
 
 // Pill and badge text uses the -800 tone in the light theme: they often sit on another tint (4.5:1).
-export function Badge({ tone = 'neutral', children }: { tone?: keyof typeof TONES; children: ReactNode }) {
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}>{children}</span>;
+export function Badge({ tone = 'neutral', toneClass, children }: { tone?: keyof typeof TONES; /** Classes of a hue outside the tones, instead of `tone`. */ toneClass?: string; children: ReactNode }) {
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${toneClass ?? TONES[tone]}`}>{children}</span>;
 }
 
 const TRACK_TONES: Record<Track, string> = {
