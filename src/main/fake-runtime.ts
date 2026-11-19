@@ -11,6 +11,7 @@ import { textFile } from '@bug-detective/catalog/contract';
 import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
+import { DependenciesMissingError } from './services/workspace.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
@@ -37,6 +38,8 @@ interface Scenario {
   cleanupFails: string[];
   /** Starting and stopping the dev server fail. */
   devServerFails: boolean;
+  /** The project's node_modules are not in the workspace yet. */
+  dependenciesMissing: boolean;
   /** `npm run db:reset` fails. */
   dbResetFails: boolean;
   /** How long importing a stage takes, so the "unlocking" state can be seen. */
@@ -72,6 +75,7 @@ const DEFAULT_SCENARIO: Scenario = {
   vscodeFails: false,
   cleanupFails: [],
   devServerFails: false,
+  dependenciesMissing: false,
   dbResetFails: false,
   unlockDelayMs: 0,
   unlockFails: null,
@@ -464,10 +468,13 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async workspaceStatus() {
-    return { ports: await this.workspacePorts(), devServerUp: this.devServerUp, branch: await this.currentBranch() };
+    return { ports: await this.workspacePorts(), devServerUp: this.devServerUp, branch: await this.currentBranch(), dependenciesReady: !this.scenario.dependenciesMissing };
   }
 
   async startDevServer() {
+    if (this.scenario.dependenciesMissing) {
+      throw new DependenciesMissingError();
+    }
     if (this.scenario.devServerFails) {
       throw new Error('npm run dev failed (fake)');
     }
@@ -490,6 +497,7 @@ export class FakeRuntime implements GameRuntime {
     devServerUp?: boolean;
     workspaceLost?: boolean;
     dbResetFails?: boolean;
+    dependenciesMissing?: boolean;
     workspaceOutOfMemory?: boolean;
     servicesOutOfMemory?: string[];
     dockerOs?: 'linux' | 'windows';
@@ -505,6 +513,7 @@ export class FakeRuntime implements GameRuntime {
     if (change.dockerMemoryBytes !== undefined) this.scenario.dockerMemoryBytes = change.dockerMemoryBytes;
     if (change.freeDiskBytes !== undefined) this.scenario.freeDiskBytes = change.freeDiskBytes;
     if (change.dbResetFails !== undefined) this.scenario.dbResetFails = change.dbResetFails;
+    if (change.dependenciesMissing !== undefined) this.scenario.dependenciesMissing = change.dependenciesMissing;
     if (change.devServerUp !== undefined) this.devServerUp = change.devServerUp;
     if (change.workspaceOutOfMemory !== undefined) this.workspaceOom = change.workspaceOutOfMemory;
     if (change.servicesOutOfMemory !== undefined) this.servicesOom = change.servicesOutOfMemory;

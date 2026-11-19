@@ -1,6 +1,6 @@
 {
   "ticket": 1,
-  "ticketMarkdown": "# Um título vazio não mostra nada\n\nNotes without a title must show Untitled.\n",
+  "ticketMarkdown": "# Um título vazio não mostra nada\n\n| Campo | Valor |\n| --- | --- |\n| Tipo de item | História |\n| Status | A fazer |\n| Trilha | Front-end |\n\nNotes without a title must show Untitled.\n",
   "hints": [],
   "hintsTotal": 3,
   "solutionMarkdown": null,

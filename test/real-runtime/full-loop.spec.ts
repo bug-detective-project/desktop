@@ -161,11 +161,12 @@ test('the full game loop with real Docker and VS Code', async () => {
 
     if (ticket === 1) {
       // Open app in browser: the dev server on the published port, through the forwarder.
-      // The status (with the published port) loads asynchronously; the button only shows when the server is down.
-      await expect(page.getByTestId('open-browser')).toContainText(':');
+      // One button: "Start dev server" while the server is down, "Open app in browser" (with the published port) once it is up.
+      await expect(page.getByTestId('start-dev-server').or(page.getByTestId('open-browser'))).toBeVisible();
       if (await page.getByTestId('start-dev-server').isVisible()) {
         await page.getByTestId('start-dev-server').click();
       }
+      await expect(page.getByTestId('open-browser')).toContainText(':', { timeout: 120_000 });
       const port = Number(/:(\d+)/.exec((await page.getByTestId('open-browser').textContent()) ?? '')?.[1]);
       await expect.poll(async () => (await fetch(`http://127.0.0.1:${port}/`).catch(() => null))?.status ?? 0, { timeout: 120_000 }).toBe(200);
       const tickets = (await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()) as unknown[];

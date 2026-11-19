@@ -368,6 +368,21 @@ describe('a workspace whose volume went', () => {
     expect(await runtime.hasRepository()).toBe(true);
   });
 
+  it('refuses to start the dev server while the project dependencies are not installed, and says so in the status', async () => {
+    const { game, runtime } = createGame({ scenario: { dependenciesMissing: true } });
+    await game.init();
+    await game.nextAssignment();
+
+    expect((await game.workspaceStatus()).dependenciesReady).toBe(false);
+    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'dependenciesMissing' });
+    expect((await game.workspaceStatus()).devServerUp).toBe(false);
+
+    runtime.simulate({ dependenciesMissing: false });
+    expect((await game.workspaceStatus()).dependenciesReady).toBe(true);
+    await game.startDevServer();
+    expect((await game.workspaceStatus()).devServerUp).toBe(true);
+  });
+
   it('is noticed by the environment check, blocks the code actions, and is recreated ticket by ticket', async () => {
     const { game, runtime } = createGame();
     await game.init();

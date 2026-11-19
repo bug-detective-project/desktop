@@ -510,6 +510,21 @@ const SERVICE_FORWARD_BASE = 20000;
 /** Changes when the variables or the memory of the workspace do: the container is then recreated, its volumes kept. */
 export const ENV_KEY_LABEL = 'bugdetective.env-key';
 
+/** How long `npm run dev` may take to answer before the start counts as failed. */
+const DEV_SERVER_START_MS = 60_000;
+const DEV_SERVER_LOG_LINES = 6;
+const DEV_SERVER_LOG_CHARS = 600;
+
+/** The dev server was asked to start before the project's dependencies were installed. */
+export class DependenciesMissingError extends Error {
+  constructor() {
+    super('The project dependencies are not installed in the workspace');
+  }
+}
+
+/** `npm run dev` ran and the app is not answering; the message is the end of its log. */
+export class DevServerFailedError extends Error {}
+
 export class Workspace {
   private readonly docker: Docker;
   private readonly image: string;
@@ -997,8 +1012,20 @@ export class Workspace {
     return result.code === 0;
   }
 
-  /** Starts `npm run dev` in the background inside the container, logging to /tmp/dev-server.log. */
+  /** True when the node_modules of the current lockfile are in the workspace. */
+  async dependenciesReady(): Promise<boolean> {
+    const key = await this.dependencyKey();
+    return key !== null && (await this.installedDependencyKey()) === key;
+  }
+
+  /**
+   * Starts `npm run dev` in the background inside the container, logging to /tmp/dev-server.log.
+   * Fails, with the last lines of that log, when the server is not answering in the end.
+   */
   async startDevServer(): Promise<void> {
+    if (!(await this.dependenciesReady())) {
+      throw new DependenciesMissingError();
+    }
     await this.docker.checked([
       'exec',
       '--detach',
@@ -1011,7 +1038,37 @@ export class Workspace {
       '-c',
       'exec npm run dev > /tmp/dev-server.log 2>&1',
     ]);
-    await this.waitForDevServer(true, 30_000);
+    const deadline = Date.now() + DEV_SERVER_START_MS;
+    for (;;) {
+      if (await this.isDevServerUp()) {
+        return;
+      }
+      // A command that died (a missing script, a port in use) is not worth waiting for.
+      if (Date.now() >= deadline || !(await this.isDevServerStarting())) {
+        throw new DevServerFailedError(await this.devServerLogTail());
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  /** Whether `npm run dev` is still running in the container. */
+  private async isDevServerStarting(): Promise<boolean> {
+    const result = await this.docker.exec(this.names.container, ['pgrep', '-f', '[n]pm run dev'], { user: 'node', timeoutMs: 10_000 });
+    return result.code === 0;
+  }
+
+  /** The last lines of /tmp/dev-server.log, without colors. */
+  private async devServerLogTail(): Promise<string> {
+    const result = await this.docker.exec(this.names.container, ['tail', '-n', String(DEV_SERVER_LOG_LINES), '/tmp/dev-server.log'], { user: 'node', timeoutMs: 10_000 });
+    const text = result.stdout
+      .toString('utf8')
+      // eslint-disable-next-line no-control-regex
+      .replace(/\u001b\[[0-9;]*m/g, '')
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter(Boolean)
+      .join('\n');
+    return text.slice(-DEV_SERVER_LOG_CHARS);
   }
 
   /**
