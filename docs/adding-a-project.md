@@ -190,8 +190,9 @@ A project whose code needs a database declares it in the same `bugDetective.proj
 }
 ```
 
-- `image` comes from the catalog's list of allowed images (today only `postgres:17`); a new image
-  enters by pull request to the catalog. The rules and the limits (up to 4 services, 64 MB to 1 GB
+- `image` comes from the catalog's list of allowed images (`postgres:17`, and `mysql:8.4` since
+  catalog 1.8.0, whose default server needs `"memory": "512m"`); a new image enters by pull
+  request to the catalog. The rules and the limits (up to 4 services, 64 MB to 1 GB
   each, a memory peak of 8 GB) are in the catalog's README, "Project services".
 - The app starts each service in its own container next to the workspace, on the project's
   internal network (no internet, no published port), and sets the `variables` on the workspace
@@ -208,16 +209,19 @@ A project whose code needs a database declares it in the same `bugDetective.proj
 - When `db:reset` fails, "Try again" on the Dashboard recreates the services first; "Recreate
   services" does the same for a service that does not start or ran out of memory.
 - **Looking at the data.** Three ways, all optional for the player:
-  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`;
+  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`, or `mysql`,
+    which takes no URL: a MySQL project also declares `"MYSQL_HOST": "{{host}}"` and
+    `"MYSQL_TCP_PORT": "{{port}}"`, which the client reads, so `mysql -u root -p <database>` works;
   - `"publish": true` on a service also publishes its port on the player's computer, on
     `127.0.0.1` only and on a free port (the service's own when it is free); the Dashboard shows
     it next to the service (`localhost:5432`), for the player's own database tools;
-  - the project may recommend SQLTools and its PostgreSQL driver in `.vscode/extensions.json`
-    (`mtxr.sqltools`, `mtxr.sqltools-driver-pg`), which connect from inside the workspace to
-    the service by its name.
+  - the project may recommend SQLTools and its driver in `.vscode/extensions.json`
+    (`mtxr.sqltools` with `mtxr.sqltools-driver-pg` or `mtxr.sqltools-driver-mysql`), which
+    connect from inside the workspace to the service by its name.
 - The tests of `main` that need a service run through `bd with-services` (see the `ci.yml` of
   step 1), against a database of their own, never the one the dev server uses.
-- A project with services needs `minAppVersion` 1.2.0 in the catalog.
+- A project with services needs `minAppVersion` 1.2.0 in the catalog; one with MySQL needs 1.3.0,
+  whose workspace image carries the `mysql` client.
 
 ### The QA CLI (`run.ts`)
 

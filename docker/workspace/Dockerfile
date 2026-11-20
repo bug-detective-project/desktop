@@ -3,14 +3,26 @@
 # a port forwarder for the Vite dev server.
 FROM node:26.12.1-bookworm
 
-# The command-line client of each database on the catalog's list of service images (today
-# PostgreSQL), so the player can look at a service's data from the workspace's terminal:
-# psql "$DATABASE_URL". It comes from PostgreSQL's own package repository, to be the same major
-# version as the server. Installed before GnuPG is removed below.
+# The command-line client of each database on the catalog's list of service images (PostgreSQL 17
+# and MySQL 8.4), so the player can look at a service's data from the workspace's terminal:
+# psql "$DATABASE_URL", or mysql (it reads MYSQL_HOST and MYSQL_TCP_PORT, which a MySQL project
+# declares; it takes no URL). Each comes from its database's own package repository, to be the same
+# major version as the server. Installed before GnuPG is removed below.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends postgresql-common ca-certificates \
  && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
  && apt-get install -y --no-install-recommends postgresql-client-17 \
+ && rm -rf /var/lib/apt/lists/*
+
+# MySQL's own repository, its 8.4 LTS series. The signing key is checked against the fingerprint
+# MySQL publishes before apt trusts it.
+RUN curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2025 -o /tmp/mysql.asc \
+ && gpg --show-keys --with-colons /tmp/mysql.asc | grep -q '^fpr:::::::::BCA43417C3B485DD128EC6D4B7B3B788A8D3785C:$' \
+ && gpg --dearmor < /tmp/mysql.asc > /usr/share/keyrings/mysql.gpg \
+ && rm /tmp/mysql.asc \
+ && echo 'deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian/ bookworm mysql-8.4-lts' > /etc/apt/sources.list.d/mysql.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends mysql-client \
  && rm -rf /var/lib/apt/lists/*
 
 # The snapshot imports and the player's work keep LF line endings, whatever the host settings are.

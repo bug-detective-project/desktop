@@ -184,6 +184,9 @@ describe("a project's services with real Docker", () => {
     // The workspace image carries the database's own client: the player looks at the data from the terminal.
     const answer = await docker.exec(container, ['sh', '-c', 'psql "$DATABASE_URL" -tAc "select 1"'], { user: 'node', timeoutMs: 30_000 });
     expect(answer.stdout.toString('utf8').trim()).toBe('1');
+    // And the client of the other database on the catalog's list, of the same major version as its server.
+    const mysql = await docker.exec(container, ['mysql', '--version'], { user: 'node' });
+    expect(mysql.stdout.toString('utf8')).toMatch(/Ver 8\.4\./);
   });
 
   it('records the image as its own only when it pulled it', async () => {
