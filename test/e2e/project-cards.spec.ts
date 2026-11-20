@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { createProjectRepo } from '../helpers/project-repo.ts';
-import { launch, supportdeskQa, takeNextTicket } from './fixtures.ts';
+import { launch, projectQa, takeNextTicket } from './fixtures.ts';
+import { smokedesk } from './content.ts';
 
 const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
 let dir: string;
@@ -26,7 +27,7 @@ test.beforeAll(async () => {
   });
   const hard = await createProjectRepo(dir, { front: 1, back: 0 }, 'Hard', 'hard', { difficulty: 'advanced' });
   catalog = [
-    { id: 'supportdesk', qaDir: supportdeskQa, starter: true },
+    { id: 'smokedesk', qaDir: projectQa, starter: true },
     { id: 'easy', qaDir: easy.qaDir },
     { id: 'middle', qaDir: middle.qaDir },
     { id: 'hard', qaDir: hard.qaDir },
@@ -117,19 +118,15 @@ test('the brief shows the client, the stack that exists, the tickets and the ski
   }
 });
 
-test('the SupportDesk publication lists its seven skills: five on the card, all of them after "See all"', async () => {
+test('the project lists the skills of its story on the back of its card', async () => {
+  // Five fit on the card and "See all" shows the rest (ProjectFlipCard's stories); Smoke Desk has fewer.
   const { page, close } = await openProjects();
   try {
-    await page.getByTestId('project-supportdesk-brief').click();
-    const back = page.getByTestId('project-supportdesk-back');
-    const skills = back.getByTestId('project-skills').getByRole('listitem');
-    await expect(skills).toHaveCount(5);
-    await expect(skills.first()).toHaveText('Async and state');
-    await expect(back.getByTestId('project-skills-all')).toHaveText('See all (7)');
-
-    await back.getByTestId('project-skills-all').click();
-    await expect(skills).toHaveCount(7);
-    await expect(skills.last()).toHaveText('Server security');
+    await page.getByTestId('project-smokedesk-brief').click();
+    const back = page.getByTestId('project-smokedesk-back');
+    const skills = smokedesk.story.en.project.skills!;
+    await expect(back.getByTestId('project-skills').getByRole('listitem')).toHaveText(skills.slice(0, 5));
+    await expect(back.getByTestId('project-skills-all')).toHaveCount(skills.length > 5 ? 1 : 0);
   } finally {
     await close();
   }
@@ -152,8 +149,8 @@ test('the front shows the monogram, the difficulty in its color, the badge only 
       await expect(meter.locator('.bg-border')).toHaveCount(3 - filled);
     }
     await expect(page.getByTestId('project-current')).toHaveCount(1);
-    await expect(page.getByTestId('project-supportdesk').getByTestId('project-current')).toHaveText('Current project');
-    await expect(page.getByTestId('switch-supportdesk')).toHaveCount(0);
+    await expect(page.getByTestId('project-smokedesk').getByTestId('project-current')).toHaveText('Current project');
+    await expect(page.getByTestId('switch-smokedesk')).toHaveCount(0);
     for (const id of ['easy', 'middle', 'hard']) {
       await expect(page.getByTestId(`switch-${id}`)).toHaveText('Play this project');
     }
@@ -219,14 +216,14 @@ test('"Play this project" keeps the switch flow: the confirmation, the backup of
     await expect(dialog.getByTestId('switch-export')).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByTestId('project-supportdesk').getByTestId('project-current')).toBeVisible();
+    await expect(page.getByTestId('project-smokedesk').getByTestId('project-current')).toBeVisible();
 
     await page.getByTestId('switch-easy').click();
     await page.getByTestId('confirm-switch').click();
     await expect(page.getByTestId('toast-info')).toHaveText('Notes Board is your project now.');
     await expect(page.getByTestId('project-easy').getByTestId('project-current')).toBeVisible();
     await expect(page.getByTestId('switch-easy')).toHaveCount(0);
-    await expect(page.getByTestId('switch-supportdesk')).toBeEnabled();
+    await expect(page.getByTestId('switch-smokedesk')).toBeEnabled();
   } finally {
     await close();
   }

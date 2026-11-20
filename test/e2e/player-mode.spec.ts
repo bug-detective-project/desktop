@@ -8,7 +8,7 @@ test('a build run from source plays like the installed app: no development tools
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
   await writeFile(
     join(userData, 'catalog.local.json'),
-    JSON.stringify({ projects: { supportdesk: { qaRef: 'not-for-players' } } }),
+    JSON.stringify({ projects: { smokedesk: { qaRef: 'not-for-players' } } }),
   );
   const { page, close } = await launch(
     {},

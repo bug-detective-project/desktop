@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { dragCard, expectFlagsLoaded, launch, startFirstTicket } from './fixtures.ts';
-import { supportdesk } from './content.ts';
+import { smokedesk } from './content.ts';
 
 test('settings: preferences, developer tools, backup and about tabs', async () => {
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-settings-'));
@@ -79,7 +79,7 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await expect(page.getByTestId('backup-outdated')).toHaveText('Backup outdated');
     await expect(page.getByTestId('last-export')).toContainText('Never exported');
     await expect(page.getByTestId('campaign-progress')).toHaveText(
-      `0 tickets completed · ${supportdesk.key('front-1')} (To Do)`,
+      `0 tickets completed · ${smokedesk.key('front-1')} (To Do)`,
     );
     const file = join(saves, 'bug-detective-2026-10-27.bdsave');
     await app.evaluate(({ dialog }, path) => {

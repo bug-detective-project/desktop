@@ -5,12 +5,13 @@ import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
-import { SUPPORTDESK_CHOICE_FILE } from './global-setup.ts';
-import type { SupportdeskChoice } from './global-setup.ts';
+import { PROJECT_CHOICE_FILE } from './global-setup.ts';
+import type { ProjectChoice } from './global-setup.ts';
 
-/** The SupportDesk qa folder next to the desktop folder, the content of the e2e tests. */
-/** SupportDesk's qa folder for these tests, chosen by global-setup.ts (the local worktree or the pinned publication). */
-export const supportdeskQa = (JSON.parse(readFileSync(SUPPORTDESK_CHOICE_FILE, 'utf8')) as SupportdeskChoice).qaDir;
+/** The id of the project the e2e tests play: Smoke Desk, made for the app's own tests. */
+export const PROJECT_ID = 'smokedesk';
+/** Smoke Desk's qa folder for these tests, chosen by global-setup.ts (the local worktree or the pinned publication). */
+export const projectQa = (JSON.parse(readFileSync(PROJECT_CHOICE_FILE, 'utf8')) as ProjectChoice).qaDir;
 
 export interface Launched {
   app: ElectronApplication;
@@ -20,7 +21,7 @@ export interface Launched {
 
 /**
  * Launches the built app (pnpm run build) with the fake runtime: prerequisites and QA outcomes
- * come from the scenario, content comes from the local SupportDesk qa folder (../supportdesk-qa,
+ * come from the scenario, content comes from the local Smoke Desk qa folder (../smokedesk-qa,
  * listed in a projects catalog file passed with BUGDETECTIVE_CATALOG_FILE, so the tests never
  * download). `catalog` replaces that catalog's projects; `catalogText` writes the file as is.
  * `catalogFile: false` leaves the variable out, so the Development settings apply; `localCatalog`
@@ -43,7 +44,7 @@ export async function launch(
   await writeFile(
     catalogFile,
     options.catalogText ??
-      JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }),
+      JSON.stringify({ projects: options.catalog ?? [{ id: PROJECT_ID, qaDir: projectQa, starter: true }] }),
   );
   if (options.localCatalog !== undefined) {
     await writeFile(

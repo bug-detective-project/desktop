@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { dragCard, launch, startFirstTicket, supportdeskQa, takeNextTicket } from './fixtures.ts';
-import { supportdesk } from './content.ts';
+import { dragCard, launch, startFirstTicket, projectQa, takeNextTicket } from './fixtures.ts';
+import { smokedesk } from './content.ts';
 
 /** Plays an unlocked ticket to Done with the fake QA passing. */
 async function finish(page: Page, ticket: number) {
@@ -24,7 +24,7 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     await startFirstTicket(page);
     await expect(page.getByTestId('nav-projects')).toHaveCount(0);
     await finish(page, 1);
-    for (let ticket = 2; ticket <= supportdesk.counts.front; ticket++) {
+    for (let ticket = 2; ticket <= smokedesk.counts.front; ticket++) {
       await page.getByTestId('nav-dashboard').click();
       await takeNextTicket(page, 'front');
       await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'todo');
@@ -33,24 +33,24 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     // The front track is done, so the project is done: Projects appears and stays.
     await expect(page.getByTestId('nav-projects')).toBeVisible();
     await page.getByTestId('nav-projects').click();
-    const card = page.getByTestId('project-supportdesk');
-    await expect(card).toContainText(supportdesk.story.en.project.name);
+    const card = page.getByTestId('project-smokedesk');
+    await expect(card).toContainText(smokedesk.story.en.project.name);
     await expect(card.getByTestId('project-current')).toHaveText('Current project');
     await expect(card.getByTestId('project-difficulty')).toContainText(
-      `${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`,
+      `${smokedesk.difficulty![0].toUpperCase()}${smokedesk.difficulty!.slice(1)}`,
     );
     await expect(card.getByTestId('project-tickets').first()).toHaveText(
-      `Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`,
+      `Front ${smokedesk.counts.front}/${smokedesk.counts.front} · Back 0/${smokedesk.counts.back}`,
     );
     // The active project has no switch button, only its brief.
-    await expect(page.getByTestId('switch-supportdesk')).toHaveCount(0);
-    await expect(page.getByTestId('project-supportdesk-brief')).toBeEnabled();
+    await expect(page.getByTestId('switch-smokedesk')).toHaveCount(0);
+    await expect(page.getByTestId('project-smokedesk-brief')).toBeEnabled();
   } finally {
     await close();
   }
 });
 
-const supportdeskEntry = { id: 'supportdesk', qaDir: supportdeskQa, starter: true };
+const smokedeskEntry = { id: 'smokedesk', qaDir: projectQa, starter: true };
 // A second project that is never downloaded in these tests (its folder does not exist).
 const inventory = { id: 'inventory', qaDir: '/nonexistent/inventory-qa' };
 const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
@@ -58,7 +58,7 @@ const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
 test('a project that needs a newer app says so, and cannot be chosen', async () => {
   const { page, close } = await launch(
     {},
-    { env: showProjects, catalog: [supportdeskEntry, { ...inventory, minAppVersion: '99.0.0' }] },
+    { env: showProjects, catalog: [smokedeskEntry, { ...inventory, minAppVersion: '99.0.0' }] },
   );
   try {
     await page.getByTestId('start-playing').click();
@@ -66,7 +66,7 @@ test('a project that needs a newer app says so, and cannot be chosen', async () 
     const card = page.getByTestId('project-inventory');
     await expect(card.getByTestId('project-needs-update')).toHaveText('Update Bug Detective to play this project.');
     await expect(card.getByTestId('switch-inventory')).toBeDisabled();
-    await expect(page.getByTestId('project-supportdesk').getByTestId('project-needs-update')).toHaveCount(0);
+    await expect(page.getByTestId('project-smokedesk').getByTestId('project-needs-update')).toHaveCount(0);
   } finally {
     await close();
   }
@@ -75,12 +75,12 @@ test('a project that needs a newer app says so, and cannot be chosen', async () 
 test('a hidden project does not show on the Projects screen', async () => {
   const { page, close } = await launch(
     {},
-    { env: showProjects, catalog: [supportdeskEntry, { ...inventory, hidden: true }] },
+    { env: showProjects, catalog: [smokedeskEntry, { ...inventory, hidden: true }] },
   );
   try {
     await page.getByTestId('start-playing').click();
     await page.getByTestId('nav-projects').click();
-    await expect(page.getByTestId('project-supportdesk')).toBeVisible();
+    await expect(page.getByTestId('project-smokedesk')).toBeVisible();
     await expect(page.getByTestId('project-inventory')).toHaveCount(0);
   } finally {
     await close();
@@ -88,7 +88,7 @@ test('a hidden project does not show on the Projects screen', async () => {
 });
 
 test('a new game whose first project needs a newer app cannot start', async () => {
-  const { page, close } = await launch({}, { catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
+  const { page, close } = await launch({}, { catalog: [{ ...smokedeskEntry, minAppVersion: '99.0.0' }] });
   try {
     await expect(page.getByTestId('starter-needs-update')).toHaveText(
       'Update Bug Detective to start playing. The first project needs a newer version of the app.',
@@ -108,7 +108,7 @@ test('a game in progress whose project now needs a newer app shows a notice and 
     } finally {
       await first.close();
     }
-    const second = await launch({}, { userData, catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
+    const second = await launch({}, { userData, catalog: [{ ...smokedeskEntry, minAppVersion: '99.0.0' }] });
     try {
       await second.page.getByTestId('nav-dashboard').click();
       await expect(second.page.getByTestId('project-needs-update')).toContainText(

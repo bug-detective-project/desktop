@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import electronPath from 'electron';
-import { launch, supportdeskQa } from './fixtures.ts';
+import { launch, projectQa } from './fixtures.ts';
 
 test('startup: a failed start reports why and quits instead of running without a window', async () => {
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
@@ -57,7 +57,7 @@ test('startup: without a readable catalog the app opens with the copy bundled at
   }
 });
 
-test('startup: the tests play SupportDesk from the local qa folder from the first start, never downloading it', async () => {
+test('startup: the tests play Smoke Desk from the local qa folder from the first start, never downloading it', async () => {
   const { page, close } = await launch();
   try {
     await expect(page.getByTestId('start-playing')).toBeVisible();
@@ -69,7 +69,7 @@ test('startup: the tests play SupportDesk from the local qa folder from the firs
           ).bugDetective.snapshot()
         ).contentSource,
     );
-    expect(source).toBe(`local: ${supportdeskQa}`);
+    expect(source).toBe(`local: ${projectQa}`);
   } finally {
     await close();
   }
