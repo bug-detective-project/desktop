@@ -49,7 +49,8 @@ test('opening the workspace to the internet asks first, shows on the Dashboard, 
       .toBe('codeReview');
     await page.evaluate(async () => {
       await window.bugDetective.acceptReview(1);
-      await window.bugDetective.nextAssignment('front');
+      // Smoke Desk has one front ticket: the next one is the back ticket.
+      await window.bugDetective.nextAssignment('back');
     });
     await expect
       .poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).workspaceInternet))
