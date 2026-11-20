@@ -247,14 +247,8 @@
           "database": "JSON file"
         },
         "skills": {
-          "en": [
-            "Reading a failing test",
-            "Small fixes"
-          ],
-          "pt": [
-            "Ler um teste que falha",
-            "Correções pequenas"
-          ]
+          "en": ["Reading a failing test", "Small fixes"],
+          "pt": ["Ler um teste que falha", "Correções pequenas"]
         },
         "difficulty": "beginner",
         "counts": {
@@ -344,10 +338,7 @@
     ],
     "ready": true
   },
-  "log": [
-    "Bug Detective QA (fake)",
-    "» Saving the approved solution for the code review"
-  ],
+  "log": ["Bug Detective QA (fake)", "» Saving the approved solution for the code review"],
   "reviewNotice": null,
   "contentSource": "local: /tmp/notes-project/notes-qa",
   "projectStory": {
@@ -367,10 +358,7 @@
         "name": "Notes",
         "about": "A note-taking app.",
         "stack": "Node.js",
-        "skills": [
-          "Reading a failing test",
-          "Small fixes"
-        ]
+        "skills": ["Reading a failing test", "Small fixes"]
       },
       "messages": {
         "welcome": {
@@ -417,10 +405,7 @@
         "name": "Notes",
         "about": "Um app de notas.",
         "stack": "Node.js",
-        "skills": [
-          "Ler um teste que falha",
-          "Correções pequenas"
-        ]
+        "skills": ["Ler um teste que falha", "Correções pequenas"]
       },
       "messages": {
         "welcome": {

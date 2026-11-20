@@ -28,14 +28,28 @@ export interface Launched {
  */
 export async function launch(
   scenario: object = {},
-  options: { userData?: string; env?: Record<string, string>; catalog?: object[]; catalogText?: string; catalogFile?: boolean; localCatalog?: object | string } = {},
+  options: {
+    userData?: string;
+    env?: Record<string, string>;
+    catalog?: object[];
+    catalogText?: string;
+    catalogFile?: boolean;
+    localCatalog?: object | string;
+  } = {},
 ): Promise<Launched> {
   // A data folder with a space and non-ASCII characters, like C:\Users\João Silva\AppData\Roaming.
   const userData = options.userData ?? (await mkdtemp(join(tmpdir(), 'João Silva e2e-')));
   const catalogFile = join(userData, 'test-catalog.json');
-  await writeFile(catalogFile, options.catalogText ?? JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }));
+  await writeFile(
+    catalogFile,
+    options.catalogText ??
+      JSON.stringify({ projects: options.catalog ?? [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }] }),
+  );
   if (options.localCatalog !== undefined) {
-    await writeFile(join(userData, 'catalog.local.json'), typeof options.localCatalog === 'string' ? options.localCatalog : JSON.stringify(options.localCatalog));
+    await writeFile(
+      join(userData, 'catalog.local.json'),
+      typeof options.localCatalog === 'string' ? options.localCatalog : JSON.stringify(options.localCatalog),
+    );
   }
   // ELECTRON_RUN_AS_NODE (set when started from some editor processes) would turn Electron into plain Node.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
@@ -83,7 +97,9 @@ export async function simulate(
   },
 ): Promise<void> {
   await app.evaluate((_electron, value) => {
-    (globalThis as unknown as { bugDetectiveFake: { simulate(change: unknown): void } }).bugDetectiveFake.simulate(value);
+    (globalThis as unknown as { bugDetectiveFake: { simulate(change: unknown): void } }).bugDetectiveFake.simulate(
+      value,
+    );
   }, change);
 }
 
@@ -107,15 +123,24 @@ export async function dragCard(page: Page, ticket: number, column: 'inProgress' 
     await card.dragTo(page.getByTestId(`column-${column}`));
     try {
       await expect
-        .poll(async () => (await card.getAttribute('data-status')) !== before.status || (await card.textContent()) !== before.text, { timeout: 3000 })
+        .poll(
+          async () =>
+            (await card.getAttribute('data-status')) !== before.status || (await card.textContent()) !== before.text,
+          { timeout: 3000 },
+        )
         .toBe(true);
       return;
     } catch {
       console.warn(`drag of card ${ticket} to ${column} was not registered (attempt ${attempt}), retrying`);
     }
   }
-  const toasts = [...(await page.getByTestId('toast-error').allTextContents()), ...(await page.getByTestId('toast-info').allTextContents())];
-  throw new Error(`Dragging card ${ticket} to ${column} had no effect${toasts.length ? ` (toasts: ${toasts.join(' | ')})` : ''}`);
+  const toasts = [
+    ...(await page.getByTestId('toast-error').allTextContents()),
+    ...(await page.getByTestId('toast-info').allTextContents()),
+  ];
+  throw new Error(
+    `Dragging card ${ticket} to ${column} had no effect${toasts.length ? ` (toasts: ${toasts.join(' | ')})` : ''}`,
+  );
 }
 
 /** The flags inside `scope` are exactly these languages', in order, and every one has loaded (they are bundled: no network). */
@@ -123,12 +148,20 @@ export async function expectFlagsLoaded(scope: Locator, languages: readonly stri
   const flags = scope.locator('img[data-testid^="flag-"]');
   await expect(flags).toHaveCount(languages.length);
   await expect
-    .poll(() => flags.evaluateAll((images) => images.map((image) => [image.dataset.testid, (image as HTMLImageElement).naturalWidth > 0])))
+    .poll(() =>
+      flags.evaluateAll((images) =>
+        images.map((image) => [image.dataset.testid, (image as HTMLImageElement).naturalWidth > 0]),
+      ),
+    )
     .toEqual(languages.map((language) => [`flag-${language}`, true]));
 }
 
 /** Opens "Get next assignment ▾" and picks a track (front by default). */
-export async function takeNextTicket(page: Page, track: 'front' | 'back' | 'fullstack' = 'front', button = 'next-assignment'): Promise<void> {
+export async function takeNextTicket(
+  page: Page,
+  track: 'front' | 'back' | 'fullstack' = 'front',
+  button = 'next-assignment',
+): Promise<void> {
   await page.getByTestId(button).click();
   await page.getByTestId(`next-assignment-${track}`).click();
 }

@@ -20,7 +20,8 @@ import { workspaceDir } from '../../src/main/services/workspace.ts';
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
 const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
-const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
+const DOCKER =
+  process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 const WORKSPACE = workspaceDir('supportdesk');
 
@@ -60,14 +61,20 @@ async function cardStatus(page: Page, ticket: number, status: string, timeout = 
 /** Waits until Docker answers and the environment report says ready (after a restart it takes a moment). */
 async function waitForEnvironment(page: Page) {
   await expect
-    .poll(async () => page.evaluate(async () => (await window.bugDetective.refreshEnvironment()).ready), { timeout: 3 * 60_000, intervals: [2000] })
+    .poll(async () => page.evaluate(async () => (await window.bugDetective.refreshEnvironment()).ready), {
+      timeout: 3 * 60_000,
+      intervals: [2000],
+    })
     .toBe(true);
 }
 
 const GIB = 1024 ** 3;
 /** Memory in use of the containers whose name matches, in bytes, from `docker stats` ("1.2GiB / 3GiB"). */
 function memoryInUse(nameFilter: string): number {
-  const names = docker('ps', '--filter', `name=${nameFilter}`, '--format', '{{.Names}}').trim().split('\n').filter(Boolean);
+  const names = docker('ps', '--filter', `name=${nameFilter}`, '--format', '{{.Names}}')
+    .trim()
+    .split('\n')
+    .filter(Boolean);
   let total = 0;
   for (const name of names) {
     let usage: string;
@@ -79,7 +86,9 @@ function memoryInUse(nameFilter: string): number {
     const match = /^([\d.]+)\s*([KMG]i?B|B)$/i.exec(usage);
     if (!match) continue;
     const unit = match[2].toUpperCase();
-    total += Number(match[1]) * (unit.startsWith('G') ? GIB : unit.startsWith('M') ? 1024 ** 2 : unit.startsWith('K') ? 1024 : 1);
+    total +=
+      Number(match[1]) *
+      (unit.startsWith('G') ? GIB : unit.startsWith('M') ? 1024 ** 2 : unit.startsWith('K') ? 1024 : 1);
   }
   return total;
 }
@@ -127,7 +136,9 @@ test('the full game loop with real Docker and VS Code', async () => {
   for (const id of ['docker', 'wsl', 'vscode']) {
     await expect(page.getByTestId(`check-${id}`)).toHaveAttribute('data-status', 'ok', { timeout: 60_000 });
   }
-  await expect(page.getByTestId('check-devcontainers')).not.toHaveAttribute('data-status', 'pending', { timeout: 60_000 });
+  await expect(page.getByTestId('check-devcontainers')).not.toHaveAttribute('data-status', 'pending', {
+    timeout: 60_000,
+  });
   if ((await page.getByTestId('check-devcontainers').getAttribute('data-status')) !== 'ok') {
     await expect(page.getByTestId('start-playing')).toBeDisabled();
     log('checklist: Dev Containers missing, installing it from the checklist');
@@ -148,14 +159,18 @@ test('the full game loop with real Docker and VS Code', async () => {
     await cardStatus(page, ticket, 'todo', 120_000);
     log(`ticket ${ticket}: unlocked`);
     await installEnvironment(page);
-    expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--show-current').trim()).toBe(`player/ticket-${ticket}`);
+    expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--show-current').trim()).toBe(
+      `player/ticket-${ticket}`,
+    );
 
     // Open in VS Code, attached to the workspace container.
     await page.getByTestId('nav-board').click();
     await page.getByTestId(`card-${ticket}`).click();
     await page.getByTestId('open-vscode').click();
     await expect
-      .poll(() => docker('exec', CONTAINER, 'sh', '-c', 'ps -eo args | grep -c "[v]scode-server" || true').trim(), { timeout: 5 * 60_000 })
+      .poll(() => docker('exec', CONTAINER, 'sh', '-c', 'ps -eo args | grep -c "[v]scode-server" || true').trim(), {
+        timeout: 5 * 60_000,
+      })
       .not.toBe('0');
     log(`ticket ${ticket}: VS Code server running in the container`);
 
@@ -168,7 +183,11 @@ test('the full game loop with real Docker and VS Code', async () => {
       }
       await expect(page.getByTestId('open-browser')).toContainText(':', { timeout: 120_000 });
       const port = Number(/:(\d+)/.exec((await page.getByTestId('open-browser').textContent()) ?? '')?.[1]);
-      await expect.poll(async () => (await fetch(`http://127.0.0.1:${port}/`).catch(() => null))?.status ?? 0, { timeout: 120_000 }).toBe(200);
+      await expect
+        .poll(async () => (await fetch(`http://127.0.0.1:${port}/`).catch(() => null))?.status ?? 0, {
+          timeout: 120_000,
+        })
+        .toBe(200);
       const tickets = (await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()) as unknown[];
       expect(tickets.length).toBeGreaterThan(10);
       log(`ticket 1: app answers on http://127.0.0.1:${port}/ (${tickets.length} tickets through the Vite proxy)`);
@@ -195,7 +214,11 @@ test('the full game loop with real Docker and VS Code', async () => {
       await expect(page.getByTestId('qa-comment').first()).toHaveAttribute('data-kind', 'interrupted');
       await page.getByTestId('tab-history').click();
       await expect(page.getByTestId('attempt')).toHaveCount(0);
-      await expect.poll(() => docker('ps', '-a', '--filter', 'label=bugdetective.role=qa', '--format', '{{.Names}}').trim(), { timeout: 60_000 }).toBe('');
+      await expect
+        .poll(() => docker('ps', '-a', '--filter', 'label=bugdetective.role=qa', '--format', '{{.Names}}').trim(), {
+          timeout: 60_000,
+        })
+        .toBe('');
       await page.getByTestId('close-panel').click();
       log('ticket 1: restart recovered the interrupted QA run (no attempt counted, container removed)');
     }
@@ -220,7 +243,9 @@ test('the full game loop with real Docker and VS Code', async () => {
 
     // The player applies the fix in the workspace.
     const patch = await readFile(join(supportdeskQa, 'tickets', `front-${ticket}`, 'reference.patch'));
-    execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'apply', '-'], { input: patch });
+    execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'apply', '-'], {
+      input: patch,
+    });
 
     await submitQa(page, ticket, 'codeReview');
     await page.getByTestId(`card-${ticket}`).click();
@@ -275,7 +300,9 @@ test('the full game loop with real Docker and VS Code', async () => {
   await page.getByTestId('restore-progress').click();
   await expect(page.getByTestId('restore-warning')).toBeVisible();
   await page.getByTestId('confirm-restore').click();
-  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress restored' })).toBeVisible({ timeout: 5 * 60_000 });
+  await expect(page.getByTestId('toast-info').filter({ hasText: 'Progress restored' })).toBeVisible({
+    timeout: 5 * 60_000,
+  });
   expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
   expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
     /player\/ticket-1[\s\S]*player\/ticket-4/,

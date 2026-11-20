@@ -13,7 +13,8 @@ export default async function afterPack(context) {
     console.log('  • test build: the Electron fuses stay as they are');
     return;
   }
-  const executable = electronPlatformName === 'win32' ? `${packager.appInfo.productFilename}.exe` : packager.executableName;
+  const executable =
+    electronPlatformName === 'win32' ? `${packager.appInfo.productFilename}.exe` : packager.executableName;
   await flipFuses(join(appOutDir, executable), {
     version: FuseVersion.V1,
     [FuseV1Options.RunAsNode]: false,

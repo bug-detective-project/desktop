@@ -5,7 +5,10 @@ test('offline on the first download: a clear message, and "Try again" repeats th
   // A published project whose host is a closed port: every download fails on the network.
   const { page, close } = await launch(
     { environmentReady: false },
-    { catalog: [{ id: 'supportdesk', repository: 'bug-detective-project/supportdesk', starter: true }], env: { BUGDETECTIVE_CONTENT_BASE_URL: 'http://127.0.0.1:1' } },
+    {
+      catalog: [{ id: 'supportdesk', repository: 'bug-detective-project/supportdesk', starter: true }],
+      env: { BUGDETECTIVE_CONTENT_BASE_URL: 'http://127.0.0.1:1' },
+    },
   );
   try {
     await expect(page.getByTestId('checklist-first-download')).toBeVisible();

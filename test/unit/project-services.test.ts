@@ -7,7 +7,11 @@ import { ProjectServices, declarationKey, serviceNames } from '../../src/main/se
 
 const IMAGE = SERVICE_IMAGES['postgres:17']!;
 const declared: Declared = {
-  db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'shop' }, variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } },
+  db: {
+    image: 'postgres:17',
+    env: { POSTGRES_PASSWORD: 'shop' },
+    variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' },
+  },
 };
 const CONTAINER = 'bugdetective-svc-shop-db';
 const VOLUME = 'bugdetective-svcdata-shop-db-0';
@@ -28,7 +32,9 @@ function world(options: { ready?: () => boolean; runFails?: string; dies?: { oom
   const calls: string[][] = [];
   const out = (text = '', code = 0, stderr = '') => ({ code, stdout: Buffer.from(text), stderr, timedOut: false });
   const labelsOf = (args: readonly string[]) =>
-    Object.fromEntries(args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])));
+    Object.fromEntries(
+      args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])),
+    );
   const runner: CommandRunner = async (_cli, args) => {
     calls.push([...args]);
     const [a, b] = args;
@@ -78,7 +84,15 @@ function world(options: { ready?: () => boolean; runFails?: string; dies?: { oom
 }
 
 const servicesOf = (docker: Docker, services: Declared = declared, extra: { readyTimeoutMs?: number } = {}) =>
-  new ProjectServices({ docker, prefix: 'bugdetective', project: 'shop', network: 'bugdetective-net-shop', services, pollMs: 1, ...extra });
+  new ProjectServices({
+    docker,
+    prefix: 'bugdetective',
+    project: 'shop',
+    network: 'bugdetective-net-shop',
+    services,
+    pollMs: 1,
+    ...extra,
+  });
 
 describe('the names of a service', () => {
   it('names the container and one volume per data path after the project and the service', () => {
@@ -158,7 +172,12 @@ describe('ProjectServices.ensureRunning', () => {
   it('reports a service that cannot be created, without throwing', async () => {
     const { docker } = world({ runFails: 'docker: Error response from daemon: no such image' });
     expect(await servicesOf(docker).ensureRunning()).toEqual([
-      { name: 'db', image: 'postgres:17', state: 'failed', reason: 'docker: Error response from daemon: no such image' },
+      {
+        name: 'db',
+        image: 'postgres:17',
+        state: 'failed',
+        reason: 'docker: Error response from daemon: no such image',
+      },
     ]);
   });
 

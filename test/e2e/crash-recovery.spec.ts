@@ -31,7 +31,9 @@ test('a renderer that dies is reloaded on its own', async () => {
             .evaluate(async ({ BrowserWindow }) => {
               const contents = BrowserWindow.getAllWindows()[0]?.webContents;
               if (!contents || contents.isCrashed() || contents.isLoading()) return false;
-              return contents.executeJavaScript('document.querySelector("[data-testid=checklist],[data-testid=dashboard]") !== null') as Promise<boolean>;
+              return contents.executeJavaScript(
+                'document.querySelector("[data-testid=checklist],[data-testid=dashboard]") !== null',
+              ) as Promise<boolean>;
             })
             // Right after the crash the old frame is being disposed: not back yet.
             .catch(() => false),

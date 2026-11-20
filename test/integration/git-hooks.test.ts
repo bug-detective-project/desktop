@@ -32,16 +32,29 @@ let runtime: DockerRuntime;
 let game: Game;
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 /** Runs a shell script in the repository as the player would (the real git, hooks and all). */
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: DIR })).stdout.toString('utf8').trim();
+  return (
+    await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: DIR })
+  ).stdout
+    .toString('utf8')
+    .trim();
 }
 
-const exists = (path: string) => docker.exec(runtime.names.container, ['test', '-e', path], { user: 'node' }).then((result) => result.code === 0);
+const exists = (path: string) =>
+  docker.exec(runtime.names.container, ['test', '-e', path], { user: 'node' }).then((result) => result.code === 0);
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bd-hooks-'));
@@ -49,7 +62,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
   game = new Game({
     store: new StateStore(dir),
@@ -74,7 +91,7 @@ afterAll(async () => {
 });
 
 describe('git hooks planted in the workspace', () => {
-  it('never run under the app\'s git operations, while the player\'s own git still runs them', async () => {
+  it("never run under the app's git operations, while the player's own git still runs them", async () => {
     await sh(`printf '#!/bin/sh\ntouch /tmp/hook-ran\n' > .git/hooks/post-checkout && chmod +x .git/hooks/post-checkout
 git config core.fsmonitor 'touch /tmp/fsmonitor-ran'
 git config filter.evil.clean 'touch /tmp/filter-ran'

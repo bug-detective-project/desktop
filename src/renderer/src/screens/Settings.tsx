@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CheckResult, DevCatalogView, DiskUsageItem, DockerCleanup, ExternalLink, LocalCatalog, SaveSummary, Snapshot } from '@shared/api.ts';
+import type {
+  CheckResult,
+  DevCatalogView,
+  DiskUsageItem,
+  DockerCleanup,
+  ExternalLink,
+  LocalCatalog,
+  SaveSummary,
+  Snapshot,
+} from '@shared/api.ts';
 import { parseMinutes, toMinutes } from '@shared/duration.ts';
 import { LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, backupStatus } from '@shared/types.ts';
 import type { Language, Theme } from '@shared/types.ts';
@@ -65,8 +74,15 @@ function useCleanupResult() {
     }
   };
   const dialog = result && (
-    <Modal title={t('settings.cleanup.partialTitle')} icon={<Icon name="alertTriangle" className="size-5 text-amber-500" />} onClose={() => setResult(null)} data-testid="cleanup-result">
-      <p className="text-base leading-relaxed">{t('settings.cleanup.partial', { removed: result.removed, count: result.failed.length })}</p>
+    <Modal
+      title={t('settings.cleanup.partialTitle')}
+      icon={<Icon name="alertTriangle" className="size-5 text-amber-500" />}
+      onClose={() => setResult(null)}
+      data-testid="cleanup-result"
+    >
+      <p className="text-base leading-relaxed">
+        {t('settings.cleanup.partial', { removed: result.removed, count: result.failed.length })}
+      </p>
       <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-lg border border-border/80 bg-secondary/40 p-3">
         {result.failed.map((item) => (
           <li key={`${item.kind}:${item.name}`} className="min-w-0" data-testid="cleanup-failed">
@@ -106,7 +122,17 @@ function PaneHeader({ title, help, aside }: { title: string; help: string; aside
 
 /** One preference: its title and help on the left, the control on the right. */
 /** `level` 2 in a pane without a section heading above its rows (Preferences), 3 under one. */
-function Row({ title, help, children, level = 3 }: { title: string; help: string; children: ReactNode; level?: 2 | 3 }) {
+function Row({
+  title,
+  help,
+  children,
+  level = 3,
+}: {
+  title: string;
+  help: string;
+  children: ReactNode;
+  level?: 2 | 3;
+}) {
   const Heading = level === 2 ? 'h2' : 'h3';
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-8">
@@ -128,7 +154,12 @@ function useProgressText(snapshot: Snapshot): { done: string; current: { key: st
   }
   const done = t('settings.ticketsDone', { count: tickets.filter((ticket) => ticket.status === 'done').length });
   const active = tickets.find((ticket) => ticket.ticket === currentTicket && ticket.status !== 'done');
-  const current = active ? { key: ticketTitle(snapshot, active.ticket, i18n.language as Language).key, stage: t(`board.columns.${active.status}`) } : null;
+  const current = active
+    ? {
+        key: ticketTitle(snapshot, active.ticket, i18n.language as Language).key,
+        stage: t(`board.columns.${active.status}`),
+      }
+    : null;
   return { done, current };
 }
 
@@ -148,7 +179,8 @@ function QaTimeout({ seconds }: { seconds: number }) {
     setInvalid(false);
   }
 
-  const inRange = (value: number | null): value is number => value !== null && value >= MIN_QA_TIMEOUT_SECONDS && value <= MAX_QA_TIMEOUT_SECONDS;
+  const inRange = (value: number | null): value is number =>
+    value !== null && value >= MIN_QA_TIMEOUT_SECONDS && value <= MAX_QA_TIMEOUT_SECONDS;
   const save = (value: number) => {
     setText(toMinutes(value));
     setInvalid(false);
@@ -166,8 +198,10 @@ function QaTimeout({ seconds }: { seconds: number }) {
   };
   const typed = parseMinutes(text);
   const base = inRange(typed) ? typed : seconds;
-  const step = (delta: number) => save(Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, base + delta)));
-  const stepButton = 'rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm font-medium text-foreground tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
+  const step = (delta: number) =>
+    save(Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, base + delta)));
+  const stepButton =
+    'rounded-md border border-border bg-secondary px-2.5 py-1.5 text-sm font-medium text-foreground tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="flex flex-col items-start gap-1.5 md:items-end">
@@ -191,10 +225,22 @@ function QaTimeout({ seconds }: { seconds: number }) {
           <span className="text-base text-muted-foreground">{t('settings.qaTimeoutUnit')}</span>
         </label>
         <div className="flex items-center gap-1.5">
-          <button type="button" className={stepButton} onClick={() => step(-60)} disabled={base <= MIN_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutLess')}>
+          <button
+            type="button"
+            className={stepButton}
+            onClick={() => step(-60)}
+            disabled={base <= MIN_QA_TIMEOUT_SECONDS}
+            aria-label={t('settings.qaTimeoutLess')}
+          >
             -1m
           </button>
-          <button type="button" className={stepButton} onClick={() => step(60)} disabled={base >= MAX_QA_TIMEOUT_SECONDS} aria-label={t('settings.qaTimeoutMore')}>
+          <button
+            type="button"
+            className={stepButton}
+            onClick={() => step(60)}
+            disabled={base >= MAX_QA_TIMEOUT_SECONDS}
+            aria-label={t('settings.qaTimeoutMore')}
+          >
             +1m
           </button>
         </div>
@@ -212,12 +258,19 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation();
   const { settings } = snapshot.state;
   return (
-    <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-preferences">
+    <div
+      className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`}
+      data-testid="settings-pane-preferences"
+    >
       <Row level={2} title={t('settings.language')} help={t('settings.languageHelp')}>
         <Segmented
           label={t('settings.language')}
           value={settings.language}
-          options={LANGUAGES.map((language) => ({ value: language, icon: <Flag language={language} />, text: LANGUAGE_NAMES[language] }))}
+          options={LANGUAGES.map((language) => ({
+            value: language,
+            icon: <Flag language={language} />,
+            text: LANGUAGE_NAMES[language],
+          }))}
           onChange={(language) => void api.updateSettings({ language })}
           testId="language"
         />
@@ -226,7 +279,11 @@ function Preferences({ snapshot }: { snapshot: Snapshot }) {
         <Segmented
           label={t('settings.theme')}
           value={settings.theme}
-          options={THEMES.map((theme) => ({ value: theme, icon: <Icon name={THEME_ICONS[theme]} className="size-3.5" />, text: t(`settings.themes.${theme}`) }))}
+          options={THEMES.map((theme) => ({
+            value: theme,
+            icon: <Icon name={THEME_ICONS[theme]} className="size-3.5" />,
+            text: t(`settings.themes.${theme}`),
+          }))}
           onChange={(theme) => void api.updateSettings({ theme })}
           testId="theme"
         />
@@ -309,12 +366,24 @@ function DiskUsage({ snapshot, refresh }: { snapshot: Snapshot; refresh: number 
           {[...DISK_ITEMS, ...SERVICE_DISK_ITEMS.filter((id) => items?.some((entry) => entry.id === id))].map((id) => {
             const item = items?.find((entry) => entry.id === id);
             return (
-              <div key={id} className="min-w-0 rounded-lg border border-border/60 bg-card p-3" data-testid={`disk-${id}`}>
-                <span className="block truncate text-sm font-semibold text-muted-foreground">{t(`settings.diskItems.${id}.name`)}</span>
-                <span className="mt-0.5 block text-lg font-bold text-foreground tabular-nums">
-                  {items === null ? t('settings.diskMeasuring') : typeof item?.bytes === 'number' ? formatBytes(item.bytes, i18n.language) : '—'}
+              <div
+                key={id}
+                className="min-w-0 rounded-lg border border-border/60 bg-card p-3"
+                data-testid={`disk-${id}`}
+              >
+                <span className="block truncate text-sm font-semibold text-muted-foreground">
+                  {t(`settings.diskItems.${id}.name`)}
                 </span>
-                <span className="block text-sm text-muted-foreground">{item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}</span>
+                <span className="mt-0.5 block text-lg font-bold text-foreground tabular-nums">
+                  {items === null
+                    ? t('settings.diskMeasuring')
+                    : typeof item?.bytes === 'number'
+                      ? formatBytes(item.bytes, i18n.language)
+                      : '—'}
+                </span>
+                <span className="block text-sm text-muted-foreground">
+                  {item && item.bytes === null ? t('settings.diskNotCreated') : t(`settings.diskItems.${id}.help`)}
+                </span>
               </div>
             );
           })}
@@ -336,7 +405,14 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
     if (check.id === 'docker') {
       if (snapshot.dockerState === 'notRunning') {
         return (
-          <Button variant="primary" size="sm" busy={snapshot.busy === 'startingDocker'} disabled={snapshot.busy !== null} onClick={() => run('docker', () => api.startDocker())} data-testid="start-docker">
+          <Button
+            variant="primary"
+            size="sm"
+            busy={snapshot.busy === 'startingDocker'}
+            disabled={snapshot.busy !== null}
+            onClick={() => run('docker', () => api.startDocker())}
+            data-testid="start-docker"
+          >
             {t('checklist.docker.start')}
           </Button>
         );
@@ -349,7 +425,12 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
     }
     if (check.id === 'devcontainers' && vscodeFound) {
       return (
-        <Button size="sm" busy={busy === 'devcontainers'} onClick={() => run('devcontainers', () => api.installDevContainers())} data-testid="install-devcontainers">
+        <Button
+          size="sm"
+          busy={busy === 'devcontainers'}
+          onClick={() => run('devcontainers', () => api.installDevContainers())}
+          data-testid="install-devcontainers"
+        >
           {t('settings.installDevContainers')}
         </Button>
       );
@@ -393,14 +474,25 @@ function Environment({ snapshot }: { snapshot: Snapshot }) {
           const status = toolStatus(snapshot, check);
           const problem =
             check.id === 'docker'
-              ? snapshot.dockerState && snapshot.dockerState !== 'running' && t(`checklist.docker.${snapshot.dockerState}`)
+              ? snapshot.dockerState &&
+                snapshot.dockerState !== 'running' &&
+                t(`checklist.docker.${snapshot.dockerState}`)
               : check.status !== 'ok' && t(`checklist.${check.id}.${check.reason ?? 'notFound'}`);
           return (
-            <div key={id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between" data-testid={`tool-${id}`} data-status={status.label}>
+            <div
+              key={id}
+              className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+              data-testid={`tool-${id}`}
+              data-status={status.label}
+            >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-base font-semibold text-foreground">{t(`checklist.${id}.title`)}</span>
-                  {check.version && <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-sm text-muted-foreground">v{check.version}</span>}
+                  {check.version && (
+                    <span className="rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-sm text-muted-foreground">
+                      v{check.version}
+                    </span>
+                  )}
                 </div>
                 {problem && <p className="mt-1 text-base text-muted-foreground">{problem}</p>}
               </div>
@@ -425,10 +517,15 @@ function DockerLeftovers({ snapshot, onCleaned }: { snapshot: Snapshot; onCleane
   const cleanup = useCleanupResult();
   const dockerDown = snapshot.dockerState !== 'running';
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="docker-leftovers">
+    <div
+      className="flex flex-col gap-3 rounded-xl border border-border/80 bg-secondary/40 p-4 sm:flex-row sm:items-center sm:justify-between"
+      data-testid="docker-leftovers"
+    >
       <div className="min-w-0">
         <h3 className="text-base font-semibold text-foreground">{t('settings.cleanup.leftoversTitle')}</h3>
-        <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">{dockerDown ? t('settings.cleanup.needsDocker') : t('settings.cleanup.leftoversHelp')}</p>
+        <p className="mt-0.5 text-base leading-relaxed text-muted-foreground">
+          {dockerDown ? t('settings.cleanup.needsDocker') : t('settings.cleanup.leftoversHelp')}
+        </p>
       </div>
       <Button
         size="sm"
@@ -490,7 +587,9 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
   const [confirmRemoveDocker, setConfirmRemoveDocker] = useState(false);
   const cleanup = useCleanupResult();
   const progress = useProgressText(snapshot);
-  const progressText = progress.current ? `${progress.done} · ${progress.current.key} (${progress.current.stage})` : progress.done;
+  const progressText = progress.current
+    ? `${progress.done} · ${progress.current.key} (${progress.current.stage})`
+    : progress.done;
   const last = snapshot.state.lastExport;
   const lastFile = last && splitPath(last.path);
   const outdated = backupStatus(snapshot.state) === 'outdated';
@@ -512,14 +611,20 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
           help={t('settings.backupHelp')}
           aside={
             outdated && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-sm leading-none font-semibold whitespace-nowrap text-amber-700 dark:text-amber-400" data-testid="backup-outdated">
+              <span
+                className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-sm leading-none font-semibold whitespace-nowrap text-amber-700 dark:text-amber-400"
+                data-testid="backup-outdated"
+              >
                 <Icon name="alertTriangle" className="size-3 text-amber-500" />
                 {t('settings.backupOutdated')}
               </span>
             )
           }
         />
-        <dl className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-base" data-testid="last-export">
+        <dl
+          className="space-y-2.5 rounded-xl border border-border/80 bg-secondary/40 p-4 text-base"
+          data-testid="last-export"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <dt className="text-muted-foreground">{t('settings.lastExport')}</dt>
             <dd className="min-w-0 text-right">
@@ -528,7 +633,8 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
                   <span className="font-mono text-sm font-semibold text-foreground">{lastFile.name}</span>
                   <span className="text-muted-foreground">
                     {' · '}
-                    {ago(last.at, now, i18n.language)} ({new Date(last.at).toLocaleDateString(locale(i18n.language), { dateStyle: 'medium' })})
+                    {ago(last.at, now, i18n.language)} (
+                    {new Date(last.at).toLocaleDateString(locale(i18n.language), { dateStyle: 'medium' })})
                   </span>
                 </>
               ) : (
@@ -561,7 +667,7 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
-           
+
             busy={busy === 'export' || task === 'exporting'}
             disabled={task !== null || dockerDown}
             onClick={() =>
@@ -575,7 +681,12 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             <Icon name="download" />
             {t('settings.export')}
           </Button>
-          <Button busy={busy === 'inspect'} disabled={task !== null || dockerDown} onClick={() => run('inspect', async () => setPending(await api.inspectSave()))} data-testid="restore-progress">
+          <Button
+            busy={busy === 'inspect'}
+            disabled={task !== null || dockerDown}
+            onClick={() => run('inspect', async () => setPending(await api.inspectSave()))}
+            data-testid="restore-progress"
+          >
             <Icon name="rotateCcw" />
             {t('settings.restore')}
           </Button>
@@ -586,10 +697,17 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
         <Icon name="alertTriangle" className="mt-0.5 size-4 text-destructive" />
         <div className="min-w-0 space-y-4">
           <div>
-            <h2 className="text-lg leading-tight font-bold tracking-tight text-destructive">{t('settings.dangerZone')}</h2>
+            <h2 className="text-lg leading-tight font-bold tracking-tight text-destructive">
+              {t('settings.dangerZone')}
+            </h2>
             <p className="mt-1 text-base leading-relaxed text-muted-foreground">{t('settings.dangerZoneHelp')}</p>
           </div>
-          <Button variant="dangerOutline" disabled={task !== null} onClick={() => setConfirmNewGame(true)} data-testid="new-game">
+          <Button
+            variant="dangerOutline"
+            disabled={task !== null}
+            onClick={() => setConfirmNewGame(true)}
+            data-testid="new-game"
+          >
             <Icon name="rotateCcw" />
             {t('settings.newGame')}
           </Button>
@@ -649,7 +767,11 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
       {cleanup.dialog}
 
       {confirmNewGame && (
-        <Modal title={t('settings.newGameTitle')} icon={<Icon name="rotateCcw" className="size-5 text-destructive" />} onClose={() => setConfirmNewGame(false)}>
+        <Modal
+          title={t('settings.newGameTitle')}
+          icon={<Icon name="rotateCcw" className="size-5 text-destructive" />}
+          onClose={() => setConfirmNewGame(false)}
+        >
           <Notice>
             <p className="text-base leading-relaxed">{t('settings.newGameWarning')}</p>
           </Notice>
@@ -677,14 +799,24 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             <dt className="text-muted-foreground">{t('settings.restoreFile')}</dt>
             <dd className="font-mono text-sm font-semibold break-all">{pending.summary.fileName}</dd>
             <dt className="text-muted-foreground">{t('settings.restoreCreated')}</dt>
-            <dd>{new Date(pending.summary.createdAt).toLocaleString(locale(i18n.language), { dateStyle: 'medium', timeStyle: 'short' })}</dd>
+            <dd>
+              {new Date(pending.summary.createdAt).toLocaleString(locale(i18n.language), {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </dd>
             <dt className="text-muted-foreground">{t('settings.restoreVersion')}</dt>
-            <dd>Bug Detective <span className="font-mono text-sm">{pending.summary.appVersion}</span></dd>
+            <dd>
+              Bug Detective <span className="font-mono text-sm">{pending.summary.appVersion}</span>
+            </dd>
             <dt className="text-muted-foreground">{t('settings.restoreProgress')}</dt>
             <dd className="font-semibold">{t('settings.ticketsDone', { count: pending.summary.ticketsDone })}</dd>
           </dl>
           {!pending.summary.fromThisInstall && (
-            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-base text-foreground" data-testid="foreign-save-warning">
+            <div
+              className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-base text-foreground"
+              data-testid="foreign-save-warning"
+            >
               <p className="flex items-start gap-2 font-medium">
                 <Icon name="alertTriangle" className="mt-0.5 size-4 shrink-0 text-destructive" />
                 {t('settings.restoreForeign')}
@@ -692,7 +824,10 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
             </div>
           )}
           {pending.summary.overwritesProgress && (
-            <div className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-base text-amber-900 dark:text-amber-200" data-testid="restore-warning">
+            <div
+              className="mt-4 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-base text-amber-900 dark:text-amber-200"
+              data-testid="restore-warning"
+            >
               <p className="flex items-start gap-2 font-medium">
                 <Icon name="alertTriangle" className="mt-0.5 size-4 text-amber-500" />
                 {t('settings.restoreWarning')}
@@ -729,7 +864,11 @@ function Backup({ snapshot, now }: { snapshot: Snapshot; now: number }) {
 function Restoring({ log }: { log: string[] }) {
   const { t } = useTranslation();
   return (
-    <Modal title={t('settings.restoringTitle')} icon={<Icon name="spinner" className="size-5 text-primary" />} data-testid="restoring">
+    <Modal
+      title={t('settings.restoringTitle')}
+      icon={<Icon name="spinner" className="size-5 text-primary" />}
+      data-testid="restoring"
+    >
       <p className="text-base text-muted-foreground">{t('settings.restoringHelp')}</p>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-busy>
         <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
@@ -762,11 +901,19 @@ function About({ snapshot }: { snapshot: Snapshot }) {
   return (
     <div className={pane} data-testid="settings-pane-about">
       <div className="flex items-start gap-4">
-        <img src={logo} alt="" className="size-12 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
+        <img
+          src={logo}
+          alt=""
+          className="size-12 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15"
+          draggable={false}
+        />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight">{t('app.name')}</h2>
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold text-primary" data-testid="app-version">
+            <span
+              className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold text-primary"
+              data-testid="app-version"
+            >
               v{snapshot.appVersion}
             </span>
           </div>
@@ -781,7 +928,9 @@ function About({ snapshot }: { snapshot: Snapshot }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {parts.map((part) => (
             <div key={part.id} className="rounded-lg border border-border/60 bg-card p-3">
-              <span className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">{part.name}</span>
+              <span className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                {part.name}
+              </span>
               <span className="mt-0.5 block font-mono text-base font-bold text-foreground">v{part.version}</span>
               <span className="text-sm text-muted-foreground">{t(`settings.runtimeParts.${part.id}`)}</span>
             </div>
@@ -798,7 +947,11 @@ function About({ snapshot }: { snapshot: Snapshot }) {
           <Button size="sm" onClick={() => void api.openLogsFolder().catch(toast.error)} data-testid="open-logs">
             {t('settings.openLogs')}
           </Button>
-          <Button size="sm" onClick={() => void api.openExternal('feedback').catch(toast.error)} data-testid="send-feedback">
+          <Button
+            size="sm"
+            onClick={() => void api.openExternal('feedback').catch(toast.error)}
+            data-testid="send-feedback"
+          >
             {t('settings.sendFeedback')}
             <Icon name="externalLink" className="size-3.5" />
           </Button>
@@ -843,19 +996,37 @@ function formOf(view: DevCatalogView) {
 /** catalog.local.json from the form; overrides of projects outside the catalog in use stay as they were. */
 function settingsOf(view: DevCatalogView, form: ReturnType<typeof formOf>): LocalCatalog {
   const listed = new Set(view.projects.map((item) => item.id));
-  const projects: NonNullable<LocalCatalog['projects']> = Object.fromEntries(Object.entries(view.settings.projects ?? {}).filter(([id]) => !listed.has(id)));
+  const projects: NonNullable<LocalCatalog['projects']> = Object.fromEntries(
+    Object.entries(view.settings.projects ?? {}).filter(([id]) => !listed.has(id)),
+  );
   for (const { id } of view.projects) {
     const project = form.projects[id] ?? projectFormOf(view.settings, id);
     if (project.kind === 'ref') projects[id] = { qaRef: project.ref.trim() };
     if (project.kind === 'folder') projects[id] = { qaDir: project.folder.trim() };
   }
   const catalog =
-    form.kind === 'github' ? { github: form.repository.trim(), branch: form.branch.trim() || 'main' } : form.kind === 'file' ? { file: form.file.trim() } : undefined;
+    form.kind === 'github'
+      ? { github: form.repository.trim(), branch: form.branch.trim() || 'main' }
+      : form.kind === 'file'
+        ? { file: form.file.trim() }
+        : undefined;
   return { ...(catalog && { catalog }), ...(Object.keys(projects).length > 0 && { projects }) };
 }
 
 /** A path field with "Choose…", which opens the system dialog. */
-function PathField({ value, onChange, kind, testId, disabled }: { value: string; onChange: (value: string) => void; kind: 'file' | 'folder'; testId: string; disabled: boolean }) {
+function PathField({
+  value,
+  onChange,
+  kind,
+  testId,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  kind: 'file' | 'folder';
+  testId: string;
+  disabled: boolean;
+}) {
   const { t } = useTranslation();
   const toast = useToast();
   const choose = async () => {
@@ -868,7 +1039,14 @@ function PathField({ value, onChange, kind, testId, disabled }: { value: string;
   };
   return (
     <div className="flex w-full items-center gap-2">
-      <input className={textInput} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} spellCheck={false} data-testid={testId} />
+      <input
+        className={textInput}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        spellCheck={false}
+        data-testid={testId}
+      />
       <Button size="sm" onClick={() => void choose()} disabled={disabled} data-testid={`${testId}-choose`}>
         {t('settings.dev.choose')}
       </Button>
@@ -888,10 +1066,19 @@ function Development({ view }: { view: DevCatalogView }) {
       toast.info(t('settings.dev.applied'));
     });
   const setProject = (id: string, change: Partial<ProjectForm>) =>
-    setForm((current) => ({ ...current, projects: { ...current.projects, [id]: { ...(current.projects[id] ?? projectFormOf(view.settings, id)), ...change } } }));
+    setForm((current) => ({
+      ...current,
+      projects: {
+        ...current.projects,
+        [id]: { ...(current.projects[id] ?? projectFormOf(view.settings, id)), ...change },
+      },
+    }));
 
   return (
-    <div className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`} data-testid="settings-pane-development">
+    <div
+      className={`${card} divide-y divide-border/70 [&>*:not(:first-child)]:pt-7 [&>*:not(:last-child)]:pb-7`}
+      data-testid="settings-pane-development"
+    >
       <div className="space-y-4">
         <PaneHeader title={t('settings.dev.title')} help={t('settings.dev.help', { file: view.file })} />
         {locked && <Notice data-testid="dev-catalog-test-file">{t('settings.dev.testFile')}</Notice>}
@@ -908,7 +1095,11 @@ function Development({ view }: { view: DevCatalogView }) {
           <Segmented<SourceKind>
             label={t('settings.dev.source')}
             value={form.kind}
-            options={(['official', 'github', 'file'] as const).map((kind) => ({ value: kind, icon: null, text: t(`settings.dev.sources.${kind}`) }))}
+            options={(['official', 'github', 'file'] as const).map((kind) => ({
+              value: kind,
+              icon: null,
+              text: t(`settings.dev.sources.${kind}`),
+            }))}
             onChange={(kind) => setForm((current) => ({ ...current, kind }))}
             testId="dev-catalog-source"
           />
@@ -917,15 +1108,38 @@ function Development({ view }: { view: DevCatalogView }) {
           <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
             <label className="space-y-1 text-sm font-medium text-muted-foreground">
               {t('settings.dev.repository')}
-              <input className={textInput} value={form.repository} placeholder="owner/catalog" onChange={(event) => setForm((current) => ({ ...current, repository: event.target.value }))} disabled={locked} spellCheck={false} data-testid="dev-catalog-github-repository" />
+              <input
+                className={textInput}
+                value={form.repository}
+                placeholder="owner/catalog"
+                onChange={(event) => setForm((current) => ({ ...current, repository: event.target.value }))}
+                disabled={locked}
+                spellCheck={false}
+                data-testid="dev-catalog-github-repository"
+              />
             </label>
             <label className="space-y-1 text-sm font-medium text-muted-foreground">
               {t('settings.dev.branch')}
-              <input className={textInput} value={form.branch} onChange={(event) => setForm((current) => ({ ...current, branch: event.target.value }))} disabled={locked} spellCheck={false} data-testid="dev-catalog-github-branch" />
+              <input
+                className={textInput}
+                value={form.branch}
+                onChange={(event) => setForm((current) => ({ ...current, branch: event.target.value }))}
+                disabled={locked}
+                spellCheck={false}
+                data-testid="dev-catalog-github-branch"
+              />
             </label>
           </div>
         )}
-        {form.kind === 'file' && <PathField value={form.file} onChange={(file) => setForm((current) => ({ ...current, file }))} kind="file" testId="dev-catalog-file" disabled={locked} />}
+        {form.kind === 'file' && (
+          <PathField
+            value={form.file}
+            onChange={(file) => setForm((current) => ({ ...current, file }))}
+            kind="file"
+            testId="dev-catalog-file"
+            disabled={locked}
+          />
+        )}
       </div>
 
       <div className="space-y-5">
@@ -933,26 +1147,53 @@ function Development({ view }: { view: DevCatalogView }) {
         {view.projects.map((project) => {
           const value = form.projects[project.id] ?? projectFormOf(view.settings, project.id);
           return (
-            <div key={project.id} className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4" data-testid={`dev-project-${project.id}`}>
+            <div
+              key={project.id}
+              className="space-y-3 rounded-xl border border-border/80 bg-secondary/40 p-4"
+              data-testid={`dev-project-${project.id}`}
+            >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <h3 className="font-mono text-base font-semibold text-foreground">{project.id}</h3>
-                  <p className="text-sm break-all text-muted-foreground" data-testid={`dev-project-${project.id}-source`}>
+                  <p
+                    className="text-sm break-all text-muted-foreground"
+                    data-testid={`dev-project-${project.id}-source`}
+                  >
                     {project.source}
                   </p>
                 </div>
                 <Segmented<ProjectSource>
                   label={project.id}
                   value={value.kind}
-                  options={(['published', 'ref', 'folder'] as const).map((kind) => ({ value: kind, icon: null, text: t(`settings.dev.projectSources.${kind}`, { ref: project.qaRef }) }))}
+                  options={(['published', 'ref', 'folder'] as const).map((kind) => ({
+                    value: kind,
+                    icon: null,
+                    text: t(`settings.dev.projectSources.${kind}`, { ref: project.qaRef }),
+                  }))}
                   onChange={(kind) => setProject(project.id, { kind })}
                   testId={`dev-project-${project.id}`}
                 />
               </div>
               {value.kind === 'ref' && (
-                <input className={textInput} value={value.ref} placeholder="qa-next" onChange={(event) => setProject(project.id, { ref: event.target.value })} disabled={locked} spellCheck={false} data-testid={`dev-project-${project.id}-ref-name`} />
+                <input
+                  className={textInput}
+                  value={value.ref}
+                  placeholder="qa-next"
+                  onChange={(event) => setProject(project.id, { ref: event.target.value })}
+                  disabled={locked}
+                  spellCheck={false}
+                  data-testid={`dev-project-${project.id}-ref-name`}
+                />
               )}
-              {value.kind === 'folder' && <PathField value={value.folder} onChange={(folder) => setProject(project.id, { folder })} kind="folder" testId={`dev-project-${project.id}-folder-path`} disabled={locked} />}
+              {value.kind === 'folder' && (
+                <PathField
+                  value={value.folder}
+                  onChange={(folder) => setProject(project.id, { folder })}
+                  kind="folder"
+                  testId={`dev-project-${project.id}-folder-path`}
+                  disabled={locked}
+                />
+              )}
             </div>
           );
         })}
@@ -963,10 +1204,20 @@ function Development({ view }: { view: DevCatalogView }) {
           {t('settings.dev.inUse')} <span className="font-mono text-sm break-all text-foreground">{view.inUse}</span>
         </p>
         <div className="flex shrink-0 gap-2">
-          <Button onClick={() => void apply({})} disabled={locked || action.busy !== null} data-testid="dev-catalog-reset">
+          <Button
+            onClick={() => void apply({})}
+            disabled={locked || action.busy !== null}
+            data-testid="dev-catalog-reset"
+          >
             {t('settings.dev.reset')}
           </Button>
-          <Button variant="primary" onClick={() => void apply(settingsOf(view, form))} busy={action.busy === 'apply'} disabled={locked || action.busy !== null} data-testid="dev-catalog-apply">
+          <Button
+            variant="primary"
+            onClick={() => void apply(settingsOf(view, form))}
+            busy={action.busy === 'apply'}
+            disabled={locked || action.busy !== null}
+            data-testid="dev-catalog-apply"
+          >
             {t('settings.dev.apply')}
           </Button>
         </div>
@@ -993,7 +1244,10 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
         <p className="mt-1 text-base text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="mb-8 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs" role="tablist">
+      <div
+        className="mb-8 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-secondary/50 p-1.5 shadow-2xs"
+        role="tablist"
+      >
         {TABS.filter(({ id }) => id !== 'development' || snapshot.devCatalog !== null).map(({ id, icon }) => {
           const active = tab === id;
           return (
@@ -1004,7 +1258,9 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
               aria-selected={active}
               onClick={() => setTab(id)}
               className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-base whitespace-nowrap transition-colors ${
-                active ? 'bg-primary font-semibold text-primary-foreground shadow-xs' : 'font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                active
+                  ? 'bg-primary font-semibold text-primary-foreground shadow-xs'
+                  : 'font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               }`}
               data-testid={`settings-tab-${id}`}
             >
@@ -1028,7 +1284,9 @@ export function Settings({ snapshot }: { snapshot: Snapshot }) {
       {tab === 'backup' && <Backup snapshot={snapshot} now={now} />}
       {tab === 'about' && <About snapshot={snapshot} />}
       {/* Remounts with the settings just applied; a catalog refreshed in the background keeps the edits. */}
-      {tab === 'development' && snapshot.devCatalog && <Development key={JSON.stringify(snapshot.devCatalog.settings)} view={snapshot.devCatalog} />}
+      {tab === 'development' && snapshot.devCatalog && (
+        <Development key={JSON.stringify(snapshot.devCatalog.settings)} view={snapshot.devCatalog} />
+      )}
       {snapshot.busy === 'restoring' && <Restoring log={snapshot.log} />}
     </div>
   );

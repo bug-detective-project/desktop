@@ -25,19 +25,34 @@ const containers: string[] = [];
 async function raw(network: boolean, script: string) {
   const name = `${names.prefix}-qa-${containers.length + 1}`;
   containers.push(name);
-  return docker.run([...qa.containerArgs(name, { network }), '--entrypoint', 'sh', image, '-c', script], { timeoutMs: 60_000 });
+  return docker.run([...qa.containerArgs(name, { network }), '--entrypoint', 'sh', image, '-c', script], {
+    timeoutMs: 60_000,
+  });
 }
 
 beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  image = (JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string }).workspace;
+  image = (JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string })
+    .workspace;
   qa = new QaRunner({ docker, image, dockerHostPath: (path) => path, names, project: 'notes' });
   await docker.createVolume(names.volume, 'workspace', 'notes');
   await docker.createVolume(names.cacheVolume, 'qa-cache', 'notes');
   // The QA image hands /cache to node on the volume's first mount; the workspace image stands in here, so do it by hand.
-  await docker.checked(['run', '--rm', '--user', 'root', '--mount', `type=volume,src=${names.cacheVolume},dst=/cache`, '--entrypoint', 'chown', image, 'node:node', '/cache']);
+  await docker.checked([
+    'run',
+    '--rm',
+    '--user',
+    'root',
+    '--mount',
+    `type=volume,src=${names.cacheVolume},dst=/cache`,
+    '--entrypoint',
+    'chown',
+    image,
+    'node:node',
+    '/cache',
+  ]);
 });
 
 afterAll(async () => {

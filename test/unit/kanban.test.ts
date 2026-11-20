@@ -74,7 +74,9 @@ describe('player moves', () => {
         if (ok) {
           expect(ticketStatus(rules.playerMove(state, 1, to, ctx))).toBe(to);
         } else {
-          expect(() => rules.playerMove(state, 1, to, ctx)).toThrow(expect.objectContaining({ code: 'moveNotAllowed' }));
+          expect(() => rules.playerMove(state, 1, to, ctx)).toThrow(
+            expect.objectContaining({ code: 'moveNotAllowed' }),
+          );
         }
       });
     }
@@ -82,7 +84,9 @@ describe('player moves', () => {
 
   it('cannot cancel QA', () => {
     const state = withTicket('inQa');
-    expect(() => rules.playerMove(state, 1, 'inProgress', ctx)).toThrow(expect.objectContaining({ code: 'moveNotAllowed' }));
+    expect(() => rules.playerMove(state, 1, 'inProgress', ctx)).toThrow(
+      expect.objectContaining({ code: 'moveNotAllowed' }),
+    );
     expect(() => rules.playerMove(state, 1, 'todo', ctx)).toThrow(expect.objectContaining({ code: 'moveNotAllowed' }));
   });
 
@@ -93,7 +97,9 @@ describe('player moves', () => {
 
   it('only moves the active ticket', () => {
     const state = withTicket('todo');
-    expect(() => rules.playerMove(state, 2, 'inProgress', ctx)).toThrow(expect.objectContaining({ code: 'noSuchTicket' }));
+    expect(() => rules.playerMove(state, 2, 'inProgress', ctx)).toThrow(
+      expect.objectContaining({ code: 'noSuchTicket' }),
+    );
   });
 
   it('appends every transition to the activity log', () => {
@@ -113,17 +119,23 @@ describe('one active ticket at a time', () => {
     for (const status of ['todo', 'inProgress', 'inQa', 'codeReview'] as Column[]) {
       const state = withTicket(status);
       expect(rules.canTakeTicket(state)).toBe(false);
-      expect(() => rules.unlockTicket(state, 2, unlocked(2, 'def'), ctx)).toThrow(expect.objectContaining({ code: 'ticketNotDone' }));
+      expect(() => rules.unlockTicket(state, 2, unlocked(2, 'def'), ctx)).toThrow(
+        expect.objectContaining({ code: 'ticketNotDone' }),
+      );
     }
     const done = withTicket('done');
     expect(rules.canTakeTicket(done)).toBe(true);
     const next = rules.unlockTicket(done, 2, unlocked(2, 'def'), ctx);
     expect(next.currentTicket).toBe(2);
-    expect(next.inbox.filter((message) => message.kind === 'assignment').map((message) => message.ticket)).toEqual([1, 2]);
+    expect(next.inbox.filter((message) => message.kind === 'assignment').map((message) => message.ticket)).toEqual([
+      1, 2,
+    ]);
   });
 
   it('unlocks tickets in order', () => {
-    expect(() => rules.unlockTicket(rules.createInitialState(ctx), 2, unlocked(2, 'x'), ctx)).toThrow(expect.objectContaining({ code: 'wrongTicket' }));
+    expect(() => rules.unlockTicket(rules.createInitialState(ctx), 2, unlocked(2, 'x'), ctx)).toThrow(
+      expect.objectContaining({ code: 'wrongTicket' }),
+    );
   });
 
   it('makes Done tickets read-only', () => {
@@ -141,12 +153,19 @@ describe('one active ticket at a time', () => {
       state = rules.unlockTicket(state, ticket, unlocked(ticket, 'x'), ctx);
       state = rules.playerMove(state, ticket, 'inProgress', ctx);
       state = rules.playerMove(state, ticket, 'inQa', ctx);
-      state = rules.recordQaResult(state, ticket, { ...outcome('passed'), result: { ...result('passed'), ticket } }, ctx);
+      state = rules.recordQaResult(
+        state,
+        ticket,
+        { ...outcome('passed'), result: { ...result('passed'), ticket } },
+        ctx,
+      );
       state = rules.acceptReview(state, ticket, ctx);
     }
     expect(state.inbox.at(-1)!.kind).toBe('completion');
     expect(rules.nextIdFor(state, state.tracks!, 'front')).toBeNull();
-    expect(() => rules.unlockTicket(state, 5, unlocked(5, 'x'), ctx)).toThrow(expect.objectContaining({ code: 'noMoreTickets' }));
+    expect(() => rules.unlockTicket(state, 5, unlocked(5, 'x'), ctx)).toThrow(
+      expect.objectContaining({ code: 'noMoreTickets' }),
+    );
   });
 });
 
@@ -164,7 +183,10 @@ describe('career tracks', () => {
     const ticket = state.tickets.length + 1;
     return finish(rules.unlockTicket(state, ticket, unlocked(ticket, 'x', counts, id), ctx), ticket);
   };
-  const completions = (state: GameState) => state.inbox.filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion').map((m) => `${m.kind}:${m.track}`);
+  const completions = (state: GameState) =>
+    state.inbox
+      .filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion')
+      .map((m) => `${m.kind}:${m.track}`);
 
   it('gives the next ticket of each track in order', () => {
     const state = rules.createInitialState(ctx);
@@ -192,16 +214,31 @@ describe('career tracks', () => {
   });
 
   it('records the ticket id, track, commit and manifest version', () => {
-    const state = rules.unlockTicket(rules.createInitialState(ctx), 1, { ...unlocked(1, 'abc', counts, 'back-1'), manifestVersion: '2.0.0' }, ctx);
+    const state = rules.unlockTicket(
+      rules.createInitialState(ctx),
+      1,
+      { ...unlocked(1, 'abc', counts, 'back-1'), manifestVersion: '2.0.0' },
+      ctx,
+    );
     expect(state.tracks).toEqual(counts);
-    expect(state.tickets[0]).toMatchObject({ ticket: 1, id: 'back-1', track: 'back', stageCommit: 'abc', manifestVersion: '2.0.0' });
+    expect(state.tickets[0]).toMatchObject({
+      ticket: 1,
+      id: 'back-1',
+      track: 'back',
+      stageCommit: 'abc',
+      manifestVersion: '2.0.0',
+    });
   });
 
   it('refuses a ticket already unlocked, or a new one before the current is done', () => {
     const one = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'x', counts), ctx);
-    expect(() => rules.unlockTicket(one, 2, unlocked(2, 'x', counts, 'back-1'), ctx)).toThrow(expect.objectContaining({ code: 'ticketNotDone' }));
+    expect(() => rules.unlockTicket(one, 2, unlocked(2, 'x', counts, 'back-1'), ctx)).toThrow(
+      expect.objectContaining({ code: 'ticketNotDone' }),
+    );
     const done = finish(one, 1);
-    expect(() => rules.unlockTicket(done, 2, unlocked(2, 'x', counts, 'front-1'), ctx)).toThrow(expect.objectContaining({ code: 'wrongTicket' }));
+    expect(() => rules.unlockTicket(done, 2, unlocked(2, 'x', counts, 'front-1'), ctx)).toThrow(
+      expect.objectContaining({ code: 'wrongTicket' }),
+    );
   });
 
   it('completes the project with the first track, then each other track once', () => {
@@ -276,9 +313,15 @@ describe('switching projects', () => {
 
   it('refuses to switch with a ticket open, a review checked out, or another switch going on', () => {
     const open = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'x', counts), ctx);
-    expect(() => rules.beginSwitch(open, 'first', 'second', ctx)).toThrow(expect.objectContaining({ code: 'ticketNotDone' }));
+    expect(() => rules.beginSwitch(open, 'first', 'second', ctx)).toThrow(
+      expect.objectContaining({ code: 'ticketNotDone' }),
+    );
     const switching = rules.beginSwitch(done(), 'first', 'second', ctx);
-    expect(() => rules.beginSwitch(switching, 'second', 'third', ctx)).toThrow(expect.objectContaining({ code: 'switchInProgress' }));
-    expect(() => rules.beginSwitch(done(), 'first', 'first', ctx)).toThrow(expect.objectContaining({ code: 'sameProject' }));
+    expect(() => rules.beginSwitch(switching, 'second', 'third', ctx)).toThrow(
+      expect.objectContaining({ code: 'switchInProgress' }),
+    );
+    expect(() => rules.beginSwitch(done(), 'first', 'first', ctx)).toThrow(
+      expect.objectContaining({ code: 'sameProject' }),
+    );
   });
 });

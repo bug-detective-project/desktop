@@ -13,7 +13,16 @@ import type { ProjectRepo } from './project-repo.ts';
 
 export const NOTES_FIXTURE = resolve(import.meta.dirname, '..', 'fixtures', 'notes');
 export const NOTES_TICKETS = ['front-1', 'front-2', 'back-1'] as const;
-const TICKET_TEXTS = ['ticket.en.md', 'ticket.pt.md', 'hints.en.json', 'hints.pt.json', 'review.en.md', 'review.pt.md', 'solution.en.md', 'solution.pt.md'];
+const TICKET_TEXTS = [
+  'ticket.en.md',
+  'ticket.pt.md',
+  'hints.en.json',
+  'hints.pt.json',
+  'review.en.md',
+  'review.pt.md',
+  'solution.en.md',
+  'solution.pt.md',
+];
 
 async function filesUnder(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true });
@@ -24,7 +33,11 @@ export async function createNotesProject(dir: string): Promise<ProjectRepo> {
   const projectDir = join(dir, 'notes');
   const qaDir = join(dir, 'notes-qa');
   const git = (cwd: string, ...args: string[]) =>
-    execFileSync('git', ['-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    execFileSync('git', ['-c', 'core.autocrlf=false', ...args], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
 
   await cp(join(NOTES_FIXTURE, 'main'), projectDir, { recursive: true });
   git(projectDir, 'init', '-q', '-b', 'main');

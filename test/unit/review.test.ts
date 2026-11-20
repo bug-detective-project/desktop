@@ -124,7 +124,9 @@ describe('comparison diff', () => {
   it('aligns removed and added lines side by side, by line number', () => {
     const [file] = parseDiff(MODIFIED);
     const rows = splitRows(file.lines).filter((row) => row.kind === 'line');
-    expect(rows.map((row) => row.kind === 'line' && [row.left.number, row.left.kind, row.right.number, row.right.kind])).toEqual([
+    expect(
+      rows.map((row) => row.kind === 'line' && [row.left.number, row.left.kind, row.right.number, row.right.kind]),
+    ).toEqual([
       [1, 'context', 1, 'context'],
       [2, 'del', 2, 'add'],
       [3, 'del', undefined, 'empty'],
@@ -147,7 +149,9 @@ describe('review helpers', () => {
   });
 
   it('makes every file read-only, keeping the project settings (JSONC)', () => {
-    const merged = JSON.parse(readOnlySettings('{\n  // tabs\n  "editor.tabSize": 2, /* block */\n  "url": "http://x",\n}\n'));
+    const merged = JSON.parse(
+      readOnlySettings('{\n  // tabs\n  "editor.tabSize": 2, /* block */\n  "url": "http://x",\n}\n'),
+    );
     expect(merged).toEqual({ 'editor.tabSize': 2, url: 'http://x', 'files.readonlyInclude': { '**': true } });
     expect(JSON.parse(readOnlySettings(null))).toEqual({ 'files.readonlyInclude': { '**': true } });
     expect(JSON.parse(readOnlySettings('not json'))).toEqual({ 'files.readonlyInclude': { '**': true } });
@@ -167,7 +171,12 @@ const stored = (ticket: number, snapshotText = 'mine\n'): StoredReview => ({
     approvedAt: ctx.now,
     language: 'en',
     commits: { approved: sha('a'), reference: sha('b'), snapshot: sha('c') },
-    comparison: { solutions: MODIFIED, solutionsIgnoringWhitespace: MODIFIED, baseline: '', baselineIgnoringWhitespace: '' },
+    comparison: {
+      solutions: MODIFIED,
+      solutionsIgnoringWhitespace: MODIFIED,
+      baseline: '',
+      baselineIgnoringWhitespace: '',
+    },
   },
   snapshotDiff: `diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-stage\n+${snapshotText}`,
 });
@@ -176,7 +185,10 @@ describe('review store', () => {
   it('stores the approved solution as a diff, not as copies of the tree', async () => {
     const store = new ReviewStore(join(dir, 'reviews'));
     await store.save(stored(1));
-    expect((await readdir(store.dir(1))).filter((name) => !name.startsWith('.')).sort()).toEqual(['review.json', 'snapshot.diff']);
+    expect((await readdir(store.dir(1))).filter((name) => !name.startsWith('.')).sort()).toEqual([
+      'review.json',
+      'snapshot.diff',
+    ]);
   });
 
   it('keeps the approved snapshot immutable', async () => {
@@ -193,7 +205,15 @@ describe('review store', () => {
     await store.save(stored(1));
     await store.save(stored(2));
     const state = { ...rules.createInitialState(ctx), tickets: [] };
-    const save = readSave(createSave({ state, bundle: null, packages: new Map(), reviews: await store.exportFiles() }, '0.1.0', ctx.now, KEY), KEY);
+    const save = readSave(
+      createSave(
+        { state, bundle: null, packages: new Map(), reviews: await store.exportFiles() },
+        '0.1.0',
+        ctx.now,
+        KEY,
+      ),
+      KEY,
+    );
     expect([...save.reviews.keys()]).toHaveLength(4);
 
     const restored = new ReviewStore(join(dir, 'restored'));
@@ -350,7 +370,10 @@ describe('code review in the game', () => {
     await passQa(first.game);
     await first.game.openReview(1);
     const session = first.game.current.reviewSession!;
-    await new StateStore(dir).save({ ...first.game.current, reviewSession: { ...session, phase: 'saving', wipCommit: null } });
+    await new StateStore(dir).save({
+      ...first.game.current,
+      reviewSession: { ...session, phase: 'saving', wipCommit: null },
+    });
 
     const { game, runtime } = createGame();
     runtime.headInfo = { commit: sha('e'), parent: session.returnPoint.head, subject: WIP_MESSAGE };
@@ -373,7 +396,9 @@ describe('code review in the game', () => {
 
   it('applies the same technique to any project through its configuration only', async () => {
     const { game, runtime } = createGame();
-    (game as unknown as { options: { review: unknown } }).options.review = parseReviewConfig({ exclude: ['client/**'] });
+    (game as unknown as { options: { review: unknown } }).options.review = parseReviewConfig({
+      exclude: ['client/**'],
+    });
     await game.init();
     await passQa(game);
     expect(runtime.builds[0].snapshot).toEqual([]);

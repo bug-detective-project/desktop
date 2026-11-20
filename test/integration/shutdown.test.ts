@@ -32,8 +32,16 @@ let runtime: DockerRuntime;
 let game: Game;
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 async function qaContainers(): Promise<string[]> {
@@ -59,7 +67,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
   game = newGame();
   await game.init();
@@ -95,9 +107,14 @@ describe('closing the app', () => {
   it('records a QA run in progress as interrupted and leaves no QA container', async () => {
     await game.move(1, 'inProgress');
     // The notes QA is over in seconds: hold this run, so the shutdown finds it running.
-    await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo 120000 > .qa-sleep-ms'], { user: 'node', workdir: workspaceDir('notes') });
+    await docker.execChecked(runtime.names.container, ['sh', '-c', 'echo 120000 > .qa-sleep-ms'], {
+      user: 'node',
+      workdir: workspaceDir('notes'),
+    });
     const run = game.move(1, 'inQa');
-    await expect.poll(() => game.snapshot().state.tickets.find((item) => item.ticket === 1)?.status, { timeout: 60_000 }).toBe('inQa');
+    await expect
+      .poll(() => game.snapshot().state.tickets.find((item) => item.ticket === 1)?.status, { timeout: 60_000 })
+      .toBe('inQa');
     await run;
     // Give the QA container a moment to exist, then close the app on top of it.
     await expect.poll(() => qaContainers(), { timeout: 120_000, interval: 500 }).not.toEqual([]);
@@ -106,7 +123,9 @@ describe('closing the app', () => {
     expect(await qaContainers()).toEqual([]);
     expect((await docker.inspectContainer(runtime.names.container))?.running).toBe(false);
 
-    const saved = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')) as { tickets: { ticket: number; status: string; attempts: unknown[]; comments: { kind: string }[] }[] };
+    const saved = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')) as {
+      tickets: { ticket: number; status: string; attempts: unknown[]; comments: { kind: string }[] }[];
+    };
     const ticket = saved.tickets.find((item) => item.ticket === 1)!;
     expect(ticket.status).toBe('inProgress');
     expect(ticket.attempts).toEqual([]);

@@ -11,7 +11,18 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['out/**', 'dist/**', 'build/**', 'node_modules/**', 'tools/lint/node_modules/**', 'test-results/**', 'playwright-report/**', 'test/.cache/**', 'storybook-static/**', 'coverage/**'],
+    ignores: [
+      'out/**',
+      'dist/**',
+      'build/**',
+      'node_modules/**',
+      'tools/lint/node_modules/**',
+      'test-results/**',
+      'playwright-report/**',
+      'test/.cache/**',
+      'storybook-static/**',
+      'coverage/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -24,7 +35,10 @@ export default tseslint.config(
     },
     rules: {
       // Unused values are errors, except deliberately ignored ones (_name).
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'separate-type-imports' }],
       eqeqeq: ['error', 'always'],
       'no-console': 'off',

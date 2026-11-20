@@ -39,7 +39,10 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
 
   const refresh = useCallback(() => {
     if (dockerUp) {
-      void api.workspaceStatus().then(setStatus).catch(() => setStatus(null));
+      void api
+        .workspaceStatus()
+        .then(setStatus)
+        .catch(() => setStatus(null));
     }
   }, [dockerUp]);
   // Asked again every few seconds: the server may be started in the VS Code terminal or stopped on the Dashboard.
@@ -69,21 +72,44 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   return (
     <div className="grid grid-cols-2 gap-2">
       <Tooltip content={t('ticket.vscodeHint')} hoverOnly>
-        <Button variant="primary" className="w-full" disabled={!dockerUp || blocksVSCode(snapshot.busy)} busy={busy === 'vscode'} onClick={() => run('vscode', () => api.openVSCode())} data-testid="open-vscode">
+        <Button
+          variant="primary"
+          className="w-full"
+          disabled={!dockerUp || blocksVSCode(snapshot.busy)}
+          busy={busy === 'vscode'}
+          onClick={() => run('vscode', () => api.openVSCode())}
+          data-testid="open-vscode"
+        >
           {busy !== 'vscode' && <Icon name="code" />}
           {t('ticket.openVSCode')}
         </Button>
       </Tooltip>
       {status?.devServerUp ? (
-        <Button className="w-full" disabled={!dockerUp} busy={busy === 'browser'} onClick={() => run('browser', () => api.openAppInBrowser())} data-testid="open-browser">
+        <Button
+          className="w-full"
+          disabled={!dockerUp}
+          busy={busy === 'browser'}
+          onClick={() => run('browser', () => api.openAppInBrowser())}
+          data-testid="open-browser"
+        >
           {busy !== 'browser' && <Icon name="externalLink" />}
           {t('ticket.openBrowser')}
           {status.ports && <span className="font-mono text-sm text-muted-foreground">:{status.ports.client}</span>}
         </Button>
       ) : (
         // Without node_modules `npm run dev` cannot start: the button says where to look.
-        <Tooltip content={blocked ? t('ticket.dependenciesMissing') : t('ticket.devServerDown')} className="w-full" hoverOnly>
-          <Button className="w-full" disabled={!dockerUp || !status || blocked} busy={busy === 'dev'} onClick={() => run('dev', () => api.startDevServer())} data-testid="start-dev-server">
+        <Tooltip
+          content={blocked ? t('ticket.dependenciesMissing') : t('ticket.devServerDown')}
+          className="w-full"
+          hoverOnly
+        >
+          <Button
+            className="w-full"
+            disabled={!dockerUp || !status || blocked}
+            busy={busy === 'dev'}
+            onClick={() => run('dev', () => api.startDevServer())}
+            data-testid="start-dev-server"
+          >
             {busy !== 'dev' && <Icon name="play" />}
             {t('ticket.startDevServer')}
           </Button>
@@ -93,7 +119,15 @@ function WorkspaceActions({ snapshot, ticket }: { snapshot: Snapshot; ticket: Ti
   );
 }
 
-function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticket: TicketState; content: TicketContent | null }) {
+function Conversation({
+  snapshot,
+  ticket,
+  content,
+}: {
+  snapshot: Snapshot;
+  ticket: TicketState;
+  content: TicketContent | null;
+}) {
   const { t } = useTranslation();
   const toast = useToast();
   const people = company(snapshot.state.settings.language).people;
@@ -129,7 +163,9 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
       );
     return (
       <div key={index} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid={`chat-${entry.kind}`}>
-        <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-base ${mine ? 'bg-primary text-primary-foreground' : 'border border-border bg-muted text-foreground'}`}>
+        <div
+          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-base ${mine ? 'bg-primary text-primary-foreground' : 'border border-border bg-muted text-foreground'}`}
+        >
           {!mine && <p className="mb-1 text-sm font-semibold text-primary">{senior}</p>}
           {body}
         </div>
@@ -144,13 +180,23 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
       {canAsk ? (
         <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
           {ticket.hintsRevealed < total ? (
-            <Button variant="primary" busy={busy} onClick={() => act(() => api.askSenior(ticket.ticket))} data-testid="ask-hint">
+            <Button
+              variant="primary"
+              busy={busy}
+              onClick={() => act(() => api.askSenior(ticket.ticket))}
+              data-testid="ask-hint"
+            >
               {t('ticket.senior.ask')}
             </Button>
           ) : !ticket.solutionRevealed ? (
             <>
               <span className="text-base text-muted-foreground">{t('ticket.senior.noMoreHints')}</span>
-              <Button variant="primary" busy={busy} onClick={() => act(() => api.revealSolution(ticket.ticket))} data-testid="reveal-solution">
+              <Button
+                variant="primary"
+                busy={busy}
+                onClick={() => act(() => api.revealSolution(ticket.ticket))}
+                data-testid="reveal-solution"
+              >
                 {t('ticket.senior.askSolution')}
               </Button>
             </>
@@ -160,7 +206,9 @@ function Conversation({ snapshot, ticket, content }: { snapshot: Snapshot; ticke
           </span>
         </div>
       ) : (
-        ticket.status !== 'done' && <p className="text-base text-muted-foreground">{t('ticket.senior.onlyInProgress')}</p>
+        ticket.status !== 'done' && (
+          <p className="text-base text-muted-foreground">{t('ticket.senior.onlyInProgress')}</p>
+        )
       )}
     </div>
   );
@@ -183,13 +231,19 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
               const passed = attempt.result.tests.filter((test) => test.status === 'passed').length;
               const failed = attempt.result.tests.filter((test) => test.status === 'failed').length;
               return (
-                <li key={attempt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-base" data-testid="attempt">
+                <li
+                  key={attempt.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-base"
+                  data-testid="attempt"
+                >
                   <span className="font-medium">{t('ticket.attempt', { number: attempt.number })}</span>
                   <Badge tone={attempt.result.status === 'passed' ? 'ok' : 'danger'}>
                     {t(`ticket.attemptResult.${attempt.result.status}`)}
                   </Badge>
                   <span className="text-muted-foreground">{t('ticket.testsSummary', { passed, failed })}</span>
-                  <time className="ml-auto text-sm text-muted-foreground">{new Date(attempt.finishedAt).toLocaleString(locale)}</time>
+                  <time className="ml-auto text-sm text-muted-foreground">
+                    {new Date(attempt.finishedAt).toLocaleString(locale)}
+                  </time>
                 </li>
               );
             })}
@@ -201,9 +255,13 @@ function History({ ticket, snapshot }: { ticket: TicketState; snapshot: Snapshot
         <ol className="space-y-1.5 text-base" data-testid="activity">
           {activity.map((entry, index) => (
             <li key={index} className="flex gap-3" data-testid="activity-entry">
-              <time className="w-40 shrink-0 text-sm text-muted-foreground">{new Date(entry.at).toLocaleString(locale)}</time>
+              <time className="w-40 shrink-0 text-sm text-muted-foreground">
+                {new Date(entry.at).toLocaleString(locale)}
+              </time>
               <span>
-                {entry.from ? t('ticket.transition', { from: column(entry.from), to: column(entry.to) }) : t('ticket.created', { to: column(entry.to) })}
+                {entry.from
+                  ? t('ticket.transition', { from: column(entry.from), to: column(entry.to) })
+                  : t('ticket.created', { to: column(entry.to) })}
                 <span className="ml-2 text-sm text-muted-foreground">({t(`ticket.actor.${entry.actor}`)})</span>
               </span>
             </li>
@@ -248,7 +306,11 @@ export function TicketPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose} data-testid="ticket-panel-backdrop">
+    <div
+      className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-[2px]"
+      onClick={onClose}
+      data-testid="ticket-panel-backdrop"
+    >
       <aside
         className="flex h-full w-panel max-w-full flex-col border-l border-border bg-background shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -259,7 +321,9 @@ export function TicketPanel({
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-sm font-bold text-primary">{ticketTitle(snapshot, ticket.ticket, language).key}</span>
+                <span className="font-mono text-sm font-bold text-primary">
+                  {ticketTitle(snapshot, ticket.ticket, language).key}
+                </span>
                 <StagePill status={ticket.status} />
                 <TicketTypeBadge {...metaOfEntry(snapshot.ticketMeta[ticket.ticket])} />
               </div>
@@ -267,7 +331,14 @@ export function TicketPanel({
                 {snapshot.titles[ticket.ticket]?.[language]}
               </h2>
             </div>
-            <Button variant="ghost" size="sm" className="px-2" onClick={onClose} aria-label={t('common.close')} data-testid="close-panel">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              onClick={onClose}
+              aria-label={t('common.close')}
+              data-testid="close-panel"
+            >
               <Icon name="x" />
             </Button>
           </div>
@@ -286,10 +357,15 @@ export function TicketPanel({
           {practiced && (
             // Only a Done ticket says what it trained: before that, the skills would hint at the cause.
             <div data-testid="ticket-practiced">
-              <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{t('ticket.practiced')}</p>
+              <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                {t('ticket.practiced')}
+              </p>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {practiced.map((skill) => (
-                  <li key={skill} className="max-w-full rounded-full border border-border bg-muted px-2.5 py-0.5 text-sm break-words text-foreground">
+                  <li
+                    key={skill}
+                    className="max-w-full rounded-full border border-border bg-muted px-2.5 py-0.5 text-sm break-words text-foreground"
+                  >
                     {skill}
                   </li>
                 ))}
@@ -303,7 +379,11 @@ export function TicketPanel({
             onChange={setTab}
             tabs={[
               { id: 'ticket', label: t('ticket.tabs.ticket') },
-              { id: 'qa', label: t('ticket.tabs.qa'), badge: ticket.comments.length > 0 ? <Badge>{ticket.comments.length}</Badge> : undefined },
+              {
+                id: 'qa',
+                label: t('ticket.tabs.qa'),
+                badge: ticket.comments.length > 0 ? <Badge>{ticket.comments.length}</Badge> : undefined,
+              },
               { id: 'history', label: t('ticket.tabs.history') },
               { id: 'senior', label: t('ticket.tabs.senior', { name: senior }) },
             ]}
@@ -327,7 +407,8 @@ export function TicketPanel({
                   );
                 }
                 // The card's tag, in the hue of the ticket's track, with the card's wording ("Front-end").
-                if (TRACK_FIELDS.has(field)) return <TrackBadge track={ticket.track} label={value} testId="ticket-track" />;
+                if (TRACK_FIELDS.has(field))
+                  return <TrackBadge track={ticket.track} label={value} testId="ticket-track" />;
                 return undefined;
               }}
             >
@@ -337,7 +418,10 @@ export function TicketPanel({
           {tab === 'qa' && (
             <div className="space-y-3" data-testid="qa-comments">
               {qaRunning && (
-                <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-base" data-testid="qa-running">
+                <div
+                  className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-base"
+                  data-testid="qa-running"
+                >
                   <p className="flex items-center gap-2 font-medium text-foreground">
                     <Icon name="spinner" className="size-4 text-amber-500" />
                     {t('qa.running')}
@@ -345,9 +429,16 @@ export function TicketPanel({
                   {snapshot.busy === 'qa' && <LogView lines={snapshot.log} />}
                 </div>
               )}
-              {ticket.comments.length === 0 && !qaRunning && <p className="text-base text-muted-foreground">{t('ticket.noComments')}</p>}
+              {ticket.comments.length === 0 && !qaRunning && (
+                <p className="text-base text-muted-foreground">{t('ticket.noComments')}</p>
+              )}
               {[...ticket.comments].reverse().map((comment, index) => (
-                <QaCommentView key={comment.id} comment={comment} ticketType={metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type} defaultOpen={index === 0} />
+                <QaCommentView
+                  key={comment.id}
+                  comment={comment}
+                  ticketType={metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type}
+                  defaultOpen={index === 0}
+                />
               ))}
             </div>
           )}

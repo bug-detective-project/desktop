@@ -67,7 +67,9 @@ describe('resolveSupportdesk', () => {
   it('points each ticket branch at its published commit, not at the branch tip', async () => {
     const { qaDir } = await resolveSupportdesk(options());
     for (const [id, commit] of Object.entries(published)) {
-      expect(execFileSync('git', ['-C', qaDir, 'rev-parse', `refs/heads/${id}`], { encoding: 'utf8' }).trim()).toBe(commit);
+      expect(execFileSync('git', ['-C', qaDir, 'rev-parse', `refs/heads/${id}`], { encoding: 'utf8' }).trim()).toBe(
+        commit,
+      );
     }
     expect(existsSync(join(qaDir, 'later.txt'))).toBe(false);
   });
@@ -84,7 +86,9 @@ describe('resolveSupportdesk', () => {
     const offline = async () => {
       throw new Error('Could not resolve host: github.com');
     };
-    await expect(resolveSupportdesk({ ...options(), clone: offline })).rejects.toThrow(/\.\.\/supportdesk-qa[\s\S]*internet/);
+    await expect(resolveSupportdesk({ ...options(), clone: offline })).rejects.toThrow(
+      /\.\.\/supportdesk-qa[\s\S]*internet/,
+    );
     expect(existsSync(join(dir, 'cache', 'supportdesk-qa-v1.0.0'))).toBe(false);
   });
 });

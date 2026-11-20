@@ -17,7 +17,12 @@ export function qaImageTag(qaBase: string, tool: readonly ArchiveFile[], reposit
 }
 
 /** Writes (once) the build context: the docker/qa files plus the tool under cli/. Returns its folder. */
-export async function writeQaContext(qaBaseDir: string, qaBase: string, tool: readonly ArchiveFile[], buildRoot: string): Promise<string> {
+export async function writeQaContext(
+  qaBaseDir: string,
+  qaBase: string,
+  tool: readonly ArchiveFile[],
+  buildRoot: string,
+): Promise<string> {
   // Named like the image tag, so a new Dockerfile or a new tool never reuses an older folder.
   const target = join(buildRoot, `qa-${qaImageTag(qaBase, tool).split(':')[1]}`);
   // The marker sits next to the folder, so it never becomes part of the build context.

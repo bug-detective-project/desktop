@@ -114,7 +114,9 @@ export function OnboardingTicketDemo({ tab }: { tab: DemoTab }) {
             <p className="text-base text-muted-foreground">{t('ticket.senior.intro', { name: senior })}</p>
             <div className="space-y-3">
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl bg-primary px-4 py-2.5 text-base text-primary-foreground">{t('onboarding.demo.question')}</div>
+                <div className="max-w-[85%] rounded-2xl bg-primary px-4 py-2.5 text-base text-primary-foreground">
+                  {t('onboarding.demo.question')}
+                </div>
               </div>
               <div className="flex justify-start">
                 <div className="max-w-[85%] rounded-2xl border border-border bg-muted px-4 py-2.5 text-base text-foreground">
@@ -125,7 +127,9 @@ export function OnboardingTicketDemo({ tab }: { tab: DemoTab }) {
             </div>
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
               <Button variant="primary">{t('ticket.senior.ask')}</Button>
-              <span className="ml-auto text-sm text-muted-foreground">{t('ticket.hintsUsed', { used: 1, total: 3 })}</span>
+              <span className="ml-auto text-sm text-muted-foreground">
+                {t('ticket.hintsUsed', { used: 1, total: 3 })}
+              </span>
             </div>
           </div>
         )}

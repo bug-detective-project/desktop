@@ -8,12 +8,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const InProgress: Story = {
-  render: () => <TicketPanel snapshot={snapshotFixture('active')} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  render: () => (
+    <TicketPanel snapshot={snapshotFixture('active')} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />
+  ),
   play: async ({ canvasElement }) => {
     await expect(await within(canvasElement.ownerDocument.body).findByTestId('ticket-markdown')).toBeVisible();
   },
 };
-export const InCodeReview: Story = { render: () => <TicketPanel snapshot={snapshotFixture('review')} ticketNumber={1} onClose={fn()} onOpenReview={fn()} /> };
+export const InCodeReview: Story = {
+  render: () => (
+    <TicketPanel snapshot={snapshotFixture('review')} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />
+  ),
+};
 export const Portuguese: Story = { ...InProgress, globals: { locale: 'pt' } };
 
 /** The header says the kind of work of the ticket, and the both-sides mark when it has one. */
@@ -77,7 +83,10 @@ export const IssueTypeInPortuguese: Story = {
   },
 };
 
-const skills = { en: ['Building components', 'Routes and navigation'], pt: ['Criação de componentes', 'Criação de rotas e navegação'] };
+const skills = {
+  en: ['Building components', 'Routes and navigation'],
+  pt: ['Criação de componentes', 'Criação de rotas e navegação'],
+};
 /** The review snapshot with its ticket in another column, and the skills the main process sent for it (none unless Done). */
 const withTicket = (status: 'inProgress' | 'codeReview' | 'done', practiced: Record<number, typeof skills>) => {
   const snapshot = snapshotFixture('review', { practiced });
@@ -87,11 +96,17 @@ const withTicket = (status: 'inProgress' | 'codeReview' | 'done', practiced: Rec
 
 /** A Done ticket says what it trained. */
 export const DoneWithPracticedSkills: Story = {
-  render: () => <TicketPanel snapshot={withTicket('done', { 1: skills })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  render: () => (
+    <TicketPanel snapshot={withTicket('done', { 1: skills })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />
+  ),
   play: async ({ canvasElement }) => {
     const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');
     await expect(practiced).toHaveTextContent('You practiced');
-    await expect(within(practiced).getAllByRole('listitem').map((item) => item.textContent)).toEqual(skills.en);
+    await expect(
+      within(practiced)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(skills.en);
   },
 };
 export const DoneWithPracticedSkillsInPortuguese: Story = {
@@ -100,7 +115,11 @@ export const DoneWithPracticedSkillsInPortuguese: Story = {
   play: async ({ canvasElement }) => {
     const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');
     await expect(practiced).toHaveTextContent('Você praticou');
-    await expect(within(practiced).getAllByRole('listitem').map((item) => item.textContent)).toEqual(skills.pt);
+    await expect(
+      within(practiced)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(skills.pt);
   },
 };
 
@@ -116,7 +135,14 @@ export const DoneWithoutSkills: Story = {
 
 /** The skills hint at the cause: a ticket that is not Done never shows them, whatever the snapshot holds. */
 export const NotDoneNeverShowsSkills: Story = {
-  render: () => <TicketPanel snapshot={withTicket('codeReview', { 1: skills })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />,
+  render: () => (
+    <TicketPanel
+      snapshot={withTicket('codeReview', { 1: skills })}
+      ticketNumber={1}
+      onClose={fn()}
+      onOpenReview={fn()}
+    />
+  ),
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
     await body.findByTestId('ticket-panel');
@@ -127,8 +153,13 @@ export const NotDoneNeverShowsSkills: Story = {
 /** A skill may be 60 characters long: the tag wraps inside the header instead of widening the panel. */
 export const DoneWithALongSkill: Story = {
   render: () => {
-    const long = { en: ['Tracing a request across services and message queues, end to'], pt: ['Rastrear uma requisição entre serviços e filas de mensagens'] };
-    return <TicketPanel snapshot={withTicket('done', { 1: long })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />;
+    const long = {
+      en: ['Tracing a request across services and message queues, end to'],
+      pt: ['Rastrear uma requisição entre serviços e filas de mensagens'],
+    };
+    return (
+      <TicketPanel snapshot={withTicket('done', { 1: long })} ticketNumber={1} onClose={fn()} onOpenReview={fn()} />
+    );
   },
   play: async ({ canvasElement }) => {
     const practiced = await within(canvasElement.ownerDocument.body).findByTestId('ticket-practiced');

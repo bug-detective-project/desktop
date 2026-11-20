@@ -67,8 +67,15 @@ if (process.env.DATABASE_URL && !values['deps-only']) {
 }
 const timeoutSeconds = Number(values.timeout);
 const depsOnly = values['deps-only'] === true;
-if (!Number.isInteger(ticket) || !values.workspace || !(depsOnly ? values['deps-cache'] : values.package) || !(timeoutSeconds > 0)) {
-  console.error('Usage: node run.ts --ticket <n> --workspace <path> --package <dir> [--lang en|pt] [--json out.json] [--timeout 180] [--deps-cache <dir> [--deps-only]]');
+if (
+  !Number.isInteger(ticket) ||
+  !values.workspace ||
+  !(depsOnly ? values['deps-cache'] : values.package) ||
+  !(timeoutSeconds > 0)
+) {
+  console.error(
+    'Usage: node run.ts --ticket <n> --workspace <path> --package <dir> [--lang en|pt] [--json out.json] [--timeout 180] [--deps-cache <dir> [--deps-only]]',
+  );
   process.exit(2);
 }
 const text = values.lang === 'pt' ? MESSAGES.pt : MESSAGES.en;
@@ -78,25 +85,37 @@ const deadline = started + timeoutSeconds * 1000;
 /** Runs `node --test` on the files; top-level TAP lines become the tests. Kills the whole run at the deadline. */
 function nodeTest(cwd: string, files: string): Promise<{ status: Status; tests: TestResult[] }> {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--test', '--test-reporter=tap', files], { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['--test', '--test-reporter=tap', files], {
+      cwd,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let output = '';
     child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString('utf8')));
     child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString('utf8')));
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        process.kill(-child.pid!, 'SIGKILL');
-      } catch {
-        child.kill('SIGKILL');
-      }
-    }, Math.max(0, deadline - Date.now()));
+    const timer = setTimeout(
+      () => {
+        timedOut = true;
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch {
+          child.kill('SIGKILL');
+        }
+      },
+      Math.max(0, deadline - Date.now()),
+    );
     child.on('close', (code) => {
       clearTimeout(timer);
-      const tests = [...output.matchAll(/^(not )?ok \d+ - (.+)$/gm)].map(
-        (match): TestResult => (match[1] ? { name: match[2], status: 'failed', error: output.slice(-2000) } : { name: match[2], status: 'passed' }),
+      const tests = [...output.matchAll(/^(not )?ok \d+ - (.+)$/gm)].map((match): TestResult =>
+        match[1]
+          ? { name: match[2], status: 'failed', error: output.slice(-2000) }
+          : { name: match[2], status: 'passed' },
       );
-      resolve({ status: timedOut ? 'timeout' : code === 0 ? 'passed' : 'failed', tests: timedOut ? tests.concat({ name: files, status: 'unfinished' }) : tests });
+      resolve({
+        status: timedOut ? 'timeout' : code === 0 ? 'passed' : 'failed',
+        tests: timedOut ? tests.concat({ name: files, status: 'unfinished' }) : tests,
+      });
     });
   });
 }
@@ -105,7 +124,10 @@ function nodeTest(cwd: string, files: string): Promise<{ status: Status; tests: 
 async function copyWorkspace(): Promise<string> {
   const app = await mkdtemp(join(tmpdir(), 'notes-qa-'));
   const skip = new Set(['node_modules', '.git']);
-  await cp(values.workspace!, app, { recursive: true, filter: (source) => !skip.has(basename(source)) && !source.endsWith('.db') });
+  await cp(values.workspace!, app, {
+    recursive: true,
+    filter: (source) => !skip.has(basename(source)) && !source.endsWith('.db'),
+  });
   return app;
 }
 
@@ -155,8 +177,20 @@ async function main(): Promise<void> {
   } finally {
     await rm(app, { recursive: true, force: true });
   }
-  const message = result.status === 'passed' ? text.passed : result.status === 'timeout' ? text.timeout(timeoutSeconds) : text.failed(gate);
-  const output = { ticket, gate, status: result.status, message, tests: result.tests, durationMs: Date.now() - started };
+  const message =
+    result.status === 'passed'
+      ? text.passed
+      : result.status === 'timeout'
+        ? text.timeout(timeoutSeconds)
+        : text.failed(gate);
+  const output = {
+    ticket,
+    gate,
+    status: result.status,
+    message,
+    tests: result.tests,
+    durationMs: Date.now() - started,
+  };
   console.log(message);
   if (values.json) {
     await writeFile(values.json, `${JSON.stringify(output, null, 2)}\n`);

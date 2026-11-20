@@ -7,15 +7,30 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const locale = (language: string) => JSON.parse(readFileSync(join(root, 'src', 'renderer', 'src', 'locales', `${language}.json`), 'utf8')) as { errors: Record<string, string> };
+const locale = (language: string) =>
+  JSON.parse(readFileSync(join(root, 'src', 'renderer', 'src', 'locales', `${language}.json`), 'utf8')) as {
+    errors: Record<string, string>;
+  };
 
 function mainSources(dir = join(root, 'src', 'main')): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? mainSources(join(dir, entry.name)) : entry.name.endsWith('.ts') ? [readFileSync(join(dir, entry.name), 'utf8')] : [],
+    entry.isDirectory()
+      ? mainSources(join(dir, entry.name))
+      : entry.name.endsWith('.ts')
+        ? [readFileSync(join(dir, entry.name), 'utf8')]
+        : [],
   );
 }
 
-const codes = [...new Set(mainSources().flatMap((source) => [...source.matchAll(/new GameError\('([A-Za-z]+)'|error: \{ code: '([A-Za-z]+)'/g)].map((match) => match[1] ?? match[2])))].sort();
+const codes = [
+  ...new Set(
+    mainSources().flatMap((source) =>
+      [...source.matchAll(/new GameError\('([A-Za-z]+)'|error: \{ code: '([A-Za-z]+)'/g)].map(
+        (match) => match[1] ?? match[2],
+      ),
+    ),
+  ),
+].sort();
 
 describe('error messages', () => {
   it('finds the codes the main process sends', () => {

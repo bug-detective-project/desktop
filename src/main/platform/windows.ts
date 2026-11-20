@@ -87,7 +87,9 @@ function findOnPath(deps: WindowsDeps, file: string): string | null {
  */
 export /** %APPDATA%\Code\User\globalStorage of the user's VS Code. */
 function vscodeGlobalStorage(env: NodeJS.ProcessEnv): string {
-  const appData = env.APPDATA ?? (env.USERPROFILE ? path.join(env.USERPROFILE, 'AppData', 'Roaming') : 'C:\\Users\\Default\\AppData\\Roaming');
+  const appData =
+    env.APPDATA ??
+    (env.USERPROFILE ? path.join(env.USERPROFILE, 'AppData', 'Roaming') : 'C:\\Users\\Default\\AppData\\Roaming');
   return path.join(appData, 'Code', 'User', 'globalStorage');
 }
 
@@ -245,7 +247,11 @@ export function createWindowsPlatform(overrides: Partial<WindowsDeps> = {}): Pla
         return false;
       }
       const script = closeWindowsScript(`[Container ${containerName}`);
-      const result = await runner(path.join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { timeoutMs: 30_000 });
+      const result = await runner(
+        path.join(system32, 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+        ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+        { timeoutMs: 30_000 },
+      );
       return result.code === 0 && result.stdout.toString('utf8').trim() === '0';
     },
 

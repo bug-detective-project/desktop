@@ -27,7 +27,9 @@ async function git(dir: string, ...args: string[]): Promise<string> {
 
 /** The published ticket commits of the clone's manifest.json. */
 async function publishedCommits(dir: string): Promise<{ id: string; commit: string }[]> {
-  const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as { entries: { id: string; commit: string }[] };
+  const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
+    entries: { id: string; commit: string }[];
+  };
   return manifest.entries.map(({ id, commit }) => ({ id, commit }));
 }
 
@@ -46,7 +48,12 @@ async function validClone(dir: string, ref: string): Promise<boolean> {
   }
 }
 
-export async function resolveSupportdesk(options: { local: string; cache: string; ref: string; clone(url: string, dir: string): Promise<void> }): Promise<SupportdeskChoice> {
+export async function resolveSupportdesk(options: {
+  local: string;
+  cache: string;
+  ref: string;
+  clone(url: string, dir: string): Promise<void>;
+}): Promise<SupportdeskChoice> {
   if (existsSync(join(options.local, 'package.json'))) {
     return { qaDir: options.local, pinned: false };
   }
@@ -74,7 +81,10 @@ export async function resolveSupportdesk(options: { local: string; cache: string
 export default async function globalSetup(): Promise<void> {
   const choice = await resolveSupportdesk({
     // BUGDETECTIVE_E2E_PINNED_SUPPORTDESK=1 plays the pinned publication even with the local folder there.
-    local: process.env.BUGDETECTIVE_E2E_PINNED_SUPPORTDESK === '1' ? join(root, 'test', '.cache', 'no-local-supportdesk') : resolve(root, '..', 'supportdesk-qa'),
+    local:
+      process.env.BUGDETECTIVE_E2E_PINNED_SUPPORTDESK === '1'
+        ? join(root, 'test', '.cache', 'no-local-supportdesk')
+        : resolve(root, '..', 'supportdesk-qa'),
     cache: join(root, 'test', '.cache'),
     ref: SUPPORTDESK_QA_REF,
     clone: async (url, dir) => {
@@ -83,5 +93,9 @@ export default async function globalSetup(): Promise<void> {
   });
   await mkdir(join(root, 'test', '.cache'), { recursive: true });
   await writeFile(SUPPORTDESK_CHOICE_FILE, `${JSON.stringify(choice, null, 2)}\n`);
-  console.log(choice.pinned ? `SupportDesk: ${SUPPORTDESK_QA_REF} (pinned, ${choice.qaDir})` : `SupportDesk: ${choice.qaDir} (local)`);
+  console.log(
+    choice.pinned
+      ? `SupportDesk: ${SUPPORTDESK_QA_REF} (pinned, ${choice.qaDir})`
+      : `SupportDesk: ${choice.qaDir} (local)`,
+  );
 }

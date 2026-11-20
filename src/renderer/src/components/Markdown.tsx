@@ -7,7 +7,16 @@ import remarkGfm from 'remark-gfm';
 /** A task list item's box ("- [x]"): read-only, and named for screen readers. */
 function TaskCheckbox({ checked }: { checked: boolean }) {
   const { t } = useTranslation();
-  return <input type="checkbox" checked={checked} readOnly disabled aria-label={t(checked ? 'markdown.taskDone' : 'markdown.taskOpen')} className="mr-1.5 align-middle accent-primary" />;
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      readOnly
+      disabled
+      aria-label={t(checked ? 'markdown.taskDone' : 'markdown.taskOpen')}
+      className="mr-1.5 align-middle accent-primary"
+    />
+  );
 }
 
 // Links and images never load anything: the app shows no remote content.
@@ -24,12 +33,20 @@ const components: Components = {
   blockquote: ({ children }) => <blockquote className="my-2 border-l-4 border-border pl-3">{children}</blockquote>,
   code: ({ children, className }) =>
     className ? (
-      <code className={`${className} block overflow-x-auto rounded-lg border border-border/60 bg-muted p-3 font-mono text-sm text-foreground`}>{children}</code>
+      <code
+        className={`${className} block overflow-x-auto rounded-lg border border-border/60 bg-muted p-3 font-mono text-sm text-foreground`}
+      >
+        {children}
+      </code>
     ) : (
-      <code className="rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[0.85em] font-semibold text-foreground">{children}</code>
+      <code className="rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[0.85em] font-semibold text-foreground">
+        {children}
+      </code>
     ),
   table: ({ children }) => <table className="my-3 w-full border-collapse">{children}</table>,
-  th: ({ children }) => <th className="border border-border bg-muted px-2 py-1 text-left font-medium text-foreground">{children}</th>,
+  th: ({ children }) => (
+    <th className="border border-border bg-muted px-2 py-1 text-left font-medium text-foreground">{children}</th>
+  ),
   td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
   input: ({ checked }) => <TaskCheckbox checked={checked ?? false} />,
 };
@@ -71,7 +88,10 @@ export function Markdown({
 }) {
   return (
     <div className={`text-muted-foreground [&>*:last-child]:mb-0 ${className}`} data-testid={testId}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={fieldValue ? { ...components, tr: fieldRow(fieldValue) } : components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={fieldValue ? { ...components, tr: fieldRow(fieldValue) } : components}
+      >
         {children}
       </ReactMarkdown>
     </div>

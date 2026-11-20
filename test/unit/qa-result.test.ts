@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { outOfMemoryResult, outerTimeoutResult, parseQaResult, QaInfrastructureError } from '../../src/main/services/qa.ts';
+import {
+  outOfMemoryResult,
+  outerTimeoutResult,
+  parseQaResult,
+  QaInfrastructureError,
+} from '../../src/main/services/qa.ts';
 import { commentForResult } from '../../src/shared/kanban.ts';
 import { qaMessage, trimError } from '../../src/shared/qaMessages.ts';
 import type { QaComment } from '../../src/shared/types.ts';
@@ -14,7 +19,11 @@ const gate2Failure = {
   message: 'Gate 2 failed: the reported bug is still unresolved.',
   tests: [
     { name: 'client/src/pages/TicketList.test.tsx > TicketList > renders the tickets', status: 'passed' },
-    { name: 'Ticket 1: details follow Previous and Next > Next shows the next ticket', status: 'failed', error: 'expect(locator).toHaveText(expected) failed' },
+    {
+      name: 'Ticket 1: details follow Previous and Next > Next shows the next ticket',
+      status: 'failed',
+      error: 'expect(locator).toHaveText(expected) failed',
+    },
     { name: 'Ticket 1: details follow Previous and Next > Previous shows the previous ticket', status: 'failed' },
   ],
   durationMs: 36612,
@@ -31,7 +40,9 @@ describe('parseQaResult', () => {
     expect(() => parseQaResult('not json', 1)).toThrow(QaInfrastructureError);
     expect(() => parseQaResult(JSON.stringify({ ...gate2Failure, status: 'maybe' }), 1)).toThrow(QaInfrastructureError);
     expect(() => parseQaResult(JSON.stringify({ ...gate2Failure, gate: 3 }), 1)).toThrow(QaInfrastructureError);
-    expect(() => parseQaResult(JSON.stringify({ ...gate2Failure, tests: undefined }), 1)).toThrow(QaInfrastructureError);
+    expect(() => parseQaResult(JSON.stringify({ ...gate2Failure, tests: undefined }), 1)).toThrow(
+      QaInfrastructureError,
+    );
     expect(() => parseQaResult(JSON.stringify(gate2Failure), 2)).toThrow(/expected 2/);
   });
 
@@ -80,10 +91,19 @@ describe('QA comment and message selection', () => {
     const base = { id: 'x', at: ctx.now };
     expect(qaMessage({ ...base, kind: 'passed' })).toMatchObject({ key: 'passed' });
     expect(qaMessage({ ...base, kind: 'interrupted' })).toMatchObject({ key: 'interrupted' });
-    expect(qaMessage({ ...base, kind: 'error', detail: 'Docker stopped' })).toMatchObject({ key: 'error', params: { detail: 'Docker stopped' } });
+    expect(qaMessage({ ...base, kind: 'error', detail: 'Docker stopped' })).toMatchObject({
+      key: 'error',
+      params: { detail: 'Docker stopped' },
+    });
     // Never the branch name, whether HEAD is on another branch or detached.
-    expect(qaMessage({ ...base, kind: 'branchWarning', branch: 'main' } as QaComment)).toMatchObject({ key: 'branchWarning', params: {} });
-    expect(qaMessage({ ...base, kind: 'branchWarning', branch: null } as QaComment)).toMatchObject({ key: 'branchWarning', params: {} });
+    expect(qaMessage({ ...base, kind: 'branchWarning', branch: 'main' } as QaComment)).toMatchObject({
+      key: 'branchWarning',
+      params: {},
+    });
+    expect(qaMessage({ ...base, kind: 'branchWarning', branch: null } as QaComment)).toMatchObject({
+      key: 'branchWarning',
+      params: {},
+    });
   });
 
   it('trims long errors', () => {

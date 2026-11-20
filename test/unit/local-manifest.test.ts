@@ -32,7 +32,11 @@ describe('buildManifest (the local content source)', () => {
   });
 
   it('copies ticket.json into the entry of its ticket, and only of that one', async () => {
-    const meta = { type: 'build', bothSides: true, skills: { en: ['Building components'], pt: ['Criação de componentes'] } };
+    const meta = {
+      type: 'build',
+      bothSides: true,
+      skills: { en: ['Building components'], pt: ['Criação de componentes'] },
+    };
     await writeFile(join(repo.qaDir, 'tickets', 'front-1', 'ticket.json'), `${JSON.stringify(meta)}\n`);
     repo.git(repo.qaDir, 'add', 'tickets/front-1/ticket.json');
     repo.git(repo.qaDir, 'commit', '-q', '-m', 'Describe front-1');

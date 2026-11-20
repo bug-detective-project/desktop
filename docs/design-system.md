@@ -12,18 +12,18 @@ Calm, realistic internal developer tool in someone's first week. No points, stre
 
 Defined once in `src/renderer/src/styles.css` (Tailwind CSS 4, shadcn-style names). `:root` holds the light theme, `.dark` the dark one; `@theme inline` exposes them as utilities.
 
-| Token | Utility examples | Use |
-| --- | --- | --- |
-| `background` / `foreground` | `bg-background`, `text-foreground` | Page canvas and main text |
-| `card` / `card-foreground` | `bg-card` | Cards, header, panels |
-| `popover` | `bg-popover` | Modals, toasts |
-| `primary` / `primary-foreground` | `bg-primary`, `text-primary`, `bg-primary/10` | Brand (editorial indigo `oklch(0.50 0.15 265)`, `oklch(0.68 0.15 265)` in dark), primary buttons, active nav, ticket keys |
-| `secondary` | `bg-secondary` | Secondary buttons, neutral pills |
-| `muted` / `muted-foreground` | `bg-muted`, `text-muted-foreground` | Subtle surfaces, metadata, body text of messages |
-| `accent` | `bg-accent` | Rare highlights |
-| `destructive` | `bg-destructive`, `text-destructive`, `bg-destructive/5` | Errors, blocked states, New game |
-| `border` / `input` / `ring` | `border-border`, `border-input`, `ring-ring/50` | Lines, form fields, focus rings |
-| `radius` (0.5rem) | `rounded-md`, `rounded-lg`, `rounded-xl` | `rounded-xl` for cards, `rounded-lg` for buttons and inner boxes |
+| Token                            | Utility examples                                         | Use                                                                                                                       |
+| -------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `background` / `foreground`      | `bg-background`, `text-foreground`                       | Page canvas and main text                                                                                                 |
+| `card` / `card-foreground`       | `bg-card`                                                | Cards, header, panels                                                                                                     |
+| `popover`                        | `bg-popover`                                             | Modals, toasts                                                                                                            |
+| `primary` / `primary-foreground` | `bg-primary`, `text-primary`, `bg-primary/10`            | Brand (editorial indigo `oklch(0.50 0.15 265)`, `oklch(0.68 0.15 265)` in dark), primary buttons, active nav, ticket keys |
+| `secondary`                      | `bg-secondary`                                           | Secondary buttons, neutral pills                                                                                          |
+| `muted` / `muted-foreground`     | `bg-muted`, `text-muted-foreground`                      | Subtle surfaces, metadata, body text of messages                                                                          |
+| `accent`                         | `bg-accent`                                              | Rare highlights                                                                                                           |
+| `destructive`                    | `bg-destructive`, `text-destructive`, `bg-destructive/5` | Errors, blocked states, New game                                                                                          |
+| `border` / `input` / `ring`      | `border-border`, `border-input`, `ring-ring/50`          | Lines, form fields, focus rings                                                                                           |
+| `radius` (0.5rem)                | `rounded-md`, `rounded-lg`, `rounded-xl`                 | `rounded-xl` for cards, `rounded-lg` for buttons and inner boxes                                                          |
 
 Fonts: **Inter** for the UI, **JetBrains Mono** for IDs, versions, paths, code and logs (see Typography). Both are bundled locally (`@fontsource-variable/*`); the app loads nothing remote.
 
@@ -41,20 +41,20 @@ The theme follows the Settings value (System / Light / Dark); `App.tsx` toggles 
 
 **Base size: 16px.** Normal text is `text-base` (1rem = 16px, the browser default set on `body`); every other size steps from it. Two families on every screen:
 
-| Family | Utility | Use |
-| --- | --- | --- |
-| **Inter Variable** (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` as fallback) | `font-sans`, set on `body` | All UI text |
-| **JetBrains Mono Variable** (`ui-monospace, monospace` as fallback) | `font-mono` | Only ticket keys (`SD-214`), versions, file names and paths, e-mail addresses, code and logs. Never for sentences, labels, stage names or numbers (use `tabular-nums` for sizes and durations) |
+| Family                                                                                               | Utility                    | Use                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inter Variable** (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` as fallback) | `font-sans`, set on `body` | All UI text                                                                                                                                                                                    |
+| **JetBrains Mono Variable** (`ui-monospace, monospace` as fallback)                                  | `font-mono`                | Only ticket keys (`SD-214`), versions, file names and paths, e-mail addresses, code and logs. Never for sentences, labels, stage names or numbers (use `tabular-nums` for sizes and durations) |
 
-| Role | Size | Classes | Examples |
-| --- | --- | --- | --- |
-| Page title | 30px | `text-3xl font-bold tracking-tight` | "Board", "Settings", "Before you start", the code review title |
-| Subject | 20px | `text-xl font-bold tracking-tight` | Directive subject, ticket panel title, dialog titles, About app name |
-| Card heading | 18px | `text-lg font-bold tracking-tight` (or `font-semibold`) | Settings pane titles and setting titles, Danger zone,  app name in the header |
-| **Normal text** | **16px** | `text-base` | Card titles, directive and ticket body, list items, help texts, dialog text, inputs, tabs, navigation, buttons (`md`) |
-| Secondary | 14px | `text-sm text-muted-foreground` | Dates, ticket keys, secondary lines, badges, chips, header pills, small buttons (`sm`) |
-| Label | 12px | `text-xs font-bold uppercase tracking-wider` | Board column titles, Dashboard section labels ("Current task", "Project context", "Contacts", "Local environment"), counters |
-| Small | 12px | `text-xs` | Dashboard tags ("Your team", "Client", "Hints mentor"), the "role · company" lines in Contacts, the Local environment statuses ("Running", "Ready · 1.1 GB") |
+| Role            | Size     | Classes                                                 | Examples                                                                                                                                                     |
+| --------------- | -------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Page title      | 30px     | `text-3xl font-bold tracking-tight`                     | "Board", "Settings", "Before you start", the code review title                                                                                               |
+| Subject         | 20px     | `text-xl font-bold tracking-tight`                      | Directive subject, ticket panel title, dialog titles, About app name                                                                                         |
+| Card heading    | 18px     | `text-lg font-bold tracking-tight` (or `font-semibold`) | Settings pane titles and setting titles, Danger zone, app name in the header                                                                                 |
+| **Normal text** | **16px** | `text-base`                                             | Card titles, directive and ticket body, list items, help texts, dialog text, inputs, tabs, navigation, buttons (`md`)                                        |
+| Secondary       | 14px     | `text-sm text-muted-foreground`                         | Dates, ticket keys, secondary lines, badges, chips, header pills, small buttons (`sm`)                                                                       |
+| Label           | 12px     | `text-xs font-bold uppercase tracking-wider`            | Board column titles, Dashboard section labels ("Current task", "Project context", "Contacts", "Local environment"), counters                                 |
+| Small           | 12px     | `text-xs`                                               | Dashboard tags ("Your team", "Client", "Hints mentor"), the "role · company" lines in Contacts, the Local environment statuses ("Running", "Ready · 1.1 GB") |
 
 Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap`). Markdown (`Markdown.tsx`): `h1` 24px, paragraphs in `text-muted-foreground leading-relaxed`, `strong` in `font-semibold text-foreground`, inline code as `bg-muted border border-border/60 font-mono font-semibold` chips; the container sets `text-base`.
 
@@ -64,13 +64,13 @@ Nothing is smaller than 12px (`text-xs`). Buttons never wrap (`whitespace-nowrap
 
 One hue per Kanban column, in `components/stage.ts` and rendered by `StagePill` (`components/ui.tsx`). The column dots on the Board use the same hues.
 
-| Stage | Pill | Dot |
-| --- | --- | --- |
-| To Do | `bg-secondary text-secondary-foreground border-border` | slate |
-| In Progress | `bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-500/20` | blue, pulsing |
-| In QA | `bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20` | amber, pulsing |
-| Code Review | `bg-indigo-500/10 text-indigo-800 dark:text-indigo-400 border-indigo-500/20` | indigo |
-| Done | `bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20` | emerald |
+| Stage       | Pill                                                                             | Dot            |
+| ----------- | -------------------------------------------------------------------------------- | -------------- |
+| To Do       | `bg-secondary text-secondary-foreground border-border`                           | slate          |
+| In Progress | `bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-500/20`             | blue, pulsing  |
+| In QA       | `bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20`         | amber, pulsing |
+| Code Review | `bg-indigo-500/10 text-indigo-800 dark:text-indigo-400 border-indigo-500/20`     | indigo         |
+| Done        | `bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20` | emerald        |
 
 Action buttons never take the stage color: "Read & accept code review" is a primary button.
 

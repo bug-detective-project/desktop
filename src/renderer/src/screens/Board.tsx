@@ -108,7 +108,12 @@ function TicketCard({
           </span>
         )}
       </div>
-      <button type="button" className="mt-1 line-clamp-2 w-full cursor-[inherit] text-left font-medium text-foreground focus-visible:outline-none" aria-label={`${ticketKey}: ${title}`} data-testid="card-open">
+      <button
+        type="button"
+        className="mt-1 line-clamp-2 w-full cursor-[inherit] text-left font-medium text-foreground focus-visible:outline-none"
+        aria-label={`${ticketKey}: ${title}`}
+        data-testid="card-open"
+      >
         {title}
       </button>
       {lastQaFailed(ticket) && (
@@ -118,7 +123,11 @@ function TicketCard({
       )}
       {onSolveBug && (
         // A click on the card opens the ticket; this button keeps its own click to itself.
-        <div className="mt-2.5" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+        <div
+          className="mt-2.5"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
           <Button size="xs" busy={solving} onClick={onSolveBug} data-testid="solve-bug">
             {t('board.solveBug')}
           </Button>
@@ -169,7 +178,8 @@ export function Board({
     ticket.ticket === state.currentTicket && (PLAYER_MOVES[ticket.status]?.length ?? 0) > 0 && snapshot.busy !== 'qa';
   // Cards that QA or the code review will move can still be picked up: dropping them explains what moves them.
   const canDrag = (ticket: TicketState) =>
-    canMove(ticket) || (ticket.ticket === state.currentTicket && (ticket.status === 'inQa' || ticket.status === 'codeReview'));
+    canMove(ticket) ||
+    (ticket.ticket === state.currentTicket && (ticket.status === 'inQa' || ticket.status === 'codeReview'));
 
   // In QA pulses only while a QA run is in progress; In Progress always does.
   const moveForward = async (ticket: number, to: Column) => {
@@ -275,13 +285,21 @@ export function Board({
               } ${dragging && !allowed ? 'opacity-60' : ''}`}
             >
               <header className={`flex items-center gap-2 border-b px-4 py-3 ${STAGE[column].pill}`}>
-                <span className={`size-1.5 shrink-0 rounded-full ${STAGE[column].dot} ${pulses(column) ? 'animate-pulse' : ''}`} aria-hidden />
+                <span
+                  className={`size-1.5 shrink-0 rounded-full ${STAGE[column].dot} ${pulses(column) ? 'animate-pulse' : ''}`}
+                  aria-hidden
+                />
                 <h2 className="truncate text-xs font-bold tracking-wider uppercase">{t(`board.columns.${column}`)}</h2>
-                <span className="ml-auto text-xs font-medium text-muted-foreground tabular-nums" data-testid={`count-${column}`}>
+                <span
+                  className="ml-auto text-xs font-medium text-muted-foreground tabular-nums"
+                  data-testid={`count-${column}`}
+                >
                   {tickets.length}
                 </span>
               </header>
-              <div className={`flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 transition-colors ${over === column && allowed ? 'bg-primary/5' : ''}`}>
+              <div
+                className={`flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 transition-colors ${over === column && allowed ? 'bg-primary/5' : ''}`}
+              >
                 {tickets.length === 0 && (
                   <p
                     className={`rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground ${

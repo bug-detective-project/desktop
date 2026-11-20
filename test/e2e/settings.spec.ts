@@ -15,13 +15,19 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await expect(page.getByRole('navigation').getByTestId('nav-settings')).toHaveCount(0);
     await expect(page.getByTestId('nav-settings')).toHaveText('');
     await expect(page.getByTestId('nav-settings')).toHaveAccessibleName('Settings');
-    const [language, gear] = await Promise.all([page.getByTestId('language-menu').boundingBox(), page.getByTestId('nav-settings').boundingBox()]);
+    const [language, gear] = await Promise.all([
+      page.getByTestId('language-menu').boundingBox(),
+      page.getByTestId('nav-settings').boundingBox(),
+    ]);
     expect(gear!.x).toBeGreaterThan(language!.x);
     await page.getByTestId('nav-settings').click();
     await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
     const settings = page.getByTestId('settings');
     // The tab bar takes the whole width of the screen's content, like the pane below it.
-    const [bar, pane] = await Promise.all([settings.getByRole('tablist').boundingBox(), page.getByTestId('settings-pane-preferences').boundingBox()]);
+    const [bar, pane] = await Promise.all([
+      settings.getByRole('tablist').boundingBox(),
+      page.getByTestId('settings-pane-preferences').boundingBox(),
+    ]);
     expect(Math.round(bar!.width)).toBe(Math.round(pane!.width));
 
     // Preferences: language and theme apply at once. Each language option shows its flag.
@@ -72,7 +78,9 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     await page.getByTestId('settings-tab-backup').click();
     await expect(page.getByTestId('backup-outdated')).toHaveText('Backup outdated');
     await expect(page.getByTestId('last-export')).toContainText('Never exported');
-    await expect(page.getByTestId('campaign-progress')).toHaveText(`0 tickets completed · ${supportdesk.key('front-1')} (To Do)`);
+    await expect(page.getByTestId('campaign-progress')).toHaveText(
+      `0 tickets completed · ${supportdesk.key('front-1')} (To Do)`,
+    );
     const file = join(saves, 'bug-detective-2026-10-27.bdsave');
     await app.evaluate(({ dialog }, path) => {
       dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as never;
@@ -101,7 +109,9 @@ test('settings: preferences, developer tools, backup and about tabs', async () =
     expect(diagnostics).not.toContain('João Silva');
     // Send feedback opens the discussions page (the e2e build logs the links it would open).
     await page.getByTestId('send-feedback').click();
-    await expect.poll(() => readFile(join(userData, 'opened-urls.log'), 'utf8').catch(() => '')).toContain('https://github.com/bug-detective-project/desktop/discussions');
+    await expect
+      .poll(() => readFile(join(userData, 'opened-urls.log'), 'utf8').catch(() => ''))
+      .toContain('https://github.com/bug-detective-project/desktop/discussions');
 
     // Never git branch names or the number of tickets.
     for (const tab of ['preferences', 'environment', 'backup', 'about']) {
@@ -144,10 +154,14 @@ test('restoring a save made by another installation warns that it brings code in
     }, file);
     await page.getByTestId('restore-progress').click();
     const dialog = page.getByTestId('restore-dialog');
-    await expect(dialog.getByTestId('foreign-save-warning')).toContainText('This backup was created on another computer. It brings code that will run in your workspace.');
+    await expect(dialog.getByTestId('foreign-save-warning')).toContainText(
+      'This backup was created on another computer. It brings code that will run in your workspace.',
+    );
     await expect(dialog.getByTestId('restore-warning')).toHaveCount(0);
     await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));
-    await expect(dialog.getByTestId('foreign-save-warning')).toContainText('Este backup foi criado em outro computador.');
+    await expect(dialog.getByTestId('foreign-save-warning')).toContainText(
+      'Este backup foi criado em outro computador.',
+    );
     await dialog.getByTestId('confirm-restore').click();
     await expect(page.getByTestId('toast-info')).toContainText('Progresso restaurado.');
     await expect(page.getByTestId('last-export')).toContainText('from-a-friend.bdsave');
@@ -186,11 +200,15 @@ test('settings show Docker stopped with a way to start it', async () => {
     await expect(page.getByTestId('tool-docker')).toHaveAttribute('data-status', 'stopped');
     await expect(page.getByTestId('disk-usage')).toContainText('Start Docker to measure disk usage.');
     await expect(page.getByTestId('clean-leftovers')).toBeDisabled();
-    await expect(page.getByTestId('docker-leftovers')).toContainText('Docker is not running: start it to clean up. If Docker Desktop is stuck, restart it.');
+    await expect(page.getByTestId('docker-leftovers')).toContainText(
+      'Docker is not running: start it to clean up. If Docker Desktop is stuck, restart it.',
+    );
     await page.getByTestId('settings-tab-backup').click();
     await expect(page.getByTestId('export-progress')).toBeDisabled();
     await expect(page.getByTestId('remove-docker')).toBeDisabled();
-    await expect(page.getByTestId('settings-pane-backup')).toContainText('Start Docker to export or restore your progress.');
+    await expect(page.getByTestId('settings-pane-backup')).toContainText(
+      'Start Docker to export or restore your progress.',
+    );
 
     await page.getByTestId('settings-tab-environment').click();
     await page.getByTestId('start-docker').click();
@@ -208,20 +226,28 @@ test('Docker cleanup: leftovers keep the game, removing everything starts a new 
     await page.getByTestId('nav-settings').click();
     await page.getByTestId('settings-tab-environment').click();
     await page.getByTestId('clean-leftovers').click();
-    await expect(page.getByTestId('toast-info').filter({ hasText: 'Docker cleanup done: 3 items removed.' })).toBeVisible();
+    await expect(
+      page.getByTestId('toast-info').filter({ hasText: 'Docker cleanup done: 3 items removed.' }),
+    ).toBeVisible();
 
     // Removing everything asks first and lists what goes.
     await page.getByTestId('settings-tab-backup').click();
     await page.getByTestId('remove-docker').click();
     const dialog = page.getByTestId('remove-docker-dialog');
     await expect(dialog).toContainText('This deletes the code in your workspace and starts a new game.');
-    await expect(dialog).toContainText("Volumes: your code, the data of the project's services, the VS Code server, the dependency cache and the QA copy");
+    await expect(dialog).toContainText(
+      "Volumes: your code, the data of the project's services, the VS Code server, the dependency cache and the QA copy",
+    );
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
 
     await page.getByTestId('remove-docker').click();
     await page.getByTestId('confirm-remove-docker').click();
-    await expect(page.getByTestId('toast-info').filter({ hasText: 'Everything Bug Detective created in Docker was removed. A new game has started.' })).toBeVisible();
+    await expect(
+      page
+        .getByTestId('toast-info')
+        .filter({ hasText: 'Everything Bug Detective created in Docker was removed. A new game has started.' }),
+    ).toBeVisible();
     // A new game: no ticket on the board, and the downloads are needed again.
     await page.getByTestId('nav-board').click();
     await expect(page.getByTestId('card-1')).toHaveCount(0);
@@ -243,7 +269,9 @@ test('Docker cleanup lists what Docker could not remove, and why', async () => {
     const result = page.getByTestId('cleanup-result');
     await expect(result).toContainText('Alguns itens não foram removidos');
     await expect(result).toContainText('2 removidos. O Docker não conseguiu remover 1 item:');
-    await expect(result.getByTestId('cleanup-failed')).toHaveText('Volume: bugdetective-qa-inputError response from daemon: bugdetective-qa-input is in use');
+    await expect(result.getByTestId('cleanup-failed')).toHaveText(
+      'Volume: bugdetective-qa-inputError response from daemon: bugdetective-qa-input is in use',
+    );
     // Leftovers never touch the game: no line about it.
     await expect(result.getByTestId('cleanup-game')).toHaveCount(0);
     await expect(result).toContainText('Se o Docker Desktop parecer travado, reinicie-o');
@@ -265,7 +293,9 @@ test('removing everything keeps the game when Docker could not remove the code',
     await expect(result.getByTestId('cleanup-failed')).toHaveCount(2);
     await expect(result.getByTestId('cleanup-failed').first()).toContainText('Container: bugdetective-workspace');
     await expect(result.getByTestId('cleanup-failed').last()).toContainText('Volume: bugdetective-workspace');
-    await expect(result.getByTestId('cleanup-game')).toHaveText('Your progress was kept: the volume with your code could not be removed.');
+    await expect(result.getByTestId('cleanup-game')).toHaveText(
+      'Your progress was kept: the volume with your code could not be removed.',
+    );
     await result.getByRole('button', { name: 'Close' }).last().click();
     await page.getByTestId('nav-board').click();
     await expect(page.getByTestId('card-1')).toBeVisible();
@@ -274,7 +304,7 @@ test('removing everything keeps the game when Docker could not remove the code',
   }
 });
 
-test('open logs folder: a failure shows its reason, and a success opens the folder with the day\'s log', async () => {
+test("open logs folder: a failure shows its reason, and a success opens the folder with the day's log", async () => {
   // The same data folder for both starts: the second one finds the log of the first.
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
   const openLogs = async (page: Page) => {
@@ -286,10 +316,15 @@ test('open logs folder: a failure shows its reason, and a success opens the fold
   try {
     // The opener answers with a problem (no file manager, say): the toast carries it. Nothing else
     // on the screen reacts, which is what happened before this was handled.
-    const failing = await launch({}, { userData, env: { BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM: 'No file manager is installed' } });
+    const failing = await launch(
+      {},
+      { userData, env: { BUGDETECTIVE_E2E_OPEN_PATH_PROBLEM: 'No file manager is installed' } },
+    );
     try {
       await openLogs(failing.page);
-      await expect(failing.page.getByTestId('toast-error')).toContainText('The logs folder could not be opened: No file manager is installed');
+      await expect(failing.page.getByTestId('toast-error')).toContainText(
+        'The logs folder could not be opened: No file manager is installed',
+      );
     } finally {
       await failing.close();
     }
@@ -299,7 +334,9 @@ test('open logs folder: a failure shows its reason, and a success opens the fold
       await expect(working.page.getByTestId('toast-error')).toHaveCount(0);
       // The folder that was opened is the logs folder, and it holds the day's file: the main
       // process logs one line at every start.
-      await expect.poll(() => readFile(join(userData, 'opened-paths.log'), 'utf8').catch(() => '')).toContain(join(userData, 'logs'));
+      await expect
+        .poll(() => readFile(join(userData, 'opened-paths.log'), 'utf8').catch(() => ''))
+        .toContain(join(userData, 'logs'));
       const logs = await readdir(join(userData, 'logs'));
       expect(logs).toEqual([expect.stringMatching(/^bug-detective-\d{4}-\d{2}-\d{2}\.log$/)]);
       expect(await readFile(join(userData, 'logs', logs[0]), 'utf8')).toContain('Bug Detective');

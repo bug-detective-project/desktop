@@ -28,21 +28,38 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
       await expect(card).toHaveAttribute('data-status', 'todo');
     }
     // ...and by the main process, even when the renderer asks directly.
-    const direct = await page.evaluate(() => window.bugDetective.move(1, 'done').then(() => 'moved', (error: Error) => error.message));
+    const direct = await page.evaluate(() =>
+      window.bugDetective.move(1, 'done').then(
+        () => 'moved',
+        (error: Error) => error.message,
+      ),
+    );
     expect(direct).toContain('moveNotAllowed');
 
     await dragCard(page, 1, 'inProgress');
     await expect(card).toHaveAttribute('data-status', 'inProgress');
-    await expect(hint).toHaveText("Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.");
+    await expect(hint).toHaveText(
+      "Move your ticket to In QA when the fix is ready. QA runs the project's tests first, then the ticket's own checks.",
+    );
     await dropExplains(page, card, 'todo', 'Tickets in progress cannot go back to To Do.');
     await expect(card).toHaveAttribute('data-status', 'inProgress');
 
     // In QA: the card cannot move while QA runs (a drop says QA will move it), then comes back with a comment.
     await dragCard(page, 1, 'inQa');
     await expect(card).toHaveAttribute('data-status', 'inQa');
-    await dropExplains(page, card, 'done', 'Your card is being tested. When QA finishes, it moves the card to the right column.');
+    await dropExplains(
+      page,
+      card,
+      'done',
+      'Your card is being tested. When QA finishes, it moves the card to the right column.',
+    );
     await expect(card).toHaveAttribute('data-status', 'inQa');
-    const cancel = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
+    const cancel = await page.evaluate(() =>
+      window.bugDetective.move(1, 'inProgress').then(
+        () => 'moved',
+        (error: Error) => error.message,
+      ),
+    );
     expect(cancel).toMatch(/moveNotAllowed|busy/);
     await expect(card).toHaveAttribute('data-status', 'inProgress', { timeout: 15_000 });
     await expect(card).toHaveAttribute('data-attempts', '1');
@@ -73,7 +90,12 @@ test('the player can only drag To Do → In Progress → In QA; QA and review mo
     // A Done ticket next to an active one: the active one decides the subtitle.
     await expect(hint).toHaveText('Move your ticket to In Progress and start your task.');
     await expect(page.getByTestId('card-1')).toHaveAttribute('draggable', 'false');
-    const reopen = await page.evaluate(() => window.bugDetective.move(1, 'inProgress').then(() => 'moved', (error: Error) => error.message));
+    const reopen = await page.evaluate(() =>
+      window.bugDetective.move(1, 'inProgress').then(
+        () => 'moved',
+        (error: Error) => error.message,
+      ),
+    );
     expect(reopen).toContain('notActiveTicket');
   } finally {
     await close();
@@ -87,9 +109,15 @@ test('Get Next Assignment asks for the track and shows each track, its next tick
     await expect(page.getByTestId('next-assignment')).toBeEnabled();
     await page.getByTestId('next-assignment').click();
     await expect(page.getByTestId('next-assignment-front')).toContainText('Front');
-    await expect(page.getByTestId('next-assignment-front')).toContainText(`Next: ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front} done`);
-    await expect(page.getByTestId('next-assignment-back')).toContainText(`Next: ${supportdesk.key('back-1')} · 0/${supportdesk.counts.back} done`);
-    await expect(page.getByTestId('next-assignment-fullstack')).toContainText(`Next: Front · ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front + supportdesk.counts.back} done`);
+    await expect(page.getByTestId('next-assignment-front')).toContainText(
+      `Next: ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front} done`,
+    );
+    await expect(page.getByTestId('next-assignment-back')).toContainText(
+      `Next: ${supportdesk.key('back-1')} · 0/${supportdesk.counts.back} done`,
+    );
+    await expect(page.getByTestId('next-assignment-fullstack')).toContainText(
+      `Next: Front · ${supportdesk.key('front-1')} · 0/${supportdesk.counts.front + supportdesk.counts.back} done`,
+    );
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('next-assignment-tracks')).toHaveCount(0);
     await page.getByTestId('next-assignment').click();
@@ -124,7 +152,12 @@ test('Get Next Assignment is unavailable until the current ticket is Done', asyn
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('next-assignment')).toHaveCount(0);
     await expect(page.getByTestId('dashboard')).not.toContainText('Finish the current ticket');
-    const result = await page.evaluate(() => window.bugDetective.nextAssignment('front').then(() => 'unlocked', (error: Error) => error.message));
+    const result = await page.evaluate(() =>
+      window.bugDetective.nextAssignment('front').then(
+        () => 'unlocked',
+        (error: Error) => error.message,
+      ),
+    );
     expect(result).toContain('ticketNotDone');
   } finally {
     await close();
@@ -163,12 +196,16 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     // The work desk: the current task, then the local environment, then the drawer button; the action lives only here.
     const desk = page.getByTestId('work-desk');
     await expect(desk).toHaveAttribute('aria-label', 'Your desk');
-    const order = await desk.locator('[data-testid="assignment-card"], [data-testid="environment-card"], [data-testid="project-drawer-toggle"]').evaluateAll((items) =>
-      items.map((item) => item.getAttribute('data-testid')),
-    );
+    const order = await desk
+      .locator(
+        '[data-testid="assignment-card"], [data-testid="environment-card"], [data-testid="project-drawer-toggle"]',
+      )
+      .evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')));
     expect(order).toEqual(['assignment-card', 'environment-card', 'project-drawer-toggle']);
     // Below Local environment: the client.
-    await expect(page.getByTestId('desk-client')).toHaveText(new RegExp(`Client\\s*${supportdesk.story.en.client.name}`));
+    await expect(page.getByTestId('desk-client')).toHaveText(
+      new RegExp(`Client\\s*${supportdesk.story.en.client.name}`),
+    );
     const below = await page.evaluate(() => {
       const top = (id: string) => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
       return top('desk-client') > top('environment-card');
@@ -199,7 +236,9 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     await expect(page.getByTestId('desk-primary')).toHaveText('Start ticket on Board');
     await expect(page.getByTestId('desk-vscode')).toHaveAttribute('title', 'Open in VS Code');
     // The current task is the desk's first child.
-    expect(await desk.evaluate((element) => element.firstElementChild?.getAttribute('data-testid'))).toBe('assignment-card');
+    expect(await desk.evaluate((element) => element.firstElementChild?.getAttribute('data-testid'))).toBe(
+      'assignment-card',
+    );
     await expect(page.getByTestId('desk-browser')).toHaveAttribute('title', 'Open app in browser');
     await expect(desk).not.toContainText('player/');
     await page.getByTestId('desk-primary').click();
@@ -248,7 +287,9 @@ test('the dashboard shows only the current assignment, never how many tickets ex
     // Native controls and scrollbars follow the theme.
     const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
     await expect.poll(scheme).toBe(before ? 'light' : 'dark');
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement, '::-webkit-scrollbar-button').display)).toBe('none');
+    expect(
+      await page.evaluate(() => getComputedStyle(document.documentElement, '::-webkit-scrollbar-button').display),
+    ).toBe('none');
   } finally {
     await close();
   }
@@ -279,7 +320,9 @@ test('Project & contacts opens in a drawer: closed by default, closes with the b
     await expect(page.getByTestId('contacts-card').locator('li').first()).toContainText('Hints mentor');
     // Then the manager, on the player's own team.
     await expect(page.getByTestId('contacts-card').locator('li').nth(1)).toContainText('Rafaela Nunes');
-    await expect(page.getByTestId('contacts-card').locator('li').nth(1)).toContainText('Engineering manager · Lanternfish Labs');
+    await expect(page.getByTestId('contacts-card').locator('li').nth(1)).toContainText(
+      'Engineering manager · Lanternfish Labs',
+    );
 
     // Escape closes and gives the focus back to the desk button.
     await page.keyboard.press('Escape');
@@ -343,11 +386,18 @@ test('the columns are framed cards with a placeholder when empty, in English and
     await expect(page.getByTestId('board-hint')).toHaveText(
       'Mova seu ticket para Em QA quando a correção estiver pronta. O QA roda primeiro os testes do projeto e depois as verificações do ticket.',
     );
-    await expect(page.getByTestId('empty-todo')).toHaveText('Nada esperando. Novas tarefas chegam na sua caixa de entrada.');
+    await expect(page.getByTestId('empty-todo')).toHaveText(
+      'Nada esperando. Novas tarefas chegam na sua caixa de entrada.',
+    );
     await expect(page.getByTestId('empty-inQa')).toHaveText('Solte seu ticket aqui para rodar o QA.');
     await expect(page.getByTestId('empty-codeReview')).toHaveText('Tickets aprovados no QA aguardam revisão aqui.');
     await expect(page.getByTestId('empty-done')).toHaveText('Os tickets chegam aqui quando você aceita a revisão.');
-    await dropExplains(page, page.getByTestId('card-1'), 'todo', 'Tarefas em andamento não podem voltar para a coluna A fazer.');
+    await dropExplains(
+      page,
+      page.getByTestId('card-1'),
+      'todo',
+      'Tarefas em andamento não podem voltar para a coluna A fazer.',
+    );
   } finally {
     await close();
   }
@@ -394,7 +444,12 @@ test('the dashboard is one card with three panes that fit the window and scroll 
       const desk = document.querySelector('[data-testid="work-desk"]')!.getBoundingClientRect();
       const inbox = document.querySelector('[data-testid="inbox"]')!.parentElement!.getBoundingClientRect();
       const message = document.querySelector('[data-testid="message"]')!.getBoundingClientRect();
-      return { desk: desk.width, inbox: inbox.width, message: message.width, sameTop: desk.top === inbox.top && inbox.top === message.top };
+      return {
+        desk: desk.width,
+        inbox: inbox.width,
+        message: message.width,
+        sameTop: desk.top === inbox.top && inbox.top === message.top,
+      };
     });
     expect(panes).toMatchObject({ desk: 320, inbox: 400, sameTop: true });
     expect(panes.message).toBeGreaterThan(400);
@@ -402,7 +457,8 @@ test('the dashboard is one card with three panes that fit the window and scroll 
     // The page never scrolls: the inbox list and the e-mail do, each on its own.
     const main = page.locator('main');
     await expect.poll(() => main.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
-    const scrolls = (id: string) => page.getByTestId(id).evaluate((element) => element.scrollHeight > element.clientHeight);
+    const scrolls = (id: string) =>
+      page.getByTestId(id).evaluate((element) => element.scrollHeight > element.clientHeight);
     await expect.poll(() => scrolls('message')).toBe(true);
     await page.getByTestId('inbox').evaluate((list) => {
       const item = list.querySelector('li')!;
@@ -423,9 +479,17 @@ test('the dashboard is one card with three panes that fit the window and scroll 
     for (const language of ['en', 'pt'] as const) {
       await page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
       await expect(page.getByTestId('nav-board')).toHaveText(language === 'en' ? 'Board' : 'Quadro');
-      const wrapped = await page.getByTestId('dashboard').locator('button').evaluateAll((buttons) =>
-        buttons.filter((button) => getComputedStyle(button).whiteSpace !== 'nowrap' && button.closest('[data-testid="inbox"]') === null).map((button) => button.textContent),
-      );
+      const wrapped = await page
+        .getByTestId('dashboard')
+        .locator('button')
+        .evaluateAll((buttons) =>
+          buttons
+            .filter(
+              (button) =>
+                getComputedStyle(button).whiteSpace !== 'nowrap' && button.closest('[data-testid="inbox"]') === null,
+            )
+            .map((button) => button.textContent),
+        );
       expect(wrapped).toEqual([]);
     }
     await expect(page.getByTestId('work-desk')).toHaveAttribute('aria-label', 'Sua mesa');
@@ -578,7 +642,11 @@ test('an older e-mail of a done ticket says so and links to it on the Board', as
     await page.getByTestId('desk-primary').click();
     await page.getByTestId('accept-review').click();
     await page.getByTestId('nav-dashboard').click();
-    await page.getByTestId('inbox-message').filter({ hasText: supportdesk.assignment('front-1', 'en') }).getByRole('button').click();
+    await page
+      .getByTestId('inbox-message')
+      .filter({ hasText: supportdesk.assignment('front-1', 'en') })
+      .getByRole('button')
+      .click();
     await expect(page.getByTestId('previous-directive')).toContainText(supportdesk.key('front-1'));
     await page.getByTestId('view-done-ticket').click();
     await expect(page.getByTestId('board')).toBeVisible();

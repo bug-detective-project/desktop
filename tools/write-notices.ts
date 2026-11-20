@@ -21,7 +21,11 @@ for (const target of ['main', 'preload', 'renderer']) {
 const notices = renderNotices(await readFile(join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8'), packages);
 await writeFile(join(root, 'out', 'THIRD_PARTY_NOTICES.md'), notices);
 const missing = packages.filter((item) => !item.licenseText).map((item) => `${item.name}@${item.version}`);
-console.log(`out/THIRD_PARTY_NOTICES.md: ${new Set(packages.map((item) => `${item.name}@${item.version}`)).size} bundled packages`);
+console.log(
+  `out/THIRD_PARTY_NOTICES.md: ${new Set(packages.map((item) => `${item.name}@${item.version}`)).size} bundled packages`,
+);
 if (missing.length > 0) {
-  console.warn(`No license file shipped by: ${[...new Set(missing)].join(', ')} (their package.json license is listed instead)`);
+  console.warn(
+    `No license file shipped by: ${[...new Set(missing)].join(', ')} (their package.json license is listed instead)`,
+  );
 }

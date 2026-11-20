@@ -24,7 +24,9 @@ describe('appFetch', () => {
 
 describe('fetchTextWith', () => {
   it('returns the text of a 200 and fails on any other status', async () => {
-    const fetchImpl = vi.fn(async (url: string | URL | Request) => (String(url).endsWith('/ok') ? new Response('hello') : new Response('', { status: 503 })));
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      String(url).endsWith('/ok') ? new Response('hello') : new Response('', { status: 503 }),
+    );
     const fetchText = fetchTextWith(fetchImpl as unknown as typeof fetch);
     expect(await fetchText('https://example.test/ok')).toBe('hello');
     await expect(fetchText('https://example.test/down')).rejects.toThrow(/answered 503/);

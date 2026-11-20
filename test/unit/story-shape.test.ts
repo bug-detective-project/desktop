@@ -20,7 +20,11 @@ describe('shapeOf', () => {
   it('names the paths whose type changed, went missing or are new', () => {
     const stored = shapeOf({ id: 1, name: 'x', old: true, nested: { n: 1 } });
     const captured = shapeOf({ id: '1', name: 'y', nested: { n: 1, m: null } });
-    expect(shapeDifferences(stored, captured)).toEqual(['$.id: number → string', '$.nested.m: (missing) → null', '$.old: boolean → (missing)']);
+    expect(shapeDifferences(stored, captured)).toEqual([
+      '$.id: number → string',
+      '$.nested.m: (missing) → null',
+      '$.old: boolean → (missing)',
+    ]);
     expect(shapeDifferences(stored, stored)).toEqual([]);
   });
 });

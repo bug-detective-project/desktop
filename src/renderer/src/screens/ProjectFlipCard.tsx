@@ -17,7 +17,8 @@ const LEVELS = {
   advanced: { filled: 3, bar: 'bg-destructive', text: 'text-destructive' },
 } as const;
 
-const face = 'absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm [backface-visibility:hidden]';
+const face =
+  'absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm [backface-visibility:hidden]';
 const label = 'text-xs font-semibold tracking-wider text-muted-foreground uppercase';
 /** How many of the project's skills (up to 12, in the author's order) the brief shows before "See all". */
 const SKILLS_SHOWN = 5;
@@ -28,7 +29,17 @@ const SKILLS_SHOWN = 5;
  * brief (client, stack, tickets and the skills practiced). It flips only from its buttons; the
  * hidden face is inert, and the focus moves to the button that flips back.
  */
-export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: ProjectCard; language: Language; blocked: string | null; onPlay: (card: ProjectCard) => void }) {
+export function ProjectFlipCard({
+  card,
+  language,
+  blocked,
+  onPlay,
+}: {
+  card: ProjectCard;
+  language: Language;
+  blocked: string | null;
+  onPlay: (card: ProjectCard) => void;
+}) {
   const { t } = useTranslation();
   const [flipped, setFlipped] = useState(false);
   // The brief shows the first skills of the project; the rest opens on request, inside the card.
@@ -63,7 +74,12 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
         style={flipped ? { transform: 'rotateY(180deg)' } : undefined}
         data-testid={`project-${card.id}-flipper`}
       >
-        <section className={face} aria-hidden={flipped || undefined} inert={flipped} data-testid={`project-${card.id}-front`}>
+        <section
+          className={face}
+          aria-hidden={flipped || undefined}
+          inert={flipped}
+          data-testid={`project-${card.id}-front`}
+        >
           <div className="flex items-center gap-4 border-b border-border bg-muted/70 px-6 py-5">
             <div
               className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--primary)_18%,var(--card))] font-mono text-xl font-semibold text-primary"
@@ -74,7 +90,10 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             </div>
             {details?.difficulty && <Difficulty level={details.difficulty} />}
             {card.active && (
-              <span className="ml-auto shrink-0 self-start rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-sm font-medium text-primary" data-testid="project-current">
+              <span
+                className="ml-auto shrink-0 self-start rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-sm font-medium text-primary"
+                data-testid="project-current"
+              >
                 {t('projects.current')}
               </span>
             )}
@@ -89,7 +108,9 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 </span>
               )}
             </div>
-            <p className="line-clamp-4 text-base leading-relaxed text-muted-foreground">{details ? details.about[language] : t('projects.noDetails')}</p>
+            <p className="line-clamp-4 text-base leading-relaxed text-muted-foreground">
+              {details ? details.about[language] : t('projects.noDetails')}
+            </p>
             {card.unavailable === 'appTooOld' && (
               <p className="text-sm font-medium text-amber-700 dark:text-amber-400" data-testid="project-needs-update">
                 {t('projects.needsUpdate')}
@@ -102,7 +123,13 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             )}
             {!card.active && blocked && <p className="text-sm text-muted-foreground">{blocked}</p>}
             <div className="mt-auto flex items-center justify-between gap-3 whitespace-nowrap">
-              <Button ref={briefButton} size="sm" disabled={!details} onClick={() => flip(true)} data-testid={`project-${card.id}-brief`}>
+              <Button
+                ref={briefButton}
+                size="sm"
+                disabled={!details}
+                onClick={() => flip(true)}
+                data-testid={`project-${card.id}-brief`}
+              >
                 <FileText className="size-4" aria-hidden />
                 {t('projects.brief')}
               </Button>
@@ -110,7 +137,13 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 <Button
                   variant="primary"
                   disabled={blocked !== null || card.unavailable !== null}
-                  title={card.unavailable === 'appTooOld' ? t('projects.needsUpdate') : card.unavailable ? t('projects.unavailable') : (blocked ?? undefined)}
+                  title={
+                    card.unavailable === 'appTooOld'
+                      ? t('projects.needsUpdate')
+                      : card.unavailable
+                        ? t('projects.unavailable')
+                        : (blocked ?? undefined)
+                  }
                   onClick={() => onPlay(card)}
                   data-testid={`switch-${card.id}`}
                 >
@@ -122,7 +155,12 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
           </div>
         </section>
 
-        <section className={`${face} [transform:rotateY(180deg)]`} aria-hidden={!flipped || undefined} inert={!flipped} data-testid={`project-${card.id}-back`}>
+        <section
+          className={`${face} [transform:rotateY(180deg)]`}
+          aria-hidden={!flipped || undefined}
+          inert={!flipped}
+          data-testid={`project-${card.id}-back`}
+        >
           <div className="flex items-start justify-between gap-3 border-b border-border bg-muted/70 px-6 py-4">
             <div className="min-w-0">
               <p className={label}>{name}</p>
@@ -132,7 +170,14 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
                 </h3>
               )}
             </div>
-            <Button ref={closeButton} variant="ghost" size="sm" onClick={() => flip(false)} aria-label={t('projects.closeBrief')} data-testid={`project-${card.id}-close-brief`}>
+            <Button
+              ref={closeButton}
+              variant="ghost"
+              size="sm"
+              onClick={() => flip(false)}
+              aria-label={t('projects.closeBrief')}
+              data-testid={`project-${card.id}-close-brief`}
+            >
               <Icon name="x" />
             </Button>
           </div>
@@ -140,11 +185,41 @@ export function ProjectFlipCard({ card, language, blocked, onPlay }: { card: Pro
             <div className="flex min-h-0 flex-1 flex-col px-6 pt-7 pb-6">
               {/* The label column is at least 76px and as wide as the longest label ("Banco de dados"), so values line up. */}
               <dl className="grid grid-cols-[auto_minmax(76px,auto)_1fr] items-center gap-x-2 gap-y-2 text-sm">
-                {details.stack?.frontend && <Row icon={<Monitor />} label={t('projects.frontend')} value={details.stack.frontend} testId="project-stack-frontend" />}
-                {details.stack?.backend && <Row icon={<Icon name="server" />} label={t('projects.backend')} value={details.stack.backend} testId="project-stack-backend" />}
-                {details.stack?.database && <Row icon={<Database />} label={t('projects.database')} value={details.stack.database} testId="project-stack-database" />}
-                {tickets && <Row icon={<Ticket />} label={t('projects.tickets')} value={tickets} testId="project-tickets" />}
-                {details.memoryBytes !== null && <Row icon={<MemoryStick />} label={t('projects.memory')} value={gigabytes(details.memoryBytes, language)} testId="project-memory" />}
+                {details.stack?.frontend && (
+                  <Row
+                    icon={<Monitor />}
+                    label={t('projects.frontend')}
+                    value={details.stack.frontend}
+                    testId="project-stack-frontend"
+                  />
+                )}
+                {details.stack?.backend && (
+                  <Row
+                    icon={<Icon name="server" />}
+                    label={t('projects.backend')}
+                    value={details.stack.backend}
+                    testId="project-stack-backend"
+                  />
+                )}
+                {details.stack?.database && (
+                  <Row
+                    icon={<Database />}
+                    label={t('projects.database')}
+                    value={details.stack.database}
+                    testId="project-stack-database"
+                  />
+                )}
+                {tickets && (
+                  <Row icon={<Ticket />} label={t('projects.tickets')} value={tickets} testId="project-tickets" />
+                )}
+                {details.memoryBytes !== null && (
+                  <Row
+                    icon={<MemoryStick />}
+                    label={t('projects.memory')}
+                    value={gigabytes(details.memoryBytes, language)}
+                    testId="project-memory"
+                  />
+                )}
               </dl>
               {skills.length > 0 && (
                 <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-border pt-4">
@@ -206,7 +281,17 @@ function Difficulty({ level }: { level: keyof typeof LEVELS }) {
 }
 
 /** The icons come from lucide-react directly: components/icons.tsx is imported by the app header, which this screen must not change. */
-function Row({ icon, label: name, value, testId }: { icon: ReactNode; label: string; value: ReactNode; testId: string }) {
+function Row({
+  icon,
+  label: name,
+  value,
+  testId,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  testId: string;
+}) {
   return (
     <div className="contents" data-testid={testId}>
       <span className="text-muted-foreground [&>svg]:size-4" aria-hidden>

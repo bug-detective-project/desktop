@@ -2,7 +2,16 @@ import { mkdtemp, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildDiagnostics, isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from '../../src/main/services/logs.ts';
+import {
+  buildDiagnostics,
+  isWsl,
+  logFileName,
+  openLogsFolder,
+  openWithWindowsExplorer,
+  pruneLogs,
+  recentLines,
+  redactPaths,
+} from '../../src/main/services/logs.ts';
 
 describe('log files', () => {
   it('names the file after the day, in local time', () => {
@@ -30,7 +39,9 @@ describe('log files', () => {
 
 describe('redactPaths', () => {
   it('replaces the home folder in every spelling with ~', () => {
-    expect(redactPaths('C:\\Users\\João Silva\\AppData and C:/Users/João Silva/x', 'C:\\Users\\João Silva')).toBe('~\\AppData and ~/x');
+    expect(redactPaths('C:\\Users\\João Silva\\AppData and C:/Users/João Silva/x', 'C:\\Users\\João Silva')).toBe(
+      '~\\AppData and ~/x',
+    );
     expect(redactPaths('/home/pleao/project', '/home/pleao')).toBe('~/project');
     expect(redactPaths('nothing', '')).toBe('nothing');
   });
@@ -48,7 +59,13 @@ describe('buildDiagnostics', () => {
       ],
       project: { id: 'supportdesk', name: 'SupportDesk', manifestVersion: '2.6.0' },
       dockerState: 'running',
-      environment: { items: [{ id: 'workspaceImage', ready: true }, { id: 'qaImage', ready: false }], ready: false },
+      environment: {
+        items: [
+          { id: 'workspaceImage', ready: true },
+          { id: 'qaImage', ready: false },
+        ],
+        ready: false,
+      },
       logLines: ['» Fetching front-1', 'saved C:\\Users\\João Silva\\AppData\\Roaming\\Bug Detective\\state.json'],
       home: 'C:\\Users\\João Silva',
       now: new Date('2026-11-04T10:00:00.000Z'),
@@ -94,7 +111,7 @@ describe('openWithWindowsExplorer', () => {
     expect(isWsl('win32', { WSL_DISTRO_NAME: 'Ubuntu-22.04' })).toBe(false);
   });
 
-  it('opens the folder\'s Windows path in Explorer, whose exit code 1 is not a failure', async () => {
+  it("opens the folder's Windows path in Explorer, whose exit code 1 is not a failure", async () => {
     const calls: [string, string[]][] = [];
     const exec = async (file: string, args: string[]) => {
       calls.push([file, args]);
@@ -109,7 +126,11 @@ describe('openWithWindowsExplorer', () => {
   });
 
   it('reports a missing wslpath or explorer.exe', async () => {
-    await expect(openWithWindowsExplorer('/home/dev/logs', async () => { throw enoent(); })).resolves.toContain('wslpath:');
+    await expect(
+      openWithWindowsExplorer('/home/dev/logs', async () => {
+        throw enoent();
+      }),
+    ).resolves.toContain('wslpath:');
     const exec = async (file: string) => {
       if (file === 'wslpath') return { stdout: 'C:\\x\n' };
       throw enoent();

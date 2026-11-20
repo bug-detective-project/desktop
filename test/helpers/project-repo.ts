@@ -49,7 +49,12 @@ export function projectStory(name: string, ids: string[], skills?: string[]): st
   const message = (subject: string) => ({ subject, body: `${subject}.` });
   return `${JSON.stringify(
     {
-      client: { name: 'Client', about: 'A client.', contacts: 'Someone', reporters: [{ name: 'Someone', role: 'Lead' }] },
+      client: {
+        name: 'Client',
+        about: 'A client.',
+        contacts: 'Someone',
+        reporters: [{ name: 'Someone', role: 'Lead' }],
+      },
       project: { name, about: `The ${name} app.`, stack: 'Text files', ...(skills && { skills }) },
       messages: {
         welcome: message('Welcome'),
@@ -79,11 +84,21 @@ export interface ProjectBrief {
   services?: Record<string, unknown>;
 }
 
-export async function createProjectRepo(dir: string, counts: TicketCounts, name = 'Demo', id = name.toLowerCase(), brief: ProjectBrief = {}): Promise<ProjectRepo> {
+export async function createProjectRepo(
+  dir: string,
+  counts: TicketCounts,
+  name = 'Demo',
+  id = name.toLowerCase(),
+  brief: ProjectBrief = {},
+): Promise<ProjectRepo> {
   const projectDir = join(dir, id);
   const qaDir = join(dir, `${id}-qa`);
   const git = (cwd: string, ...args: string[]) =>
-    execFileSync('git', ['-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    execFileSync('git', ['-c', 'core.autocrlf=false', ...args], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
 
   await mkdir(projectDir, { recursive: true });
   git(projectDir, 'init', '-q', '-b', 'main');

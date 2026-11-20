@@ -31,15 +31,27 @@ let runtime: DockerRuntime;
 let game: Game;
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 /** The dev server's processes still running in the container (npm, concurrently, Vite, the API's node --watch). */
 async function devProcesses(): Promise<string[]> {
-  const result = await docker.exec(runtime.names.container, ['sh', '-c', "pgrep -af '[n]pm run dev|[c]oncurrently|[n]ode_modules/.bin/vite|[n]ode --watch' || true"], {
-    user: 'node',
-  });
+  const result = await docker.exec(
+    runtime.names.container,
+    ['sh', '-c', "pgrep -af '[n]pm run dev|[c]oncurrently|[n]ode_modules/.bin/vite|[n]ode --watch' || true"],
+    {
+      user: 'node',
+    },
+  );
   return result.stdout
     .toString('utf8')
     .split('\n')
@@ -53,7 +65,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
   game = new Game({
     store: new StateStore(dir),
@@ -82,7 +98,9 @@ afterAll(async () => {
 describe('the workspace layout', () => {
   it("keeps the repository in /workspaces/<project> with the project's git identity", async () => {
     const sh = async (script: string) =>
-      (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node' })).stdout.toString('utf8').trim();
+      (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node' })).stdout
+        .toString('utf8')
+        .trim();
     expect(await sh('test -d /workspaces/notes/.git && echo yes')).toBe('yes');
     expect(await sh('ls /workspaces')).toBe('notes');
     expect(await sh('git -C /workspaces/notes config user.name')).toBe('Notes Developer');
@@ -112,11 +130,17 @@ describe('the dev server with real Docker', () => {
 
   it('stops a server the player started in the VS Code terminal', async () => {
     // Like the VS Code terminal: npm run dev in the workspace, outside the app's own start.
-    await docker.execChecked(runtime.names.container, ['sh', '-c', 'nohup npm run dev > /tmp/terminal-dev.log 2>&1 &'], {
-      user: 'node',
-      workdir: workspaceDir('notes'),
-    });
-    await expect.poll(async () => (await game.workspaceStatus()).devServerUp, { timeout: 30_000, interval: 500 }).toBe(true);
+    await docker.execChecked(
+      runtime.names.container,
+      ['sh', '-c', 'nohup npm run dev > /tmp/terminal-dev.log 2>&1 &'],
+      {
+        user: 'node',
+        workdir: workspaceDir('notes'),
+      },
+    );
+    await expect
+      .poll(async () => (await game.workspaceStatus()).devServerUp, { timeout: 30_000, interval: 500 })
+      .toBe(true);
 
     await game.stopDevServer();
     expect((await game.workspaceStatus()).devServerUp).toBe(false);
@@ -142,7 +166,11 @@ describe('the dev server with real Docker', () => {
   it('fails with the end of the log when npm run dev dies, instead of waiting in silence', async () => {
     const dir = workspaceDir('notes');
     // A dev script that dies at once, like a missing command would.
-    await docker.execChecked(runtime.names.container, ['npm', 'pkg', 'set', 'scripts.dev=echo boom-from-the-dev-script && exit 3'], { user: 'node', workdir: dir });
+    await docker.execChecked(
+      runtime.names.container,
+      ['npm', 'pkg', 'set', 'scripts.dev=echo boom-from-the-dev-script && exit 3'],
+      { user: 'node', workdir: dir },
+    );
     try {
       const startedAt = Date.now();
       const failure = await game.startDevServer().then(
@@ -156,7 +184,10 @@ describe('the dev server with real Docker', () => {
       expect(Date.now() - startedAt).toBeLessThan(30_000);
       expect((await game.workspaceStatus()).devServerUp).toBe(false);
     } finally {
-      await docker.execChecked(runtime.names.container, ['git', 'checkout', '--', 'package.json'], { user: 'node', workdir: dir });
+      await docker.execChecked(runtime.names.container, ['git', 'checkout', '--', 'package.json'], {
+        user: 'node',
+        workdir: dir,
+      });
     }
   });
 

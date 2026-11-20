@@ -42,7 +42,14 @@ test('startup: without a readable catalog the app opens with the copy bundled at
   const { page, close } = await launch({}, { catalogText: 'not a catalog' });
   try {
     await expect(page.getByTestId('start-playing')).toBeVisible();
-    const source = await page.evaluate(async () => (await (window as unknown as { bugDetective: { snapshot(): Promise<{ contentSource: string }> } }).bugDetective.snapshot()).contentSource);
+    const source = await page.evaluate(
+      async () =>
+        (
+          await (
+            window as unknown as { bugDetective: { snapshot(): Promise<{ contentSource: string }> } }
+          ).bugDetective.snapshot()
+        ).contentSource,
+    );
     // The bundled catalog is the official one: SupportDesk from its GitHub repository.
     expect(source).toContain('github.com/bug-detective-project/supportdesk');
   } finally {
@@ -50,12 +57,18 @@ test('startup: without a readable catalog the app opens with the copy bundled at
   }
 });
 
-
 test('startup: the tests play SupportDesk from the local qa folder from the first start, never downloading it', async () => {
   const { page, close } = await launch();
   try {
     await expect(page.getByTestId('start-playing')).toBeVisible();
-    const source = await page.evaluate(async () => (await (window as unknown as { bugDetective: { snapshot(): Promise<{ contentSource: string }> } }).bugDetective.snapshot()).contentSource);
+    const source = await page.evaluate(
+      async () =>
+        (
+          await (
+            window as unknown as { bugDetective: { snapshot(): Promise<{ contentSource: string }> } }
+          ).bugDetective.snapshot()
+        ).contentSource,
+    );
     expect(source).toBe(`local: ${supportdeskQa}`);
   } finally {
     await close();

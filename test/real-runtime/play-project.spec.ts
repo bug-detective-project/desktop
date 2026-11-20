@@ -26,7 +26,8 @@ const project = process.env.BD_PLAY_PROJECT ?? '';
 const qaDir = process.env.BD_PLAY_QA_DIR ?? '';
 const reportFile = process.env.BD_PLAY_REPORT ?? '';
 const root = resolve(import.meta.dirname, '..', '..');
-const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
+const DOCKER =
+  process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
@@ -80,7 +81,10 @@ async function writeReport(played: Played[], started: number): Promise<void> {
     '',
     '| Ticket | Result | Time |',
     '| --- | --- | --- |',
-    ...played.map((ticket) => `| \`${ticket.id}\` | ${ticket.result}${ticket.note ? `: ${ticket.note}` : ''} | ${ticket.seconds} s |`),
+    ...played.map(
+      (ticket) =>
+        `| \`${ticket.id}\` | ${ticket.result}${ticket.note ? `: ${ticket.note}` : ''} | ${ticket.seconds} s |`,
+    ),
     '',
   ];
   await writeFile(reportFile, lines.join('\n'));
@@ -98,7 +102,12 @@ test(`plays every ticket of ${project || 'a project'} to Done`, async () => {
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
   const app = await electron.launch({
     args: [root],
-    env: { ...parentEnv, BUGDETECTIVE_USER_DATA: userData, BUGDETECTIVE_CATALOG_FILE: catalogFile, BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON: 'true' },
+    env: {
+      ...parentEnv,
+      BUGDETECTIVE_USER_DATA: userData,
+      BUGDETECTIVE_CATALOG_FILE: catalogFile,
+      BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON: 'true',
+    },
   });
   const page = await app.firstWindow();
   const workspace = workspaceDir(project);
@@ -123,7 +132,9 @@ test(`plays every ticket of ${project || 'a project'} to Done`, async () => {
         await cardStatus(page, card, 'inProgress', 120_000);
 
         const patch = await readFile(join(qaDir, 'tickets', ticket.id, 'reference.patch'));
-        execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', workspace, CONTAINER, 'git', 'apply', '-'], { input: patch });
+        execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', workspace, CONTAINER, 'git', 'apply', '-'], {
+          input: patch,
+        });
 
         await dragCard(page, card, 'inQa');
         // The first QA run builds the project's QA image.
@@ -136,7 +147,11 @@ test(`plays every ticket of ${project || 'a project'} to Done`, async () => {
         Object.assign(ticket, { result: 'done', seconds: seconds(ticketStarted) });
         log(`${ticket.id}: Done in ${ticket.seconds} s`);
       } catch (error) {
-        Object.assign(ticket, { result: 'failed', seconds: seconds(ticketStarted), note: (error as Error).message.split('\n')[0]!.slice(0, 160) });
+        Object.assign(ticket, {
+          result: 'failed',
+          seconds: seconds(ticketStarted),
+          note: (error as Error).message.split('\n')[0]!.slice(0, 160),
+        });
         throw error;
       }
     }

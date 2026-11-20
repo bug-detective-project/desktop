@@ -36,8 +36,12 @@ test('Projects shows up once a track is done, with each project, its difficulty 
     const card = page.getByTestId('project-supportdesk');
     await expect(card).toContainText(supportdesk.story.en.project.name);
     await expect(card.getByTestId('project-current')).toHaveText('Current project');
-    await expect(card.getByTestId('project-difficulty')).toContainText(`${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`);
-    await expect(card.getByTestId('project-tickets').first()).toHaveText(`Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`);
+    await expect(card.getByTestId('project-difficulty')).toContainText(
+      `${supportdesk.difficulty![0].toUpperCase()}${supportdesk.difficulty!.slice(1)}`,
+    );
+    await expect(card.getByTestId('project-tickets').first()).toHaveText(
+      `Front ${supportdesk.counts.front}/${supportdesk.counts.front} · Back 0/${supportdesk.counts.back}`,
+    );
     // The active project has no switch button, only its brief.
     await expect(page.getByTestId('switch-supportdesk')).toHaveCount(0);
     await expect(page.getByTestId('project-supportdesk-brief')).toBeEnabled();
@@ -52,7 +56,10 @@ const inventory = { id: 'inventory', qaDir: '/nonexistent/inventory-qa' };
 const showProjects = { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' };
 
 test('a project that needs a newer app says so, and cannot be chosen', async () => {
-  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdeskEntry, { ...inventory, minAppVersion: '99.0.0' }] });
+  const { page, close } = await launch(
+    {},
+    { env: showProjects, catalog: [supportdeskEntry, { ...inventory, minAppVersion: '99.0.0' }] },
+  );
   try {
     await page.getByTestId('start-playing').click();
     await page.getByTestId('nav-projects').click();
@@ -66,7 +73,10 @@ test('a project that needs a newer app says so, and cannot be chosen', async () 
 });
 
 test('a hidden project does not show on the Projects screen', async () => {
-  const { page, close } = await launch({}, { env: showProjects, catalog: [supportdeskEntry, { ...inventory, hidden: true }] });
+  const { page, close } = await launch(
+    {},
+    { env: showProjects, catalog: [supportdeskEntry, { ...inventory, hidden: true }] },
+  );
   try {
     await page.getByTestId('start-playing').click();
     await page.getByTestId('nav-projects').click();
@@ -80,7 +90,9 @@ test('a hidden project does not show on the Projects screen', async () => {
 test('a new game whose first project needs a newer app cannot start', async () => {
   const { page, close } = await launch({}, { catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
   try {
-    await expect(page.getByTestId('starter-needs-update')).toHaveText('Update Bug Detective to start playing. The first project needs a newer version of the app.');
+    await expect(page.getByTestId('starter-needs-update')).toHaveText(
+      'Update Bug Detective to start playing. The first project needs a newer version of the app.',
+    );
     await expect(page.getByTestId('start-playing')).toBeDisabled();
   } finally {
     await close();
@@ -99,7 +111,9 @@ test('a game in progress whose project now needs a newer app shows a notice and 
     const second = await launch({}, { userData, catalog: [{ ...supportdeskEntry, minAppVersion: '99.0.0' }] });
     try {
       await second.page.getByTestId('nav-dashboard').click();
-      await expect(second.page.getByTestId('project-needs-update')).toContainText('Update Bug Detective: this project needs a newer version of the app.');
+      await expect(second.page.getByTestId('project-needs-update')).toContainText(
+        'Update Bug Detective: this project needs a newer version of the app.',
+      );
       await second.page.getByTestId('nav-board').click();
       await expect(second.page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo');
     } finally {
@@ -109,7 +123,6 @@ test('a game in progress whose project now needs a newer app shows a notice and 
     await rm(userData, { recursive: true, force: true });
   }
 });
-
 
 test('a catalog that cannot be refreshed shows a warning with "Try again" over the last saved list', async () => {
   // An unreadable catalog: the refresh fails, the bundled list shows.

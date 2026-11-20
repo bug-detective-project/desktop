@@ -4,7 +4,10 @@ import { DockerRuntime } from '../../src/main/runtime.ts';
 
 describe('installEnvironment', () => {
   it('moves the workspace to the new image before removing the images of older versions', async () => {
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     const calls: string[] = [];
     const internals = runtime as unknown as Record<string, unknown>;
     internals.docker = async () => ({ imageExists: async () => true });
@@ -27,7 +30,10 @@ describe('installEnvironment', () => {
 
 describe('workspaceStatus', () => {
   const runtimeWith = (info: { running: boolean; ports: Record<number, number> } | null) => {
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     const ensureRunning = vi.fn();
     (runtime as unknown as Record<string, unknown>).workspace = async () => ({
       info: async () => info,
@@ -42,14 +48,24 @@ describe('workspaceStatus', () => {
 
   it('reads the running container without starting or recreating anything', async () => {
     const { runtime, ensureRunning } = runtimeWith({ running: true, ports: { 15173: 5174, 3001: 3002 } });
-    expect(await runtime.workspaceStatus()).toEqual({ ports: { client: 5174, api: 3002 }, devServerUp: true, branch: 'player/ticket-1', dependenciesReady: true });
+    expect(await runtime.workspaceStatus()).toEqual({
+      ports: { client: 5174, api: 3002 },
+      devServerUp: true,
+      branch: 'player/ticket-1',
+      dependenciesReady: true,
+    });
     expect(ensureRunning).not.toHaveBeenCalled();
   });
 
   it('reports a stopped or missing container as not running, and leaves it as it is', async () => {
     for (const info of [{ running: false, ports: { 15173: 5173, 3001: 3001 } }, null]) {
       const { runtime, ensureRunning } = runtimeWith(info);
-      expect(await runtime.workspaceStatus()).toEqual({ ports: null, devServerUp: false, branch: null, dependenciesReady: false });
+      expect(await runtime.workspaceStatus()).toEqual({
+        ports: null,
+        devServerUp: false,
+        branch: null,
+        dependenciesReady: false,
+      });
       expect(ensureRunning).not.toHaveBeenCalled();
     }
   });

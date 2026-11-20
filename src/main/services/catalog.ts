@@ -15,26 +15,38 @@ import type { Catalog, CatalogProject } from '@bug-detective/catalog/contract';
 import { writeFileAtomic } from './content/store.ts';
 import type { LocalCatalog } from '../../shared/api.ts';
 
-export const OFFICIAL_CATALOG_URL = 'https://raw.githubusercontent.com/bug-detective-project/catalog/main/projects.json';
+export const OFFICIAL_CATALOG_URL =
+  'https://raw.githubusercontent.com/bug-detective-project/catalog/main/projects.json';
 const FETCH_TIMEOUT_MS = 30_000;
 
 /** A repository of the organization, like the contract's rule for project repositories. */
 const REPOSITORY = new RegExp(`^${PROJECT_OWNER}/[A-Za-z0-9_.-]{1,100}$`);
 const PROJECT_ID = /^[a-z][a-z0-9-]{0,39}$/;
 
-export type CatalogSourceChoice = { kind: 'official' } | { kind: 'github'; repository: string; branch: string } | { kind: 'file'; path: string };
+export type CatalogSourceChoice =
+  { kind: 'official' } | { kind: 'github'; repository: string; branch: string } | { kind: 'file'; path: string };
 
-const overrideSchema = z.union([z.object({ qaDir: z.string().min(1) }).strict(), z.object({ qaRef: z.string().min(1).max(100) }).strict()]);
+const overrideSchema = z.union([
+  z.object({ qaDir: z.string().min(1) }).strict(),
+  z.object({ qaRef: z.string().min(1).max(100) }).strict(),
+]);
 
 export const localCatalogSchema = z
   .object({
     catalog: z
       .union([
-        z.object({ github: z.string().regex(REPOSITORY, `use ${PROJECT_OWNER}/<name>`), branch: z.string().min(1).max(100).default('main') }).strict(),
+        z
+          .object({
+            github: z.string().regex(REPOSITORY, `use ${PROJECT_OWNER}/<name>`),
+            branch: z.string().min(1).max(100).default('main'),
+          })
+          .strict(),
         z.object({ file: z.string().min(1) }).strict(),
       ])
       .optional(),
-    projects: z.record(z.string().regex(PROJECT_ID, 'project ids are lowercase, like supportdesk'), overrideSchema).optional(),
+    projects: z
+      .record(z.string().regex(PROJECT_ID, 'project ids are lowercase, like supportdesk'), overrideSchema)
+      .optional(),
   })
   .strict();
 
@@ -46,7 +58,9 @@ export function parseLocalCatalog(raw: unknown): LocalCatalog {
   const result = localCatalogSchema.safeParse(raw);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw new Error(`Invalid catalog.local.json: ${issue?.path.join('.') || 'file'}: ${issue?.message ?? 'unknown error'}`);
+    throw new Error(
+      `Invalid catalog.local.json: ${issue?.path.join('.') || 'file'}: ${issue?.message ?? 'unknown error'}`,
+    );
   }
   return result.data;
 }
@@ -63,7 +77,10 @@ export async function readLocalCatalogFile(path: string): Promise<{ settings: Lo
     return { settings: parseLocalCatalog(JSON.parse(text)), error: null };
   } catch (error) {
     const message = (error as Error).message;
-    return { settings: {}, error: message.startsWith('Invalid catalog.local.json') ? message : `Invalid catalog.local.json: ${message}` };
+    return {
+      settings: {},
+      error: message.startsWith('Invalid catalog.local.json') ? message : `Invalid catalog.local.json: ${message}`,
+    };
   }
 }
 
@@ -230,7 +247,9 @@ export class CatalogService {
 
   private url(): string {
     const { choice } = this.options;
-    return choice.kind === 'github' ? `https://raw.githubusercontent.com/${choice.repository}/${choice.branch}/projects.json` : OFFICIAL_CATALOG_URL;
+    return choice.kind === 'github'
+      ? `https://raw.githubusercontent.com/${choice.repository}/${choice.branch}/projects.json`
+      : OFFICIAL_CATALOG_URL;
   }
 
   private resolve(raw: unknown, fallback = false): ResolvedProject[] {

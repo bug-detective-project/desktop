@@ -17,7 +17,9 @@ test.beforeAll(async () => {
     stack: { frontend: 'Elm · Parcel' },
     skills: { en: ['Pair debugging'], pt: ['Depuração em dupla'] },
   });
-  const middle = await createProjectRepo(dir, { front: 1, back: 0 }, 'Inventário Geral', 'middle', { difficulty: 'intermediate' });
+  const middle = await createProjectRepo(dir, { front: 1, back: 0 }, 'Inventário Geral', 'middle', {
+    difficulty: 'intermediate',
+  });
   const hard = await createProjectRepo(dir, { front: 1, back: 0 }, 'Ledger', 'hard', { difficulty: 'advanced' });
   catalog = [
     { id: 'supportdesk', qaDir: supportdeskQa, starter: true },
@@ -34,13 +36,17 @@ test.afterAll(async () => {
 async function openProjects(language?: 'pt') {
   const launched = await launch({}, { env: { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' }, catalog });
   await launched.page.getByTestId('start-playing').click();
-  if (language) await launched.page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
+  if (language)
+    await launched.page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
   await launched.page.getByTestId('nav-projects').click();
   await expect(launched.page.getByTestId('project-easy-monogram')).toBeVisible();
   return launched;
 }
 
-const shown = (page: Page) => page.locator('[data-testid^="project-"][data-testid$="-flipper"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')!.replace(/^project-|-flipper$/g, '')));
+const shown = (page: Page) =>
+  page
+    .locator('[data-testid^="project-"][data-testid$="-flipper"]')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')!.replace(/^project-|-flipper$/g, '')));
 
 test('the search finds projects by name, stack and skill, ignoring case and accents, and counts them', async () => {
   const { page, close } = await openProjects();

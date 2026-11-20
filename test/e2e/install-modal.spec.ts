@@ -3,7 +3,10 @@ import { expect, test } from '@playwright/test';
 import { launch, takeNextTicket } from './fixtures.ts';
 
 async function resize(app: ElectronApplication, page: Page, width: number, height: number): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h), [width, height]);
+  await app.evaluate(
+    ({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h),
+    [width, height],
+  );
   await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
 }
 
@@ -31,9 +34,18 @@ test('downloading the environment opens a large modal with the log that only clo
     await expect(modal.getByTestId('install-modal-status')).toHaveText('Everything is ready.', { timeout: 10_000 });
     await expect(modal.getByTestId('log-view')).toContainText('» docker build bugdetective-qa (fake)');
     await modal.getByTestId('install-modal-copy').click();
-    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toContain('» docker build bugdetective-qa (fake)');
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toContain('» docker build bugdetective-qa (fake)');
     // The page may write to the clipboard, never read it.
-    expect(await page.evaluate(() => navigator.clipboard.readText().then(() => 'read', () => 'denied'))).toBe('denied');
+    expect(
+      await page.evaluate(() =>
+        navigator.clipboard.readText().then(
+          () => 'read',
+          () => 'denied',
+        ),
+      ),
+    ).toBe('denied');
     await page.keyboard.press('Escape');
     await expect(modal).toBeVisible();
     // The work desk no longer shows the log.
@@ -56,7 +68,9 @@ test('less than 10 GB free on the Docker disk asks before downloading: Cancel ke
     await page.getByTestId('start-playing').click();
     await page.getByTestId('install-environment').click();
     const modal = page.getByTestId('install-modal');
-    await expect(modal.getByTestId('install-modal-low-disk')).toContainText('About 10 GB are needed on the Docker disk; you have 1.0 GB free.');
+    await expect(modal.getByTestId('install-modal-low-disk')).toContainText(
+      'About 10 GB are needed on the Docker disk; you have 1.0 GB free.',
+    );
     await expect(modal.getByTestId('install-modal-close')).toHaveCount(0);
     await modal.getByTestId('install-modal-cancel').click();
     await expect(modal).toHaveCount(0);
@@ -73,7 +87,10 @@ test('less than 10 GB free on the Docker disk asks before downloading: Cancel ke
 });
 
 test('a failed download keeps the modal open with the error and the log until "Close", in Portuguese too', async () => {
-  const { page, close } = await launch({ environmentReady: false, installFails: 'docker build failed: no space left on device' });
+  const { page, close } = await launch({
+    environmentReady: false,
+    installFails: 'docker build failed: no space left on device',
+  });
   try {
     await page.getByTestId('start-playing').click();
     await page.evaluate(() => window.bugDetective.updateSettings({ language: 'pt' }));

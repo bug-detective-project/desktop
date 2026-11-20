@@ -16,11 +16,15 @@ describe('workspaceDir', () => {
 describe('attachedContainerUri', () => {
   it('points at the container and the project folder', () => {
     const hex = Buffer.from(JSON.stringify({ containerName: '/bugdetective-workspace' })).toString('hex');
-    expect(attachedContainerUri('bugdetective-workspace', workspaceDir('notes'))).toBe(`vscode-remote://attached-container+${hex}/workspaces/notes`);
+    expect(attachedContainerUri('bugdetective-workspace', workspaceDir('notes'))).toBe(
+      `vscode-remote://attached-container+${hex}/workspaces/notes`,
+    );
   });
 
   it('refuses a folder outside the workspaces volume', () => {
     expect(() => attachedContainerUri('bugdetective-workspace', '/etc')).toThrow(/Invalid workspace folder/);
-    expect(() => attachedContainerUri('bugdetective-workspace', '/workspaces/../etc')).toThrow(/Invalid workspace folder/);
+    expect(() => attachedContainerUri('bugdetective-workspace', '/workspaces/../etc')).toThrow(
+      /Invalid workspace folder/,
+    );
   });
 });

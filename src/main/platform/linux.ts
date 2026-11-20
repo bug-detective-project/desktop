@@ -85,7 +85,8 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
         return null;
       }
       // Older callers answer without %APPDATA%: it is next to %LOCALAPPDATA% (…\AppData\Roaming).
-      const appData = appDataRaw && appDataRaw !== '%APPDATA%' ? appDataRaw : win32.join(win32.dirname(localAppData), 'Roaming');
+      const appData =
+        appDataRaw && appDataRaw !== '%APPDATA%' ? appDataRaw : win32.join(win32.dirname(localAppData), 'Roaming');
       // Same mapping as wslpath with the default automount root (/mnt).
       const toLinux = (windowsPath: string) => {
         const match = /^([A-Za-z]):\\?(.*)$/.exec(windowsPath);
@@ -124,7 +125,14 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       const wslenv = ['ELECTRON_RUN_AS_NODE', ...(env.WSLENV ?? '').split(':').filter(Boolean)].join(':');
       const childEnv: NodeJS.ProcessEnv = { ...env, ELECTRON_RUN_AS_NODE: '1', WSLENV: wslenv };
       delete childEnv.VSCODE_DEV;
-      return { source, launcher, command: exe, baseArgs: [cliJs], env: childEnv, globalStorage: side.toLinux(win32.join(side.appData, 'Code', 'User', 'globalStorage')) };
+      return {
+        source,
+        launcher,
+        command: exe,
+        baseArgs: [cliJs],
+        env: childEnv,
+        globalStorage: side.toLinux(win32.join(side.appData, 'Code', 'User', 'globalStorage')),
+      };
     }
     return null;
   }
@@ -137,7 +145,16 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       ['/usr/bin/code', '/usr/share/code/bin/code', '/snap/bin/code'].find((file) => deps.fileExists(file)) ??
       null;
     const configHome = env.XDG_CONFIG_HOME || path.join(env.HOME ?? '/root', '.config');
-    return launcher ? { source: 'path', launcher, command: launcher, baseArgs: [], env: { ...env }, globalStorage: path.join(configHome, 'Code', 'User', 'globalStorage') } : null;
+    return launcher
+      ? {
+          source: 'path',
+          launcher,
+          command: launcher,
+          baseArgs: [],
+          env: { ...env },
+          globalStorage: path.join(configHome, 'Code', 'User', 'globalStorage'),
+        }
+      : null;
   }
 
   return {
@@ -157,9 +174,13 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       if (!side) {
         return false;
       }
-      const result = await runner(path.join(side.system32, 'tasklist.exe'), ['/FI', 'IMAGENAME eq Docker Desktop.exe', '/FO', 'CSV', '/NH'], {
-        timeoutMs: 10_000,
-      });
+      const result = await runner(
+        path.join(side.system32, 'tasklist.exe'),
+        ['/FI', 'IMAGENAME eq Docker Desktop.exe', '/FO', 'CSV', '/NH'],
+        {
+          timeoutMs: 10_000,
+        },
+      );
       return result.code === 0 && result.stdout.toString('utf8').toLowerCase().includes('docker desktop.exe');
     },
 
@@ -182,9 +203,16 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
       // WSL 1 has no real Linux kernel; its /proc/version says "Microsoft" without "WSL2".
       const version2 = /WSL2|microsoft-standard/i.test(kernel);
       const side = await windows();
-      const release = side ? await runner(path.join(side.system32, 'wsl.exe'), ['--version'], { timeoutMs: 15_000 }) : null;
+      const release = side
+        ? await runner(path.join(side.system32, 'wsl.exe'), ['--version'], { timeoutMs: 15_000 })
+        : null;
       const version = release?.code === 0 ? parseWslVersion(decodeWslOutput(release.stdout)) : null;
-      return { installed: true, version2, detail: `${env.WSL_DISTRO_NAME ?? 'WSL'} (WSL ${version2 ? 2 : 1})`, ...(version && { version }) };
+      return {
+        installed: true,
+        version2,
+        detail: `${env.WSL_DISTRO_NAME ?? 'WSL'} (WSL ${version2 ? 2 : 1})`,
+        ...(version && { version }),
+      };
     },
 
     async locateVSCode() {
@@ -232,7 +260,9 @@ export function createLinuxPlatform(overrides: Partial<LinuxDeps> = {}): Platfor
     async freeDiskBytes() {
       // WSL 2: Docker Desktop's disk lives on Windows (%LOCALAPPDATA%\Docker\wsl). Plain Linux: Docker Engine's data folder, or the root file system.
       const side = await windows();
-      const candidates = side ? [side.toLinux(win32.join(side.localAppData, 'Docker', 'wsl')), side.toLinux(side.localAppData)] : ['/var/lib/docker', '/'];
+      const candidates = side
+        ? [side.toLinux(win32.join(side.localAppData, 'Docker', 'wsl')), side.toLinux(side.localAppData)]
+        : ['/var/lib/docker', '/'];
       return freeBytesOf(deps.statfs, candidates);
     },
   };

@@ -3,7 +3,13 @@ import { parseMinutes, toMinutes } from '../../src/shared/duration.ts';
 import * as rules from '../../src/shared/kanban.ts';
 import { backupStatus } from '../../src/shared/types.ts';
 
-const ctx = (now: string) => ({ now, id: (() => { let n = 0; return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`; })() });
+const ctx = (now: string) => ({
+  now,
+  id: (() => {
+    let n = 0;
+    return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`;
+  })(),
+});
 
 describe('QA time limit in minutes', () => {
   it('shows seconds as minutes', () => {
@@ -29,7 +35,12 @@ describe('QA time limit in minutes', () => {
 
 describe('backup status', () => {
   const start = rules.createInitialState(ctx('2026-10-20T10:00:00.000Z'));
-  const unlocked = rules.unlockTicket(start, 1, { id: 'front-1', track: 'front', commit: 'abc', manifestVersion: '1.0.0', counts: { front: 4, back: 0 } }, ctx('2026-10-21T10:00:00.000Z'));
+  const unlocked = rules.unlockTicket(
+    start,
+    1,
+    { id: 'front-1', track: 'front', commit: 'abc', manifestVersion: '1.0.0', counts: { front: 4, back: 0 } },
+    ctx('2026-10-21T10:00:00.000Z'),
+  );
 
   it('has nothing to protect before the first ticket', () => {
     expect(backupStatus(start)).toBe('none');
@@ -41,10 +52,16 @@ describe('backup status', () => {
   });
 
   it('is current right after an export, and outdated again once the game changes', () => {
-    const exported = { ...unlocked, lastExport: { at: '2026-10-22T10:00:00.000Z', path: 'C:\\Saves\\bug-detective-2026-10-22.bdsave' } };
+    const exported = {
+      ...unlocked,
+      lastExport: { at: '2026-10-22T10:00:00.000Z', path: 'C:\\Saves\\bug-detective-2026-10-22.bdsave' },
+    };
     expect(backupStatus(exported)).toBe('current');
     expect(backupStatus(rules.playerMove(exported, 1, 'inProgress', ctx('2026-10-23T10:00:00.000Z')))).toBe('outdated');
-    const working = { ...rules.playerMove(unlocked, 1, 'inProgress', ctx('2026-10-21T11:00:00.000Z')), lastExport: exported.lastExport };
+    const working = {
+      ...rules.playerMove(unlocked, 1, 'inProgress', ctx('2026-10-21T11:00:00.000Z')),
+      lastExport: exported.lastExport,
+    };
     expect(backupStatus(working)).toBe('current');
     expect(backupStatus(rules.revealHint(working, 1, 3, ctx('2026-10-23T10:00:00.000Z')))).toBe('outdated');
   });

@@ -97,9 +97,13 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
     try {
       await second.page.getByTestId('nav-board').click();
       await second.page.getByTestId('card-1').click();
-      await expect(second.page.getByTestId('ticket-markdown')).toContainText(supportdesk.ticketSection('front-1', 'pt'));
+      await expect(second.page.getByTestId('ticket-markdown')).toContainText(
+        supportdesk.ticketSection('front-1', 'pt'),
+      );
       await expect(second.page.getByTestId('ticket-track')).toHaveText('Front-end');
-      await expect(second.page.getByTestId('ticket-title')).toContainText(supportdesk.title('front-1', 'pt').split(': ')[1]);
+      await expect(second.page.getByTestId('ticket-title')).toContainText(
+        supportdesk.title('front-1', 'pt').split(': ')[1],
+      );
       await second.page.getByTestId('close-panel').click();
       await second.page.getByTestId('nav-dashboard').click();
       await expect(second.page.getByTestId('inbox')).toContainText(supportdesk.assignment('front-1', 'pt'));
@@ -186,7 +190,9 @@ test('without the project dependencies the dev server cannot be started, on the 
     const start = panel.getByTestId('start-dev-server');
     await expect(start).toBeDisabled();
     await start.hover({ force: true });
-    await expect(panel.getByRole('tooltip').filter({ hasText: 'check the state of the local environment' })).toBeVisible();
+    await expect(
+      panel.getByRole('tooltip').filter({ hasText: 'check the state of the local environment' }),
+    ).toBeVisible();
     await panel.getByTestId('close-panel').click();
 
     await page.getByTestId('nav-dashboard').click();

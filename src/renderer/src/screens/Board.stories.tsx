@@ -6,8 +6,12 @@ import { Board } from './Board.tsx';
 const meta = { title: 'Screens/Board', parameters: { layout: 'fullscreen' } } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const TicketInProgress: Story = { render: () => <Board snapshot={snapshotFixture('active')} onOpenTicket={fn()} onOpenReview={fn()} /> };
-export const TicketInCodeReview: Story = { render: () => <Board snapshot={snapshotFixture('review')} onOpenTicket={fn()} onOpenReview={fn()} /> };
+export const TicketInProgress: Story = {
+  render: () => <Board snapshot={snapshotFixture('active')} onOpenTicket={fn()} onOpenReview={fn()} />,
+};
+export const TicketInCodeReview: Story = {
+  render: () => <Board snapshot={snapshotFixture('review')} onOpenTicket={fn()} onOpenReview={fn()} />,
+};
 
 /** From the keyboard the card's title is its button: Tab reaches it and Enter opens the ticket. */
 const openTicket = fn();

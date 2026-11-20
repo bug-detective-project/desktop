@@ -560,7 +560,9 @@ export class Workspace {
 
   /** A short hash of the published services; empty when there is none. */
   private get forwardKey(): string {
-    return this.publishedServices.length === 0 ? '' : createHash('sha256').update(JSON.stringify(this.publishedServices)).digest('hex').slice(0, 16);
+    return this.publishedServices.length === 0
+      ? ''
+      : createHash('sha256').update(JSON.stringify(this.publishedServices)).digest('hex').slice(0, 16);
   }
 
   /** The port on the computer (127.0.0.1) of each published service; empty when the forwarder does not exist. */
@@ -582,7 +584,10 @@ export class Workspace {
     if (variables.length === 0 && this.memory === undefined) {
       return '';
     }
-    return createHash('sha256').update(JSON.stringify([variables, this.memory ?? null])).digest('hex').slice(0, 16);
+    return createHash('sha256')
+      .update(JSON.stringify([variables, this.memory ?? null]))
+      .digest('hex')
+      .slice(0, 16);
   }
 
   /** The project's repository folder in the container. */
@@ -595,7 +600,11 @@ export class Workspace {
 
   /** What the scripts need: the folder and the identity of the project. */
   private get env(): Record<string, string> {
-    return { WORKSPACE_DIR: this.dir, PROJECT_ID: this.project ?? '', PROJECT_NAME: this.projectName ?? this.project ?? '' };
+    return {
+      WORKSPACE_DIR: this.dir,
+      PROJECT_ID: this.project ?? '',
+      PROJECT_NAME: this.projectName ?? this.project ?? '',
+    };
   }
 
   get containerName(): string {
@@ -657,7 +666,9 @@ export class Workspace {
       }
       const routes = [
         ...Object.values(CONTAINER_PORTS).map((port) => `${port}:${this.names.container}:${port}`),
-        ...this.publishedServices.map((service, index) => `${SERVICE_FORWARD_BASE + index}:${service.name}:${service.port}`),
+        ...this.publishedServices.map(
+          (service, index) => `${SERVICE_FORWARD_BASE + index}:${service.name}:${service.port}`,
+        ),
       ].join(',');
       await this.docker.checked([
         'container',
@@ -694,7 +705,12 @@ export class Workspace {
 
   private async ensureForwarder(): Promise<void> {
     let info = await this.docker.inspectContainer(this.forwarder);
-    if (info && (info.image !== this.image || !info.networks.includes(this.network) || (info.labels[FORWARD_KEY_LABEL] ?? '') !== this.forwardKey)) {
+    if (
+      info &&
+      (info.image !== this.image ||
+        !info.networks.includes(this.network) ||
+        (info.labels[FORWARD_KEY_LABEL] ?? '') !== this.forwardKey)
+    ) {
       await this.docker.removeContainer(this.forwarder);
       info = null;
     }
@@ -750,7 +766,9 @@ export class Workspace {
     if (!info || info.networks.includes(OPEN_NETWORK) === on) {
       return;
     }
-    await (on ? this.docker.connectNetwork(OPEN_NETWORK, this.names.container) : this.docker.disconnectNetwork(OPEN_NETWORK, this.names.container));
+    await (on
+      ? this.docker.connectNetwork(OPEN_NETWORK, this.names.container)
+      : this.docker.disconnectNetwork(OPEN_NETWORK, this.names.container));
   }
 
   /** Stops the forwarder (it comes back with the next action of the game). */
@@ -766,7 +784,12 @@ export class Workspace {
     await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
     await this.docker.createInternalNetwork(this.network, 'network', this.project);
     let info = await this.info();
-    if (info && (info.image !== this.image || !info.networks.includes(this.network) || (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey)) {
+    if (
+      info &&
+      (info.image !== this.image ||
+        !info.networks.includes(this.network) ||
+        (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey)
+    ) {
       // A newer app version ships a newer image, the container is of another project's network, or the
       // project's services or memory changed: recreate it, keep the volumes.
       await this.docker.removeContainer(this.names.container);
@@ -793,10 +816,19 @@ export class Workspace {
   }
 
   private exec(command: readonly string[], options: Parameters<Docker['exec']>[2] = {}) {
-    return this.docker.execChecked(this.names.container, command, { user: 'node', workdir: this.dir, env: this.env, ...options });
+    return this.docker.execChecked(this.names.container, command, {
+      user: 'node',
+      workdir: this.dir,
+      env: this.env,
+      ...options,
+    });
   }
 
-  private script(name: keyof typeof SCRIPTS, args: readonly string[] = [], options: Parameters<Docker['exec']>[2] = {}) {
+  private script(
+    name: keyof typeof SCRIPTS,
+    args: readonly string[] = [],
+    options: Parameters<Docker['exec']>[2] = {},
+  ) {
     return this.exec(['sh', '-c', SCRIPTS[name], 'sh', ...args], options);
   }
 
@@ -837,17 +869,24 @@ export class Workspace {
     if (!/^[0-9TZ:.-]{10,40}$/.test(gameId)) {
       throw new Error(`Invalid game id: ${gameId}`);
     }
-    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    const stamp = now
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d+Z$/, 'Z');
     const { stdout } = await this.script('claimForGame', [gameId, stamp], { timeoutMs: 60_000 });
     return Number(stdout.toString('utf8').trim().split('\n').at(-1)) || 0;
   }
 
   /** Writes settings into VS Code's machine settings in the container, so the next attach reads them (see vscode.ts). */
   async seedVSCodeMachineSettings(settings: Readonly<Record<string, string | boolean>>): Promise<void> {
-    await this.docker.execChecked(this.names.container, ['node', '-e', MERGE_SETTINGS_SCRIPT, VSCODE_MACHINE_SETTINGS_FILE, JSON.stringify(settings)], {
-      user: 'node',
-      timeoutMs: 30_000,
-    });
+    await this.docker.execChecked(
+      this.names.container,
+      ['node', '-e', MERGE_SETTINGS_SCRIPT, VSCODE_MACHINE_SETTINGS_FILE, JSON.stringify(settings)],
+      {
+        user: 'node',
+        timeoutMs: 30_000,
+      },
+    );
   }
 
   /** Marks the repository as belonging to a game, without archiving anything (used after a restore). */
@@ -899,7 +938,14 @@ export class Workspace {
     const { messages } = build;
     const { stdout } = await this.script(
       'buildReview',
-      [ticketArg(build.ticket), build.date, messages.approved, messages.reference, messages.snapshot, ...build.excludes],
+      [
+        ticketArg(build.ticket),
+        build.date,
+        messages.approved,
+        messages.reference,
+        messages.snapshot,
+        ...build.excludes,
+      ],
       { input: tar, timeoutMs: 120_000 },
     );
     const [approved, reference, snapshot] = stdout.toString('utf8').trim().split('\n').at(-1)!.split(' ');
@@ -909,28 +955,49 @@ export class Workspace {
   /** The commits review/ticket-N and qa-approved/ticket-N point at, or null when missing. */
   async reviewRefs(ticket: number): Promise<{ branch: string | null; tag: string | null }> {
     const resolve = async (ref: string) => {
-      const result = await this.docker.exec(this.names.container, ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`], {
-        user: 'node',
-        workdir: this.dir,
-      });
+      const result = await this.docker.exec(
+        this.names.container,
+        ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`],
+        {
+          user: 'node',
+          workdir: this.dir,
+        },
+      );
       return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
     };
     const number = ticketArg(ticket);
-    return { branch: await resolve(`refs/heads/review/ticket-${number}`), tag: await resolve(`refs/tags/qa-approved/ticket-${number}`) };
+    return {
+      branch: await resolve(`refs/heads/review/ticket-${number}`),
+      tag: await resolve(`refs/tags/qa-approved/ticket-${number}`),
+    };
   }
 
   /** git diff between two commits, with rename detection. */
-  async diff(from: string, to: string, options: { ignoreWhitespace?: boolean; pathspecs?: readonly string[] } = {}): Promise<string> {
-    const whitespace = options.ignoreWhitespace ? ['--ignore-all-space', '--ignore-cr-at-eol', '--ignore-blank-lines'] : [];
-    return this.git(['diff', '--no-color', '--no-ext-diff', '-M', ...whitespace, from, to, '--', '.', ...(options.pathspecs ?? [])], {
-      timeoutMs: 60_000,
-    });
+  async diff(
+    from: string,
+    to: string,
+    options: { ignoreWhitespace?: boolean; pathspecs?: readonly string[] } = {},
+  ): Promise<string> {
+    const whitespace = options.ignoreWhitespace
+      ? ['--ignore-all-space', '--ignore-cr-at-eol', '--ignore-blank-lines']
+      : [];
+    return this.git(
+      ['diff', '--no-color', '--no-ext-diff', '-M', ...whitespace, from, to, '--', '.', ...(options.pathspecs ?? [])],
+      {
+        timeoutMs: 60_000,
+      },
+    );
   }
 
   async reviewReturnPoint(): Promise<ReturnPoint> {
     const { stdout } = await this.script('reviewReturnPoint', [], { timeoutMs: 60_000 });
     const [branch, head, indexTree, excludesFile] = stdout.toString('utf8').trim().split('\n');
-    return { branch: branch === '-' ? null : branch, head, indexTree, excludesFile: excludesFile === '-' ? null : excludesFile };
+    return {
+      branch: branch === '-' ? null : branch,
+      head,
+      indexTree,
+      excludesFile: excludesFile === '-' ? null : excludesFile,
+    };
   }
 
   /** Commits uncommitted and untracked work, except excluded paths. Returns the commit, or null when nothing changed. */
@@ -977,7 +1044,11 @@ export class Workspace {
   /** "<node version>\0<platform>\0<arch>" of the images, part of the dependency cache key. */
   private async runtime(): Promise<string> {
     this.runtimeKey ??= (
-      await this.exec(['node', '-e', 'process.stdout.write(`${process.version}\\0${process.platform}\\0${process.arch}`)'])
+      await this.exec([
+        'node',
+        '-e',
+        'process.stdout.write(`${process.version}\\0${process.platform}\\0${process.arch}`)',
+      ])
     ).stdout.toString('utf8');
     return this.runtimeKey;
   }
@@ -991,7 +1062,10 @@ export class Workspace {
     if (result.code !== 0) {
       return null;
     }
-    return createHash('sha256').update(result.stdout).update(`\0${await this.runtime()}`).digest('hex');
+    return createHash('sha256')
+      .update(result.stdout)
+      .update(`\0${await this.runtime()}`)
+      .digest('hex');
   }
 
   async installedDependencyKey(): Promise<string | null> {
@@ -1003,7 +1077,9 @@ export class Workspace {
   }
 
   async cachedDependencies(key: string): Promise<boolean> {
-    const result = await this.docker.exec(this.names.container, ['test', '-f', `${CACHE_DIR}/deps/${key}.tar`], { user: 'node' });
+    const result = await this.docker.exec(this.names.container, ['test', '-f', `${CACHE_DIR}/deps/${key}.tar`], {
+      user: 'node',
+    });
     return result.code === 0;
   }
 
@@ -1022,7 +1098,16 @@ export class Workspace {
   async isDevServerUp(): Promise<boolean> {
     const result = await this.docker.exec(
       this.names.container,
-      ['curl', '--fail', '--silent', '--output', '/dev/null', '--max-time', '2', `http://127.0.0.1:${CONTAINER_PORTS.client}/`],
+      [
+        'curl',
+        '--fail',
+        '--silent',
+        '--output',
+        '/dev/null',
+        '--max-time',
+        '2',
+        `http://127.0.0.1:${CONTAINER_PORTS.client}/`,
+      ],
       { user: 'node', timeoutMs: 10_000 },
     );
     return result.code === 0;
@@ -1069,13 +1154,20 @@ export class Workspace {
 
   /** Whether `npm run dev` is still running in the container. */
   private async isDevServerStarting(): Promise<boolean> {
-    const result = await this.docker.exec(this.names.container, ['pgrep', '-f', '[n]pm run dev'], { user: 'node', timeoutMs: 10_000 });
+    const result = await this.docker.exec(this.names.container, ['pgrep', '-f', '[n]pm run dev'], {
+      user: 'node',
+      timeoutMs: 10_000,
+    });
     return result.code === 0;
   }
 
   /** The last lines of /tmp/dev-server.log, without colors. */
   private async devServerLogTail(): Promise<string> {
-    const result = await this.docker.exec(this.names.container, ['tail', '-n', String(DEV_SERVER_LOG_LINES), '/tmp/dev-server.log'], { user: 'node', timeoutMs: 10_000 });
+    const result = await this.docker.exec(
+      this.names.container,
+      ['tail', '-n', String(DEV_SERVER_LOG_LINES), '/tmp/dev-server.log'],
+      { user: 'node', timeoutMs: 10_000 },
+    );
     const text = result.stdout
       .toString('utf8')
       // eslint-disable-next-line no-control-regex
@@ -1095,7 +1187,11 @@ export class Workspace {
   async stopDevServer(): Promise<void> {
     await this.docker.exec(
       this.names.container,
-      ['sh', '-c', "pkill -f '[n]pm run dev'; pkill -f '[c]oncurrently'; pkill -f '[n]ode_modules/.bin/vite'; pkill -f '[n]ode --watch'; true"],
+      [
+        'sh',
+        '-c',
+        "pkill -f '[n]pm run dev'; pkill -f '[c]oncurrently'; pkill -f '[n]ode_modules/.bin/vite'; pkill -f '[n]ode --watch'; true",
+      ],
       { user: 'node', timeoutMs: 10_000 },
     );
     await this.waitForDevServer(false, 10_000);

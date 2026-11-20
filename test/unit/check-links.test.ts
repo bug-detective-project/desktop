@@ -11,7 +11,10 @@ const links = {
 
 describe('check-links', () => {
   it('checks each page of the project once, and leaves the sites of other people out', () => {
-    expect(projectUrls(links)).toEqual(['https://github.com/bug-detective-project/desktop', 'https://github.com/bug-detective-project/desktop/discussions']);
+    expect(projectUrls(links)).toEqual([
+      'https://github.com/bug-detective-project/desktop',
+      'https://github.com/bug-detective-project/desktop/discussions',
+    ]);
   });
 
   it('reports a page that answers with an error or does not answer', async () => {
@@ -33,6 +36,8 @@ describe('check-links', () => {
 
   it('finds the section of the README each link points at', () => {
     const readme = '# App\n\n## Networks with a proxy\n\ntext\n';
-    expect(missingAnchors(links, readme)).toEqual(['credentialsHelp: no section "vs-code-and-your-credentials" in README.md']);
+    expect(missingAnchors(links, readme)).toEqual([
+      'credentialsHelp: no section "vs-code-and-your-credentials" in README.md',
+    ]);
   });
 });

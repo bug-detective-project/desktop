@@ -14,14 +14,23 @@ import contentPt from './data/ticket-content-pt.json';
 
 const SNAPSHOTS = { queued, active, review } as unknown as Record<'queued' | 'active' | 'review', Snapshot>;
 
-type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? (T[K] extends unknown[] ? T[K] : DeepPartial<T[K]>) : T[K] };
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? (T[K] extends unknown[] ? T[K] : DeepPartial<T[K]>) : T[K];
+};
 
 function merge<T>(base: T, overrides: DeepPartial<T> | undefined): T {
   if (!overrides) return base;
   const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
   for (const [key, value] of Object.entries(overrides)) {
     const original = result[key];
-    result[key] = value !== null && typeof value === 'object' && !Array.isArray(value) && original !== null && typeof original === 'object' ? merge(original, value) : value;
+    result[key] =
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      original !== null &&
+      typeof original === 'object'
+        ? merge(original, value)
+        : value;
   }
   return result as T;
 }
@@ -32,7 +41,10 @@ function language(): Language {
 }
 
 /** A snapshot of the game: the next assignment waiting, a ticket in progress, or one in Code Review. */
-export function snapshotFixture(moment: 'queued' | 'active' | 'review' = 'queued', overrides?: DeepPartial<Snapshot>): Snapshot {
+export function snapshotFixture(
+  moment: 'queued' | 'active' | 'review' = 'queued',
+  overrides?: DeepPartial<Snapshot>,
+): Snapshot {
   const base = structuredClone(SNAPSHOTS[moment]);
   base.state.settings.language = language();
   return merge(base, overrides);
@@ -55,7 +67,10 @@ export function projectCardFixture(overrides: Partial<ProjectCard> = {}): Projec
     played: false,
     details: {
       name: both('Notes'),
-      about: { en: 'A small note-taking app with a list, a preview and a search.', pt: 'Um pequeno app de notas, com lista, prévia e busca.' },
+      about: {
+        en: 'A small note-taking app with a list, a preview and a search.',
+        pt: 'Um pequeno app de notas, com lista, prévia e busca.',
+      },
       client: both('Northwind Studio'),
       stack: { frontend: 'React · Vite', backend: 'Node.js · Express', database: 'SQLite' },
       skills: { en: ['Async and state', 'Reading errors'], pt: ['Assincronia e estado', 'Ler erros'] },

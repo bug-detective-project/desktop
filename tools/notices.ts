@@ -42,13 +42,26 @@ export function packagesOf(ids: Iterable<string>): BundledPackage[] {
     if (!existsSync(manifest)) {
       continue;
     }
-    const json = JSON.parse(readFileSync(manifest, 'utf8')) as { name: string; version: string; license?: string | { type: string } };
-    const files = readdirSync(dir).filter((file) => LICENSE_FILE.test(file)).sort();
+    const json = JSON.parse(readFileSync(manifest, 'utf8')) as {
+      name: string;
+      version: string;
+      license?: string | { type: string };
+    };
+    const files = readdirSync(dir)
+      .filter((file) => LICENSE_FILE.test(file))
+      .sort();
     const text = files.map((file) => readFileSync(join(dir, file), 'utf8').trim()).join('\n\n');
     const license = typeof json.license === 'string' ? json.license : (json.license?.type ?? 'UNKNOWN');
-    packages.set(`${json.name}@${json.version}`, { name: json.name, version: json.version, license, licenseText: text || null });
+    packages.set(`${json.name}@${json.version}`, {
+      name: json.name,
+      version: json.version,
+      license,
+      licenseText: text || null,
+    });
   }
-  return [...packages.values()].sort((a, b) => (a.name === b.name ? (a.version < b.version ? -1 : 1) : a.name < b.name ? -1 : 1));
+  return [...packages.values()].sort((a, b) =>
+    a.name === b.name ? (a.version < b.version ? -1 : 1) : a.name < b.name ? -1 : 1,
+  );
 }
 
 /**
@@ -74,7 +87,11 @@ export function bundledLicenses(options: { skipChunks?: RegExp } = {}): Plugin {
           output.originalFileNames.forEach((file) => ids.add(resolve(root, file)));
         }
       }
-      this.emitFile({ type: 'asset', fileName: LICENSES_FILE, source: `${JSON.stringify(packagesOf(ids), null, 2)}\n` });
+      this.emitFile({
+        type: 'asset',
+        fileName: LICENSES_FILE,
+        source: `${JSON.stringify(packagesOf(ids), null, 2)}\n`,
+      });
     },
   };
 }
@@ -85,7 +102,9 @@ export function renderNotices(handWritten: string, packages: readonly BundledPac
   const sections = [...unique.values()]
     .sort((a, b) => (a.name === b.name ? (a.version < b.version ? -1 : 1) : a.name < b.name ? -1 : 1))
     .map((item) => {
-      const text = item.licenseText ?? `The package ships no license file; its package.json declares the license "${item.license}".`;
+      const text =
+        item.licenseText ??
+        `The package ships no license file; its package.json declares the license "${item.license}".`;
       return `### ${item.name} ${item.version}\n\nLicense: ${item.license}\n\n\`\`\`text\n${text}\n\`\`\`\n`;
     });
   return `${handWritten.trimEnd()}\n\n## npm packages bundled into the app\n\nThe app's code includes these packages, built into its scripts and styles.\n\n${sections.join('\n')}`;

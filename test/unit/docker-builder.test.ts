@@ -8,7 +8,8 @@ function fake(builderExists: boolean) {
   const calls: string[][] = [];
   const docker = new Docker('docker', async (_command, args) => {
     calls.push([...args]);
-    if (args[0] === 'buildx' && args[1] === 'inspect') return builderExists ? ok('Name: x') : { ...ok(), code: 1, stderr: 'not found' };
+    if (args[0] === 'buildx' && args[1] === 'inspect')
+      return builderExists ? ok('Name: x') : { ...ok(), code: 1, stderr: 'not found' };
     return ok();
   });
   return { docker, calls };
@@ -21,7 +22,20 @@ describe('Docker.build with the app builder', () => {
     expect(calls).toEqual([
       ['buildx', 'inspect', 'bugdetective-test-builder'],
       ['buildx', 'create', '--name', 'bugdetective-test-builder', '--driver', 'docker-container'],
-      ['buildx', 'build', '--builder', 'bugdetective-test-builder', '--load', '--progress', 'plain', '--label', 'bugdetective.role=workspace-image', '--tag', 'img:tag', '/ctx'],
+      [
+        'buildx',
+        'build',
+        '--builder',
+        'bugdetective-test-builder',
+        '--load',
+        '--progress',
+        'plain',
+        '--label',
+        'bugdetective.role=workspace-image',
+        '--tag',
+        'img:tag',
+        '/ctx',
+      ],
       ['buildx', 'prune', '--builder', 'bugdetective-test-builder', '--force', '--keep-storage', '2GB'],
     ]);
   });

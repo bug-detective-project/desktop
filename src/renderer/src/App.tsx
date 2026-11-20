@@ -129,7 +129,12 @@ export function App() {
         )}
       </main>
       {openTicket !== null && view !== 'review' && onboarding === null && (
-        <TicketPanel snapshot={snapshot} ticketNumber={openTicket} onClose={() => setOpenTicket(null)} onOpenReview={() => openReview(openTicket)} />
+        <TicketPanel
+          snapshot={snapshot}
+          ticketNumber={openTicket}
+          onClose={() => setOpenTicket(null)}
+          onOpenReview={() => openReview(openTicket)}
+        />
       )}
       {onboarding !== null && (
         <Onboarding

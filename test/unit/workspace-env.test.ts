@@ -8,11 +8,21 @@ const NETWORK = 'bugdetective-net-shop';
 
 /** A docker CLI over an in-memory set of containers; every other command succeeds. */
 function world() {
-  const containers: Record<string, { running: boolean; labels: Record<string, string>; networks: string[]; ports: Record<string, { HostPort: string }[]> }> = {};
+  const containers: Record<
+    string,
+    {
+      running: boolean;
+      labels: Record<string, string>;
+      networks: string[];
+      ports: Record<string, { HostPort: string }[]>;
+    }
+  > = {};
   const calls: string[][] = [];
   const out = (text = '', code = 0) => ({ code, stdout: Buffer.from(text), stderr: '', timedOut: false });
   const labelsOf = (args: readonly string[]) =>
-    Object.fromEntries(args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])));
+    Object.fromEntries(
+      args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])),
+    );
   const runner: CommandRunner = async (_cli, args) => {
     calls.push([...args]);
     const [a, b] = args;
@@ -27,7 +37,12 @@ function world() {
           return [[`${container}/tcp`, [{ HostPort: host! }]]];
         }),
       );
-      containers[name] = { running: a === 'run', labels: labelsOf(args), networks: [args[args.indexOf('--network') + 1]!], ports };
+      containers[name] = {
+        running: a === 'run',
+        labels: labelsOf(args),
+        networks: [args[args.indexOf('--network') + 1]!],
+        ports,
+      };
       return out('id');
     }
     if (a === 'network' && b === 'connect') return (containers[last]!.networks.push(args[2]!), out());
@@ -67,12 +82,16 @@ const workspaceOf = (
 ) => new Workspace({ docker, image: IMAGE, isPortFree: async () => true, project: 'shop', ...extra });
 
 /** True when `flag value` appears as two consecutive arguments. */
-const has = (args: string[], flag: string, value: string) => args.some((arg, index) => arg === flag && args[index + 1] === value);
+const has = (args: string[], flag: string, value: string) =>
+  args.some((arg, index) => arg === flag && args[index + 1] === value);
 
 describe("the workspace and the project's services", () => {
   it('starts with the variables of the services and the memory the project asks for', async () => {
     const { docker, runs } = world();
-    await workspaceOf(docker, { variables: { DATABASE_URL: 'pg://db:5432', CACHE_URL: 'redis://cache:6379' }, memory: '4g' }).ensureRunning();
+    await workspaceOf(docker, {
+      variables: { DATABASE_URL: 'pg://db:5432', CACHE_URL: 'redis://cache:6379' },
+      memory: '4g',
+    }).ensureRunning();
     const [run] = runs();
     expect(has(run!, '--env', 'DATABASE_URL=pg://db:5432')).toBe(true);
     expect(has(run!, '--env', 'CACHE_URL=redis://cache:6379')).toBe(true);
@@ -118,7 +137,9 @@ describe("the workspace and the project's services", () => {
     await workspaceOf(docker, { variables: { DATABASE_URL: 'pg://db:5432' } }).ensureRunning();
     await workspaceOf(docker, changed).ensureRunning();
     expect(runs()).toHaveLength(2);
-    expect(calls.filter((call) => call[0] === 'container' && call[1] === 'rm').map((call) => call.at(-1))).toEqual(['bugdetective-workspace']);
+    expect(calls.filter((call) => call[0] === 'container' && call[1] === 'rm').map((call) => call.at(-1))).toEqual([
+      'bugdetective-workspace',
+    ]);
     expect(calls.filter((call) => call[0] === 'volume' && call[1] === 'rm')).toHaveLength(0);
   });
 });
@@ -150,7 +171,10 @@ describe('the published port of a service', () => {
     // Windows can reserve whole blocks (2741 to 3240): no port from 3001 to 3200 can be listened on.
     const { docker, calls } = world();
     const handedOut = [55001, 55002];
-    const workspace = workspaceOf(docker, { isPortFree: async (port) => port < 2741 || port > 3240, anyFreePort: async () => handedOut.shift()! });
+    const workspace = workspaceOf(docker, {
+      isPortFree: async (port) => port < 2741 || port > 3240,
+      anyFreePort: async () => handedOut.shift()!,
+    });
     await workspace.ensureRunning();
     const [create] = forwarders(calls);
     expect(has(create!, '--publish', '127.0.0.1:5173:15173')).toBe(true);

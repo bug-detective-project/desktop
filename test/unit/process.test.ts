@@ -15,6 +15,8 @@ describe('runCommand', () => {
     expect(result.code).not.toBe(0);
     expect(result.stdout.length).toBe(0);
     expect(result.stderr).toContain('larger than 1000 bytes');
-    await expect(runChecked(runCommand, process.execPath, print(1024 * 1024), { maxStdout: 1000 })).rejects.toBeInstanceOf(CommandError);
+    await expect(
+      runChecked(runCommand, process.execPath, print(1024 * 1024), { maxStdout: 1000 }),
+    ).rejects.toBeInstanceOf(CommandError);
   });
 });

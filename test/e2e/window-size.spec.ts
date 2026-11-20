@@ -4,7 +4,10 @@ import { launch, startFirstTicket } from './fixtures.ts';
 
 /** Resizes the window's content area; the window minimum would otherwise stop below 960 x 540. */
 async function resize(app: ElectronApplication, page: Page, width: number, height: number): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h), [width, height]);
+  await app.evaluate(
+    ({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setContentSize(w, h),
+    [width, height],
+  );
   await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
 }
 

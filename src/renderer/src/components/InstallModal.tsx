@@ -57,7 +57,10 @@ export function InstallModal({
         )}
         {phase === 'lowDisk' && lowDisk && (
           <Notice tone="warn" data-testid="install-modal-low-disk">
-            {t('dashboard.installModal.lowDisk', { needed: Math.round(lowDisk.neededBytes / 1e9), free: (lowDisk.freeBytes / 1e9).toFixed(1) })}
+            {t('dashboard.installModal.lowDisk', {
+              needed: Math.round(lowDisk.neededBytes / 1e9),
+              free: (lowDisk.freeBytes / 1e9).toFixed(1),
+            })}
           </Notice>
         )}
         {phase === 'done' && (

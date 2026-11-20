@@ -31,12 +31,27 @@ let runtime: DockerRuntime;
 let game: Game;
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 async function git(...args: string[]): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['git', ...args], { user: 'node', workdir: workspaceDir('notes') })).stdout.toString('utf8').trim();
+  return (
+    await docker.execChecked(runtime.names.container, ['git', ...args], {
+      user: 'node',
+      workdir: workspaceDir('notes'),
+    })
+  ).stdout
+    .toString('utf8')
+    .trim();
 }
 
 beforeAll(async () => {
@@ -45,7 +60,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
   game = new Game({
     store: new StateStore(dir),
@@ -72,33 +91,37 @@ afterAll(async () => {
 });
 
 describe('a workspace volume removed outside the game', () => {
-  it('is noticed, blocks the code actions, and the code of every ticket is recreated', async () => {
-    const before = await git('rev-parse', 'stage-1^{tree}');
-    expect((await game.refreshEnvironment()).ready).toBe(true);
-    expect(game.snapshot().workspaceLost).toBe(false);
+  it(
+    'is noticed, blocks the code actions, and the code of every ticket is recreated',
+    async () => {
+      const before = await git('rev-parse', 'stage-1^{tree}');
+      expect((await game.refreshEnvironment()).ready).toBe(true);
+      expect(game.snapshot().workspaceLost).toBe(false);
 
-    // What a Docker cleanup does: the container and the volume are gone.
-    await docker.removeContainer(runtime.names.container);
-    await docker.removeVolume(runtime.names.volume);
+      // What a Docker cleanup does: the container and the volume are gone.
+      await docker.removeContainer(runtime.names.container);
+      await docker.removeVolume(runtime.names.volume);
 
-    await game.refreshEnvironment();
-    expect(game.snapshot().workspaceLost).toBe(true);
-    await expect(game.move(1, 'inQa')).rejects.toMatchObject({ code: 'workspaceLost' });
-    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'workspaceLost' });
+      await game.refreshEnvironment();
+      expect(game.snapshot().workspaceLost).toBe(true);
+      await expect(game.move(1, 'inQa')).rejects.toMatchObject({ code: 'workspaceLost' });
+      await expect(game.startDevServer()).rejects.toMatchObject({ code: 'workspaceLost' });
 
-    await game.rebuildWorkspace();
-    expect(game.snapshot().workspaceLost).toBe(false);
-    expect(await git('rev-parse', 'stage-1^{tree}')).toBe(before);
-    expect(await git('symbolic-ref', '--short', 'HEAD')).toBe('player/ticket-1');
-    expect(await git('config', '--get', 'bugdetective.game')).toBe(game.snapshot().state.createdAt);
-    expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
+      await game.rebuildWorkspace();
+      expect(game.snapshot().workspaceLost).toBe(false);
+      expect(await git('rev-parse', 'stage-1^{tree}')).toBe(before);
+      expect(await git('symbolic-ref', '--short', 'HEAD')).toBe('player/ticket-1');
+      expect(await git('config', '--get', 'bugdetective.game')).toBe(game.snapshot().state.createdAt);
+      expect(game.snapshot().state.tickets[0].status).toBe('inProgress');
 
-    // The new volume has the code but not the dependencies: the dev server waits for them, as on
-    // the Dashboard, where the player installs them again.
-    await expect(game.startDevServer()).rejects.toMatchObject({ code: 'dependenciesMissing' });
-    await game.installEnvironment();
-    await game.startDevServer();
-    expect((await game.workspaceStatus()).devServerUp).toBe(true);
-    await game.stopDevServer();
-  }, 10 * 60_000);
+      // The new volume has the code but not the dependencies: the dev server waits for them, as on
+      // the Dashboard, where the player installs them again.
+      await expect(game.startDevServer()).rejects.toMatchObject({ code: 'dependenciesMissing' });
+      await game.installEnvironment();
+      await game.startDevServer();
+      expect((await game.workspaceStatus()).devServerUp).toBe(true);
+      await game.stopDevServer();
+    },
+    10 * 60_000,
+  );
 });

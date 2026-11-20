@@ -15,7 +15,9 @@ const WAIT_MS = 180_000;
 /** Why this machine must not run the check, or null when it is a disposable one. */
 export function refusal(env, platform) {
   const hosted = env.CI === 'true' && env.GITHUB_ACTIONS === 'true' && env.RUNNER_ENVIRONMENT === 'github-hosted';
-  return hosted && platform === 'win32' ? null : 'Refusing to run: uninstalling deletes the game state and Docker data, so this runs only on a GitHub-hosted Windows runner.';
+  return hosted && platform === 'win32'
+    ? null
+    : 'Refusing to run: uninstalling deletes the game state and Docker data, so this runs only on a GitHub-hosted Windows runner.';
 }
 
 /** Where a per-user install puts the app, its data and its shortcuts. */
@@ -26,7 +28,10 @@ export function installedPaths(env) {
     uninstaller: win32.join(folder, 'Uninstall Bug Detective.exe'),
     removeDockerData: win32.join(folder, 'resources', 'remove-docker-data.ps1'),
     data: win32.join(env.APPDATA, 'Bug Detective'),
-    shortcuts: [win32.join(env.USERPROFILE, 'Desktop', 'Bug Detective.lnk'), win32.join(env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Bug Detective.lnk')],
+    shortcuts: [
+      win32.join(env.USERPROFILE, 'Desktop', 'Bug Detective.lnk'),
+      win32.join(env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Bug Detective.lnk'),
+    ],
   };
 }
 
@@ -50,11 +55,13 @@ async function waitFor(condition, what) {
 }
 
 const volumeExists = () => run('docker', ['volume', 'inspect', VOLUME]).status === 0;
-const registered = () => run('reg', ['query', UNINSTALL_KEY, '/s', '/f', 'Bug Detective', '/d']).stdout?.includes('Bug Detective');
+const registered = () =>
+  run('reg', ['query', UNINSTALL_KEY, '/s', '/f', 'Bug Detective', '/d']).stdout?.includes('Bug Detective');
 
 function install(setup) {
   const result = run(setup, ['/S']);
-  if (result.status !== 0) throw new Error(`The installer exited with ${result.status}: ${result.error?.message ?? result.stderr}`);
+  if (result.status !== 0)
+    throw new Error(`The installer exited with ${result.status}: ${result.error?.message ?? result.stderr}`);
 }
 
 /** The app has fuses Playwright cannot drive: it must start, stay up and write its log. */
@@ -85,7 +92,8 @@ async function main() {
   const setup = join(dist, installer);
 
   const created = run('docker', ['volume', 'create', '--label', 'bugdetective.role=workspace', VOLUME]);
-  if (created.status !== 0) throw new Error(`The runner's Docker cannot create a volume: ${created.error?.message ?? created.stderr}`);
+  if (created.status !== 0)
+    throw new Error(`The runner's Docker cannot create a volume: ${created.error?.message ?? created.stderr}`);
 
   say(`Installing ${installer}`);
   install(setup);
@@ -93,7 +101,10 @@ async function main() {
   check(existsSync(paths.exe), 'the app is installed in the per-user folder');
   check(existsSync(paths.uninstaller), 'the uninstaller is installed');
   check(existsSync(paths.removeDockerData), 'the Docker cleanup script is installed');
-  check(paths.shortcuts.every((file) => existsSync(file)), 'the desktop and Start menu shortcuts exist');
+  check(
+    paths.shortcuts.every((file) => existsSync(file)),
+    'the desktop and Start menu shortcuts exist',
+  );
   check(registered(), 'Windows lists the app under installed programs');
 
   await openApp(paths);
@@ -114,7 +125,10 @@ async function main() {
   check(!volumeExists(), "the app's Docker data is removed");
   await waitFor(() => !existsSync(paths.data), 'the game state to go');
   check(!existsSync(paths.data), 'the game state is removed');
-  check(paths.shortcuts.every((file) => !existsSync(file)), 'the shortcuts are removed');
+  check(
+    paths.shortcuts.every((file) => !existsSync(file)),
+    'the shortcuts are removed',
+  );
   check(!registered(), 'Windows no longer lists the app');
   say('The installer installs, updates and uninstalls.');
 }

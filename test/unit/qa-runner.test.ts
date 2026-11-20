@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Docker } from '../../src/main/services/docker.ts';
-import { HARDENING_ARGS, QA_LIMITS, WORKSPACE_LIMITS, containerLimits, limitArgs } from '../../src/main/services/limits.ts';
+import {
+  HARDENING_ARGS,
+  QA_LIMITS,
+  WORKSPACE_LIMITS,
+  containerLimits,
+  limitArgs,
+} from '../../src/main/services/limits.ts';
 import type { RunResult } from '../../src/main/services/process.ts';
 import { QaRunner } from '../../src/main/services/qa.ts';
 import { resourceNames } from '../../src/main/services/workspace.ts';
@@ -27,13 +33,28 @@ function fakeDocker(oom: boolean) {
 }
 
 function runner(docker: Docker) {
-  return new QaRunner({ docker, image: 'qa:test', dockerHostPath: (path) => path, names: resourceNames('bugdetective-unit'), project: 'notes' });
+  return new QaRunner({
+    docker,
+    image: 'qa:test',
+    dockerHostPath: (path) => path,
+    names: resourceNames('bugdetective-unit'),
+    project: 'notes',
+  });
 }
 
 describe('limitArgs', () => {
   it('sets the memory and pids limits and drops every capability', () => {
     expect(limitArgs(WORKSPACE_LIMITS)).toEqual(['--memory', '3g', '--pids-limit', '1024', ...HARDENING_ARGS]);
-    expect(limitArgs(QA_LIMITS)).toEqual(['--memory', '2g', '--pids-limit', '512', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges']);
+    expect(limitArgs(QA_LIMITS)).toEqual([
+      '--memory',
+      '2g',
+      '--pids-limit',
+      '512',
+      '--cap-drop',
+      'ALL',
+      '--security-opt',
+      'no-new-privileges',
+    ]);
   });
 });
 
@@ -44,13 +65,23 @@ describe('containerLimits', () => {
   });
 
   it('reads the environment variables, memory as docker takes it and pids as a number', () => {
-    const env = { BUGDETECTIVE_WORKSPACE_MEMORY: '6G', BUGDETECTIVE_WORKSPACE_PIDS: '2048', BUGDETECTIVE_QA_MEMORY: '2560m', BUGDETECTIVE_QA_PIDS: '256' };
+    const env = {
+      BUGDETECTIVE_WORKSPACE_MEMORY: '6G',
+      BUGDETECTIVE_WORKSPACE_PIDS: '2048',
+      BUGDETECTIVE_QA_MEMORY: '2560m',
+      BUGDETECTIVE_QA_PIDS: '256',
+    };
     expect(containerLimits('workspace', env)).toEqual({ memory: '6g', pids: 2048 });
     expect(containerLimits('qa', env)).toEqual({ memory: '2560m', pids: 256 });
   });
 
   it('keeps the default for a value docker would refuse', () => {
-    const env = { BUGDETECTIVE_WORKSPACE_MEMORY: 'lots', BUGDETECTIVE_WORKSPACE_PIDS: '0', BUGDETECTIVE_QA_MEMORY: '', BUGDETECTIVE_QA_PIDS: '12 pids' };
+    const env = {
+      BUGDETECTIVE_WORKSPACE_MEMORY: 'lots',
+      BUGDETECTIVE_WORKSPACE_PIDS: '0',
+      BUGDETECTIVE_QA_MEMORY: '',
+      BUGDETECTIVE_QA_PIDS: '12 pids',
+    };
     expect(containerLimits('workspace', env)).toEqual(WORKSPACE_LIMITS);
     expect(containerLimits('qa', env)).toEqual(QA_LIMITS);
   });
@@ -93,19 +124,31 @@ describe('QaRunner', () => {
     const { docker, calls } = fakeDocker(false);
     const controller = new AbortController();
     controller.abort();
-    await expect(runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg', signal: controller.signal })).rejects.toThrow();
+    await expect(
+      runner(docker).run({
+        ticket: 1,
+        language: 'en',
+        timeoutSeconds: 180,
+        packageDir: '/tmp/pkg',
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow();
     expect(calls.filter((args) => args[0] === 'run')).toEqual([]);
   });
 
   it('treats exit code 137 without an OOM kill as a missing result', async () => {
     const { docker } = fakeDocker(false);
-    await expect(runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' })).rejects.toThrow(/did not produce a result/);
+    await expect(
+      runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' }),
+    ).rejects.toThrow(/did not produce a result/);
   });
 
   it('runs QA, the dependency preparation and the helpers with the QA limits, as node', async () => {
     const { docker, calls } = fakeDocker(false);
     await runner(docker).prepareDependencies(1);
-    await runner(docker).run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' }).catch(() => {});
+    await runner(docker)
+      .run({ ticket: 1, language: 'en', timeoutSeconds: 180, packageDir: '/tmp/pkg' })
+      .catch(() => {});
     const runs = calls.filter((args) => args[0] === 'run');
     expect(runs.length).toBeGreaterThanOrEqual(3);
     for (const args of runs) {
@@ -120,7 +163,13 @@ describe('QaRunner', () => {
 });
 
 describe('a QA run of a project with services', () => {
-  const services = { db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'notes' }, variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+  const services = {
+    db: {
+      image: 'postgres:17',
+      env: { POSTGRES_PASSWORD: 'notes' },
+      variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' },
+    },
+  };
   const RESULT = JSON.stringify({ ticket: 1, gate: 2, status: 'passed', message: 'ok', tests: [], durationMs: 5 });
 
   /** A docker CLI where containers and networks exist once created; the QA run answers with a result file. */
@@ -141,7 +190,17 @@ describe('a QA run of a project with services', () => {
       if (a === 'container' && b === 'inspect') {
         if (!containers.has(last)) return { ...ok(), code: 1 };
         if (args.includes('--format')) return ok('false\n');
-        return ok(JSON.stringify([{ Id: 'id', Name: `/${last}`, State: { Running: containers.get(last) }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+        return ok(
+          JSON.stringify([
+            {
+              Id: 'id',
+              Name: `/${last}`,
+              State: { Running: containers.get(last) },
+              Config: { Image: 'x', Labels: {} },
+              HostConfig: { PortBindings: {} },
+            },
+          ]),
+        );
       }
       if (a === 'run') {
         const name = args[args.indexOf('--name') + 1]!;
@@ -160,7 +219,15 @@ describe('a QA run of a project with services', () => {
 
   const request = { ticket: 1, language: 'en' as const, timeoutSeconds: 60, packageDir: '/pkg' };
   const withServices = (docker: Docker) =>
-    new QaRunner({ docker, image: 'qa:test', dockerHostPath: (path) => path, names: resourceNames('bugdetective-unit'), project: 'notes', services, servicePollMs: 1 });
+    new QaRunner({
+      docker,
+      image: 'qa:test',
+      dockerHostPath: (path) => path,
+      names: resourceNames('bugdetective-unit'),
+      project: 'notes',
+      services,
+      servicePollMs: 1,
+    });
 
   it('puts the QA container on the network of its own services, with their variables, and removes everything after the run', async () => {
     const { docker, containers, networks, qaRun, calls } = await world();
@@ -192,7 +259,9 @@ describe('a QA run of a project with services', () => {
 
   it('does not run QA when a service does not start, says which one and why, and leaves nothing', async () => {
     const { docker, containers, networks, qaRun } = await world({ serviceDies: true });
-    await expect(withServices(docker).run(request)).rejects.toThrow(/The service db \(postgres:17\) for QA did not start: it stopped: Error: superuser password is not specified\./);
+    await expect(withServices(docker).run(request)).rejects.toThrow(
+      /The service db \(postgres:17\) for QA did not start: it stopped: Error: superuser password is not specified\./,
+    );
     expect(qaRun()).toBeUndefined();
     expect([...containers.keys()]).toEqual([]);
     expect([...networks]).toEqual([]);

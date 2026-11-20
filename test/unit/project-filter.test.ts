@@ -26,8 +26,17 @@ function card(id: string, details: Partial<NonNullable<ProjectCard['details']>> 
 }
 
 const cards = [
-  card('SupportDesk', { about: both('A support app'), difficulty: 'beginner', stack: { frontend: 'React · Vite', database: 'SQLite' }, skills: { en: ['Async and state'], pt: ['Assincronia e estado'] } }),
-  card('Inventário', { about: { en: 'Stock control', pt: 'Controle de estoque' }, difficulty: 'intermediate', stack: { backend: 'Python · FastAPI' } }),
+  card('SupportDesk', {
+    about: both('A support app'),
+    difficulty: 'beginner',
+    stack: { frontend: 'React · Vite', database: 'SQLite' },
+    skills: { en: ['Async and state'], pt: ['Assincronia e estado'] },
+  }),
+  card('Inventário', {
+    about: { en: 'Stock control', pt: 'Controle de estoque' },
+    difficulty: 'intermediate',
+    stack: { backend: 'Python · FastAPI' },
+  }),
   card('Payments', { difficulty: 'advanced' }),
   card('gone', null),
 ];
@@ -35,7 +44,12 @@ const ids = (list: ProjectCard[]) => list.map((item) => item.id);
 
 describe('filterProjects', () => {
   it('shows every project without a query or a level', () => {
-    expect(ids(filterProjects(cards, { query: '', level: 'all' }, 'en'))).toEqual(['SupportDesk', 'Inventário', 'Payments', 'gone']);
+    expect(ids(filterProjects(cards, { query: '', level: 'all' }, 'en'))).toEqual([
+      'SupportDesk',
+      'Inventário',
+      'Payments',
+      'gone',
+    ]);
   });
 
   it.each([
@@ -68,8 +82,34 @@ describe('filterProjects', () => {
   });
 
   it('finds a project by a skill the card only shows under "See all"', () => {
-    const en = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Caching', 'Eight', 'Nine', 'Ten', 'Eleven', 'Text search'];
-    const pt = ['Um', 'Dois', 'Três', 'Quatro', 'Cinco', 'Seis', 'Cache', 'Oito', 'Nove', 'Dez', 'Onze', 'Busca textual'];
+    const en = [
+      'One',
+      'Two',
+      'Three',
+      'Four',
+      'Five',
+      'Six',
+      'Caching',
+      'Eight',
+      'Nine',
+      'Ten',
+      'Eleven',
+      'Text search',
+    ];
+    const pt = [
+      'Um',
+      'Dois',
+      'Três',
+      'Quatro',
+      'Cinco',
+      'Seis',
+      'Cache',
+      'Oito',
+      'Nove',
+      'Dez',
+      'Onze',
+      'Busca textual',
+    ];
     const many = [...cards, card('Catalog', { skills: { en, pt } })];
     expect(ids(filterProjects(many, { query: 'caching', level: 'all' }, 'en'))).toEqual(['Catalog']);
     expect(ids(filterProjects(many, { query: 'busca textual', level: 'all' }, 'pt'))).toEqual(['Catalog']);
@@ -86,9 +126,13 @@ describe('filterProjects', () => {
   });
 
   it('every tag must match, together with the text being typed', () => {
-    expect(ids(filterProjects(cards, { query: '', tags: ['react', 'sqlite'], level: 'all' }, 'en'))).toEqual(['SupportDesk']);
+    expect(ids(filterProjects(cards, { query: '', tags: ['react', 'sqlite'], level: 'all' }, 'en'))).toEqual([
+      'SupportDesk',
+    ]);
     expect(ids(filterProjects(cards, { query: '', tags: ['react', 'fastapi'], level: 'all' }, 'en'))).toEqual([]);
-    expect(ids(filterProjects(cards, { query: 'stock', tags: ['python'], level: 'all' }, 'en'))).toEqual(['Inventário']);
+    expect(ids(filterProjects(cards, { query: 'stock', tags: ['python'], level: 'all' }, 'en'))).toEqual([
+      'Inventário',
+    ]);
     expect(ids(filterProjects(cards, { query: '', tags: ['python'], level: 'beginner' }, 'en'))).toEqual([]);
   });
 });

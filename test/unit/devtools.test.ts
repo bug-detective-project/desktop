@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({ session: {} }));
 const { isDevToolsShortcut } = await import('../../src/main/devtools.ts');
 
-const key = (key: string, modifiers: Partial<{ control: boolean; meta: boolean; shift: boolean; alt: boolean }> = {}, type = 'keyDown') => ({
+const key = (
+  key: string,
+  modifiers: Partial<{ control: boolean; meta: boolean; shift: boolean; alt: boolean }> = {},
+  type = 'keyDown',
+) => ({
   type,
   key,
   control: false,

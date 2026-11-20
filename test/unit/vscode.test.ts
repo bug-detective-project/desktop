@@ -9,7 +9,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { serviceRunning, hasGitHubCredential } from '../../src/main/platform/types.ts';
-import { VSCODE_MACHINE_SETTINGS, VSCode, attachedContainerConfig, attachedContainerConfigPath } from '../../src/main/services/vscode.ts';
+import {
+  VSCODE_MACHINE_SETTINGS,
+  VSCode,
+  attachedContainerConfig,
+  attachedContainerConfigPath,
+} from '../../src/main/services/vscode.ts';
 import { MERGE_SETTINGS_SCRIPT } from '../../src/main/services/workspace.ts';
 
 let dir: string;
@@ -22,12 +27,20 @@ afterEach(async () => {
 
 describe('the attached-container configuration file', () => {
   it('names the file after the container, escaping what the extension escapes', () => {
-    expect(attachedContainerConfigPath('/gs', 'bugdetective-workspace')).toBe(join('/gs', 'ms-vscode-remote.remote-containers', 'nameConfigs', 'bugdetective-workspace.json'));
-    expect(attachedContainerConfigPath('/gs', 'a:b/c%d')).toBe(join('/gs', 'ms-vscode-remote.remote-containers', 'nameConfigs', 'a%3ab%2fc%25d.json'));
+    expect(attachedContainerConfigPath('/gs', 'bugdetective-workspace')).toBe(
+      join('/gs', 'ms-vscode-remote.remote-containers', 'nameConfigs', 'bugdetective-workspace.json'),
+    );
+    expect(attachedContainerConfigPath('/gs', 'a:b/c%d')).toBe(
+      join('/gs', 'ms-vscode-remote.remote-containers', 'nameConfigs', 'a%3ab%2fc%25d.json'),
+    );
   });
 
   it('sets the folder, the node user, no SSH agent socket and the settings, keeping other keys of an existing file', () => {
-    const config = attachedContainerConfig('/workspaces/supportdesk', { forwardPorts: [9229], remoteEnv: { FOO: 'bar' }, settings: { 'editor.fontSize': 14 as never } });
+    const config = attachedContainerConfig('/workspaces/supportdesk', {
+      forwardPorts: [9229],
+      remoteEnv: { FOO: 'bar' },
+      settings: { 'editor.fontSize': 14 as never },
+    });
     expect(config).toEqual({
       forwardPorts: [9229],
       workspaceFolder: '/workspaces/supportdesk',
@@ -35,24 +48,40 @@ describe('the attached-container configuration file', () => {
       remoteEnv: { FOO: 'bar', SSH_AUTH_SOCK: null },
       settings: { 'editor.fontSize': 14, ...VSCODE_MACHINE_SETTINGS },
     });
-    expect(VSCODE_MACHINE_SETTINGS).toMatchObject({ 'dev.containers.gitCredentialHelperConfigLocation': 'none', 'dev.containers.copyGitConfig': false, 'remote.downloadExtensionsLocally': true });
+    expect(VSCODE_MACHINE_SETTINGS).toMatchObject({
+      'dev.containers.gitCredentialHelperConfigLocation': 'none',
+      'dev.containers.copyGitConfig': false,
+      'remote.downloadExtensionsLocally': true,
+    });
     expect(() => attachedContainerConfig('/etc')).toThrow(/Invalid workspace folder/);
   });
 
   it('turns the .gitconfig copy off the way the extension reads it: a false new key falls back to the deprecated key', () => {
     // Dev Containers 0.469.0: getConfiguration(key) { return settings['dev.containers.' + key] || settings['remote.containers.' + key]; }
     // and the caller then does `?? isCopyGitConfigEnabled`, true by default: undefined would copy the file.
-    const read = (key: string) => VSCODE_MACHINE_SETTINGS[`dev.containers.${key}`] || VSCODE_MACHINE_SETTINGS[`remote.containers.${key}`];
+    const read = (key: string) =>
+      VSCODE_MACHINE_SETTINGS[`dev.containers.${key}`] || VSCODE_MACHINE_SETTINGS[`remote.containers.${key}`];
     expect(read('copyGitConfig')).toBe(false);
     expect(read('gitCredentialHelperConfigLocation')).toBe('none');
   });
 
   it('is written into the VS Code global storage of the CLI that will open the window, and merged over a damaged file', async () => {
-    const cli = { source: 'path' as const, launcher: 'code', command: 'code', baseArgs: [], env: {}, globalStorage: dir };
+    const cli = {
+      source: 'path' as const,
+      launcher: 'code',
+      command: 'code',
+      baseArgs: [],
+      env: {},
+      globalStorage: dir,
+    };
     const vscode = new VSCode(cli, async () => ({ code: 0, stdout: Buffer.from(''), stderr: '', timedOut: false }));
     const file = await vscode.writeAttachedConfig('bugdetective-workspace', '/workspaces/supportdesk');
     expect(file).toBe(attachedContainerConfigPath(dir, 'bugdetective-workspace'));
-    expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ workspaceFolder: '/workspaces/supportdesk', remoteUser: 'node', remoteEnv: { SSH_AUTH_SOCK: null } });
+    expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({
+      workspaceFolder: '/workspaces/supportdesk',
+      remoteUser: 'node',
+      remoteEnv: { SSH_AUTH_SOCK: null },
+    });
     await writeFile(file, '{ not json');
     await vscode.writeAttachedConfig('bugdetective-workspace', '/workspaces/supportdesk');
     expect(JSON.parse(await readFile(file, 'utf8')).remoteUser).toBe('node');
@@ -60,7 +89,8 @@ describe('the attached-container configuration file', () => {
 });
 
 describe('the machine settings merge script', () => {
-  const run = (file: string, settings: Record<string, unknown>) => execFileSync(process.execPath, ['-e', MERGE_SETTINGS_SCRIPT, file, JSON.stringify(settings)], { encoding: 'utf8' });
+  const run = (file: string, settings: Record<string, unknown>) =>
+    execFileSync(process.execPath, ['-e', MERGE_SETTINGS_SCRIPT, file, JSON.stringify(settings)], { encoding: 'utf8' });
 
   it('creates the folder and the file, and keeps what the file already had', async () => {
     const file = join(dir, 'data', 'Machine', 'settings.json');

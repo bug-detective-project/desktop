@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { EnvironmentReport, Snapshot } from '../../src/shared/api.ts';
 import type { TicketState } from '../../src/shared/types.ts';
-import { deskState, environmentRows, environmentSummary, inboxMessageText } from '../../src/renderer/src/screens/dashboardState.ts';
+import {
+  deskState,
+  environmentRows,
+  environmentSummary,
+  inboxMessageText,
+} from '../../src/renderer/src/screens/dashboardState.ts';
 
 const READY: EnvironmentReport = {
   items: [
@@ -56,7 +61,14 @@ describe('deskState', () => {
 });
 
 describe('environmentRows, the services of the project', () => {
-  const ready = { items: [{ id: 'workspaceImage' as const, ready: true }, { id: 'qaImage' as const, ready: true }, { id: 'projectDependencies' as const, ready: true }], ready: true };
+  const ready = {
+    items: [
+      { id: 'workspaceImage' as const, ready: true },
+      { id: 'qaImage' as const, ready: true },
+      { id: 'projectDependencies' as const, ready: true },
+    ],
+    ready: true,
+  };
 
   it('adds no row for a project without services', () => {
     const rows = environmentRows(snapshot({ environment: ready, services: [] }), t);
@@ -80,7 +92,13 @@ describe('environmentRows, the services of the project', () => {
     expect(rows.map((row) => [row.id, row.name, row.tone, row.status, row.busy])).toEqual([
       ['service-db', 'db · postgres:17', 'ok', 'dashboard.envStatus.ready', false],
       ['service-cache', 'cache · postgres:17', 'warn', 'dashboard.envStatus.starting', true],
-      ['service-audit', 'audit · postgres:17', 'danger', 'dashboard.envStatus.serviceStopped: superuser password is not specified', false],
+      [
+        'service-audit',
+        'audit · postgres:17',
+        'danger',
+        'dashboard.envStatus.serviceStopped: superuser password is not specified',
+        false,
+      ],
       ['service-search', 'search · postgres:17', 'danger', 'dashboard.envStatus.serviceStopped', false],
       ['service-queue', 'queue · postgres:17', 'danger', 'dashboard.envStatus.serviceOutOfMemory', false],
     ]);
@@ -88,15 +106,25 @@ describe('environmentRows, the services of the project', () => {
 
   it('lists the service images among the downloads only when the project needs them', () => {
     const environment = { items: [...ready.items, { id: 'serviceImages' as const, ready: false }], ready: false };
-    const rows = environmentRows(snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }), t);
+    const rows = environmentRows(
+      snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }),
+      t,
+    );
     const row = rows.find((item) => item.id === 'serviceImages')!;
-    expect([row.name, row.tone, row.status]).toEqual(['dashboard.env.serviceImages', 'danger', 'dashboard.envStatus.missing']);
+    expect([row.name, row.tone, row.status]).toEqual([
+      'dashboard.env.serviceImages',
+      'danger',
+      'dashboard.envStatus.missing',
+    ]);
     expect(environmentSummary(rows)).toBe('danger');
   });
 
   it('says a service is not installed yet, without a spinner, while the downloads are missing', () => {
     const environment = { items: [...ready.items, { id: 'serviceImages' as const, ready: false }], ready: false };
-    const rows = environmentRows(snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }), t);
+    const rows = environmentRows(
+      snapshot({ environment, services: [{ name: 'db', image: 'postgres:17', state: 'starting' }] }),
+      t,
+    );
     const row = rows.find((item) => item.id === 'service-db')!;
     expect([row.tone, row.status, row.busy]).toEqual(['neutral', 'dashboard.envStatus.notYet', false]);
   });
@@ -114,24 +142,54 @@ describe('environmentRows, the services of the project', () => {
       t,
     );
     expect(rows.filter((row) => row.action === 'recreateServices').map((row) => row.id)).toEqual(['service-audit']);
-    const healthy = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready' }] }), t);
+    const healthy = environmentRows(
+      snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready' }] }),
+      t,
+    );
     expect(healthy.some((row) => row.action === 'recreateServices')).toBe(false);
   });
 
   it('says where a published service answers on the computer', () => {
-    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5433 }] }), t);
+    const rows = environmentRows(
+      snapshot({
+        environment: ready,
+        services: [{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5433 }],
+      }),
+      t,
+    );
     expect(rows.find((row) => row.id === 'service-db')!.status).toBe('dashboard.envStatus.ready · localhost:5433');
   });
 
   it('warns on a service that is up but had a process killed for lack of memory', () => {
-    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: 5432, memoryKillAt: '2026-11-17T12:00:00.000Z' }] }), t);
+    const rows = environmentRows(
+      snapshot({
+        environment: ready,
+        services: [
+          {
+            name: 'db',
+            image: 'postgres:17',
+            state: 'ready',
+            hostPort: 5432,
+            memoryKillAt: '2026-11-17T12:00:00.000Z',
+          },
+        ],
+      }),
+      t,
+    );
     const row = rows.find((item) => item.id === 'service-db')!;
-    expect([row.tone, row.status, row.busy]).toEqual(['warn', 'dashboard.envStatus.ready · localhost:5432 · dashboard.envStatus.serviceMemoryKill', false]);
+    expect([row.tone, row.status, row.busy]).toEqual([
+      'warn',
+      'dashboard.envStatus.ready · localhost:5432 · dashboard.envStatus.serviceMemoryKill',
+      false,
+    ]);
     expect(row.action).toBeUndefined();
   });
 
   it('a failed service makes the summary a danger', () => {
-    const rows = environmentRows(snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }), t);
+    const rows = environmentRows(
+      snapshot({ environment: ready, services: [{ name: 'db', image: 'postgres:17', state: 'failed' }] }),
+      t,
+    );
     expect(environmentSummary(rows)).toBe('danger');
   });
 });
@@ -150,7 +208,12 @@ describe('environmentRows', () => {
   it('adds the app data row with a retry only after a failed database reset', () => {
     expect(environmentRows(snapshot(), t).some((row) => row.id === 'database')).toBe(false);
     const rows = environmentRows(snapshot({ dbResetFailed: true }), t);
-    expect(rows.at(-1)).toMatchObject({ id: 'database', tone: 'danger', status: 'dashboard.envStatus.resetFailed', action: 'retryDatabaseReset' });
+    expect(rows.at(-1)).toMatchObject({
+      id: 'database',
+      tone: 'danger',
+      status: 'dashboard.envStatus.resetFailed',
+      action: 'retryDatabaseReset',
+    });
     expect(environmentSummary(rows)).toBe('danger');
   });
 
@@ -165,7 +228,13 @@ describe('environmentRows', () => {
     expect(starting[0]).toMatchObject({ tone: 'warn', status: 'dashboard.envStatus.starting', busy: true });
     expect(environmentSummary(starting)).toBe('warn');
 
-    const missing = { items: [{ id: 'workspaceImage' as const, ready: false }, { id: 'qaImage' as const, ready: false }], ready: false };
+    const missing = {
+      items: [
+        { id: 'workspaceImage' as const, ready: false },
+        { id: 'qaImage' as const, ready: false },
+      ],
+      ready: false,
+    };
     const installing = environmentRows(snapshot({ busy: 'installing', environment: missing }), t);
     expect(tones(installing)).toMatchObject({ workspaceImage: 'warn', qaImage: 'warn' });
     expect(installing[1].busy).toBe(true);
@@ -179,14 +248,26 @@ describe('environmentRows', () => {
     expect(stopped[1]).toMatchObject({ tone: 'neutral', status: 'dashboard.envStatus.needsDocker' });
     expect(environmentSummary(stopped)).toBe('danger');
 
-    const missing = { items: [{ id: 'workspaceImage' as const, ready: false }, { id: 'qaImage' as const, ready: true }], ready: false };
+    const missing = {
+      items: [
+        { id: 'workspaceImage' as const, ready: false },
+        { id: 'qaImage' as const, ready: true },
+      ],
+      ready: false,
+    };
     const rows = environmentRows(snapshot({ environment: missing }), t);
     expect(rows[1]).toMatchObject({ tone: 'danger', status: 'dashboard.envStatus.missing' });
     expect(environmentSummary(rows)).toBe('danger');
   });
 
   it('does not count dependencies that come with the first ticket as missing', () => {
-    const beforeFirst = { items: [{ id: 'workspaceImage' as const, ready: true }, { id: 'qaImage' as const, ready: true }], ready: true };
+    const beforeFirst = {
+      items: [
+        { id: 'workspaceImage' as const, ready: true },
+        { id: 'qaImage' as const, ready: true },
+      ],
+      ready: true,
+    };
     const rows = environmentRows(snapshot({ environment: beforeFirst }), t);
     expect(rows[3]).toMatchObject({ tone: 'neutral', status: 'dashboard.envStatus.notYet' });
     expect(environmentSummary(rows)).toBe('ok');
@@ -201,7 +282,13 @@ describe('inbox message text', () => {
     assignments: { 'back-1': { subject: 'First back ticket', body: 'Go' } },
   };
   const fallback = { subject: 'Your next ticket', body: 'On the Board.' };
-  const message = (kind: 'welcome' | 'assignment' | 'completion' | 'trackCompletion', ticket?: number) => ({ id: 'm', kind, ticket, at: '', read: false });
+  const message = (kind: 'welcome' | 'assignment' | 'completion' | 'trackCompletion', ticket?: number) => ({
+    id: 'm',
+    kind,
+    ticket,
+    at: '',
+    read: false,
+  });
   const idOf = (ticket: number) => (ticket === 1 ? 'back-1' : undefined);
 
   it('uses the story message of each kind, assignments by ticket id', () => {
@@ -218,7 +305,10 @@ describe('inbox message text', () => {
 
   it('names the completed track in a track completion', () => {
     const done = { ...message('trackCompletion'), track: 'fullstack' as const };
-    expect(inboxMessageText(messages, done, fallback, idOf)).toEqual({ subject: 'The fullstack track is done', body: 'All fullstack tickets closed.' });
+    expect(inboxMessageText(messages, done, fallback, idOf)).toEqual({
+      subject: 'The fullstack track is done',
+      body: 'All fullstack tickets closed.',
+    });
   });
 
   it('falls back to a generic assignment when the story has none for the ticket', () => {

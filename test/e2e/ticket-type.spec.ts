@@ -12,7 +12,10 @@ import { dragCard, launch } from './fixtures.ts';
 test('a ticket says its type and its both-sides mark, words QA by type and shows its skills only when Done', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bd-ticket-type-'));
   const notes = await createNotesProject(dir);
-  const { page, close } = await launch({ qa: ['passed', 'gate2', 'passed'] }, { catalog: [{ id: 'notes', qaDir: notes.qaDir, starter: true }] });
+  const { page, close } = await launch(
+    { qa: ['passed', 'gate2', 'passed'] },
+    { catalog: [{ id: 'notes', qaDir: notes.qaDir, starter: true }] },
+  );
   const acceptReview = async (ticket: number) => {
     await page.getByTestId(`card-${ticket}`).click();
     await page.getByTestId('open-review').click();
@@ -65,15 +68,21 @@ test('a ticket says its type and its both-sides mark, words QA by type and shows
     await panel.getByTestId('tab-qa').click();
     const comment = panel.getByTestId('qa-comment').first();
     await expect(comment).toHaveAttribute('data-kind', 'gate2Failed');
-    await expect(comment.getByTestId('qa-comment-text')).toHaveText('The ticket is not delivered yet. Part of what it asks for is still missing or does not work.');
+    await expect(comment.getByTestId('qa-comment-text')).toHaveText(
+      'The ticket is not delivered yet. Part of what it asks for is still missing or does not work.',
+    );
     await expect(panel.getByTestId('ticket-practiced')).toHaveCount(0);
-    expect(await page.evaluate(() => window.bugDetective.snapshot().then((snapshot) => snapshot.practiced))).toEqual({});
+    expect(await page.evaluate(() => window.bugDetective.snapshot().then((snapshot) => snapshot.practiced))).toEqual(
+      {},
+    );
     await panel.getByTestId('close-panel').click();
 
     // In Code Review the reference is introduced as a delivery, and the skills are still hidden.
     await dragCard(page, 2, 'inQa');
     await expect(second).toHaveAttribute('data-status', 'codeReview', { timeout: 15_000 });
-    expect(await page.evaluate(() => window.bugDetective.snapshot().then((snapshot) => snapshot.practiced))).toEqual({});
+    expect(await page.evaluate(() => window.bugDetective.snapshot().then((snapshot) => snapshot.practiced))).toEqual(
+      {},
+    );
     await second.click();
     await page.getByTestId('open-review').click();
     await expect(page.getByTestId('review-reference-intro')).toContainText('to deliver what the ticket asks.');

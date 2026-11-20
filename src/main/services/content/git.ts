@@ -5,11 +5,28 @@ import { readTar } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 
 /** `git archive` of a ref, with line-ending conversion disabled so files keep LF on Windows. */
-export async function gitArchive(runner: CommandRunner, git: string, repoPath: string, ref: string): Promise<ArchiveFile[]> {
+export async function gitArchive(
+  runner: CommandRunner,
+  git: string,
+  repoPath: string,
+  ref: string,
+): Promise<ArchiveFile[]> {
   const { stdout } = await runChecked(
     runner,
     git,
-    ['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', '-c', 'safe.directory=*', '-C', repoPath, 'archive', '--format=tar', ref],
+    [
+      '-c',
+      'core.autocrlf=false',
+      '-c',
+      'core.eol=lf',
+      '-c',
+      'safe.directory=*',
+      '-C',
+      repoPath,
+      'archive',
+      '--format=tar',
+      ref,
+    ],
     { timeoutMs: 120_000 },
   );
   return readTar(stdout);
@@ -20,11 +37,20 @@ export async function gitArchive(runner: CommandRunner, git: string, repoPath: s
  * creates only the default branch locally). The ticket branches are published content: they are
  * built by `npx bd build` in the qa worktree (the catalog's CLI), never by hand.
  */
-export async function resolveBranchRef(runner: CommandRunner, git: string, repoPath: string, branch: string): Promise<string> {
+export async function resolveBranchRef(
+  runner: CommandRunner,
+  git: string,
+  repoPath: string,
+  branch: string,
+): Promise<string> {
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
-    const result = await runner(git, ['-c', 'safe.directory=*', '-C', repoPath, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
-      timeoutMs: 30_000,
-    });
+    const result = await runner(
+      git,
+      ['-c', 'safe.directory=*', '-C', repoPath, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+      {
+        timeoutMs: 30_000,
+      },
+    );
     if (result.code === 0) {
       return ref;
     }

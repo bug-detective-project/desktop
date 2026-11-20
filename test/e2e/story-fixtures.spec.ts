@@ -21,9 +21,15 @@ const update = process.env.BUGDETECTIVE_UPDATE_STORY_DATA === '1';
 test('capture the snapshots the stories render, and keep the stored data in the same shape', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bd-story-data-'));
   const notes = await createNotesProject(dir);
-  const { page, close } = await launch({ qa: ['gate2', 'passed'] }, { catalog: [{ id: 'notes', qaDir: notes.qaDir, starter: true }] });
+  const { page, close } = await launch(
+    { qa: ['gate2', 'passed'] },
+    { catalog: [{ id: 'notes', qaDir: notes.qaDir, starter: true }] },
+  );
   // Temporary folders get random names: stable ones keep the data's diff readable.
-  const stable = (text: string) => text.replaceAll(dir, '/tmp/notes-project').replace(/\/tmp\/João Silva e2e-[A-Za-z0-9]+/g, '/tmp/bug-detective-data');
+  const stable = (text: string) =>
+    text
+      .replaceAll(dir, '/tmp/notes-project')
+      .replace(/\/tmp\/João Silva e2e-[A-Za-z0-9]+/g, '/tmp/bug-detective-data');
   const problems: string[] = [];
   const save = async (name: string, value: unknown) => {
     const file = join(out, `${name}.json`);

@@ -130,7 +130,14 @@ test('the first time, Rafaela walks through the Dashboard and the Board, and it 
     await page.getByTestId('onboarding-finish').click();
     await expect(overlay(page)).toHaveCount(0);
     // The example never entered the game.
-    const tickets = await page.evaluate(async () => (await (window as unknown as { bugDetective: { snapshot(): Promise<{ state: { tickets: unknown[] } }> } }).bugDetective.snapshot()).state.tickets.length);
+    const tickets = await page.evaluate(
+      async () =>
+        (
+          await (
+            window as unknown as { bugDetective: { snapshot(): Promise<{ state: { tickets: unknown[] } }> } }
+          ).bugDetective.snapshot()
+        ).state.tickets.length,
+    );
     expect(tickets).toBe(0);
     await expect(page.getByTestId('nav-dashboard')).toHaveAttribute('aria-current', 'page');
 

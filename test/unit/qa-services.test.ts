@@ -6,7 +6,13 @@ import type { CommandRunner } from '../../src/main/services/process.ts';
 import { QaServiceError, QaServices, qaServiceNames, sweepQaServices } from '../../src/main/services/qa-services.ts';
 
 const IMAGE = SERVICE_IMAGES['postgres:17']!;
-const declared: Declared = { db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'shop' }, variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' } } };
+const declared: Declared = {
+  db: {
+    image: 'postgres:17',
+    env: { POSTGRES_PASSWORD: 'shop' },
+    variables: { DATABASE_URL: 'pg://{{host}}:{{port}}' },
+  },
+};
 const NETWORK = 'bugdetective-qanet-shop-run1';
 const CONTAINER = 'bugdetective-qasvc-shop-db-run1';
 
@@ -30,7 +36,18 @@ function world(options: { ready?: () => boolean; dies?: { oom?: boolean; log: st
       const container = containers[last];
       if (!container) return out('', 1);
       if (args.includes('--format')) return out(String(container.oom ?? false));
-      return out(JSON.stringify([{ Id: 'id', Name: `/${last}`, State: { Running: container.running }, Config: { Image: IMAGE.reference, Labels: {} }, HostConfig: { PortBindings: {} }, NetworkSettings: { Networks: {} } }]));
+      return out(
+        JSON.stringify([
+          {
+            Id: 'id',
+            Name: `/${last}`,
+            State: { Running: container.running },
+            Config: { Image: IMAGE.reference, Labels: {} },
+            HostConfig: { PortBindings: {} },
+            NetworkSettings: { Networks: {} },
+          },
+        ]),
+      );
     }
     if (a === 'run') {
       if (options.runFails) return out('', 125, options.runFails);
@@ -50,7 +67,10 @@ const servicesOf = (docker: Docker, extra: { readyTimeoutMs?: number } = {}) =>
 
 describe('the services of a QA run', () => {
   it('names the network and the containers after the project, the service and the run', () => {
-    expect(qaServiceNames('bugdetective', 'shop', 'run1', declared)).toEqual({ network: NETWORK, containers: { db: CONTAINER } });
+    expect(qaServiceNames('bugdetective', 'shop', 'run1', declared)).toEqual({
+      network: NETWORK,
+      containers: { db: CONTAINER },
+    });
   });
 
   it('creates an internal network of the run and starts each service on it, with its data in memory', async () => {
@@ -58,7 +78,18 @@ describe('the services of a QA run', () => {
     const started = await servicesOf(docker).start('run1');
 
     expect(started).toEqual({ network: NETWORK, variables: { DATABASE_URL: 'pg://db:5432' } });
-    expect(of('network', 'create')).toEqual([['network', 'create', '--internal', '--label', 'bugdetective.role=qa-network', '--label', 'bugdetective.project=shop', NETWORK]]);
+    expect(of('network', 'create')).toEqual([
+      [
+        'network',
+        'create',
+        '--internal',
+        '--label',
+        'bugdetective.role=qa-network',
+        '--label',
+        'bugdetective.project=shop',
+        NETWORK,
+      ],
+    ]);
     const text = of('run')[0]!.join(' ');
     expect(text).toContain(`--name ${CONTAINER}`);
     expect(text).toContain('--pull never');
@@ -79,8 +110,16 @@ describe('the services of a QA run', () => {
   });
 
   it.each([
-    ['cannot be created', { runFails: 'Error response from daemon: No such image' }, /The service db \(postgres:17\) for QA could not be started: Error response from daemon: No such image/],
-    ['stops at once', { dies: { log: 'Error: superuser password is not specified.\n' } }, /for QA did not start: it stopped: Error: superuser password is not specified\./],
+    [
+      'cannot be created',
+      { runFails: 'Error response from daemon: No such image' },
+      /The service db \(postgres:17\) for QA could not be started: Error response from daemon: No such image/,
+    ],
+    [
+      'stops at once',
+      { dies: { log: 'Error: superuser password is not specified.\n' } },
+      /for QA did not start: it stopped: Error: superuser password is not specified\./,
+    ],
     ['runs out of memory', { dies: { oom: true, log: 'Killed\n' } }, /for QA did not start: it ran out of memory/],
   ])('fails naming a service that %s, and removes everything of the run', async (_, options, message) => {
     const { docker, containers, networks } = world(options);
@@ -95,7 +134,9 @@ describe('the services of a QA run', () => {
 
   it('fails when a service is not ready in time, and removes everything of the run', async () => {
     const { docker, containers, networks } = world({ ready: () => false });
-    await expect(servicesOf(docker, { readyTimeoutMs: 15 }).start('run1')).rejects.toThrow(/did not start: it was not ready after 0\.015 s/);
+    await expect(servicesOf(docker, { readyTimeoutMs: 15 }).start('run1')).rejects.toThrow(
+      /did not start: it was not ready after 0\.015 s/,
+    );
     expect(containers).toEqual({});
     expect(networks.size).toBe(0);
   });
@@ -119,7 +160,9 @@ describe('the services of a QA run', () => {
     networks.add('someone-elses-network');
 
     const removed = await sweepQaServices(docker, 'bugdetective');
-    expect(removed.sort()).toEqual([CONTAINER, 'bugdetective-qasvc-shop-db-run2', NETWORK, 'bugdetective-qanet-shop-run2'].sort());
+    expect(removed.sort()).toEqual(
+      [CONTAINER, 'bugdetective-qasvc-shop-db-run2', NETWORK, 'bugdetective-qanet-shop-run2'].sort(),
+    );
     expect(Object.keys(containers)).toEqual(['someone-else']);
     expect([...networks]).toEqual(['someone-elses-network']);
     expect(of('container', 'ls')[0]!.join(' ')).toContain('label=bugdetective.role=qa-service');

@@ -48,10 +48,14 @@ console.log(`Docker contexts written to ${out}`);
 console.log(images);
 
 const response = await fetch(OFFICIAL_CATALOG_URL, { signal: AbortSignal.timeout(30_000) }).catch((error: Error) => {
-  throw new Error(`Could not download the projects catalog for the bundled fallback (${OFFICIAL_CATALOG_URL}): ${error.message}`);
+  throw new Error(
+    `Could not download the projects catalog for the bundled fallback (${OFFICIAL_CATALOG_URL}): ${error.message}`,
+  );
 });
 if (!response.ok) {
-  throw new Error(`Could not download the projects catalog for the bundled fallback: ${OFFICIAL_CATALOG_URL} answered ${response.status}`);
+  throw new Error(
+    `Could not download the projects catalog for the bundled fallback: ${OFFICIAL_CATALOG_URL} answered ${response.status}`,
+  );
 }
 const catalog: unknown = await response.json();
 parseCatalog(catalog);

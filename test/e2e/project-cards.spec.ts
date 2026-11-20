@@ -21,7 +21,9 @@ test.beforeAll(async () => {
     stack: { frontend: 'React · Vite' },
     skills: { en: ['Async and state', 'Tracing data flow'], pt: ['Assincronia e estado', 'Rastrear o fluxo de dados'] },
   });
-  const middle = await createProjectRepo(dir, { front: 1, back: 1 }, 'Middle', 'middle', { difficulty: 'intermediate' });
+  const middle = await createProjectRepo(dir, { front: 1, back: 1 }, 'Middle', 'middle', {
+    difficulty: 'intermediate',
+  });
   const hard = await createProjectRepo(dir, { front: 1, back: 0 }, 'Hard', 'hard', { difficulty: 'advanced' });
   catalog = [
     { id: 'supportdesk', qaDir: supportdeskQa, starter: true },
@@ -37,7 +39,9 @@ test.afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function openProjects(options: { language?: 'pt' } = {}): Promise<{ app: ElectronApplication; page: Page; close: () => Promise<void> }> {
+async function openProjects(
+  options: { language?: 'pt' } = {},
+): Promise<{ app: ElectronApplication; page: Page; close: () => Promise<void> }> {
   const launched = await launch({}, { env: showProjects, catalog });
   await launched.page.getByTestId('start-playing').click();
   if (options.language) {
@@ -65,7 +69,10 @@ test('a project card flips to its brief and back from its buttons, moving the fo
     await expect(page.getByTestId('project-easy-brief')).toHaveText('View specifications');
     await page.getByTestId('project-easy-brief').click();
     await expect(page.getByTestId('project-easy-close-brief')).toBeFocused();
-    await expect(page.getByTestId('project-easy-close-brief')).toHaveAttribute('aria-label', 'Close the specifications');
+    await expect(page.getByTestId('project-easy-close-brief')).toHaveAttribute(
+      'aria-label',
+      'Close the specifications',
+    );
     await expect(front).toHaveAttribute('aria-hidden', 'true');
     await expect(front).toHaveAttribute('inert', '');
     await expect(back).not.toHaveAttribute('aria-hidden', 'true');
@@ -97,7 +104,10 @@ test('the brief shows the client, the stack that exists, the tickets and the ski
     await expect(back.getByTestId('project-stack-backend')).toHaveCount(0);
     await expect(back.getByTestId('project-stack-database')).toHaveCount(0);
     await expect(back.getByTestId('project-tickets')).toContainText('Front 2 · Back 1');
-    await expect(back.getByTestId('project-skills').getByRole('listitem')).toHaveText(['Async and state', 'Tracing data flow']);
+    await expect(back.getByTestId('project-skills').getByRole('listitem')).toHaveText([
+      'Async and state',
+      'Tracing data flow',
+    ]);
     await expect(back.getByTestId(/^switch-/)).toHaveCount(0);
 
     await page.getByTestId('project-middle-brief').click();
@@ -129,7 +139,11 @@ test('the front shows the monogram, the difficulty in its color, the badge only 
   const { page, close } = await openProjects();
   try {
     await expect(page.getByTestId('project-easy-monogram')).toHaveText('NB');
-    const levels = { easy: ['beginner', 1, 'bg-emerald-500'], middle: ['intermediate', 2, 'bg-amber-500'], hard: ['advanced', 3, 'bg-destructive'] } as const;
+    const levels = {
+      easy: ['beginner', 1, 'bg-emerald-500'],
+      middle: ['intermediate', 2, 'bg-amber-500'],
+      hard: ['advanced', 3, 'bg-destructive'],
+    } as const;
     for (const [id, [level, filled, color]] of Object.entries(levels)) {
       const meter = page.getByTestId(`project-${id}`).getByTestId('project-difficulty');
       await expect(meter).toHaveAttribute('data-level', level);
@@ -143,7 +157,9 @@ test('the front shows the monogram, the difficulty in its color, the badge only 
     for (const id of ['easy', 'middle', 'hard']) {
       await expect(page.getByTestId(`switch-${id}`)).toHaveText('Play this project');
     }
-    await expect(page.getByTestId('project-easy').getByTestId('project-tickets').first()).toHaveText('Front 2 · Back 1');
+    await expect(page.getByTestId('project-easy').getByTestId('project-tickets').first()).toHaveText(
+      'Front 2 · Back 1',
+    );
     // No technology tags on the front.
     await expect(page.getByTestId('project-easy-front')).not.toContainText('React · Vite');
   } finally {

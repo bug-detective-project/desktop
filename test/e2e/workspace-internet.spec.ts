@@ -16,7 +16,9 @@ test('opening the workspace to the internet asks first, shows on the Dashboard, 
 
     // Cancel changes nothing.
     await page.getByTestId('workspace-internet-toggle').click();
-    await expect(page.getByTestId('workspace-internet-warning')).toContainText('your computer (host.docker.internal) and your local network');
+    await expect(page.getByTestId('workspace-internet-warning')).toContainText(
+      'your computer (host.docker.internal) and your local network',
+    );
     await page.getByTestId('workspace-internet-cancel').click();
     await expect(row).toHaveAttribute('data-on', 'false');
 
@@ -40,12 +42,18 @@ test('opening the workspace to the internet asks first, shows on the Dashboard, 
       await window.bugDetective.move(1, 'inProgress');
       await window.bugDetective.move(1, 'inQa');
     });
-    await expect.poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).state.tickets[0].status), { timeout: 15_000 }).toBe('codeReview');
+    await expect
+      .poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).state.tickets[0].status), {
+        timeout: 15_000,
+      })
+      .toBe('codeReview');
     await page.evaluate(async () => {
       await window.bugDetective.acceptReview(1);
       await window.bugDetective.nextAssignment('front');
     });
-    await expect.poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).workspaceInternet)).toBe(false);
+    await expect
+      .poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).workspaceInternet))
+      .toBe(false);
   } finally {
     await close();
   }
@@ -59,7 +67,9 @@ test('the warning is in Portuguese too', async () => {
     await page.getByTestId('nav-dashboard').click();
     await expect(page.getByTestId('env-internet')).toContainText('Internet do workspace');
     await page.getByTestId('workspace-internet-toggle').click();
-    await expect(page.getByTestId('workspace-internet-warning')).toContainText('o seu computador (host.docker.internal) e a sua rede local');
+    await expect(page.getByTestId('workspace-internet-warning')).toContainText(
+      'o seu computador (host.docker.internal) e a sua rede local',
+    );
   } finally {
     await close();
   }

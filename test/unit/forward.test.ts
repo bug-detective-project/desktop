@@ -19,7 +19,8 @@ afterEach(() => {
   }
 });
 
-const listen = (server: Server) => new Promise<number>((done) => server.listen(0, '127.0.0.1', () => done((server.address() as AddressInfo).port)));
+const listen = (server: Server) =>
+  new Promise<number>((done) => server.listen(0, '127.0.0.1', () => done((server.address() as AddressInfo).port)));
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -35,7 +36,10 @@ async function echo(prefix: string): Promise<number> {
 }
 
 function start(routes: string): Promise<void> {
-  const child = spawn(process.execPath, [script], { env: { ...process.env, BUGDETECTIVE_FORWARD: routes }, stdio: ['ignore', 'pipe', 'inherit'] });
+  const child = spawn(process.execPath, [script], {
+    env: { ...process.env, BUGDETECTIVE_FORWARD: routes },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
   running.push(child);
   const expected = routes.split(',').length;
   return new Promise((done, fail) => {

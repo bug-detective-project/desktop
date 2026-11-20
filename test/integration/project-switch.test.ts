@@ -87,7 +87,9 @@ async function finish(play: Game, ticket: number) {
   await play.waitForQa();
   const card = play.current.tickets.find((item) => item.ticket === ticket)!;
   if (card.status !== 'codeReview') {
-    throw new Error(`QA did not pass: ${JSON.stringify(card.comments.at(-1))}\n${play.snapshot().log.slice(-15).join('\n')}`);
+    throw new Error(
+      `QA did not pass: ${JSON.stringify(card.comments.at(-1))}\n${play.snapshot().log.slice(-15).join('\n')}`,
+    );
   }
   await play.acceptReview(ticket);
 }
@@ -105,12 +107,23 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new SwitchRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new SwitchRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
 });
 
 afterAll(async () => {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names }).destroy();
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  await new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+  }).destroy();
   await runtime.removeProjects(['switch-a', 'switch-b']);
   for (const volume of [runtime.names.vscodeVolume]) {
     await docker.removeVolume(volume);

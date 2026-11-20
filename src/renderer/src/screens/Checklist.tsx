@@ -50,7 +50,12 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
     <main className="mx-auto flex min-h-full max-w-2xl flex-col justify-center gap-6 p-8" data-testid="checklist">
       <div>
         <p className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-          <img src={logo} alt="" className="size-8 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
+          <img
+            src={logo}
+            alt=""
+            className="size-8 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15"
+            draggable={false}
+          />
           {t('app.name')}
         </p>
         <h1 className="mt-4 text-3xl font-bold tracking-tight">{t('checklist.title')}</h1>
@@ -60,7 +65,12 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           {t('checklist.proxy')}{' '}
-          <button type="button" className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline" onClick={() => void api.openExternal('proxyHelp')} data-testid="proxy-help">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+            onClick={() => void api.openExternal('proxyHelp')}
+            data-testid="proxy-help"
+          >
             {t('checklist.proxyHelp')}
             <Icon name="externalLink" className="size-3" />
           </button>
@@ -88,7 +98,11 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                     <Icon name="alertTriangle" className="size-4 shrink-0" aria-hidden />
                     <span>{t(`checklist.${check.id}.${warning}`)}</span>
                     {WARNING_HELP[warning] && (
-                      <button type="button" className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline" onClick={() => void api.openExternal(WARNING_HELP[warning].link)}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline"
+                        onClick={() => void api.openExternal(WARNING_HELP[warning].link)}
+                      >
                         {t(WARNING_HELP[warning].label)}
                         <Icon name="externalLink" className="size-3" />
                       </button>
@@ -97,26 +111,29 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
                 ))}
                 {check.status !== 'ok' && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {check.id === 'docker' && check.reason !== 'notInstalled' && check.reason !== 'windowsContainers' && (
-                      <Button
-                        variant="primary"
-                        busy={busy === 'docker' || snapshot.busy === 'startingDocker'}
-                        onClick={() => run('docker', () => api.startDocker())}
-                        data-testid="start-docker"
-                      >
-                        {t('checklist.docker.start')}
-                      </Button>
-                    )}
-                    {check.id === 'devcontainers' && snapshot.prerequisites?.checks.find((c) => c.id === 'vscode')?.status === 'ok' && (
-                      <Button
-                        variant="primary"
-                        busy={busy === 'devcontainers'}
-                        onClick={() => run('devcontainers', () => api.installDevContainers())}
-                        data-testid="install-devcontainers"
-                      >
-                        {t('checklist.devcontainers.install')}
-                      </Button>
-                    )}
+                    {check.id === 'docker' &&
+                      check.reason !== 'notInstalled' &&
+                      check.reason !== 'windowsContainers' && (
+                        <Button
+                          variant="primary"
+                          busy={busy === 'docker' || snapshot.busy === 'startingDocker'}
+                          onClick={() => run('docker', () => api.startDocker())}
+                          data-testid="start-docker"
+                        >
+                          {t('checklist.docker.start')}
+                        </Button>
+                      )}
+                    {check.id === 'devcontainers' &&
+                      snapshot.prerequisites?.checks.find((c) => c.id === 'vscode')?.status === 'ok' && (
+                        <Button
+                          variant="primary"
+                          busy={busy === 'devcontainers'}
+                          onClick={() => run('devcontainers', () => api.installDevContainers())}
+                          data-testid="install-devcontainers"
+                        >
+                          {t('checklist.devcontainers.install')}
+                        </Button>
+                      )}
                     <Button variant="ghost" onClick={() => void api.openExternal(helpFor(check).link)}>
                       {t(helpFor(check).label)}
                       <Icon name="externalLink" className="size-3.5" />
@@ -134,14 +151,25 @@ export function Checklist({ snapshot, onContinue }: { snapshot: Snapshot; onCont
         </Notice>
       )}
       <div className="flex items-center justify-between">
-        <Button busy={busy === 'check'} onClick={() => run('check', () => api.checkPrerequisites())} data-testid="check-again">
+        <Button
+          busy={busy === 'check'}
+          onClick={() => run('check', () => api.checkPrerequisites())}
+          data-testid="check-again"
+        >
           {t('common.checkAgain')}
         </Button>
         <div className="flex items-center gap-3">
-          {report?.allOk && <span className="flex items-center gap-1.5 text-base font-medium text-emerald-700 dark:text-emerald-400">
+          {report?.allOk && (
+            <span className="flex items-center gap-1.5 text-base font-medium text-emerald-700 dark:text-emerald-400">
               <Icon name="checkCircle" /> {t('checklist.allOk')}
-            </span>}
-          <Button variant="primary" disabled={!report?.allOk || snapshot.starterNeedsUpdate} onClick={onContinue} data-testid="start-playing">
+            </span>
+          )}
+          <Button
+            variant="primary"
+            disabled={!report?.allOk || snapshot.starterNeedsUpdate}
+            onClick={onContinue}
+            data-testid="start-playing"
+          >
             {t('checklist.continue')}
             <Icon name="arrowRight" />
           </Button>
@@ -166,7 +194,10 @@ export function DockerBanner({ snapshot }: { snapshot: Snapshot }) {
     >
       <div className="mx-auto flex max-w-10xl items-center justify-between gap-4 px-6 py-2 text-sm">
         <span className="flex items-center gap-2 font-medium text-foreground">
-          <Icon name={starting ? 'spinner' : 'alertTriangle'} className={`size-4 ${starting ? 'text-amber-500' : 'text-destructive'}`} />
+          <Icon
+            name={starting ? 'spinner' : 'alertTriangle'}
+            className={`size-4 ${starting ? 'text-amber-500' : 'text-destructive'}`}
+          />
           {starting ? t('banner.dockerStarting') : t('banner.dockerStopped')}
         </span>
         {!starting && snapshot.dockerState !== 'notInstalled' && (

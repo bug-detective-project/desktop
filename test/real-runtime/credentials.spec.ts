@@ -27,7 +27,8 @@ import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
+const DOCKER =
+  process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 const WORKSPACE = workspaceDir('supportdesk');
 const SETTLE_MS = 60_000;
@@ -35,7 +36,10 @@ const SETTLE_MS = 60_000;
 /** A shell line inside the container, as node, in the workspace; failures are part of the answer, not of the test. */
 const inside = (script: string, user = 'node') => {
   try {
-    return execFileSync(DOCKER, ['exec', '-u', user, '-w', WORKSPACE, CONTAINER, 'sh', '-c', script], { encoding: 'utf8', timeout: 60_000 }).trimEnd();
+    return execFileSync(DOCKER, ['exec', '-u', user, '-w', WORKSPACE, CONTAINER, 'sh', '-c', script], {
+      encoding: 'utf8',
+      timeout: 60_000,
+    }).trimEnd();
   } catch (error) {
     const failed = error as { stdout?: string; stderr?: string; status?: number };
     return `${(failed.stdout ?? '').trimEnd()}\n(exit ${failed.status}: ${(failed.stderr ?? '').trim().slice(0, 300)})`.trim();
@@ -56,21 +60,27 @@ function nameConfigsDir(): string {
 
 /** The newest Dev Containers log of the user's VS Code, filtered to the lines that tell what was forwarded. */
 async function extensionLogLines(): Promise<string> {
-  const logsDir = process.platform === 'win32' ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Code', 'logs') : join(homedir(), '.config', 'Code', 'logs');
+  const logsDir =
+    process.platform === 'win32'
+      ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Code', 'logs')
+      : join(homedir(), '.config', 'Code', 'logs');
   if (!existsSync(logsDir)) return '(no VS Code logs folder)';
   const files: { file: string; mtime: number }[] = [];
   const walk = async (dir: string, depth: number) => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
       if (entry.isDirectory() && depth < 5) await walk(path, depth + 1);
-      else if (entry.isFile() && /remote-containers.*\.log$/i.test(path)) files.push({ file: path, mtime: (await stat(path)).mtimeMs });
+      else if (entry.isFile() && /remote-containers.*\.log$/i.test(path))
+        files.push({ file: path, mtime: (await stat(path)).mtimeMs });
     }
   };
   await walk(logsDir, 0);
   files.sort((a, b) => b.mtime - a.mtime);
   if (files.length === 0) return '(no Dev Containers log found)';
   const text = await readFile(files[0].file, 'utf8');
-  const lines = text.split('\n').filter((line) => /ssh-agent|GPG|gpg|credential|gitconfig|Git config|Downloading|server|dotfiles|copy/i.test(line));
+  const lines = text
+    .split('\n')
+    .filter((line) => /ssh-agent|GPG|gpg|credential|gitconfig|Git config|Downloading|server|dotfiles|copy/i.test(line));
   return `${files[0].file}\n${lines.slice(-80).join('\n')}`;
 }
 
@@ -97,7 +107,10 @@ async function installEnvironment(page: Page) {
 function serverCount(): string {
   try {
     // The server process itself (not the app's own `node -e` writing under .vscode-server, nor this probe).
-    return execFileSync(DOCKER, ['exec', CONTAINER, 'sh', '-c', 'ps -eo args | grep -c "[s]erver-main.js" || true'], { encoding: 'utf8', timeout: 60_000 }).trim();
+    return execFileSync(DOCKER, ['exec', CONTAINER, 'sh', '-c', 'ps -eo args | grep -c "[s]erver-main.js" || true'], {
+      encoding: 'utf8',
+      timeout: 60_000,
+    }).trim();
   } catch {
     return '0';
   }
@@ -132,15 +145,19 @@ async function attach(page: Page) {
   await page.waitForTimeout(SETTLE_MS);
 }
 
-
 /** A fake git credential for github.com in the Windows Credential Manager (what the Git Credential Manager reads), so the helper channel has something to carry. */
 
 const PROBE_CREDENTIAL = { target: 'git:https://github.com', user: 'bugdetective-probe' };
 function storeProbeCredential(): string {
   if (process.platform !== 'win32') return '(not Windows: no fake credential stored)';
   const existing = execFileSync('cmdkey', ['/list'], { encoding: 'utf8' });
-  if (existing.includes(PROBE_CREDENTIAL.target)) return '(a real git:https://github.com credential exists: left alone, not replaced)';
-  execFileSync('cmdkey', [`/generic:${PROBE_CREDENTIAL.target}`, `/user:${PROBE_CREDENTIAL.user}`, '/pass:probe-secret-not-a-real-token'], { encoding: 'utf8' });
+  if (existing.includes(PROBE_CREDENTIAL.target))
+    return '(a real git:https://github.com credential exists: left alone, not replaced)';
+  execFileSync(
+    'cmdkey',
+    [`/generic:${PROBE_CREDENTIAL.target}`, `/user:${PROBE_CREDENTIAL.user}`, '/pass:probe-secret-not-a-real-token'],
+    { encoding: 'utf8' },
+  );
   return `(stored ${PROBE_CREDENTIAL.target} for ${PROBE_CREDENTIAL.user})`;
 }
 function removeProbeCredential(stored: string) {
@@ -165,8 +182,12 @@ function resetGitConfig() {
 /** Everything the report needs from inside the container, after an attach. */
 function probe(): Record<string, string> {
   return {
-    'credential.helper (git config --show-origin)': inside('git config --show-origin --get-all credential.helper || echo "(none)"'),
-    '~/.gitconfig': inside('ls -la /home/node/.gitconfig 2>/dev/null; cat /home/node/.gitconfig 2>/dev/null || echo "(no ~/.gitconfig)"'),
+    'credential.helper (git config --show-origin)': inside(
+      'git config --show-origin --get-all credential.helper || echo "(none)"',
+    ),
+    '~/.gitconfig': inside(
+      'ls -la /home/node/.gitconfig 2>/dev/null; cat /home/node/.gitconfig 2>/dev/null || echo "(no ~/.gitconfig)"',
+    ),
     'git credential fill for github.com, plain docker exec (redacted)': inside(`${FILL} | ${REDACT}; echo "(exit $?)"`),
     'git credential fill for github.com with REMOTE_CONTAINERS_IPC, as a VS Code terminal has it (redacted)': inside(
       `${LIVE_SOCKET}; if [ -z "$S" ]; then echo "(no live IPC socket)"; else echo "socket: $S"; REMOTE_CONTAINERS_IPC=$S ${FILL} | ${REDACT}; echo "(exit $?)"; fi`,
@@ -175,14 +196,22 @@ function probe(): Record<string, string> {
       `${LIVE_SOCKET}; I=$(echo "$S" | sed -n 's|.*-ipc-\\(.*\\)\\.sock|\\1|p'); J=/tmp/vscode-remote-containers-$I.js; N=$(ls -d /home/node/.vscode-server/bin/*/node 2>/dev/null | head -1); if [ -z "$S" ] || [ ! -f "$J" ] || [ -z "$N" ]; then echo "(no live IPC socket, script or node: S=$S J=$J N=$N)"; else echo "script: $J"; printf 'protocol=https\\nhost=github.com\\n\\n' | REMOTE_CONTAINERS_IPC=$S timeout 25 $N $J git-credential-helper get 2>&1 | ${REDACT}; echo "(exit $?)"; fi`,
     ),
     'SSH_AUTH_SOCK in the container environment': inside('printenv SSH_AUTH_SOCK || echo "(not set)"'),
-    'forwarded sockets in /tmp': inside('ls -la /tmp/vscode-*.sock /tmp/vscode-ssh-auth-* 2>/dev/null || echo "(none)"'),
+    'forwarded sockets in /tmp': inside(
+      'ls -la /tmp/vscode-*.sock /tmp/vscode-ssh-auth-* 2>/dev/null || echo "(none)"',
+    ),
     'environment of the vscode-server processes (selected variables)': inside(
       `for p in $(${SERVER_PROCESSES}); do tr "\\0" "\\n" < /proc/$p/environ 2>/dev/null | grep -E "^(SSH_AUTH_SOCK|REMOTE_CONTAINERS|REMOTE_CONTAINERS_IPC|REMOTE_CONTAINERS_DISPLAY_SOCK|DISPLAY|GPG_TTY|GIT_[A-Z_]+|GH_TOKEN|GITHUB_TOKEN)="; done | sort -u || echo "(none)"`,
     ),
-    'GPG, Docker and GitHub CLI material': inside('command -v gpg docker gh 2>/dev/null || echo "(no gpg/docker/gh binaries)"; ls -la /home/node/.gnupg /home/node/.docker /home/node/.config/gh 2>/dev/null || echo "(no ~/.gnupg, ~/.docker, ~/.config/gh)"; ls /usr/local/bin 2>/dev/null | grep -i credential || echo "(no credential helper binary in /usr/local/bin)"'),
+    'GPG, Docker and GitHub CLI material': inside(
+      'command -v gpg docker gh 2>/dev/null || echo "(no gpg/docker/gh binaries)"; ls -la /home/node/.gnupg /home/node/.docker /home/node/.config/gh 2>/dev/null || echo "(no ~/.gnupg, ~/.docker, ~/.config/gh)"; ls /usr/local/bin 2>/dev/null | grep -i credential || echo "(no credential helper binary in /usr/local/bin)"',
+    ),
     'known_hosts copied by the extension': inside('ls -la /home/node/.ssh 2>/dev/null || echo "(no ~/.ssh)"'),
-    'internet from the container (VS Code update server)': inside('curl -sS -o /dev/null -m 10 -w "%{http_code}" https://update.code.visualstudio.com/api/update/server-linux-x64/stable/latest || echo " (no answer)"'),
-    'VS Code server files in the container': inside('ls /home/node/.vscode-server 2>/dev/null | head; ls /home/node/.vscode-server/bin 2>/dev/null | head -3; ls /vscode 2>/dev/null | head -3 || true'),
+    'internet from the container (VS Code update server)': inside(
+      'curl -sS -o /dev/null -m 10 -w "%{http_code}" https://update.code.visualstudio.com/api/update/server-linux-x64/stable/latest || echo " (no answer)"',
+    ),
+    'VS Code server files in the container': inside(
+      'ls /home/node/.vscode-server 2>/dev/null | head; ls /home/node/.vscode-server/bin 2>/dev/null | head -3; ls /vscode 2>/dev/null | head -3 || true',
+    ),
   };
 }
 
@@ -197,19 +226,27 @@ function gitWritesCheck(): string {
     '--- as node: is it visible to git? (GIT_CONFIG_NOSYSTEM=1 in the image)',
     inside('git config --show-origin --get-all credential.helper || echo "(no helper visible to git)"'),
     '--- as node: the global write the extension makes (GIT_CONFIG_GLOBAL is a read-only file of the image)',
-    inside('git config --global --replace-all credential.helper probe-helper; echo exit=$?; git config --show-origin --get-all credential.helper || echo "(no helper visible to git)"'),
+    inside(
+      'git config --global --replace-all credential.helper probe-helper; echo exit=$?; git config --show-origin --get-all credential.helper || echo "(no helper visible to git)"',
+    ),
     '--- as node: a copied ~/.gitconfig with the player identity is ignored',
-    inside('printf "[user]\\n\\tname = pedro\\n" > /home/node/.gitconfig; echo "user.name seen: $(git config --get user.name || echo none)"; rm -f /home/node/.gitconfig'),
+    inside(
+      'printf "[user]\\n\\tname = pedro\\n" > /home/node/.gitconfig; echo "user.name seen: $(git config --get user.name || echo none)"; rm -f /home/node/.gitconfig',
+    ),
   ];
   inside('git config --system --unset-all credential.helper 2>/dev/null; echo cleaned', 'root');
   return lines.join('\n');
 }
 
 function section(title: string, results: Record<string, string>): string {
-  return [`## ${title}`, '', ...Object.entries(results).flatMap(([name, value]) => [`### ${name}`, '', '```', value || '(empty)', '```', ''])].join('\n');
+  return [
+    `## ${title}`,
+    '',
+    ...Object.entries(results).flatMap(([name, value]) => [`### ${name}`, '', '```', value || '(empty)', '```', '']),
+  ].join('\n');
 }
 
-test('VS Code attaches without the player\'s git credentials, .gitconfig or agents', async () => {
+test("VS Code attaches without the player's git credentials, .gitconfig or agents", async () => {
   test.setTimeout(60 * 60_000);
   await closeAttachedWindows();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -217,7 +254,12 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
   await mkdir(reportDir, { recursive: true });
   const reportFile = join(reportDir, `credentials-${stamp}.md`);
   const configFile = join(nameConfigsDir(), `${CONTAINER}.json`);
-  const report: string[] = [`# VS Code attach without credentials (${stamp})`, '', `Platform: ${process.platform}; container: ${CONTAINER}; per-container config: ${configFile}`, ''];
+  const report: string[] = [
+    `# VS Code attach without credentials (${stamp})`,
+    '',
+    `Platform: ${process.platform}; container: ${CONTAINER}; per-container config: ${configFile}`,
+    '',
+  ];
 
   const stored = storeProbeCredential();
   report.push(`Fake credential on the host: ${stored}`, '');
@@ -245,9 +287,16 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
     const after = probe();
     report.push(section('1. After the attach through the app', after));
     report.push(`### Dev Containers log (host)\n\n\`\`\`\n${await extensionLogLines()}\n\`\`\`\n`);
-    report.push(`### The per-container configuration the app wrote\n\n\`\`\`\n${existsSync(configFile) ? await readFile(configFile, 'utf8') : '(missing)'}\n\`\`\`\n`);
+    report.push(
+      `### The per-container configuration the app wrote\n\n\`\`\`\n${existsSync(configFile) ? await readFile(configFile, 'utf8') : '(missing)'}\n\`\`\`\n`,
+    );
     report.push(`### Machine settings in the container\n\n\`\`\`\n${inside(`cat ${MACHINE_SETTINGS}`)}\n\`\`\`\n`);
-    report.push(section('2. Without VS Code: the git writes the extension makes, against the image (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM)', { 'git config writes as the extension does them': gitWritesCheck() }));
+    report.push(
+      section(
+        '2. Without VS Code: the git writes the extension makes, against the image (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM)',
+        { 'git config writes as the extension does them': gitWritesCheck() },
+      ),
+    );
 
     // VS Code really attached (the extension's IPC socket of this session exists in the server's environment).
     expect(after['environment of the vscode-server processes (selected variables)']).toMatch(/REMOTE_CONTAINERS_IPC=/);
@@ -256,30 +305,57 @@ test('VS Code attaches without the player\'s git credentials, .gitconfig or agen
     expect(after['credential.helper (git config --show-origin)']).toBe('(none)');
     expect(after['~/.gitconfig']).not.toMatch(/credential|pedro|@users\.noreply\.github\.com/);
     expect(after['git credential fill for github.com, plain docker exec (redacted)']).not.toMatch(/^username=/m);
-    expect(after['git credential fill for github.com with REMOTE_CONTAINERS_IPC, as a VS Code terminal has it (redacted)']).not.toMatch(/^username=/m);
+    expect(
+      after['git credential fill for github.com with REMOTE_CONTAINERS_IPC, as a VS Code terminal has it (redacted)'],
+    ).not.toMatch(/^username=/m);
     expect(after['environment of the vscode-server processes (selected variables)']).not.toMatch(/SSH_AUTH_SOCK/);
     expect(after['GPG, Docker and GitHub CLI material']).not.toMatch(/S\.gpg-agent/);
     expect(after['GPG, Docker and GitHub CLI material']).toMatch(/no gpg\/docker\/gh binaries/);
     expect(existsSync(configFile)).toBe(true);
-    expect(JSON.parse(await readFile(configFile, 'utf8'))).toMatchObject({ remoteUser: 'node', remoteEnv: { SSH_AUTH_SOCK: null }, workspaceFolder: WORKSPACE });
-    expect(JSON.parse(inside(`cat ${MACHINE_SETTINGS}`))).toMatchObject({ 'dev.containers.gitCredentialHelperConfigLocation': 'none', 'dev.containers.copyGitConfig': false, 'remote.containers.copyGitConfig': false });
-    log(`direct IPC call answered: ${after['the helper script called directly through the IPC socket, no git config involved (redacted)'].split('\n')[0]}`);
+    expect(JSON.parse(await readFile(configFile, 'utf8'))).toMatchObject({
+      remoteUser: 'node',
+      remoteEnv: { SSH_AUTH_SOCK: null },
+      workspaceFolder: WORKSPACE,
+    });
+    expect(JSON.parse(inside(`cat ${MACHINE_SETTINGS}`))).toMatchObject({
+      'dev.containers.gitCredentialHelperConfigLocation': 'none',
+      'dev.containers.copyGitConfig': false,
+      'remote.containers.copyGitConfig': false,
+    });
+    log(
+      `direct IPC call answered: ${after['the helper script called directly through the IPC socket, no git config involved (redacted)'].split('\n')[0]}`,
+    );
 
     // The container is recreated under the open window. VS Code gives up on that window, and opening the
     // folder would only focus it: nothing attaches unless the app closes the window first.
-    const containerId = () => execFileSync(DOCKER, ['container', 'inspect', '--format', '{{.Id}}', CONTAINER], { encoding: 'utf8', timeout: 60_000 }).trim();
+    const containerId = () =>
+      execFileSync(DOCKER, ['container', 'inspect', '--format', '{{.Id}}', CONTAINER], {
+        encoding: 'utf8',
+        timeout: 60_000,
+      }).trim();
     const removed = containerId();
     execFileSync(DOCKER, ['rm', '-f', CONTAINER], { timeout: 60_000 });
     await attach(page);
     expect(containerId()).not.toBe(removed);
-    report.push('## 3. Container recreated under the open window', '', 'The app closed the old window and VS Code attached to the new container.', '');
+    report.push(
+      '## 3. Container recreated under the open window',
+      '',
+      'The app closed the old window and VS Code attached to the new container.',
+      '',
+    );
   } finally {
     removeProbeCredential(stored);
     // The app's own log of this run goes with the report (the data folder is deleted below).
     try {
       const logs = join(userData, 'logs');
       for (const name of await readdir(logs)) {
-        report.push(`## App log: ${name}\n\n\`\`\`\n${(await readFile(join(logs, name), 'utf8')).split('\n').filter((line) => /VS Code|vscode|code|Code\.exe|error|Error/.test(line)).slice(-60).join('\n')}\n\`\`\`\n`);
+        report.push(
+          `## App log: ${name}\n\n\`\`\`\n${(await readFile(join(logs, name), 'utf8'))
+            .split('\n')
+            .filter((line) => /VS Code|vscode|code|Code\.exe|error|Error/.test(line))
+            .slice(-60)
+            .join('\n')}\n\`\`\`\n`,
+        );
       }
     } catch {
       report.push('(no app log)');

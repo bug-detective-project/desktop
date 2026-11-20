@@ -4,7 +4,8 @@ import pt from '../../src/renderer/src/locales/pt.json';
 import { TICKET_TYPES, gate2FailedKey, referenceIntroKey } from '../../src/shared/ticketMeta.ts';
 
 type Texts = Record<string, unknown>;
-const at = (texts: Texts, key: string): unknown => key.split('.').reduce<unknown>((value, part) => (value as Texts | undefined)?.[part], texts);
+const at = (texts: Texts, key: string): unknown =>
+  key.split('.').reduce<unknown>((value, part) => (value as Texts | undefined)?.[part], texts);
 
 describe.each([
   ['en', en as Texts],
@@ -37,8 +38,12 @@ describe('texts by ticket type', () => {
   it('says what each kind of ticket still misses when Gate 2 fails', () => {
     expect(at(en, 'qa.comment.gate2FailedByType.optimize')).toBe('The goal of the ticket is not reached yet.');
     expect(at(pt, 'qa.comment.gate2FailedByType.optimize')).toBe('A meta do ticket ainda não foi atingida.');
-    expect(at(en, 'qa.comment.gate2FailedByType.build')).toBe('The ticket is not delivered yet. Part of what it asks for is still missing or does not work.');
-    expect(at(en, 'qa.comment.gate2FailedByType.fix')).toBe('The reported bug is still unresolved. The app still shows the behavior described in the ticket.');
+    expect(at(en, 'qa.comment.gate2FailedByType.build')).toBe(
+      'The ticket is not delivered yet. Part of what it asks for is still missing or does not work.',
+    );
+    expect(at(en, 'qa.comment.gate2FailedByType.fix')).toBe(
+      'The reported bug is still unresolved. The app still shows the behavior described in the ticket.',
+    );
   });
 
   it('calls the development button "Solve ticket"', () => {

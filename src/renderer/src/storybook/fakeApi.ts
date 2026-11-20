@@ -15,7 +15,11 @@ export interface ApiCall {
   args: unknown[];
 }
 
-const current: { overrides: ApiOverrides; calls: ApiCall[]; snapshot: Snapshot | null } = { overrides: {}, calls: [], snapshot: null };
+const current: { overrides: ApiOverrides; calls: ApiCall[]; snapshot: Snapshot | null } = {
+  overrides: {},
+  calls: [],
+  snapshot: null,
+};
 
 export const fakeApi = new Proxy({} as BugDetectiveApi, {
   get(_target, method) {
@@ -25,7 +29,8 @@ export const fakeApi = new Proxy({} as BugDetectiveApi, {
     }
     return (...args: unknown[]) => {
       current.calls.push({ method, args });
-      const override = current.overrides[method as keyof BugDetectiveApi] as ((...input: unknown[]) => unknown) | undefined;
+      const override = current.overrides[method as keyof BugDetectiveApi] as
+        ((...input: unknown[]) => unknown) | undefined;
       if (override) {
         return override(...args);
       }

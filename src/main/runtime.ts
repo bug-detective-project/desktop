@@ -5,7 +5,15 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Language, QaResult } from '../shared/types.ts';
-import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EnvironmentItem, EnvironmentReport, ReviewComparison, WorkspaceStatus } from '../shared/api.ts';
+import type {
+  DiskUsageItem,
+  DockerCleanup,
+  DockerCleanupScope,
+  EnvironmentItem,
+  EnvironmentReport,
+  ReviewComparison,
+  WorkspaceStatus,
+} from '../shared/api.ts';
 import type { Platform } from './platform/types.ts';
 import { closeStaleWindow } from './services/attached-window.ts';
 import { planCleanup } from './services/cleanup.ts';
@@ -18,7 +26,7 @@ import type { ServiceStatus } from '../shared/api.ts';
 import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
-import type { EngineState , Docker} from './services/docker.ts';
+import type { EngineState, Docker } from './services/docker.ts';
 import { Prerequisites } from './services/prerequisites.ts';
 import type { Environment } from './services/prerequisites.ts';
 import type { PrerequisiteReport } from '../shared/api.ts';
@@ -27,7 +35,15 @@ import { qaImageTag, writeQaContext } from './services/qa-image.ts';
 import { VSCODE_MACHINE_SETTINGS } from './services/vscode.ts';
 import type { VSCode } from './services/vscode.ts';
 import { Workspace, networkName, resourceNames } from './services/workspace.ts';
-import type { ResourceNames, ReturnPoint, ReturnRequest, ReturnResult, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
+import type {
+  ResourceNames,
+  ReturnPoint,
+  ReturnRequest,
+  ReturnResult,
+  ReviewBuild,
+  ReviewCommits,
+  WorkspacePorts,
+} from './services/workspace.ts';
 
 export type LineHandler = (line: string) => void;
 
@@ -276,7 +292,9 @@ export class DockerRuntime implements GameRuntime {
       return statuses;
     }
     const ports = await (await this.workspace()).servicePorts();
-    return statuses.map((status) => (status.state === 'ready' && ports[status.name] ? { ...status, hostPort: ports[status.name] } : status));
+    return statuses.map((status) =>
+      status.state === 'ready' && ports[status.name] ? { ...status, hostPort: ports[status.name] } : status,
+    );
   }
 
   /**
@@ -446,7 +464,10 @@ export class DockerRuntime implements GameRuntime {
       { id: 'qaImage', ready: qa !== null && (await docker.imageExists(qa)) },
     ];
     if (this.hasServices) {
-      items.push({ id: 'serviceImages', ready: (await (await this.serviceImages()).missing(this.declared)).length === 0 });
+      items.push({
+        id: 'serviceImages',
+        ready: (await (await this.serviceImages()).missing(this.declared)).length === 0,
+      });
     }
     if (items[0].ready && (await docker.volumeExists(this.names.volume))) {
       const workspace = await this.runningWorkspace();
@@ -468,13 +489,29 @@ export class DockerRuntime implements GameRuntime {
     const tags = await this.imageTags();
     if (!(await docker.imageExists(tags.workspace))) {
       onLine(`» docker build ${tags.workspace}`);
-      await docker.build(this.platform.dockerHostPath(join(this.contextRoot, 'workspace')), tags.workspace, 'workspace-image', (line) => onLine(line), undefined, null, this.names.prefix);
+      await docker.build(
+        this.platform.dockerHostPath(join(this.contextRoot, 'workspace')),
+        tags.workspace,
+        'workspace-image',
+        (line) => onLine(line),
+        undefined,
+        null,
+        this.names.prefix,
+      );
     }
     const qa = await this.requireQaTag();
     if (!(await docker.imageExists(qa))) {
       const context = await writeQaContext(join(this.contextRoot, 'qa'), tags.qaBase, this.qaTool!, this.qaBuildRoot);
       onLine(`» docker build ${qa}`);
-      await docker.build(this.platform.dockerHostPath(context), qa, 'qa-image', (line) => onLine(line), undefined, this.project, this.names.prefix);
+      await docker.build(
+        this.platform.dockerHostPath(context),
+        qa,
+        'qa-image',
+        (line) => onLine(line),
+        undefined,
+        this.project,
+        this.names.prefix,
+      );
     }
     if (this.hasServices) {
       await (await this.serviceImages()).ensure(this.declared, (line) => onLine(line));
@@ -532,8 +569,13 @@ export class DockerRuntime implements GameRuntime {
         Object.values(serviceNames(this.names.prefix, project, name, serviceImageOf(service)).volumes),
       );
       const dataSizes = await docker.volumeSizes(dataVolumes);
-      const imageSizes = await Promise.all(serviceImageReferences(this.declared).map((reference) => docker.imageSize(reference)));
-      items.push({ id: 'serviceData', bytes: sum(dataVolumes.map((volume) => dataSizes[volume])) }, { id: 'serviceImages', bytes: sum(imageSizes) });
+      const imageSizes = await Promise.all(
+        serviceImageReferences(this.declared).map((reference) => docker.imageSize(reference)),
+      );
+      items.push(
+        { id: 'serviceData', bytes: sum(dataVolumes.map((volume) => dataSizes[volume])) },
+        { id: 'serviceImages', bytes: sum(imageSizes) },
+      );
     }
     return items;
   }
@@ -575,7 +617,9 @@ export class DockerRuntime implements GameRuntime {
       const before = (await images.pulled()).length;
       const stuck = await images.removePulled([]);
       result.removed += before - stuck.length;
-      result.failed.push(...stuck.map((name) => ({ kind: 'image' as const, name, reason: 'Docker did not remove the image' })));
+      result.failed.push(
+        ...stuck.map((name) => ({ kind: 'image' as const, name, reason: 'Docker did not remove the image' })),
+      );
       result.workspaceKept = await docker.volumeExists(this.names.volume);
       // The builder (its BuildKit container and cache) goes with the app's data.
       await docker.removeBuilder(this.names.prefix);
@@ -645,7 +689,12 @@ export class DockerRuntime implements GameRuntime {
     if (!info?.running) {
       return { ports: null, devServerUp: false, branch: null, dependenciesReady: false };
     }
-    const [devServerUp, branch, ports, dependenciesReady] = await Promise.all([workspace.isDevServerUp(), workspace.currentBranch(), workspace.ports(), workspace.dependenciesReady()]);
+    const [devServerUp, branch, ports, dependenciesReady] = await Promise.all([
+      workspace.isDevServerUp(),
+      workspace.currentBranch(),
+      workspace.ports(),
+      workspace.dependenciesReady(),
+    ]);
     return { ports, devServerUp, branch, dependenciesReady };
   }
 
@@ -711,14 +760,23 @@ export class DockerRuntime implements GameRuntime {
     return (await this.runningWorkspace()).reviewRefs(ticket);
   }
 
-  async reviewComparison(stage: number, commits: ReviewCommits, excludes: readonly string[]): Promise<ReviewComparison> {
+  async reviewComparison(
+    stage: number,
+    commits: ReviewCommits,
+    excludes: readonly string[],
+  ): Promise<ReviewComparison> {
     const workspace = await this.runningWorkspace();
     const baseline = `refs/tags/stage-${stage}`;
     return {
       solutions: await workspace.diff(commits.snapshot, commits.reference),
-      solutionsIgnoringWhitespace: await workspace.diff(commits.snapshot, commits.reference, { ignoreWhitespace: true }),
+      solutionsIgnoringWhitespace: await workspace.diff(commits.snapshot, commits.reference, {
+        ignoreWhitespace: true,
+      }),
       baseline: await workspace.diff(baseline, commits.approved, { pathspecs: excludes }),
-      baselineIgnoringWhitespace: await workspace.diff(baseline, commits.approved, { ignoreWhitespace: true, pathspecs: excludes }),
+      baselineIgnoringWhitespace: await workspace.diff(baseline, commits.approved, {
+        ignoreWhitespace: true,
+        pathspecs: excludes,
+      }),
     };
   }
 
@@ -757,7 +815,9 @@ export class DockerRuntime implements GameRuntime {
     const controller = new AbortController();
     this.qaAbort = controller;
     try {
-      return await (await this.qa()).run({ ...request, signal: controller.signal, onLine: request.onLine && ((line) => request.onLine!(line)) });
+      return await (
+        await this.qa()
+      ).run({ ...request, signal: controller.signal, onLine: request.onLine && ((line) => request.onLine!(line)) });
     } finally {
       if (this.qaAbort === controller) this.qaAbort = null;
     }

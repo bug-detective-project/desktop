@@ -66,11 +66,17 @@ function OpenReviewButton({ snapshot, ticketNumber }: { snapshot: Snapshot; tick
           {!working && <Icon name="code" />}
           {t('review.openInVSCode')}
         </Button>
-        <span className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-hidden data-testid="vscode-steps-info">
+        <span
+          className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-hidden
+          data-testid="vscode-steps-info"
+        >
           <Icon name="info" className="size-5" />
         </span>
       </Tooltip>
-      {dockerDown && snapshot.dockerState !== 'notInstalled' && <span className="text-xs text-muted-foreground">{t('review.startsDocker')}</span>}
+      {dockerDown && snapshot.dockerState !== 'notInstalled' && (
+        <span className="text-xs text-muted-foreground">{t('review.startsDocker')}</span>
+      )}
     </div>
   );
 }
@@ -78,9 +84,16 @@ function OpenReviewButton({ snapshot, ticketNumber }: { snapshot: Snapshot; tick
 /** A card whose body collapses under its title; open by default. */
 function DropdownCard({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
   return (
-    <details open className="group min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-sm" data-testid={testId}>
+    <details
+      open
+      className="group min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-sm"
+      data-testid={testId}
+    >
       <summary className="flex cursor-pointer list-none items-center gap-2 p-5 select-none [&::-webkit-details-marker]:hidden">
-        <Icon name="chevronDown" className="size-5 -rotate-90 text-muted-foreground transition-transform group-open:rotate-0" />
+        <Icon
+          name="chevronDown"
+          className="size-5 -rotate-90 text-muted-foreground transition-transform group-open:rotate-0"
+        />
         <h2 className="text-base font-bold tracking-wider text-foreground uppercase">{title}</h2>
       </summary>
       <div className="px-5 pb-5">{children}</div>
@@ -90,7 +103,9 @@ function DropdownCard({ title, testId, children }: { title: string; testId: stri
 
 /** Whether the approved solution has no visible difference from the reference (with the current whitespace choice). */
 function isIdentical(comparison: ReviewComparison, showWhitespace: boolean): boolean {
-  return visibleFiles(parseDiff(showWhitespace ? comparison.solutions : comparison.solutionsIgnoringWhitespace)).length === 0;
+  return (
+    visibleFiles(parseDiff(showWhitespace ? comparison.solutions : comparison.solutionsIgnoringWhitespace)).length === 0
+  );
 }
 
 function Comparison({ comparison, showWhitespace }: { comparison: ReviewComparison; showWhitespace: boolean }) {
@@ -101,13 +116,21 @@ function Comparison({ comparison, showWhitespace }: { comparison: ReviewComparis
       <SplitDiff
         diff={solutions}
         testId="comparison"
-        labels={{ left: t('review.yourSolution'), right: t('review.referenceSolution'), onlyLeft: t('review.onlyYours'), onlyRight: t('review.onlyReference') }}
+        labels={{
+          left: t('review.yourSolution'),
+          right: t('review.referenceSolution'),
+          onlyLeft: t('review.onlyYours'),
+          onlyRight: t('review.onlyReference'),
+        }}
       />
     );
   }
   return (
     <div className="space-y-4">
-      <p className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-base font-medium text-foreground" data-testid="identical-message">
+      <p
+        className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-base font-medium text-foreground"
+        data-testid="identical-message"
+      >
         <Icon name="checkCircle" className="size-4 text-emerald-700 dark:text-emerald-400" />
         {t('review.identical')}
       </p>
@@ -115,13 +138,26 @@ function Comparison({ comparison, showWhitespace }: { comparison: ReviewComparis
       <SplitDiff
         diff={showWhitespace ? comparison.baseline : comparison.baselineIgnoringWhitespace}
         testId="baseline-diff"
-        labels={{ left: t('review.original'), right: t('review.yourSolution'), onlyLeft: t('review.removedByYou'), onlyRight: t('review.addedByYou') }}
+        labels={{
+          left: t('review.original'),
+          right: t('review.yourSolution'),
+          onlyLeft: t('review.removedByYou'),
+          onlyRight: t('review.addedByYou'),
+        }}
       />
     </div>
   );
 }
 
-export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snapshot; ticketNumber: number; onBack: () => void }) {
+export function CodeReview({
+  snapshot,
+  ticketNumber,
+  onBack,
+}: {
+  snapshot: Snapshot;
+  ticketNumber: number;
+  onBack: () => void;
+}) {
   const { t } = useTranslation();
   const toast = useToast();
   const ticket = findTicket(snapshot.state, ticketNumber)!;
@@ -167,10 +203,14 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
         <div>
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold tracking-wider text-muted-foreground uppercase">{t('review.title')}</span>
-            <span className="font-mono font-bold text-primary">{ticketTitle(snapshot, ticketNumber, language).key}</span>
+            <span className="font-mono font-bold text-primary">
+              {ticketTitle(snapshot, ticketNumber, language).key}
+            </span>
             <StagePill status={ticket.status} />
           </div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">{ticketTitle(snapshot, ticketNumber, language).text}</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">
+            {ticketTitle(snapshot, ticketNumber, language).text}
+          </h1>
         </div>
         <div className="flex flex-wrap gap-2" data-testid="review-actions">
           <Button variant="ghost" onClick={onBack}>
@@ -217,7 +257,11 @@ export function CodeReview({ snapshot, ticketNumber, onBack }: { snapshot: Snaps
       {/* An identical solution already shows the same diff (original → your solution) above. */}
       {!(comparison && isIdentical(comparison, showWhitespace)) && (
         <DropdownCard title={t('review.referenceSection')} testId="review-reference">
-          <p className="mb-4 text-base text-muted-foreground" data-testid="review-reference-intro">{t(referenceIntroKey(metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type), { name: company(language).people.senior.name })}</p>
+          <p className="mb-4 text-base text-muted-foreground" data-testid="review-reference-intro">
+            {t(referenceIntroKey(metaOfEntry(snapshot.ticketMeta[ticket.ticket]).type), {
+              name: company(language).people.senior.name,
+            })}
+          </p>
           {content?.referencePatch && (
             <SplitDiff
               diff={content.referencePatch}

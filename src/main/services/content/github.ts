@@ -3,7 +3,19 @@
  * ticket packages) and the archive of the ticket's commit. No login or token: GitHub is a download
  * source only.
  */
-import { ContentVerificationError, IncompletePublicationError, compareVersions, countsOf, entryById, packageOf, parseManifest, projectContentOf, readZip, verifyCode, verifyPackage } from '@bug-detective/catalog/contract';
+import {
+  ContentVerificationError,
+  IncompletePublicationError,
+  compareVersions,
+  countsOf,
+  entryById,
+  packageOf,
+  parseManifest,
+  projectContentOf,
+  readZip,
+  verifyCode,
+  verifyPackage,
+} from '@bug-detective/catalog/contract';
 import type { ArchiveFile, TicketEntry } from '@bug-detective/catalog/contract';
 import { verifyTicket } from './source.ts';
 import type { ContentSource, FetchedTicket, ProjectContent } from './source.ts';
@@ -217,7 +229,9 @@ export class GitHubContentSource implements ContentSource {
     if (lastError instanceof DownloadError) {
       throw new DownloadError(`Download failed: ${url} (${lastError.message})`, lastError.status);
     }
-    throw new NoConnectionError(`Download failed: ${url} (${lastError instanceof Error ? lastError.message : String(lastError)})`);
+    throw new NoConnectionError(
+      `Download failed: ${url} (${lastError instanceof Error ? lastError.message : String(lastError)})`,
+    );
   }
 
   /** The qa branch: the manifest and every ticket package, verified, plus the project files. */
@@ -229,7 +243,9 @@ export class GitHubContentSource implements ContentSource {
   async publication(version: string, signal?: AbortSignal): Promise<ProjectContent> {
     const content = await this.fetchQaRef(GitHubContentSource.publicationTag(version), false, signal);
     if (content.manifest.version !== version) {
-      throw new ContentVerificationError(`${this.repository}: ${GitHubContentSource.publicationTag(version)} publishes ${content.manifest.version}, not ${version}`);
+      throw new ContentVerificationError(
+        `${this.repository}: ${GitHubContentSource.publicationTag(version)} publishes ${content.manifest.version}, not ${version}`,
+      );
     }
     return content;
   }
@@ -248,7 +264,9 @@ export class GitHubContentSource implements ContentSource {
     }
     const manifest = parseManifest(json, this.project);
     if (applyFloor && this.minVersion && compareVersions(manifest.version, this.minVersion) < 0) {
-      throw new IncompletePublicationError(`${this.repository} publishes ${manifest.version}, older than ${this.minVersion}`);
+      throw new IncompletePublicationError(
+        `${this.repository} publishes ${manifest.version}, older than ${this.minVersion}`,
+      );
     }
     for (const entry of manifest.entries) {
       verifyPackage(entry, packageOf(entry, qaFiles));
