@@ -137,7 +137,10 @@ function localCatalogFile(userData: string): string {
 function catalogService(userData: string): CatalogService {
   const local = localCatalog(localCatalogFile(userData));
   return new CatalogService({
-    choice: chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: local, baseDir: appRoot }),
+    // A run from source in player mode (the real-runtime suite) still honors the tests' catalog
+    // file; catalog.local.json stays development-only (localCatalog), and the installed app always
+    // reads the official catalog.
+    choice: chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: local, baseDir: appRoot }),
     overrides: local?.projects ?? {},
     baseDir: appRoot,
     cacheFile: join(userData, 'catalog.json'),
