@@ -228,6 +228,14 @@ test('the full game loop with real Docker and VS Code', async () => {
     }
     await page.getByTestId('close-panel').click();
 
+    // The app may still be busy with the unlock's follow-up (the reset of the project's databases):
+    // a move then only says "Please wait for the current task to finish".
+    await expect
+      .poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).busy), {
+        timeout: 5 * 60_000,
+        intervals: [1000],
+      })
+      .toBeNull();
     await dragCard(page, ticket, 'inProgress');
 
     if (ticket === 1) {
