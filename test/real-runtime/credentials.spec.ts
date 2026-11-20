@@ -371,6 +371,8 @@ test("VS Code attaches without the player's git credentials, .gitconfig or agent
     await writeFile(reportFile, `${report.join('\n')}\n`);
     await test.info().attach('credentials.md', { path: reportFile, contentType: 'text/markdown' });
     log(`report: ${reportFile}`);
+    // Closing the app stops the workspace: the attached VS Code window is closed first.
+    await closeAttachedWindows().catch((error: Error) => log(error.message));
     await app.close().catch(() => {});
     await rm(userData, { recursive: true, force: true }).catch(() => {});
   }

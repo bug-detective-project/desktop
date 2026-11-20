@@ -353,6 +353,8 @@ test('the full game loop with real Docker and VS Code', async () => {
   expect(peaks.workspace + peaks.qa).toBeLessThan(4 * GIB);
 
   const head = docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim();
+  // The container goes away: a VS Code window still attached would lose its connection.
+  await closeAttachedWindows();
   docker('rm', '--force', CONTAINER);
   docker('volume', 'rm', 'bugdetective-workspace');
   log('exported, then deleted the workspace container and volume');
@@ -378,5 +380,6 @@ test('the full game loop with real Docker and VS Code', async () => {
     await expect(page.getByTestId(`env-service-${service}`)).toHaveAttribute('data-tone', 'ok', { timeout: 120_000 });
   }
   log('restored: repository, branches, board state and both services are back');
+  await closeAttachedWindows();
   await app.close();
 });

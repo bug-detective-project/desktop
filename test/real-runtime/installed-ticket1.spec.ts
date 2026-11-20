@@ -18,7 +18,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
-import { finishOnboarding } from './onboarding.ts';
+import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 import { takeNextTicket } from '../e2e/fixtures.ts';
 
@@ -41,6 +41,8 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
     .split(/\s+/)
     .filter(Boolean);
   for (const id of leftovers) execFileSync(DOCKER, ['rm', '--force', id], { stdio: 'ignore' });
+  // A VS Code window still attached to the old container would lose its connection.
+  await closeAttachedWindows();
   execFileSync(DOCKER, ['rm', '--force', CONTAINER], { stdio: 'ignore' });
   execFileSync(DOCKER, ['volume', 'rm', '--force', 'bugdetective-workspace'], { stdio: 'ignore' });
 
@@ -112,5 +114,6 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   await page.getByTestId('accept-review').click();
   await expect(card).toHaveAttribute('data-status', 'done');
   log('QA passed, review accepted, ticket 1 Done');
+  await closeAttachedWindows();
   await app.close();
 });
