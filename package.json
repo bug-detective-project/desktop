@@ -41,6 +41,8 @@
     "prepare": "husky",
     "lint": "node tools/lint/node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node tools/lint/node_modules/eslint/bin/eslint.js . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "pretest:integration": "pnpm run prepare:resources",
     "verify:push": "pnpm run typecheck && pnpm test",
     "check:action-pins": "node tools/check-action-pins.mjs",
@@ -83,6 +85,7 @@
     "i18next": "26.5.11",
     "lint-staged": "17.6.0",
     "lucide-react": "1.63.0",
+    "prettier": "3.9.10",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-i18next": "17.1.9",
@@ -95,6 +98,10 @@
     "vitest": "5.0.5"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs}": "node tools/lint/node_modules/eslint/bin/eslint.js --fix"
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "node tools/lint/node_modules/eslint/bin/eslint.js --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,html,yml,yaml}": "prettier --write"
   }
 }

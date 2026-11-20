@@ -1,0 +1,14 @@
+# Generated or installed, never edited by hand.
+node_modules/
+tools/lint/node_modules/
+out/
+dist/
+build/
+storybook-static/
+coverage/
+.vitest-reports/
+test-results/
+playwright-report/
+test/.cache/
+pr-gate/
+pnpm-lock.yaml
