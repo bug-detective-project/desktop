@@ -204,14 +204,24 @@ test('the full game loop with real Docker and VS Code', async () => {
       expect(notes.length).toBeGreaterThanOrEqual(3);
       log(`ticket 1: app answers on http://127.0.0.1:${port}/ (${notes.length} notes through the Vite proxy)`);
       // The audit service on its own published port, the one VITE_AUDIT_URL names, and allowing
-      // the client's origin (CLIENT_ORIGIN): the declared ports reached the code.
-      await page.getByTestId('close-panel').click();
-      await page.getByTestId('nav-dashboard').click();
-      const auditRow = page.getByTestId('env-port-audit');
-      await expect(auditRow).toContainText('localhost:', { timeout: 60_000 });
-      const auditPort = Number(/localhost:(\d+)/.exec((await auditRow.textContent()) ?? '')?.[1]);
-      expect(await page.getByTestId('env-port-client').textContent()).toContain(`localhost:${port}`);
-      await expect(page.getByTestId('env-port-api')).toContainText('localhost:');
+      // the client's origin (CLIENT_ORIGIN): the declared ports reached the code. The ports are read
+      // as the game reads them; the Dashboard shows them as rows (covered by ports.spec.ts).
+      let declared: { name: string; port: number | null }[] = [];
+      await expect
+        .poll(
+          async () => {
+            declared = await page.evaluate(async () => {
+              // The check that the Dashboard repeats: it reads the published ports with the services.
+              await window.bugDetective.refreshEnvironment();
+              return (await window.bugDetective.snapshot()).declaredPorts;
+            });
+            return declared.map((entry) => `${entry.name}:${entry.port !== null}`).join(',');
+          },
+          { timeout: 60_000, intervals: [2000] },
+        )
+        .toBe('client:true,api:true,audit:true');
+      const auditPort = declared.find((entry) => entry.name === 'audit')!.port!;
+      expect(declared.find((entry) => entry.name === 'client')!.port).toBe(port);
       const env = docker('exec', CONTAINER, 'printenv', 'VITE_AUDIT_URL', 'CLIENT_ORIGIN').trim().split('\n');
       expect(env).toEqual([`http://localhost:${auditPort}`, `http://localhost:${port}`]);
       const events = await fetch(`http://127.0.0.1:${auditPort}/events`, {
@@ -220,8 +230,6 @@ test('the full game loop with real Docker and VS Code', async () => {
       expect(events.headers.get('access-control-allow-origin')).toBe(`http://localhost:${port}`);
       expect(((await events.json()) as unknown[]).length).toBeGreaterThanOrEqual(3);
       log(`ticket 1: the audit service answers on its own port ${auditPort}, for the client's origin`);
-      await page.getByTestId('nav-board').click();
-      await page.getByTestId('card-1').click();
       // VS Code attached and the dev server up: the workspace's heaviest moment.
       await sampleWorkspaceMemory();
       log(`ticket 1: workspace memory peak ${(peaks.workspace / GIB).toFixed(2)} GiB with VS Code and the dev server`);
