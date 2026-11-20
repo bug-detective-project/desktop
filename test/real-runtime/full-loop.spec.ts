@@ -175,7 +175,10 @@ test('the full game loop with real Docker and VS Code', async () => {
       `player/ticket-${ticket}`,
     );
 
-    // Open in VS Code, attached to the workspace container.
+    // Open in VS Code, attached to the workspace container. A window left attached to the container
+    // from before the app's restart (it was stopped and started) is dead: opening the same folder
+    // would only focus it and nothing would attach, so it is closed first.
+    await closeAttachedWindows();
     await page.getByTestId('nav-board').click();
     await page.getByTestId(`card-${ticket}`).click();
     await page.getByTestId('open-vscode').click();
