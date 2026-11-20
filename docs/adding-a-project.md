@@ -408,12 +408,24 @@ QA (fail, then pass with the fix), the code review and the next ticket.
    branch. It never pushes `qa` and creates no tags: nothing permanent exists before the merge. Run
    it again after a failed push and it only redoes the pushes; `bd publish --abort --version 1.0.0`
    undoes a publication that was not pushed yet.
-3. Open the pull request into `qa` (the link `bd publish` prints). When `project / validate` passes
-   and a code owner approves, merge it: the merge publishes and tags it `qa-v1.0.0` and each new
+3. Play the publication in the desktop, on Windows, before opening the pull request:
+
+   ```sh
+   desktop/tools/play-project.sh <project id>
+   ```
+
+   With the work branch checked out in `<project>-qa/`, it opens the real app with a fresh data
+   folder and that project alone, installs the environment (workspace, services, QA image) and
+   plays **every** ticket of both tracks to Done with its reference fix, skipping everything the
+   check does not need (onboarding, VS Code, dev server). It writes a report with the result and
+   the time of each ticket to `desktop/pr-gate/play-<project>-<time>.md`; it goes into the
+   pull request.
+4. Open the pull request into `qa` (the link `bd publish` prints), with the report of step 3. When
+   `project / validate` passes and a code owner approves, merge it: the merge publishes and tags it `qa-v1.0.0` and each new
    ticket commit `<id>-v1.0.0`. Housekeeping on `qa` (README, workflows, `CODEOWNERS`, `.npmrc`)
    needs no new version.
 
-Every later change (tickets, QA CLI, story, review) is a new version through the same three steps.
+Every later change (tickets, QA CLI, story, review) is a new version through the same four steps.
 
 ## 8. List it in the catalog
 
@@ -468,7 +480,7 @@ the approval of a code owner of the organization.
 - [ ] The rules above: offline, dependencies from the registry and at least 7 days old, `.vscode/` and texts within the allowed lists.
 - [ ] `qa` worktree with `package.json` (`bugDetective.project` with `difficulty` and `stack`), `run.ts`, both stories (with their `skills`, the main ones first), `review.json`, `publication.yml`.
 - [ ] Every ticket folder complete, with its `ticket.json` when the ticket is not a plain fix or names skills; `bd build`, `bd verify` and `bd validate` pass.
-- [ ] Played end to end locally through `catalog.local.json`.
+- [ ] Every ticket played to Done in the desktop with `tools/play-project.sh` (report in the publication pull request).
 - [ ] `qa` protected; `bd publish` and the pull request merged (`qa-v1.0.0`).
 - [ ] Catalog pull request merged (first `hidden`), checked in the installed app, then released.
 
