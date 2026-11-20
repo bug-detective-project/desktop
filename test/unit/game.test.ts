@@ -1949,6 +1949,16 @@ describe('the services of a project', () => {
     expect(handed).toHaveBeenLastCalledWith({ services, memory: { workspace: '4g' } });
   });
 
+  it('hands the declared ports to the runtime', async () => {
+    const ports = { client: { port: 5173, open: true }, audit: { port: 3002 } };
+    await declare({ ports });
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({ ports });
+  });
+
   it('hands nothing for a project that declares no services', async () => {
     const { game, runtime } = createGame();
     const handed = vi.spyOn(runtime, 'setResources');

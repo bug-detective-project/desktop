@@ -117,6 +117,24 @@ describe("a project's services and the internet", () => {
   });
 });
 
+describe("a project's declared ports", () => {
+  it('reach the workspace, which publishes them', async () => {
+    const { docker } = recordingDocker({ containers: {}, volumes: {}, images: {} });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
+    (runtime as unknown as Record<string, unknown>).docker = async () => docker;
+    (runtime as unknown as Record<string, unknown>).imageTags = async () => ({ workspace: 'ws:test' });
+    runtime.setProject('shop');
+    const ports = { client: { port: 5173 }, audit: { port: 3002 } };
+    runtime.setResources({ ports });
+
+    const workspace = await (runtime as unknown as { workspace: () => Promise<object> }).workspace();
+    expect((workspace as unknown as { declaredPorts: unknown }).declaredPorts).toEqual(ports);
+  });
+});
+
 describe('a workspace that runs out of memory', () => {
   /** A docker CLI whose workspace container has the given state and kernel counter of processes killed for lack of memory. */
   function workspaceWith(state: { id: string; running: boolean; kills: number | null; oomKilled?: boolean }) {

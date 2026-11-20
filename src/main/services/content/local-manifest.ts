@@ -13,12 +13,19 @@ import {
   TRACKS,
   parseManifest,
   projectContentOf,
+  portsProblems,
   projectServicesProblems,
   projectStackSchema,
   ticketMetaOf,
   treeDigest,
 } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectManifest, ProjectResources, TicketEntry } from '@bug-detective/catalog/contract';
+import type {
+  ArchiveFile,
+  ProjectManifest,
+  ProjectPorts,
+  ProjectResources,
+  TicketEntry,
+} from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
 
 /** Files and folders every tickets/<id>/ must have. */
@@ -70,6 +77,7 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
         stack?: unknown;
         services?: unknown;
         memory?: unknown;
+        ports?: unknown;
       };
     };
   };
@@ -97,8 +105,8 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
     }
     stack = parsed.data;
   }
-  const { services, memory } = project;
-  const problem = projectServicesProblems({ services, memory })[0];
+  const { services, memory, ports } = project;
+  const problem = [...projectServicesProblems({ services, memory }), ...portsProblems({ ports, services })][0];
   if (problem) {
     throw new Error(`${qaDir}/package.json: bugDetective.project.${problem}`);
   }
@@ -109,6 +117,7 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
     ...(stack !== undefined && { stack }),
     ...(services !== undefined && { services: services as ProjectResources['services'] }),
     ...(memory !== undefined && { memory: memory as ProjectResources['memory'] }),
+    ...(ports !== undefined && { ports: ports as ProjectPorts }),
   };
 }
 

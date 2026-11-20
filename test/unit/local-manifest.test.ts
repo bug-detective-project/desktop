@@ -111,6 +111,23 @@ describe('buildManifest (the local content source)', () => {
     await expect(build()).rejects.toThrow(/difficulty/);
   });
 
+  it('copies the declared ports into the manifest, and refuses an invalid declaration', async () => {
+    const write = async (ports: unknown) => {
+      const file = join(repo.qaDir, 'package.json');
+      const json = JSON.parse(await readFile(file, 'utf8'));
+      json.bugDetective.project.ports = ports;
+      await writeFile(file, JSON.stringify(json));
+    };
+    const ports = {
+      client: { port: 5173, open: true },
+      audit: { port: 3002, variables: { AUDIT_URL: 'http://localhost:{{port}}' } },
+    };
+    await write(ports);
+    expect((await build()).project.ports).toEqual(ports);
+    await write({ audit: { port: 3002 } });
+    await expect(build()).rejects.toThrow(/bugDetective\.project\.ports: .*client/);
+  });
+
   it('refuses a qa folder without package.json', async () => {
     await unlink(join(repo.qaDir, 'package.json')).catch(() => {});
     await expect(build()).rejects.toThrow(/package\.json/);

@@ -23,7 +23,10 @@ import type { ProjectServices as Declared } from '@bug-detective/catalog/contrac
 import { ProjectServices, serviceNames } from './services/project-services.ts';
 import { ServiceImages, serviceImageReferences } from './services/service-images.ts';
 import type { ServiceStatus } from '../shared/api.ts';
-import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectPorts, ProjectResources } from '@bug-detective/catalog/contract';
+
+/** What a project's manifest asks of Docker: its services and memory, and the ports it publishes. */
+export type RuntimeResources = ProjectResources & { ports?: ProjectPorts };
 import { DockerUnavailableError } from './services/docker.ts';
 import { CommandError } from './services/process.ts';
 import type { EngineState, Docker } from './services/docker.ts';
@@ -66,7 +69,7 @@ export interface GameRuntime {
   /** The project whose Docker resources are created from now on (they carry its label and its folder); the name is known once the manifest is. */
   setProject(project: string, name?: string): void;
   /** The services and the memory the project declares in its manifest; null until its content is known. */
-  setResources(resources: ProjectResources | null): void;
+  setResources(resources: RuntimeResources | null): void;
   /** True when the workspace ran out of memory since the last time this was asked: the container stopped for it, or the kernel killed a process inside it and it stays up. */
   workspaceOutOfMemory(): Promise<boolean>;
   /** The services where the kernel killed a process for lack of memory since the last time this was asked, while the service stayed up. */
@@ -186,7 +189,7 @@ export class DockerRuntime implements GameRuntime {
   private qaTool: ArchiveFile[] | null = null;
   private project: string | null = null;
   private projectName: string | null = null;
-  private resources: ProjectResources | null = null;
+  private resources: RuntimeResources | null = null;
   /** The memory kills already reported for the workspace container with this id. */
   private oomSeen: { id: string; kills: number } | null = null;
   /** The same, per service of the project. */
@@ -341,7 +344,7 @@ export class DockerRuntime implements GameRuntime {
     this.projectName = name ?? this.projectName;
   }
 
-  setResources(resources: ProjectResources | null): void {
+  setResources(resources: RuntimeResources | null): void {
     this.resources = resources;
   }
 
@@ -405,6 +408,7 @@ export class DockerRuntime implements GameRuntime {
       publishedServices: Object.entries(this.declared)
         .filter(([, service]) => service.publish)
         .map(([name, service]) => ({ name, port: serviceImageOf(service).port })),
+      declaredPorts: this.resources?.ports,
     });
   }
 

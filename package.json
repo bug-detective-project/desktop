@@ -54,7 +54,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@bug-detective/catalog": "github:bug-detective-project/catalog#v1.8.0",
+    "@bug-detective/catalog": "github:bug-detective-project/catalog#4614ea2aebd449440baefc3bdd0f2d7e6c6d893f",
     "electron-log": "5.4.4",
     "fflate": "0.8.3",
     "tar-stream": "3.2.2",

@@ -15,10 +15,10 @@ import type {
   ServiceStatus,
 } from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
-import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
+import type { GameRuntime, LineHandler, QaRequest, RuntimeResources } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
 import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import { DependenciesMissingError } from './services/workspace.ts';
 import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
@@ -202,7 +202,7 @@ export class FakeRuntime implements GameRuntime {
   private branch: string | null = null;
   private stages = new Map<number, string>();
   private devServerUp = false;
-  private resources: ProjectResources | null = null;
+  private resources: RuntimeResources | null = null;
   private workspaceOom = false;
   private servicesOom: string[] = [];
 
@@ -274,7 +274,7 @@ export class FakeRuntime implements GameRuntime {
 
   setProject(_project: string, _name?: string): void {}
 
-  setResources(resources: ProjectResources | null): void {
+  setResources(resources: RuntimeResources | null): void {
     this.resources = resources;
   }
 

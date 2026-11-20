@@ -8,8 +8,8 @@
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:net';
 import { MAX_SAVE_BYTES } from './backup.ts';
-import { readTar, writeTar } from '@bug-detective/catalog/contract';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import { portVariables, readTar, writeTar } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectPorts } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
 import { containerLimits, limitArgs } from './limits.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
@@ -59,9 +59,38 @@ export function resourceNames(prefix = 'bugdetective'): ResourceNames {
     qaInputVolume: `${prefix}-qa-input`,
   };
 }
-/** Container ports: the forwarder in front of Vite, and the Express API. */
+/** Container ports of a project that declares none: the forwarder in front of Vite, and the Express API. */
 export const CONTAINER_PORTS = { client: 15173, api: 3001 } as const;
 const PREFERRED_HOST_PORTS = { client: 5173, api: 3001 } as const;
+/**
+ * A declared port p is mirrored in the workspace at p + 10000 (0.0.0.0, by forward.mjs, to the
+ * process on localhost:p), so a server that listens on localhost only is reached too.
+ */
+export const MIRROR_OFFSET = 10_000;
+/** The workspace's variable that lists the declared ports forward.mjs mirrors. */
+export const WORKSPACE_PORTS_VARIABLE = 'BUGDETECTIVE_WORKSPACE_PORTS';
+
+/** One port the forwarder publishes: its name, the port preferred on the computer and the workspace port it reaches. */
+interface PortRoute {
+  name: string;
+  preferred: number;
+  target: number;
+}
+
+/** The routes of the declared ports, or the app's two ports when the project declares none. */
+function portRoutes(declared: ProjectPorts | undefined): PortRoute[] {
+  if (!declared) {
+    return [
+      { name: 'client', preferred: PREFERRED_HOST_PORTS.client, target: CONTAINER_PORTS.client },
+      { name: 'api', preferred: PREFERRED_HOST_PORTS.api, target: CONTAINER_PORTS.api },
+    ];
+  }
+  return Object.entries(declared).map(([name, port]) => ({
+    name,
+    preferred: port.port,
+    target: port.port + MIRROR_OFFSET,
+  }));
+}
 
 /** The player's branch for a ticket. Internal: never shown in the UI. */
 export const playerBranch = (stage: number) => `player/ticket-${stage}`;
@@ -476,15 +505,8 @@ const ticketArg = (ticket: number) => {
   return String(ticket);
 };
 
-export interface WorkspacePorts {
-  client: number;
-  api: number;
-}
-
-/** The host ports the workspace container publishes. */
-export function publishedPorts(info: ContainerInfo): WorkspacePorts {
-  return { client: info.ports[CONTAINER_PORTS.client], api: info.ports[CONTAINER_PORTS.api] };
-}
+/** The port on the computer of each port the forwarder publishes, by name: client always, then api or the declared ones. */
+export type WorkspacePorts = { client: number } & Record<string, number>;
 
 export interface WorkspaceOptions {
   docker: Docker;
@@ -507,6 +529,8 @@ export interface WorkspaceOptions {
   memory?: string;
   /** The services whose port the project asks to publish on the computer (127.0.0.1 only), through the forwarder. */
   publishedServices?: { name: string; port: number }[];
+  /** The ports the project declares (the manifest's project.ports); without them, the client and the API. */
+  declaredPorts?: ProjectPorts;
 }
 
 /** Changes when the published services do: the forwarder is then recreated. */
@@ -544,6 +568,8 @@ export class Workspace {
   private readonly variables: Record<string, string>;
   private readonly memory: string | undefined;
   private readonly publishedServices: { name: string; port: number }[];
+  private readonly declaredPorts: ProjectPorts | undefined;
+  private readonly routes: PortRoute[];
 
   constructor(options: WorkspaceOptions) {
     this.docker = options.docker;
@@ -556,21 +582,50 @@ export class Workspace {
     this.variables = options.variables ?? {};
     this.memory = options.memory;
     this.publishedServices = options.publishedServices ?? [];
+    this.declaredPorts = options.declaredPorts;
+    this.routes = portRoutes(this.declaredPorts);
   }
 
-  /** A short hash of the published services; empty when there is none. */
+  /** The workspace port the client is reached on: the mirror of the declared client port, or the default 15173. */
+  private get clientTarget(): number {
+    return this.routes.find((route) => route.name === 'client')!.target;
+  }
+
+  /** A short hash of the published services and the declared ports; empty when there is neither. */
   private get forwardKey(): string {
-    return this.publishedServices.length === 0
-      ? ''
-      : createHash('sha256').update(JSON.stringify(this.publishedServices)).digest('hex').slice(0, 16);
+    if (this.publishedServices.length === 0 && !this.declaredPorts) {
+      return '';
+    }
+    const routes = this.declaredPorts ? this.routes : [];
+    const content = routes.length === 0 ? this.publishedServices : [this.publishedServices, routes];
+    return createHash('sha256').update(JSON.stringify(content)).digest('hex').slice(0, 16);
+  }
+
+  /**
+   * The forwarder port of each published service: from 20000 on, clear of the workspace ports the
+   * declared ones reach (a port 10000 is mirrored at 20000).
+   */
+  private get serviceForwardPorts(): number[] {
+    const taken = new Set(this.routes.map((route) => route.target));
+    const ports: number[] = [];
+    let next = SERVICE_FORWARD_BASE;
+    for (let index = 0; index < this.publishedServices.length; index += 1) {
+      while (taken.has(next)) {
+        next += 1;
+      }
+      ports.push(next);
+      taken.add(next);
+    }
+    return ports;
   }
 
   /** The port on the computer (127.0.0.1) of each published service; empty when the forwarder does not exist. */
   async servicePorts(): Promise<Record<string, number>> {
     const info = await this.docker.inspectContainer(this.forwarder);
+    const forward = this.serviceForwardPorts;
     const ports: Record<string, number> = {};
     this.publishedServices.forEach((service, index) => {
-      const port = info?.ports[SERVICE_FORWARD_BASE + index];
+      const port = info?.ports[forward[index]!];
       if (port) {
         ports[service.name] = port;
       }
@@ -578,9 +633,29 @@ export class Workspace {
     return ports;
   }
 
+  /**
+   * The variables the container is created with: the services', and for declared ports the ports'
+   * own (filled with the ports chosen on the computer) and the list forward.mjs mirrors.
+   */
+  private containerVariables(ports: WorkspacePorts | null): Record<string, string> {
+    if (!this.declaredPorts) {
+      return this.variables;
+    }
+    if (!ports) {
+      throw new Error('The forwarder is not running: the declared ports have no port on the computer');
+    }
+    return {
+      ...this.variables,
+      ...portVariables(this.declaredPorts, ports),
+      [WORKSPACE_PORTS_VARIABLE]: Object.values(this.declaredPorts)
+        .map((port) => port.port)
+        .join(','),
+    };
+  }
+
   /** A short hash of the variables and the memory the container is created with; empty when the project declares neither. */
-  private get envKey(): string {
-    const variables = Object.entries(this.variables).sort(([a], [b]) => a.localeCompare(b));
+  private envKey(containerVariables: Record<string, string>): string {
+    const variables = Object.entries(containerVariables).sort(([a], [b]) => a.localeCompare(b));
     if (variables.length === 0 && this.memory === undefined) {
       return '';
     }
@@ -627,10 +702,13 @@ export class Workspace {
     return forwarderName(this.names.prefix, this.project);
   }
 
-  /** Published host ports (on the forwarder), or null when it does not exist. */
+  /** Published host ports (on the forwarder), by name, or null when it does not exist. */
   async ports(): Promise<WorkspacePorts | null> {
     const info = await this.docker.inspectContainer(this.forwarder);
-    return info ? publishedPorts(info) : null;
+    if (!info) {
+      return null;
+    }
+    return Object.fromEntries(this.routes.map((route) => [route.name, info.ports[route.target]])) as WorkspacePorts;
   }
 
   private async pickPort(preferred: number, avoid: Set<number>): Promise<number> {
@@ -652,11 +730,14 @@ export class Workspace {
   /** Creates the forwarder (normal network, then the internal one) on free ports. */
   private async createForwarder(): Promise<void> {
     const avoid = new Set<number>();
+    const forward = this.serviceForwardPorts;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const client = await this.pickPort(PREFERRED_HOST_PORTS.client, avoid);
-      avoid.add(client);
-      const api = await this.pickPort(PREFERRED_HOST_PORTS.api, avoid);
-      avoid.add(api);
+      const hostPorts: number[] = [];
+      for (const route of this.routes) {
+        const port = await this.pickPort(route.preferred, avoid);
+        avoid.add(port);
+        hostPorts.push(port);
+      }
       // A published service is reached by its name on the internal network, like the workspace.
       const servicePorts: number[] = [];
       for (const service of this.publishedServices) {
@@ -665,10 +746,8 @@ export class Workspace {
         servicePorts.push(port);
       }
       const routes = [
-        ...Object.values(CONTAINER_PORTS).map((port) => `${port}:${this.names.container}:${port}`),
-        ...this.publishedServices.map(
-          (service, index) => `${SERVICE_FORWARD_BASE + index}:${service.name}:${service.port}`,
-        ),
+        ...this.routes.map((route) => `${route.target}:${this.names.container}:${route.target}`),
+        ...this.publishedServices.map((service, index) => `${forward[index]}:${service.name}:${service.port}`),
       ].join(',');
       await this.docker.checked([
         'container',
@@ -683,11 +762,8 @@ export class Workspace {
         OPEN_NETWORK,
         '--env',
         `BUGDETECTIVE_FORWARD=${routes}`,
-        '--publish',
-        `127.0.0.1:${client}:${CONTAINER_PORTS.client}`,
-        '--publish',
-        `127.0.0.1:${api}:${CONTAINER_PORTS.api}`,
-        ...servicePorts.flatMap((port, index) => ['--publish', `127.0.0.1:${port}:${SERVICE_FORWARD_BASE + index}`]),
+        ...this.routes.flatMap((route, index) => ['--publish', `127.0.0.1:${hostPorts[index]}:${route.target}`]),
+        ...servicePorts.flatMap((port, index) => ['--publish', `127.0.0.1:${port}:${forward[index]}`]),
         this.image,
       ]);
       await this.docker.connectNetwork(this.network, this.forwarder);
@@ -728,7 +804,8 @@ export class Workspace {
   }
 
   /** The workspace lives on the internal network only: nothing is published from it. */
-  private async create(): Promise<void> {
+  private async create(variables: Record<string, string>): Promise<void> {
+    const envKey = this.envKey(variables);
     const result = await this.docker.run([
       'run',
       '--detach',
@@ -736,9 +813,9 @@ export class Workspace {
       '--name',
       this.names.container,
       ...labelArgs('workspace', this.project),
-      ...(this.envKey ? ['--label', `${ENV_KEY_LABEL}=${this.envKey}`] : []),
+      ...(envKey ? ['--label', `${ENV_KEY_LABEL}=${envKey}`] : []),
       ...limitArgs(containerLimits('workspace', process.env, this.memory ? { memory: this.memory } : {})),
-      ...Object.entries(this.variables).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
+      ...Object.entries(variables).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
       '--network',
       this.network,
       '--mount',
@@ -783,15 +860,19 @@ export class Workspace {
     await this.docker.createVolume(this.names.vscodeVolume, 'vscode-server');
     await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
     await this.docker.createInternalNetwork(this.network, 'network', this.project);
+    // The forwarder first: the variables of declared ports carry the ports it got on the computer. It
+    // reaches the workspace by name on each connection, so the container may come after it.
+    await this.ensureForwarder();
+    const variables = this.containerVariables(this.declaredPorts ? await this.ports() : null);
     let info = await this.info();
     if (
       info &&
       (info.image !== this.image ||
         !info.networks.includes(this.network) ||
-        (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey)
+        (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey(variables))
     ) {
       // A newer app version ships a newer image, the container is of another project's network, or the
-      // project's services or memory changed: recreate it, keep the volumes.
+      // project's services, ports or memory changed: recreate it, keep the volumes.
       await this.docker.removeContainer(this.names.container);
       info = null;
     }
@@ -803,9 +884,8 @@ export class Workspace {
       }
     }
     if (!info) {
-      await this.create();
+      await this.create(variables);
     }
-    await this.ensureForwarder();
     const running = await this.info();
     if (!running?.running) {
       throw new Error('The workspace container is not running');
@@ -1106,7 +1186,7 @@ export class Workspace {
         '/dev/null',
         '--max-time',
         '2',
-        `http://127.0.0.1:${CONTAINER_PORTS.client}/`,
+        `http://127.0.0.1:${this.clientTarget}/`,
       ],
       { user: 'node', timeoutMs: 10_000 },
     );

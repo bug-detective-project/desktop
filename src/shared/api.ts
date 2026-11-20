@@ -271,7 +271,8 @@ export interface TicketContent {
 }
 
 export interface WorkspaceStatus {
-  ports: { client: number; api: number } | null;
+  /** The port on the computer of each published port, by name: client always, then api or the project's declared ones. */
+  ports: ({ client: number } & Record<string, number>) | null;
   devServerUp: boolean;
   branch: string | null;
   /** False while the project's node_modules are not in the workspace: the dev server cannot start. */
