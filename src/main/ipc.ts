@@ -53,6 +53,7 @@ const schemas = {
   workspaceStatus: none,
   openVSCode: none,
   openAppInBrowser: none,
+  openPortInBrowser: z.tuple([z.string().regex(/^[a-z][a-z0-9-]{0,19}$/)]),
   startDevServer: none,
   stopDevServer: none,
   solveBug: z.tuple([ticket]),
@@ -148,6 +149,14 @@ export function registerIpc(
     openAppInBrowser: async () => {
       const url = new URL(await game.appUrl());
       // Only the workspace app on the loopback address and its published port.
+      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') {
+        throw new GameError('notAllowed');
+      }
+      await openUrl(url.href);
+    },
+    openPortInBrowser: async (name) => {
+      const url = new URL(await game.portUrl(name));
+      // Only a declared port of the workspace, on the loopback address.
       if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') {
         throw new GameError('notAllowed');
       }

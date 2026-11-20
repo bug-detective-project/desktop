@@ -20,8 +20,8 @@ import type { Story } from '../content.ts';
 import { story } from '../content.ts';
 import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx';
 import { useToast } from '../toast-context.ts';
-import { deskState, environmentRows, environmentSummary, inboxMessageText } from './dashboardState.ts';
-import type { DeskState, Tone } from './dashboardState.ts';
+import { deskState, environmentRows, environmentSummary, inboxMessageText, portRows } from './dashboardState.ts';
+import type { DeskState, PortRow, Tone } from './dashboardState.ts';
 
 const locale = (language: Language) => (language === 'pt' ? 'pt-BR' : 'en-US');
 
@@ -531,6 +531,47 @@ function InternetRow({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
+/** A port the project declares: where it answers on the computer, and "Open" when the project offers it. */
+function PortRowItem({ row }: { row: PortRow }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      await api.openPortInBrowser(row.portName);
+    } catch (error) {
+      toast.error(error);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <li className="flex min-w-0 items-center gap-2.5" data-testid={`env-${row.id}`} data-tone={row.tone}>
+      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[row.tone].circle}`}>
+        <Icon name="server" className="size-[13px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-foreground">{row.name}</span>
+        <span className={`block text-xs font-medium ${TONE_STYLES[row.tone].text}`}>{row.status}</span>
+      </span>
+      {row.open && (
+        <Button
+          size="sm"
+          busy={busy}
+          disabled={busy}
+          onClick={() => void open()}
+          aria-label={t('dashboard.openPortLabel', { name: row.name })}
+          data-testid={`open-port-${row.portName}`}
+        >
+          {!busy && <Icon name="externalLink" className="size-3.5" />}
+          {t('dashboard.openPort')}
+        </Button>
+      )}
+    </li>
+  );
+}
+
 /** Local environment, always expanded: four rows and a summary badge of their worst state. */
 function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
   const { t } = useTranslation();
@@ -623,6 +664,9 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
               </Button>
             )}
           </li>
+        ))}
+        {portRows(snapshot, t).map((row) => (
+          <PortRowItem key={row.id} row={row} />
         ))}
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
         {snapshot.state.tickets.length > 0 && <InternetRow snapshot={snapshot} />}

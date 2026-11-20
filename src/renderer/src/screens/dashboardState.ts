@@ -35,6 +35,33 @@ export interface EnvRow {
   action?: 'retryDatabaseReset' | 'recreateServices';
 }
 
+/** A port the project declares, as a row of the environment. */
+export interface PortRow {
+  /** `port-<name>`. */
+  id: `port-${string}`;
+  portName: string;
+  /** The label in the app's language, or the port's own name. */
+  name: string;
+  tone: Tone;
+  /** Where it answers on the computer, or that it is not published yet. */
+  status: string;
+  /** The row offers to open it in the browser: a port marked open, published, and not the client. */
+  open: boolean;
+}
+
+/** One row per declared port, in the project's order; none for a project that declares no ports. */
+export function portRows(snapshot: Snapshot, t: (key: string) => string): PortRow[] {
+  const language = snapshot.state.settings.language;
+  return (snapshot.declaredPorts ?? []).map((port) => ({
+    id: `port-${port.name}` as const,
+    portName: port.name,
+    name: port.label?.[language] ?? port.name,
+    tone: port.port === null ? 'neutral' : 'ok',
+    status: port.port === null ? t('dashboard.envStatus.notYet') : `localhost:${port.port}`,
+    open: port.open && port.port !== null && port.name !== 'client',
+  }));
+}
+
 /** Approximate download sizes, shown next to the environment items. */
 const ENVIRONMENT_SIZES: Partial<Record<EnvironmentItemId, string>> = {
   workspaceImage: '1.1 GB',

@@ -109,6 +109,8 @@ export interface GameRuntime {
   hasRepository(): Promise<boolean>;
 
   workspacePorts(): Promise<WorkspacePorts | null>;
+  /** Where each published port is on the computer, read from the forwarder; null when it is not there. Never creates or starts anything. */
+  publishedPorts(): Promise<WorkspacePorts | null>;
   /** Ports, dev server and branch. Read-only: never creates, starts or recreates anything. */
   workspaceStatus(): Promise<WorkspaceStatus>;
   startDevServer(): Promise<void>;
@@ -677,6 +679,10 @@ export class DockerRuntime implements GameRuntime {
 
   async workspacePorts() {
     return (await this.runningWorkspace()).ports();
+  }
+
+  async publishedPorts() {
+    return (await this.workspace()).ports();
   }
 
   async workspaceInternet() {

@@ -6,6 +6,7 @@ import {
   environmentRows,
   environmentSummary,
   inboxMessageText,
+  portRows,
 } from '../../src/renderer/src/screens/dashboardState.ts';
 
 const READY: EnvironmentReport = {
@@ -313,5 +314,67 @@ describe('inbox message text', () => {
 
   it('falls back to a generic assignment when the story has none for the ticket', () => {
     expect(inboxMessageText(messages, message('assignment', 5), fallback, idOf)).toEqual(fallback);
+  });
+});
+
+describe('portRows, the ports the project declares', () => {
+  it('adds no row for a project that declares none', () => {
+    expect(portRows(snapshot({ declaredPorts: [] }), t)).toEqual([]);
+  });
+
+  it('lists each port by its label, with the port it got on the computer', () => {
+    const rows = portRows(
+      snapshot({
+        declaredPorts: [
+          { name: 'client', label: { en: 'Smoke Desk', pt: 'Smoke Desk' }, port: 5173, open: true },
+          { name: 'api', label: null, port: 3001, open: false },
+          { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3012, open: true },
+        ],
+      }),
+      t,
+    );
+    expect(rows.map((row) => [row.name, row.status, row.tone])).toEqual([
+      ['Smoke Desk', 'localhost:5173', 'ok'],
+      ['api', 'localhost:3001', 'ok'],
+      ['Audit service', 'localhost:3012', 'ok'],
+    ]);
+  });
+
+  it('offers to open a port marked open, but not the client, which has its own button', () => {
+    const rows = portRows(
+      snapshot({
+        declaredPorts: [
+          { name: 'client', label: null, port: 5173, open: true },
+          { name: 'admin', label: null, port: 4000, open: true },
+          { name: 'api', label: null, port: 3001, open: false },
+        ],
+      }),
+      t,
+    );
+    expect(rows.map((row) => [row.portName, row.open])).toEqual([
+      ['client', false],
+      ['admin', true],
+      ['api', false],
+    ]);
+  });
+
+  it('says a port is not published yet, and offers nothing to open', () => {
+    const rows = portRows(snapshot({ declaredPorts: [{ name: 'admin', label: null, port: null, open: true }] }), t);
+    expect(rows.map((row) => [row.status, row.tone, row.open])).toEqual([
+      ['dashboard.envStatus.notYet', 'neutral', false],
+    ]);
+  });
+
+  it('shows the label in the language of the app', () => {
+    const rows = portRows(
+      snapshot({
+        state: { inbox: [], settings: { language: 'pt' } },
+        declaredPorts: [
+          { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3002, open: false },
+        ],
+      } as unknown as Partial<Snapshot>),
+      t,
+    );
+    expect(rows[0]!.name).toBe('Serviço de auditoria');
   });
 });

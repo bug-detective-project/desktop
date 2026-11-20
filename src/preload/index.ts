@@ -56,6 +56,7 @@ const api: BugDetectiveApi = {
   workspaceStatus: () => call('workspaceStatus'),
   openVSCode: () => call('openVSCode'),
   openAppInBrowser: () => call('openAppInBrowser'),
+  openPortInBrowser: (name) => call('openPortInBrowser', name),
   startDevServer: () => call('startDevServer'),
   stopDevServer: () => call('stopDevServer'),
   solveBug: (ticket) => call('solveBug', ticket),

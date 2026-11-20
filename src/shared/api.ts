@@ -197,6 +197,17 @@ export interface ServiceStatus {
   memoryKillAt?: string;
 }
 
+/** A port the active project declares (the manifest's project.ports), as the Dashboard shows it. */
+export interface DeclaredPortView {
+  name: string;
+  /** The name to show, per language; the port's own name without it. */
+  label: { en: string; pt: string } | null;
+  /** The port on this computer (127.0.0.1) where it answers, or null before the workspace publishes it. */
+  port: number | null;
+  /** The Dashboard offers to open it in the browser (the client has its own button). */
+  open: boolean;
+}
+
 export interface Snapshot {
   state: GameState;
   /** The number the next unlocked ticket gets, or null when none can be taken now (one open, or none left). */
@@ -231,6 +242,8 @@ export interface Snapshot {
   workspaceOutOfMemoryAt: string | null;
   /** The services the active project declares and where each one is; empty for a project without services. */
   services: ServiceStatus[];
+  /** The ports the active project declares, in its order; empty for a project that declares none (the client and the API). */
+  declaredPorts: DeclaredPortView[];
   /** The player opened the workspace to the internet (it also reaches the computer and the local network); the game closes it on the next ticket. */
   workspaceInternet: boolean;
   /** The last catalog refresh failed (offline, or an invalid catalog): the Projects screen shows the last saved list. */
@@ -334,6 +347,8 @@ export interface BugDetectiveApi {
   workspaceStatus(): Promise<WorkspaceStatus>;
   openVSCode(): Promise<void>;
   openAppInBrowser(): Promise<void>;
+  /** Opens a declared port marked `open` in the browser, on 127.0.0.1 and the port it got. */
+  openPortInBrowser(name: string): Promise<void>;
   startDevServer(): Promise<void>;
   stopDevServer(): Promise<void>;
   /** Development only: applies the reference fix of the ticket in progress to the player's code. */

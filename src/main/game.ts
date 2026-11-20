@@ -24,6 +24,7 @@ import type {
   DevCatalogView,
   LocalCatalog,
   ServiceStatus,
+  DeclaredPortView,
 } from '../shared/api.ts';
 import { INSTALL_DISK_BYTES } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
@@ -222,6 +223,8 @@ export class Game {
   private dbResetFailed = false;
   /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
   private services: ServiceStatus[] = [];
+  /** Where each published port was on the computer at the last check; null before one, or without a forwarder. */
+  private publishedPorts: Record<string, number> | null = null;
   private workspaceOutOfMemoryAt: string | null = null;
   /** When each service last had a process killed for lack of memory while it stayed up. */
   private serviceMemoryKills: Record<string, string> = {};
@@ -667,6 +670,7 @@ export class Game {
           ? { ...service, memoryKillAt: this.serviceMemoryKills[service.name] }
           : service,
       ),
+      declaredPorts: this.declaredPortsView(),
       workspaceOutOfMemoryAt: this.workspaceOutOfMemoryAt,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
@@ -958,6 +962,7 @@ export class Game {
   private async refreshServices(): Promise<void> {
     const before = new Map(this.services.map((service) => [service.name, service.state]));
     this.services = await this.options.runtime.servicesStatus().catch(() => []);
+    this.publishedPorts = await this.options.runtime.publishedPorts().catch(() => null);
     for (const service of this.services) {
       if ((service.state === 'failed' || service.state === 'oom') && before.get(service.name) !== service.state) {
         this.appendLog(
@@ -1693,6 +1698,29 @@ export class Game {
       this.appendLog(`» Solving ticket ${ticket} with its reference patch (development)`);
       await this.options.runtime.solveBug(ticket, patch);
     });
+  }
+
+  /** The ports the active project declares, with the port each one got on the computer at the last check. */
+  private declaredPortsView(): DeclaredPortView[] {
+    return Object.entries(this.content?.manifest.project.ports ?? {}).map(([name, port]) => ({
+      name,
+      label: port.label ?? null,
+      port: this.publishedPorts?.[name] ?? null,
+      open: port.open ?? false,
+    }));
+  }
+
+  /** The URL of a declared port that the project marks to open in the browser, on the port it got. */
+  async portUrl(name: string): Promise<string> {
+    await this.requireDocker();
+    if (!this.content?.manifest.project.ports?.[name]?.open) {
+      throw new GameError('notAllowed', `The project does not offer to open the port ${name}`);
+    }
+    const port = (await this.options.runtime.workspacePorts())?.[name];
+    if (!port) {
+      throw new GameError('workspaceNotRunning');
+    }
+    return `http://127.0.0.1:${port}/`;
   }
 
   /** The URL of the player's app on the published port. */

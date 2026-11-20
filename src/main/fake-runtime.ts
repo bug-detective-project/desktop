@@ -21,7 +21,7 @@ import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import { DependenciesMissingError } from './services/workspace.ts';
-import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
+import type { ReturnRequest, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
 
@@ -480,7 +480,15 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async workspacePorts() {
-    return { client: 5173, api: 3001 };
+    const declared = this.resources?.ports;
+    // Every port gets the one it prefers: the fake computer has them all free.
+    return declared
+      ? (Object.fromEntries(Object.entries(declared).map(([name, port]) => [name, port.port])) as WorkspacePorts)
+      : { client: 5173, api: 3001 };
+  }
+
+  async publishedPorts() {
+    return this.workspacePorts();
   }
 
   private internet = false;

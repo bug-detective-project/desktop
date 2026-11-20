@@ -59,6 +59,31 @@ export const ProjectServices: Story = {
     await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Stopped: out of memory');
   },
 };
+/** A project that declares its ports: one row each, with the port it got; "Open" on those marked open, but the client. */
+const openPortInBrowser = fn(async () => {});
+export const DeclaredPorts: Story = {
+  parameters: { api: { openPortInBrowser } },
+  render: show(() =>
+    snapshotFixture('active', {
+      declaredPorts: [
+        { name: 'client', label: { en: 'Smoke Desk', pt: 'Smoke Desk' }, port: 5173, open: true },
+        { name: 'api', label: null, port: 3001, open: false },
+        { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3012, open: true },
+      ],
+    }),
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-port-client')).toHaveTextContent('Smoke Desk');
+    await expect(canvas.getByTestId('env-port-client')).toHaveTextContent('localhost:5173');
+    await expect(canvas.getByTestId('env-port-api')).toHaveTextContent('localhost:3001');
+    await expect(canvas.getByTestId('env-port-audit')).toHaveTextContent('localhost:3012');
+    await expect(canvas.queryByTestId('open-port-client')).toBeNull();
+    await expect(canvas.queryByTestId('open-port-api')).toBeNull();
+    await userEvent.click(canvas.getByTestId('open-port-audit'));
+    await expect(openPortInBrowser).toHaveBeenCalledWith('audit');
+  },
+};
 /** A stopped service offers "Recreate services", which says first what is erased and what stays. */
 const recreateServices = fn(async () => {});
 export const RecreateServices: Story = {

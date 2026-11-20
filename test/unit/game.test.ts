@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
-import { Game } from '../../src/main/game.ts';
+import { Game, GameError } from '../../src/main/game.ts';
 import type { DevCatalogOptions, GameOptions } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { StaleVSCodeWindowError } from '../../src/main/services/attached-window.ts';
@@ -1957,6 +1957,45 @@ describe('the services of a project', () => {
     await game.init();
     await game.nextAssignment();
     expect(handed).toHaveBeenLastCalledWith({ ports });
+  });
+
+  describe('declared ports', () => {
+    const ports = {
+      client: { port: 5173, open: true, label: { en: 'Smoke Desk', pt: 'Smoke Desk' } },
+      api: { port: 3001 },
+      audit: { port: 3002, open: true, label: { en: 'Audit service', pt: 'Serviço de auditoria' } },
+    };
+
+    it('are shown with the port each one got on the computer', async () => {
+      await declare({ ports });
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      await game.refreshEnvironment();
+      expect(game.snapshot().declaredPorts).toEqual([
+        { name: 'client', label: { en: 'Smoke Desk', pt: 'Smoke Desk' }, port: 5173, open: true },
+        { name: 'api', label: null, port: 3001, open: false },
+        { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3002, open: true },
+      ]);
+    });
+
+    it('are none for a project that declares none', async () => {
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      await game.refreshEnvironment();
+      expect(game.snapshot().declaredPorts).toEqual([]);
+    });
+
+    it('open in the browser when marked open, and only then', async () => {
+      await declare({ ports });
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      expect(await game.portUrl('audit')).toBe('http://127.0.0.1:3002/');
+      await expect(game.portUrl('api')).rejects.toThrow(GameError);
+      await expect(game.portUrl('nope')).rejects.toThrow(GameError);
+    });
   });
 
   it('hands nothing for a project that declares no services', async () => {
