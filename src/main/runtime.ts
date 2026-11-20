@@ -414,12 +414,23 @@ export class DockerRuntime implements GameRuntime {
     });
   }
 
-  /** The workspace, with its container running. */
+  /** The preparation of the workspace in progress: the next one waits for it (see runningWorkspace). */
+  private preparing: Promise<unknown> = Promise.resolve();
+
+  /**
+   * The workspace, with its container running. One preparation at a time: two callers at once (the
+   * Dashboard's check and an action) would otherwise both create the forwarder or the container,
+   * and the second would fail on the name the first took.
+   */
   private async runningWorkspace(): Promise<Workspace> {
-    await this.ensureServices();
-    const workspace = await this.workspace();
-    await workspace.ensureRunning();
-    return workspace;
+    const run = this.preparing.then(async () => {
+      await this.ensureServices();
+      const workspace = await this.workspace();
+      await workspace.ensureRunning();
+      return workspace;
+    });
+    this.preparing = run.catch(() => {});
+    return run;
   }
 
   private async qa(): Promise<QaRunner> {

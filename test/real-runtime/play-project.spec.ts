@@ -128,6 +128,15 @@ test(`plays every ticket of ${project || 'a project'} to Done`, async () => {
         await expect(page.getByTestId('board')).toBeVisible({ timeout: 5 * 60_000 });
         await cardStatus(page, card, 'todo', 120_000);
         await installEnvironment(page);
+        // installEnvironment leaves the app on the Dashboard; the app may still be resetting the
+        // project's data after the unlock, when a move only says "Please wait".
+        await expect
+          .poll(async () => page.evaluate(async () => (await window.bugDetective.snapshot()).busy), {
+            timeout: 5 * 60_000,
+            intervals: [1000],
+          })
+          .toBeNull();
+        await page.getByTestId('nav-board').click();
         await dragCard(page, card, 'inProgress');
         await cardStatus(page, card, 'inProgress', 120_000);
 

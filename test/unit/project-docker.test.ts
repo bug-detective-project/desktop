@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Platform } from '../../src/main/platform/types.ts';
 import { DockerRuntime } from '../../src/main/runtime.ts';
 import { Docker, PROJECT_LABEL } from '../../src/main/services/docker.ts';
+import { Workspace } from '../../src/main/services/workspace.ts';
 import type { CommandRunner } from '../../src/main/services/process.ts';
 
 /** A docker CLI that records every command and answers from a small in-memory world. */
@@ -263,5 +264,36 @@ describe('a service that runs out of memory and stays up', () => {
     const { runtime } = servicesWith({});
     runtime.setResources({});
     expect(await runtime.servicesOutOfMemory()).toEqual([]);
+  });
+});
+
+describe('preparing the workspace', () => {
+  it('runs one preparation at a time: two callers at once never create the same containers twice', async () => {
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
+    const internals = runtime as unknown as Record<string, unknown>;
+    internals.ensureServices = async () => {};
+    internals.workspace = async () =>
+      new Workspace({ docker: {} as Docker, image: 'ws:test', isPortFree: async () => true });
+    let running = 0;
+    let most = 0;
+    const ensureRunning = vi.spyOn(Workspace.prototype, 'ensureRunning').mockImplementation(async () => {
+      running += 1;
+      most = Math.max(most, running);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      running -= 1;
+      return {} as never;
+    });
+    const ports = vi.spyOn(Workspace.prototype, 'ports').mockResolvedValue(null);
+    try {
+      await Promise.all([runtime.workspacePorts(), runtime.workspacePorts(), runtime.hasRepository().catch(() => {})]);
+      expect(ensureRunning).toHaveBeenCalledTimes(3);
+      expect(most).toBe(1);
+    } finally {
+      ensureRunning.mockRestore();
+      ports.mockRestore();
+    }
   });
 });
