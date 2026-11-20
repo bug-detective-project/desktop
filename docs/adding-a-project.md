@@ -83,16 +83,16 @@ git clone git@github.com:bug-detective-project/<id>.git ../<id>   # next to desk
 `main` is the finished app, with every bug of the game fixed. The workspace and QA expect a Node
 project:
 
-| Requirement                                                                          | Why                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `package.json` and `package-lock.json` at the root                                   | The workspace installs dependencies with `npm ci`, cached by the lockfile                                                                                                            |
-| `npm run dev` serves the client on **5173** (on `localhost`) and the API on **3001** | **Start server** and **Open app in browser** reach those ports through the workspace's forwarder; **Stop server** stops `npm run dev` and `node --watch` processes                   |
-| `npm run db:reset`                                                                   | The desktop resets the project's data before every ticket                                                                                                                            |
-| A test suite (`npm test`)                                                            | `bd build` turns the project's tests into each ticket's `gate1/`                                                                                                                     |
-| ESLint and Prettier (TypeScript or JavaScript projects)                              | Set up like SupportDesk: ESLint formats TS/JS, Prettier the rest, format on save in `.vscode/settings.json`, `lint` and `format` scripts, on `main` and every ticket branch          |
-| `.npmrc` with the dependency rules                                                   | `allow-git=none`, `allow-remote=none` and `min-release-age=7`; `bd validate` requires it on `main` and on every ticket branch (see [the rules](#rules-every-project-follows))        |
-| The API checks the `Host` header                                                     | Answers only `localhost` and `127.0.0.1` (403 to anything else), so a page on the internet cannot reach the player's app through the browser                                         |
-| `.github/workflows/ci.yml` calling the catalog's `app.yml`                           | The CI of `main`: `npm ci`, `lint`, `format:check` and `test` on every push and pull request. `bd build` keeps `.github/` out of the ticket branches, so players never get workflows |
+| Requirement                                                                                                                              | Why                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package.json` and `package-lock.json` at the root                                                                                       | The workspace installs dependencies with `npm ci`, cached by the lockfile                                                                                                            |
+| `npm run dev` serves the client on **5173** (on `localhost`) and the API on **3001**, or on the ports the project declares (see "Ports") | **Start server** and **Open app in browser** reach those ports through the workspace's forwarder; **Stop server** stops `npm run dev` and `node --watch` processes                   |
+| `npm run db:reset`                                                                                                                       | The desktop resets the project's data before every ticket                                                                                                                            |
+| A test suite (`npm test`)                                                                                                                | `bd build` turns the project's tests into each ticket's `gate1/`                                                                                                                     |
+| ESLint and Prettier (TypeScript or JavaScript projects)                                                                                  | Set up like SupportDesk: ESLint formats TS/JS, Prettier the rest, format on save in `.vscode/settings.json`, `lint` and `format` scripts, on `main` and every ticket branch          |
+| `.npmrc` with the dependency rules                                                                                                       | `allow-git=none`, `allow-remote=none` and `min-release-age=7`; `bd validate` requires it on `main` and on every ticket branch (see [the rules](#rules-every-project-follows))        |
+| The API checks the `Host` header                                                                                                         | Answers only `localhost` and `127.0.0.1` (403 to anything else), so a page on the internet cannot reach the player's app through the browser                                         |
+| `.github/workflows/ci.yml` calling the catalog's `app.yml`                                                                               | The CI of `main`: `npm ci`, `lint`, `format:check` and `test` on every push and pull request. `bd build` keeps `.github/` out of the ticket branches, so players never get workflows |
 
 ```yaml
 # .github/workflows/ci.yml on main
@@ -223,6 +223,48 @@ A project whose code needs a database declares it in the same `bugDetective.proj
 - A project with services needs `minAppVersion` 1.2.0 in the catalog; one with MySQL needs 1.3.0,
   whose workspace image carries the `mysql` client.
 
+### Ports
+
+A project that runs more than a client and an API (two services, an admin page, a micro frontend)
+declares its ports in the same `bugDetective.project`. Smoke Desk, the project of the desktop's
+tests, declares three:
+
+```json
+"ports": {
+  "client": {
+    "port": 5173,
+    "open": true,
+    "label": { "en": "Smoke Desk", "pt": "Smoke Desk" },
+    "variables": { "CLIENT_ORIGIN": "http://localhost:{{port}}" }
+  },
+  "api": { "port": 3001 },
+  "audit": {
+    "port": 3002,
+    "label": { "en": "Audit service", "pt": "Serviço de auditoria" },
+    "variables": { "VITE_AUDIT_URL": "http://localhost:{{port}}" }
+  }
+}
+```
+
+- `port` is where the process listens inside the workspace (1024 to 55535). The app publishes
+  each one on the player's computer, on `127.0.0.1` and on a free port: the declared one when it is
+  free, another one when not (Windows reserves whole blocks of ports).
+- `client` is required: it is the port **Open app in browser** opens. `open: true` on another port
+  gives it an **Open** button on the Dashboard, which lists every declared port with its `label`
+  and the port it got.
+- `variables` tell the code the port it got, through `{{port}}` (the only marker), set on the
+  workspace like the services' variables. Code that the browser runs and that calls another port
+  directly (not through Vite's proxy) must read its address from a variable: the preferred port is
+  not always the one the player has. A port variable may not repeat a service's variable.
+- A server may listen on `localhost` or on `0.0.0.0`: the workspace mirrors each port so both are
+  reached.
+- Up to 6 ports, named with lower-case letters, digits and `-`. The rules are in the catalog's
+  README, "Project ports"; a project with declared ports needs `minAppVersion` 1.3.0 in the catalog.
+- **In the QA CLI**, the app runs inside the QA with nothing published: `run.ts` picks a free port
+  for each name and fills the variables with `portVariables(ports, chosen)` from
+  `@bug-detective/catalog/contract`, as the desktop does. Smoke Desk's `run.ts` is the reference.
+- Without `ports`, the app does what it always did: the client on 5173 and the API on 3001.
+
 ### The QA CLI (`run.ts`)
 
 The desktop builds the QA image from `qa` and runs `node /opt/qa/run.ts` in a container without
@@ -244,7 +286,8 @@ network. The CLI must accept:
 - If the CLI uses Playwright (browser tests), the image installs Chromium for it; otherwise it
   stays small.
 
-Two references: SupportDesk's `run.ts` (Vitest and Playwright gates) and the minimal one the desktop
+Three references: SupportDesk's `run.ts` (Vitest and Playwright gates), Smoke Desk's (two
+services, two databases and declared ports) and the minimal one the desktop unit and integration
 tests use, [`test/fixtures/notes/qa/run.ts`](../test/fixtures/notes/qa/run.ts) (`node --test`).
 
 ### The story (`story.en.json`, `story.pt.json`)
