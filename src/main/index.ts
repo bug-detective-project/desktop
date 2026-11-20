@@ -104,7 +104,9 @@ if (isDev && !isE2E && existsSync(envFile)) {
 // "Solve bug" on the board card: BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON=true, never in the installed app.
 const devSolveBug = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SOLVE_BUG_BUTTON ?? '');
 // "Skip onboarding" in Rafaela's onboarding: BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON=true, never in the installed app.
-const devSkipOnboarding = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
+// A run from source in player mode honors it too: tools/play-project.sh plays a project there.
+const devSkipOnboarding =
+  !app.isPackaged && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON ?? '');
 // The Projects screen from the start (it normally waits for a done project): BUGDETECTIVE_DEV_SHOW_PROJECTS=true, never in the installed app.
 const devShowProjects = isDev && /^(true|1)$/i.test(process.env.BUGDETECTIVE_DEV_SHOW_PROJECTS ?? '');
 // The e2e tests keep the onboarding from opening on its own unless BUGDETECTIVE_E2E_SHOW_ONBOARDING=true.

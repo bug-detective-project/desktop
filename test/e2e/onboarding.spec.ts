@@ -223,3 +223,18 @@ test('with BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON, the onboarding can be skippe
     await close();
   }
 });
+
+test('a run from source in player mode still offers to skip the onboarding when asked (tools/play-project.sh)', async () => {
+  const { page, close } = await launch(
+    {},
+    { env: { ...SHOW, BUGDETECTIVE_E2E_PLAYER_RUN: '1', BUGDETECTIVE_DEV_SKIP_ONBOARDING_BUTTON: 'true' } },
+  );
+  try {
+    await page.getByTestId('start-playing').click();
+    await page.getByTestId('onboarding-start').click();
+    await page.getByTestId('onboarding-skip').click();
+    await expect(overlay(page)).toHaveCount(0);
+  } finally {
+    await close();
+  }
+});

@@ -6,7 +6,7 @@
 #   desktop/tools/play-project.sh <project id>      (the qa worktree is ../<project>-qa)
 #
 # It syncs desktop/ and the project (repository and qa worktree) to the Windows copy, installs the
-# desktop's dependencies there, runs test/real-runtime/play-project.spec.ts and copies its report to
+# desktop's dependencies there, builds the app, runs test/real-runtime/play-project.spec.ts and copies its report to
 # pr-gate/play-<project>-<time>.md. The run opens the app on the Windows display; Docker Desktop must
 # be running. It exits non-zero when any ticket does not reach Done.
 set -euo pipefail
@@ -31,6 +31,8 @@ echo "== sync ($(date -u +%H:%M:%S))"
 "$here/tools/sync-windows.sh" "$project" > "$logs/play-sync.log"
 echo "== install ($(date -u +%H:%M:%S))"
 "$here/tools/win.sh" pnpm install --frozen-lockfile > "$logs/play-install.log" 2>&1
+echo "== build ($(date -u +%H:%M:%S))"
+"$here/tools/win.sh" pnpm run build > "$logs/play-build.log" 2>&1
 echo "== play $project ($(date -u +%H:%M:%S)); log: pr-gate/play-$project.log"
 status=0
 BD_WIN_ENV="BD_PLAY_PROJECT=$project
