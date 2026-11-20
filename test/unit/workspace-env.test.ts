@@ -57,7 +57,13 @@ function world() {
 
 const workspaceOf = (
   docker: Docker,
-  extra: { variables?: Record<string, string>; memory?: string; publishedServices?: { name: string; port: number }[]; isPortFree?: (port: number) => Promise<boolean> } = {},
+  extra: {
+    variables?: Record<string, string>;
+    memory?: string;
+    publishedServices?: { name: string; port: number }[];
+    isPortFree?: (port: number) => Promise<boolean>;
+    anyFreePort?: () => Promise<number>;
+  } = {},
 ) => new Workspace({ docker, image: IMAGE, isPortFree: async () => true, project: 'shop', ...extra });
 
 /** True when `flag value` appears as two consecutive arguments. */
@@ -138,6 +144,17 @@ describe('the published port of a service', () => {
     const workspace = workspaceOf(docker, { publishedServices: db, isPortFree: async (port) => port !== 5432 });
     await workspace.ensureRunning();
     expect(await workspace.servicePorts()).toEqual({ db: 5433 });
+  });
+
+  it('asks the system for a port when every port near the preferred one is reserved', async () => {
+    // Windows can reserve whole blocks (2741 to 3240): no port from 3001 to 3200 can be listened on.
+    const { docker, calls } = world();
+    const handedOut = [55001, 55002];
+    const workspace = workspaceOf(docker, { isPortFree: async (port) => port < 2741 || port > 3240, anyFreePort: async () => handedOut.shift()! });
+    await workspace.ensureRunning();
+    const [create] = forwarders(calls);
+    expect(has(create!, '--publish', '127.0.0.1:5173:15173')).toBe(true);
+    expect(create!.some((arg) => /^127\.0\.0\.1:55001:/.test(arg))).toBe(true);
   });
 
   it('gives two services of the same image different ports', async () => {

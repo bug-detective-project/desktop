@@ -6,6 +6,7 @@
  * environment (WORKSPACE_DIR, PROJECT_ID, PROJECT_NAME), never interpolated into the script.
  */
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:net';
 import { MAX_SAVE_BYTES } from './backup.ts';
 import { readTar, writeTar } from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
@@ -489,6 +490,12 @@ export interface WorkspaceOptions {
   docker: Docker;
   image: string;
   isPortFree: (port: number) => Promise<boolean>;
+  /**
+   * Any free port the system hands out. The fallback when every port near a preferred one is taken:
+   * Windows (Hyper-V, WinNAT) reserves whole blocks of ports, such as 2741 to 3240, which no
+   * program can listen on.
+   */
+  anyFreePort?: () => Promise<number>;
   names?: ResourceNames;
   /** The game project whose code the workspace holds (labels its container and volumes, names its folder). */
   project?: string | null;
@@ -529,6 +536,7 @@ export class Workspace {
   private readonly docker: Docker;
   private readonly image: string;
   private readonly isPortFree: (port: number) => Promise<boolean>;
+  private readonly anyFreePort: () => Promise<number>;
   private readonly names: ResourceNames;
   private readonly project: string | null;
   private readonly projectName: string | null;
@@ -541,6 +549,7 @@ export class Workspace {
     this.docker = options.docker;
     this.image = options.image;
     this.isPortFree = options.isPortFree;
+    this.anyFreePort = options.anyFreePort ?? systemFreePort;
     this.names = options.names ?? resourceNames();
     this.project = options.project ?? null;
     this.projectName = options.projectName ?? null;
@@ -618,6 +627,13 @@ export class Workspace {
   private async pickPort(preferred: number, avoid: Set<number>): Promise<number> {
     for (let port = preferred; port < preferred + 200; port += 1) {
       if (!avoid.has(port) && (await this.isPortFree(port))) {
+        return port;
+      }
+    }
+    // Nothing near the preferred port: the system knows a free one (its ephemeral range).
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const port = await this.anyFreePort();
+      if (!avoid.has(port)) {
         return port;
       }
     }
@@ -1115,4 +1131,17 @@ export class Workspace {
     await this.docker.removeNetwork(this.network).catch(() => {});
     await this.docker.removeVolume(this.names.volume);
   }
+}
+
+/** A port the system hands out as free on 127.0.0.1 (listening on port 0), closed again right away. */
+function systemFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen({ port: 0, host: '127.0.0.1', exclusive: true }, () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(() => (port > 0 ? resolve(port) : reject(new Error('The system gave no free port'))));
+    });
+  });
 }
