@@ -11,14 +11,20 @@ import type { Page } from '@playwright/test';
 export async function closeAttachedWindows(): Promise<void> {
   if (process.platform !== 'win32') return;
   const script = join(import.meta.dirname, 'close-attached-windows.ps1');
-  const closed = execFileSync(
+  const [asked, left] = execFileSync(
     'powershell.exe',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Match', '[Container bugdetective-workspace'],
     { encoding: 'utf8' },
-  ).trim();
-  if (closed !== '0') {
-    console.log(`Asked ${closed} attached VS Code window(s) to close`);
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+  )
+    .trim()
+    .split(' ')
+    .map(Number);
+  if (asked > 0) {
+    console.log(`Asked ${asked} attached VS Code window(s) to close; ${left} still open`);
+  }
+  if (left > 0) {
+    // A window that stays would only be focused by the next attach, and nothing would attach.
+    throw new Error(`${left} VS Code window(s) attached to the workspace container did not close`);
   }
 }
 

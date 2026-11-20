@@ -254,6 +254,9 @@ test('the full game loop with real Docker and VS Code', async () => {
       await dragCard(page, 1, 'inQa');
       await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'inQa');
       await page.waitForTimeout(5000);
+      // The app stops the workspace when it closes: a VS Code window still attached would lose its
+      // connection and show its "reload" dialog, so it is closed first.
+      await closeAttachedWindows();
       await app.close();
       log('ticket 1: app closed during QA');
       ({ app, page } = await open(userData));
