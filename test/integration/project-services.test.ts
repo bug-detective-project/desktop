@@ -63,8 +63,16 @@ const text = async (args: string[]): Promise<string> => (await docker.run(args))
 const psql = (sql: string) => docker.exec(SERVICE, ['psql', '-U', 'postgres', '-tAc', sql]);
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: PROJECT });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: PROJECT,
+  });
 }
 
 function newGame(): Game {
@@ -126,7 +134,11 @@ afterAll(async () => {
   }
   await docker.removeContainer(`${PREFIX}-forward-${PROJECT}`);
   await docker.removeNetwork(NETWORK).catch(() => {});
-  for (const image of (await text(['image', 'ls', '--filter', `reference=${PREFIX}-qa-image`, '--format', '{{.Repository}}:{{.Tag}}'])).split('\n').filter(Boolean)) {
+  for (const image of (
+    await text(['image', 'ls', '--filter', `reference=${PREFIX}-qa-image`, '--format', '{{.Repository}}:{{.Tag}}'])
+  )
+    .split('\n')
+    .filter(Boolean)) {
     await docker.removeImage(image, { force: true }).catch(() => {});
   }
   // The service image goes only when this test brought it.
@@ -143,9 +155,15 @@ describe("a project's services with real Docker", () => {
     expect(info?.networks).toEqual([NETWORK]);
     expect(info?.ports).toEqual({});
     expect(info?.image).toBe(REFERENCE);
-    expect(await text(['container', 'inspect', '--format', '{{range .Mounts}}{{.Type}}:{{.Name}} {{end}}', SERVICE])).toBe(`volume:${DATA}`);
-    expect(await text(['container', 'inspect', '--format', '{{.HostConfig.RestartPolicy.Name}}', SERVICE])).toMatch(/^(no)?$/);
-    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', hostPort: expect.any(Number) }]);
+    expect(
+      await text(['container', 'inspect', '--format', '{{range .Mounts}}{{.Type}}:{{.Name}} {{end}}', SERVICE]),
+    ).toBe(`volume:${DATA}`);
+    expect(await text(['container', 'inspect', '--format', '{{.HostConfig.RestartPolicy.Name}}', SERVICE])).toMatch(
+      /^(no)?$/,
+    );
+    expect(game.snapshot().services).toEqual([
+      { name: 'db', image: 'postgres:17', state: 'ready', hostPort: expect.any(Number) },
+    ]);
   });
 
   it('publishes the service on 127.0.0.1 of the computer when the project asks for it', async () => {
@@ -164,7 +182,10 @@ describe("a project's services with real Docker", () => {
   it('notices a process killed for lack of memory inside the workspace, which stays up', async () => {
     expect(await runtime.workspaceOutOfMemory()).toBe(false);
     const hungry = 'const kept = []; for (;;) kept.push(Buffer.alloc(16 * 1024 * 1024, 1));';
-    const killed = await docker.exec(runtime.names.container, ['node', '-e', hungry], { user: 'node', timeoutMs: 120_000 });
+    const killed = await docker.exec(runtime.names.container, ['node', '-e', hungry], {
+      user: 'node',
+      timeoutMs: 120_000,
+    });
     expect(killed.code).toBe(137);
     expect((await docker.inspectContainer(runtime.names.container))?.running).toBe(true);
 
@@ -176,18 +197,27 @@ describe("a project's services with real Docker", () => {
 
   it("gives the workspace the service's address, and the workspace reaches it", async () => {
     const container = runtime.names.container;
-    expect((await docker.exec(container, ['printenv', 'DATABASE_URL'], { user: 'node' })).stdout.toString('utf8').trim()).toBe(
-      'postgres://postgres:notes@db:5432/postgres',
-    );
-    const connect = "require('node:net').connect(5432, 'db').once('connect', () => process.exit(0)).once('error', () => process.exit(1))";
+    expect(
+      (await docker.exec(container, ['printenv', 'DATABASE_URL'], { user: 'node' })).stdout.toString('utf8').trim(),
+    ).toBe('postgres://postgres:notes@db:5432/postgres');
+    const connect =
+      "require('node:net').connect(5432, 'db').once('connect', () => process.exit(0)).once('error', () => process.exit(1))";
     expect((await docker.exec(container, ['node', '-e', connect], { user: 'node', timeoutMs: 30_000 })).code).toBe(0);
     // The workspace image carries the database's own client: the player looks at the data from the terminal.
-    const answer = await docker.exec(container, ['sh', '-c', 'psql "$DATABASE_URL" -tAc "select 1"'], { user: 'node', timeoutMs: 30_000 });
+    const answer = await docker.exec(container, ['sh', '-c', 'psql "$DATABASE_URL" -tAc "select 1"'], {
+      user: 'node',
+      timeoutMs: 30_000,
+    });
     expect(answer.stdout.toString('utf8').trim()).toBe('1');
+    // And the client of the other database on the catalog's list, of the same major version as its server.
+    const mysql = await docker.exec(container, ['mysql', '--version'], { user: 'node' });
+    expect(mysql.stdout.toString('utf8')).toMatch(/Ver 8\.4\./);
   });
 
   it('records the image as its own only when it pulled it', async () => {
-    const recorded = JSON.parse(await readFile(imagesFile, 'utf8').catch(() => '{"pulled":[]}')) as { pulled: string[] };
+    const recorded = JSON.parse(await readFile(imagesFile, 'utf8').catch(() => '{"pulled":[]}')) as {
+      pulled: string[];
+    };
     expect(recorded.pulled).toEqual(hadImage ? [] : [REFERENCE]);
   });
 
@@ -214,10 +244,35 @@ describe("a project's services with real Docker", () => {
     // The bug is still there: Gate 2 fails, which means QA ran to the end with its database.
     expect(ticket.attempts.at(-1)!.result).toMatchObject({ gate: 2, status: 'failed' });
     expect(logLines.join('\n')).toContain('QA database reachable at db:5432');
-    expect(await text(['container', 'ls', '--all', '--filter', 'label=bugdetective.role=qa-service', '--filter', `name=${PREFIX}`, '--format', '{{.Names}}'])).toBe('');
-    expect(await text(['network', 'ls', '--filter', 'label=bugdetective.role=qa-network', '--filter', `name=${PREFIX}`, '--format', '{{.Name}}'])).toBe('');
+    expect(
+      await text([
+        'container',
+        'ls',
+        '--all',
+        '--filter',
+        'label=bugdetective.role=qa-service',
+        '--filter',
+        `name=${PREFIX}`,
+        '--format',
+        '{{.Names}}',
+      ]),
+    ).toBe('');
+    expect(
+      await text([
+        'network',
+        'ls',
+        '--filter',
+        'label=bugdetective.role=qa-network',
+        '--filter',
+        `name=${PREFIX}`,
+        '--format',
+        '{{.Name}}',
+      ]),
+    ).toBe('');
     // The player's own database was not the one QA used.
-    expect((await psql("select count(*) from pg_tables where tablename = 'player_only'")).stdout.toString('utf8').trim()).toBe('1');
+    expect(
+      (await psql("select count(*) from pg_tables where tablename = 'player_only'")).stdout.toString('utf8').trim(),
+    ).toBe('1');
   });
 
   it('keeps the data when the app closes, and starts the service again with the next action', async () => {

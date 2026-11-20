@@ -32,7 +32,11 @@ describe('buildManifest (the local content source)', () => {
   });
 
   it('copies ticket.json into the entry of its ticket, and only of that one', async () => {
-    const meta = { type: 'build', bothSides: true, skills: { en: ['Building components'], pt: ['Criação de componentes'] } };
+    const meta = {
+      type: 'build',
+      bothSides: true,
+      skills: { en: ['Building components'], pt: ['Criação de componentes'] },
+    };
     await writeFile(join(repo.qaDir, 'tickets', 'front-1', 'ticket.json'), `${JSON.stringify(meta)}\n`);
     repo.git(repo.qaDir, 'add', 'tickets/front-1/ticket.json');
     repo.git(repo.qaDir, 'commit', '-q', '-m', 'Describe front-1');
@@ -105,6 +109,23 @@ describe('buildManifest (the local content source)', () => {
     expect((await build()).project.difficulty).toBe('intermediate');
     await write('hard');
     await expect(build()).rejects.toThrow(/difficulty/);
+  });
+
+  it('copies the declared ports into the manifest, and refuses an invalid declaration', async () => {
+    const write = async (ports: unknown) => {
+      const file = join(repo.qaDir, 'package.json');
+      const json = JSON.parse(await readFile(file, 'utf8'));
+      json.bugDetective.project.ports = ports;
+      await writeFile(file, JSON.stringify(json));
+    };
+    const ports = {
+      client: { port: 5173, open: true },
+      audit: { port: 3002, variables: { AUDIT_URL: 'http://localhost:{{port}}' } },
+    };
+    await write(ports);
+    expect((await build()).project.ports).toEqual(ports);
+    await write({ audit: { port: 3002 } });
+    await expect(build()).rejects.toThrow(/bugDetective\.project\.ports: .*client/);
   });
 
   it('refuses a qa folder without package.json', async () => {

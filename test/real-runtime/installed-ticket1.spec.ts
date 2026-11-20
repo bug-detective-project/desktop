@@ -18,14 +18,15 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
-import { finishOnboarding } from './onboarding.ts';
+import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 import { takeNextTicket } from '../e2e/fixtures.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 // The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
 const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
-const DOCKER = process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
+const DOCKER =
+  process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
 const WORKSPACE = workspaceDir('supportdesk');
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
@@ -34,19 +35,26 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   const executablePath = process.env.BUGDETECTIVE_INSTALLED_EXE;
   test.skip(!executablePath, 'Set BUGDETECTIVE_INSTALLED_EXE');
   const userData = await mkdtemp(join(tmpdir(), 'João Silva installed-'));
-  await writeFile(
-    join(userData, 'content-source.json'),
-    JSON.stringify({ kind: 'local', qaDir: supportdeskQa }),
-  );
+  await writeFile(join(userData, 'content-source.json'), JSON.stringify({ kind: 'local', qaDir: supportdeskQa }));
   // Start from no workspace at all, like a new player.
-  const leftovers = execFileSync(DOCKER, ['ps', '-aq', '--filter', 'label=bugdetective.role=qa'], { encoding: 'utf8' }).split(/\s+/).filter(Boolean);
+  const leftovers = execFileSync(DOCKER, ['ps', '-aq', '--filter', 'label=bugdetective.role=qa'], { encoding: 'utf8' })
+    .split(/\s+/)
+    .filter(Boolean);
   for (const id of leftovers) execFileSync(DOCKER, ['rm', '--force', id], { stdio: 'ignore' });
+  // A VS Code window still attached to the old container would lose its connection.
+  await closeAttachedWindows();
   execFileSync(DOCKER, ['rm', '--force', CONTAINER], { stdio: 'ignore' });
   execFileSync(DOCKER, ['volume', 'rm', '--force', 'bugdetective-workspace'], { stdio: 'ignore' });
 
-  const app = await electron.launch({ executablePath: executablePath!, env: { ...process.env, BUGDETECTIVE_USER_DATA: userData } });
+  const app = await electron.launch({
+    executablePath: executablePath!,
+    env: { ...process.env, BUGDETECTIVE_USER_DATA: userData },
+  });
   const page = await app.firstWindow();
-  const versions = await app.evaluate(({ app: electronApp }) => ({ packaged: electronApp.isPackaged, path: electronApp.getAppPath() }));
+  const versions = await app.evaluate(({ app: electronApp }) => ({
+    packaged: electronApp.isPackaged,
+    path: electronApp.getAppPath(),
+  }));
   expect(versions.packaged).toBe(true);
   log(`installed app: ${versions.path}`);
 
@@ -84,7 +92,9 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   await expect(card.or(page.getByTestId('toast-error'))).toBeVisible();
   await page.waitForTimeout(15_000);
   if ((await card.getAttribute('data-status')) !== 'inQa') {
-    log(`move refused: ${await page.getByTestId('toast-error').allTextContents()} / ${await page.getByTestId('toast-info').allTextContents()}`);
+    log(
+      `move refused: ${await page.getByTestId('toast-error').allTextContents()} / ${await page.getByTestId('toast-info').allTextContents()}`,
+    );
   }
   await expect(card).toHaveAttribute('data-status', 'inQa');
   await expect(card).toHaveAttribute('data-status', 'inProgress', { timeout: 10 * 60_000 });
@@ -104,5 +114,6 @@ test('the installed app plays ticket 1 end to end on a clean profile', async () 
   await page.getByTestId('accept-review').click();
   await expect(card).toHaveAttribute('data-status', 'done');
   log('QA passed, review accepted, ticket 1 Done');
+  await closeAttachedWindows();
   await app.close();
 });

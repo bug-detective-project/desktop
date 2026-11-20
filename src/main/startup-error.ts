@@ -12,7 +12,8 @@ const TEXT = {
   },
   pt: {
     title: 'O Bug Detective não conseguiu abrir',
-    newerVersion: 'O seu jogo salvo foi criado por uma versão mais nova do Bug Detective. Atualize o app para continuar jogando.',
+    newerVersion:
+      'O seu jogo salvo foi criado por uma versão mais nova do Bug Detective. Atualize o app para continuar jogando.',
     failed: 'Algo deu errado ao abrir o app.',
   },
 };

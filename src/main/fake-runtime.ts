@@ -4,15 +4,24 @@
  * real content source, so tickets, hints and reviews are the real ones.
  */
 import { createHash } from 'node:crypto';
-import type { DiskUsageItem, DockerCleanup, DockerCleanupScope, EngineState, EnvironmentReport, PrerequisiteReport, ReviewComparison, ServiceStatus } from '../shared/api.ts';
+import type {
+  DiskUsageItem,
+  DockerCleanup,
+  DockerCleanupScope,
+  EngineState,
+  EnvironmentReport,
+  PrerequisiteReport,
+  ReviewComparison,
+  ServiceStatus,
+} from '../shared/api.ts';
 import type { QaResult } from '../shared/types.ts';
-import type { GameRuntime, LineHandler, QaRequest } from './runtime.ts';
+import type { GameRuntime, LineHandler, QaRequest, RuntimeResources } from './runtime.ts';
 import { textFile } from '@bug-detective/catalog/contract';
 import { SERVICE_IMAGES } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectResources } from '@bug-detective/catalog/contract';
+import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import type { CleanupTarget } from './services/cleanup.ts';
 import { DependenciesMissingError } from './services/workspace.ts';
-import type { ReturnRequest, ReviewBuild, ReviewCommits } from './services/workspace.ts';
+import type { ReturnRequest, ReviewBuild, ReviewCommits, WorkspacePorts } from './services/workspace.ts';
 
 type QaOutcome = 'passed' | 'gate1' | 'gate2' | 'timeout' | 'error';
 
@@ -118,7 +127,7 @@ function solutionsDiff(whitespace: boolean): string {
     '+export async function readErrorMessage(response: Response): Promise<string | undefined> {',
     '+  try {',
     '+    const body = await response.json();',
-    '+    return typeof body?.error === \'string\' ? body.error : undefined;',
+    "+    return typeof body?.error === 'string' ? body.error : undefined;",
     '+  } catch {',
     ' }',
     'diff --git a/client/src/api/errors.ts b/client/src/api/errors.ts',
@@ -193,7 +202,7 @@ export class FakeRuntime implements GameRuntime {
   private branch: string | null = null;
   private stages = new Map<number, string>();
   private devServerUp = false;
-  private resources: ProjectResources | null = null;
+  private resources: RuntimeResources | null = null;
   private workspaceOom = false;
   private servicesOom: string[] = [];
 
@@ -202,18 +211,36 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async checkPrerequisites(): Promise<PrerequisiteReport> {
-    const { docker, wsl, vscode, devcontainers, dockerOs, dockerMemoryBytes, sshAgent, githubCredential } = this.scenario;
+    const { docker, wsl, vscode, devcontainers, dockerOs, dockerMemoryBytes, sshAgent, githubCredential } =
+      this.scenario;
     const vscodeWarnings = [...(sshAgent ? ['sshAgent'] : []), ...(githubCredential ? ['githubCredential'] : [])];
     const dockerCheck = (): PrerequisiteReport['checks'][number] => {
       if (docker !== 'running') return { id: 'docker', status: 'missing', reason: docker };
-      if (dockerOs !== 'linux') return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
-      if (dockerMemoryBytes < 4 * 1024 ** 3) return { id: 'docker', status: 'ok', warnings: ['lowMemory'], version: '4.37.1', memoryBytes: dockerMemoryBytes };
+      if (dockerOs !== 'linux')
+        return { id: 'docker', status: 'missing', reason: 'windowsContainers', version: '4.37.1' };
+      if (dockerMemoryBytes < 4 * 1024 ** 3)
+        return {
+          id: 'docker',
+          status: 'ok',
+          warnings: ['lowMemory'],
+          version: '4.37.1',
+          memoryBytes: dockerMemoryBytes,
+        };
       return { id: 'docker', status: 'ok', version: '4.37.1', memoryBytes: dockerMemoryBytes };
     };
     const checks: PrerequisiteReport['checks'] = [
       dockerCheck(),
-      wsl ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)', version: '2.3.24.0' } : { id: 'wsl', status: 'missing', reason: 'notFound' },
-      vscode ? { id: 'vscode', status: 'ok', version: '1.95.1', ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }) } : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
+      wsl
+        ? { id: 'wsl', status: 'ok', detail: 'docker-desktop (WSL 2)', version: '2.3.24.0' }
+        : { id: 'wsl', status: 'missing', reason: 'notFound' },
+      vscode
+        ? {
+            id: 'vscode',
+            status: 'ok',
+            version: '1.95.1',
+            ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }),
+          }
+        : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       devcontainers && vscode
         ? { id: 'devcontainers', status: 'ok', version: '0.388.0' }
         : { id: 'devcontainers', status: 'missing', reason: 'extensionMissing' },
@@ -247,7 +274,7 @@ export class FakeRuntime implements GameRuntime {
 
   setProject(_project: string, _name?: string): void {}
 
-  setResources(resources: ProjectResources | null): void {
+  setResources(resources: RuntimeResources | null): void {
     this.resources = resources;
   }
 
@@ -283,7 +310,9 @@ export class FakeRuntime implements GameRuntime {
       ...(failure?.name === name
         ? { state: 'failed' as const, reason: failure.reason }
         : { state: this.scenario.environmentReady ? ('ready' as const) : ('starting' as const) }),
-      ...(service.publish && this.scenario.environmentReady && failure?.name !== name && { hostPort: SERVICE_IMAGES[service.image]?.port }),
+      ...(service.publish &&
+        this.scenario.environmentReady &&
+        failure?.name !== name && { hostPort: SERVICE_IMAGES[service.image]?.port }),
     }));
   }
 
@@ -344,7 +373,9 @@ export class FakeRuntime implements GameRuntime {
       .map((target) => ({ ...target, reason: `Error response from daemon: ${target.name} is in use` }));
     const result: DockerCleanup = { removed: targets.length - failed.length, failed };
     if (scope === 'everything') {
-      result.workspaceKept = failed.some((target) => target.kind === 'volume' && target.name === 'bugdetective-workspace');
+      result.workspaceKept = failed.some(
+        (target) => target.kind === 'volume' && target.name === 'bugdetective-workspace',
+      );
       this.scenario.environmentReady = false;
       if (!result.workspaceKept) {
         this.stages.clear();
@@ -449,7 +480,15 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async workspacePorts() {
-    return { client: 5173, api: 3001 };
+    const declared = this.resources?.ports;
+    // Every port gets the one it prefers: the fake computer has them all free.
+    return declared
+      ? (Object.fromEntries(Object.entries(declared).map(([name, port]) => [name, port.port])) as WorkspacePorts)
+      : { client: 5173, api: 3001 };
+  }
+
+  async publishedPorts() {
+    return this.workspacePorts();
   }
 
   private internet = false;
@@ -468,7 +507,12 @@ export class FakeRuntime implements GameRuntime {
   }
 
   async workspaceStatus() {
-    return { ports: await this.workspacePorts(), devServerUp: this.devServerUp, branch: await this.currentBranch(), dependenciesReady: !this.scenario.dependenciesMissing };
+    return {
+      ports: await this.workspacePorts(),
+      devServerUp: this.devServerUp,
+      branch: await this.currentBranch(),
+      dependenciesReady: !this.scenario.dependenciesMissing,
+    };
   }
 
   async startDevServer() {
@@ -543,7 +587,9 @@ export class FakeRuntime implements GameRuntime {
 
   async referenceFiles(stage: number, patch = '') {
     if (patch.startsWith(FAKE_SNAPSHOT)) {
-      return (JSON.parse(patch.slice(FAKE_SNAPSHOT.length)) as { path: string; text: string }[]).map((file) => textFile(file.path, file.text));
+      return (JSON.parse(patch.slice(FAKE_SNAPSHOT.length)) as { path: string; text: string }[]).map((file) =>
+        textFile(file.path, file.text),
+      );
     }
     return [textFile('client/src/App.tsx', `export {} // reference ${stage}\n`)];
   }
@@ -555,7 +601,11 @@ export class FakeRuntime implements GameRuntime {
   async buildReview(build: ReviewBuild) {
     this.builds.push(build);
     const seed = `${build.ticket}:${build.date}`;
-    const commits = { approved: fakeCommit(`approved ${seed}`), reference: fakeCommit(`reference ${seed}`), snapshot: fakeCommit(`snapshot ${seed}`) };
+    const commits = {
+      approved: fakeCommit(`approved ${seed}`),
+      reference: fakeCommit(`reference ${seed}`),
+      snapshot: fakeCommit(`snapshot ${seed}`),
+    };
     this.reviews.set(build.ticket, commits);
     return commits;
   }
@@ -645,10 +695,21 @@ export class FakeRuntime implements GameRuntime {
           ...base,
           gate: 1,
           status: 'failed',
-          tests: [{ name: 'client/src/pages/TicketList.test.tsx > TicketList > renders', status: 'failed', error: 'expected 15 rows, got 0' }],
+          tests: [
+            {
+              name: 'client/src/pages/TicketList.test.tsx > TicketList > renders',
+              status: 'failed',
+              error: 'expected 15 rows, got 0',
+            },
+          ],
         };
       case 'timeout':
-        return { ...base, gate: 2, status: 'timeout', tests: [{ name: 'Ticket validation > slow test', status: 'unfinished' }] };
+        return {
+          ...base,
+          gate: 2,
+          status: 'timeout',
+          tests: [{ name: 'Ticket validation > slow test', status: 'unfinished' }],
+        };
       case 'error':
         throw new Error('Simulated infrastructure error');
       default:
@@ -658,7 +719,11 @@ export class FakeRuntime implements GameRuntime {
           status: 'failed',
           tests: [
             { name: 'Gate 1 > project tests', status: 'passed' },
-            { name: 'Ticket validation > Next shows the next ticket', status: 'failed', error: 'Expected "4", received "3"' },
+            {
+              name: 'Ticket validation > Next shows the next ticket',
+              status: 'failed',
+              error: 'Expected "4", received "3"',
+            },
           ],
         };
     }

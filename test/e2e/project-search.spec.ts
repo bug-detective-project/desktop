@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { createProjectRepo } from '../helpers/project-repo.ts';
-import { launch, supportdeskQa } from './fixtures.ts';
+import { launch, projectQa } from './fixtures.ts';
 
 let dir: string;
 let catalog: object[];
@@ -17,10 +17,12 @@ test.beforeAll(async () => {
     stack: { frontend: 'Elm · Parcel' },
     skills: { en: ['Pair debugging'], pt: ['Depuração em dupla'] },
   });
-  const middle = await createProjectRepo(dir, { front: 1, back: 0 }, 'Inventário Geral', 'middle', { difficulty: 'intermediate' });
+  const middle = await createProjectRepo(dir, { front: 1, back: 0 }, 'Inventário Geral', 'middle', {
+    difficulty: 'intermediate',
+  });
   const hard = await createProjectRepo(dir, { front: 1, back: 0 }, 'Ledger', 'hard', { difficulty: 'advanced' });
   catalog = [
-    { id: 'supportdesk', qaDir: supportdeskQa, starter: true },
+    { id: 'smokedesk', qaDir: projectQa, starter: true },
     { id: 'easy', qaDir: easy.qaDir },
     { id: 'middle', qaDir: middle.qaDir },
     { id: 'hard', qaDir: hard.qaDir },
@@ -34,13 +36,17 @@ test.afterAll(async () => {
 async function openProjects(language?: 'pt') {
   const launched = await launch({}, { env: { BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' }, catalog });
   await launched.page.getByTestId('start-playing').click();
-  if (language) await launched.page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
+  if (language)
+    await launched.page.evaluate((value) => window.bugDetective.updateSettings({ language: value }), language);
   await launched.page.getByTestId('nav-projects').click();
   await expect(launched.page.getByTestId('project-easy-monogram')).toBeVisible();
   return launched;
 }
 
-const shown = (page: Page) => page.locator('[data-testid^="project-"][data-testid$="-flipper"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')!.replace(/^project-|-flipper$/g, '')));
+const shown = (page: Page) =>
+  page
+    .locator('[data-testid^="project-"][data-testid$="-flipper"]')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')!.replace(/^project-|-flipper$/g, '')));
 
 test('the search finds projects by name, stack and skill, ignoring case and accents, and counts them', async () => {
   const { page, close } = await openProjects();
@@ -51,7 +57,7 @@ test('the search finds projects by name, stack and skill, ignoring case and acce
     await expect(page.getByTestId('project-count')).toHaveAttribute('role', 'status');
 
     for (const [query, expected] of [
-      ['notes', ['easy']],
+      ['notes board', ['easy']],
       ['parcel', ['easy']],
       ['pair debug', ['easy']],
       ['INVENTARIO', ['middle']],
@@ -77,10 +83,10 @@ test('each difficulty option keeps its projects, and combines with the search', 
     await expect(page.getByTestId('project-level-intermediate').locator('.bg-amber-500')).toHaveCount(1);
     await expect(page.getByTestId('project-level-advanced').locator('.bg-destructive')).toHaveCount(1);
     for (const [level, expected] of [
-      ['beginner', ['supportdesk', 'easy']],
+      ['beginner', ['smokedesk', 'easy']],
       ['intermediate', ['middle']],
       ['advanced', ['hard']],
-      ['all', ['supportdesk', 'easy', 'middle', 'hard']],
+      ['all', ['smokedesk', 'easy', 'middle', 'hard']],
     ] as const) {
       await page.getByTestId(`project-level-${level}`).click();
       await expect(page.getByTestId(`project-level-${level}`)).toHaveAttribute('aria-checked', 'true');
@@ -92,11 +98,11 @@ test('each difficulty option keeps its projects, and combines with the search', 
     await expect(page.getByTestId('project-level-beginner')).toBeFocused();
     await expect(page.getByTestId('project-level-beginner')).toHaveAttribute('aria-checked', 'true');
 
-    await page.getByRole('searchbox').fill('notes');
+    await page.getByRole('searchbox').fill('notes board');
     await expect.poll(() => shown(page)).toEqual(['easy']);
     // The filters never change the current project.
     await page.getByRole('searchbox').fill('');
-    await expect(page.getByTestId('project-supportdesk').getByTestId('project-current')).toBeVisible();
+    await expect(page.getByTestId('project-smokedesk').getByTestId('project-current')).toBeVisible();
     await expect(page.getByTestId('toast-info')).toHaveCount(0);
   } finally {
     await close();

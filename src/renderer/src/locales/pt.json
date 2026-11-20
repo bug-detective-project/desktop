@@ -137,6 +137,8 @@
       "serviceImages": "Imagens dos serviços"
     },
     "retryReset": "Tentar de novo",
+    "openPort": "Abrir",
+    "openPortLabel": "Abrir {{name}} no navegador",
     "workspaceOutOfMemory": "O workspace ficou sem memória e um processo dele foi parado (o servidor de desenvolvimento ou uma execução de testes, por exemplo). Inicie-o de novo. Se continuar acontecendo, aumente a memória do Docker (Docker Desktop: Settings, Resources, Memory).",
     "recreateServices": {
       "button": "Recriar serviços",

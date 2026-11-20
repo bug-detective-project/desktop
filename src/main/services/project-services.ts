@@ -9,7 +9,12 @@
  * A service that fails does not throw: the game goes on and the Dashboard says which one and why.
  */
 import { createHash } from 'node:crypto';
-import { SERVICE_READY_TIMEOUT_MS, serviceImageOf, serviceRunArgs, serviceVariables } from '@bug-detective/catalog/contract';
+import {
+  SERVICE_READY_TIMEOUT_MS,
+  serviceImageOf,
+  serviceRunArgs,
+  serviceVariables,
+} from '@bug-detective/catalog/contract';
 import type { ProjectService, ProjectServices as Declared, ServiceImage } from '@bug-detective/catalog/contract';
 import type { ServiceStatus } from '../../shared/api.ts';
 import { LABEL, PROJECT_LABEL } from './docker.ts';
@@ -23,10 +28,17 @@ export const SERVICE_DATA_ROLE = 'service-data';
 export const SERVICE_KEY_LABEL = 'bugdetective.service-key';
 
 /** The container of a service and the named volume of each data path of its image. */
-export function serviceNames(prefix: string, project: string, service: string, image: ServiceImage): { container: string; volumes: Record<string, string> } {
+export function serviceNames(
+  prefix: string,
+  project: string,
+  service: string,
+  image: ServiceImage,
+): { container: string; volumes: Record<string, string> } {
   return {
     container: `${prefix}-svc-${project}-${service}`,
-    volumes: Object.fromEntries(image.dataPaths.map((path, index) => [path, `${prefix}-svcdata-${project}-${service}-${index}`])),
+    volumes: Object.fromEntries(
+      image.dataPaths.map((path, index) => [path, `${prefix}-svcdata-${project}-${service}-${index}`]),
+    ),
   };
 }
 
@@ -75,7 +87,13 @@ export class ProjectServices {
     this.pollMs = options.pollMs ?? 200;
   }
 
-  private entries(): { name: string; declared: ProjectService; image: ServiceImage; container: string; volumes: Record<string, string> }[] {
+  private entries(): {
+    name: string;
+    declared: ProjectService;
+    image: ServiceImage;
+    container: string;
+    volumes: Record<string, string>;
+  }[] {
     return Object.entries(this.services).map(([name, declared]) => {
       const image = serviceImageOf(declared);
       return { name, declared, image, ...serviceNames(this.prefix, this.project, name, image) };
@@ -114,7 +132,9 @@ export class ProjectServices {
     return statuses;
   }
 
-  private async ensureOne(entry: ReturnType<ProjectServices['entries']>[number]): Promise<Pick<ServiceStatus, 'state' | 'reason'>> {
+  private async ensureOne(
+    entry: ReturnType<ProjectServices['entries']>[number],
+  ): Promise<Pick<ServiceStatus, 'state' | 'reason'>> {
     const { declared, image, container, volumes } = entry;
     const key = declarationKey(declared);
     for (const volume of Object.values(volumes)) {
@@ -203,8 +223,27 @@ export class ProjectServices {
   private async listed(kind: 'container' | 'volume', role: string): Promise<string[]> {
     const args =
       kind === 'container'
-        ? ['container', 'ls', '--all', '--filter', `label=${LABEL}=${role}`, '--filter', `label=${PROJECT_LABEL}=${this.project}`, '--format', '{{.Names}}']
-        : ['volume', 'ls', '--filter', `label=${LABEL}=${role}`, '--filter', `label=${PROJECT_LABEL}=${this.project}`, '--format', '{{.Name}}'];
+        ? [
+            'container',
+            'ls',
+            '--all',
+            '--filter',
+            `label=${LABEL}=${role}`,
+            '--filter',
+            `label=${PROJECT_LABEL}=${this.project}`,
+            '--format',
+            '{{.Names}}',
+          ]
+        : [
+            'volume',
+            'ls',
+            '--filter',
+            `label=${LABEL}=${role}`,
+            '--filter',
+            `label=${PROJECT_LABEL}=${this.project}`,
+            '--format',
+            '{{.Name}}',
+          ];
     const result = await this.docker.checked(args, { timeoutMs: 30_000 });
     return result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
   }
@@ -221,7 +260,10 @@ export class ProjectServices {
     for (const volume of await this.listed('volume', SERVICE_DATA_ROLE)) {
       await this.docker.removeVolume(volume);
     }
-    const left = [...(await this.listed('container', SERVICE_ROLE)), ...(await this.listed('volume', SERVICE_DATA_ROLE))];
+    const left = [
+      ...(await this.listed('container', SERVICE_ROLE)),
+      ...(await this.listed('volume', SERVICE_DATA_ROLE)),
+    ];
     if (left.length > 0) {
       throw new Error(`Could not remove the project's services: ${left.join(', ')}`);
     }

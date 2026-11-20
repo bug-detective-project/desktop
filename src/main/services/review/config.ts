@@ -47,4 +47,3 @@ export function excludePathspecs(config: ReviewConfig): string[] {
 export function excludesFileContent(config: ReviewConfig): string {
   return `${config.exclude.join('\n')}\n`;
 }
-

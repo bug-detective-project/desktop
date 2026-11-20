@@ -8,7 +8,14 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 import { EXTERNAL_LINKS } from '../shared/api.ts';
 import type { Envelope } from '../shared/api.ts';
-import { COLUMNS, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS, THEMES, TRACK_CHOICES } from '../shared/types.ts';
+import {
+  COLUMNS,
+  LANGUAGES,
+  MAX_QA_TIMEOUT_SECONDS,
+  MIN_QA_TIMEOUT_SECONDS,
+  THEMES,
+  TRACK_CHOICES,
+} from '../shared/types.ts';
 import type { Game } from './game.ts';
 import { GameError } from './game.ts';
 import { nativeText } from './native-text.ts';
@@ -46,6 +53,7 @@ const schemas = {
   workspaceStatus: none,
   openVSCode: none,
   openAppInBrowser: none,
+  openPortInBrowser: z.tuple([z.string().regex(/^[a-z][a-z0-9-]{0,19}$/)]),
   startDevServer: none,
   stopDevServer: none,
   solveBug: z.tuple([ticket]),
@@ -108,7 +116,11 @@ function toEnvelopeError(error: unknown): Envelope<never> {
 /** Opens an allowlisted URL; the platform may provide its own command (WSL opens the Windows browser). */
 export type UrlOpener = (url: string) => Promise<void>;
 
-export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: UrlOpener = (url) => shell.openExternal(url)): void {
+export function registerIpc(
+  game: Game,
+  rendererOrigin: string | null,
+  openUrl: UrlOpener = (url) => shell.openExternal(url),
+): void {
   const handlers: { [K in Channel]: (...args: z.infer<(typeof schemas)[K]>) => Promise<unknown> | unknown } = {
     snapshot: () => game.snapshot(),
     checkPrerequisites: () => game.checkPrerequisites(),
@@ -137,6 +149,14 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
     openAppInBrowser: async () => {
       const url = new URL(await game.appUrl());
       // Only the workspace app on the loopback address and its published port.
+      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') {
+        throw new GameError('notAllowed');
+      }
+      await openUrl(url.href);
+    },
+    openPortInBrowser: async (name) => {
+      const url = new URL(await game.portUrl(name));
+      // Only a declared port of the workspace, on the loopback address.
       if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') {
         throw new GameError('notAllowed');
       }
@@ -199,7 +219,11 @@ export function registerIpc(game: Game, rendererOrigin: string | null, openUrl: 
       const text = (key: Parameters<typeof nativeText>[1]) => nativeText(game.snapshot().state.settings.language, key);
       const options =
         kind === 'file'
-          ? { title: text('projectsCatalog'), properties: ['openFile' as const], filters: [{ name: text('projectsCatalog'), extensions: ['json'] }] }
+          ? {
+              title: text('projectsCatalog'),
+              properties: ['openFile' as const],
+              filters: [{ name: text('projectsCatalog'), extensions: ['json'] }],
+            }
           : { title: text('projectQaFolder'), properties: ['openDirectory' as const] };
       const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);

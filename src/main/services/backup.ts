@@ -93,7 +93,13 @@ export interface SaveContents {
 }
 
 /** Builds a save signed with the installation key; one larger than readSave accepts would export fine and never restore, so it throws. */
-export function createSave(contents: SaveContents, appVersion: string, now: string, key: Uint8Array, maxBytes = MAX_SAVE_BYTES): Uint8Array {
+export function createSave(
+  contents: SaveContents,
+  appVersion: string,
+  now: string,
+  key: Uint8Array,
+  maxBytes = MAX_SAVE_BYTES,
+): Uint8Array {
   const files: ArchiveFile[] = [
     { path: 'state.json', data: Buffer.from(`${JSON.stringify(contents.state, null, 2)}\n`), executable: false },
   ];
@@ -123,7 +129,10 @@ export function createSave(contents: SaveContents, appVersion: string, now: stri
     files: Object.fromEntries(files.map((file) => [file.path, sha256Hex(file.data)])),
   };
   const manifest: SaveManifest = { ...unsigned, hmac: signManifest(unsigned, key) };
-  const save = writeZip([...files, { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)), executable: false }]);
+  const save = writeZip([
+    ...files,
+    { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2)), executable: false },
+  ]);
   if (save.length > maxBytes) {
     throw new Error(`The save would be larger than ${maxBytes} bytes, the most a save can restore`);
   }
@@ -239,5 +248,13 @@ export function readSave(bytes: Uint8Array, key: Uint8Array): ValidatedSave {
       }
     }
   }
-  return { manifest, state, bundle: byPath.get('workspace.bundle')?.data ?? null, packages, reviews, others, fromThisInstall: signedBy(manifest, key) };
+  return {
+    manifest,
+    state,
+    bundle: byPath.get('workspace.bundle')?.data ?? null,
+    packages,
+    reviews,
+    others,
+    fromThisInstall: signedBy(manifest, key),
+  };
 }

@@ -31,7 +31,12 @@ export function Segmented<T extends string>({
     buttons.current[next]?.focus();
   };
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1" role="radiogroup" aria-label={label} data-testid={`${testId}-select`}>
+    <div
+      className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1"
+      role="radiogroup"
+      aria-label={label}
+      data-testid={`${testId}-select`}
+    >
       {options.map((option, index) => {
         const selected = option.value === value;
         return (
@@ -47,7 +52,9 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => move(event, index)}
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-base whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none ${
-              selected ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border' : 'font-medium text-muted-foreground hover:text-foreground'
+              selected
+                ? 'bg-card font-semibold text-foreground shadow-xs ring-1 ring-border'
+                : 'font-medium text-muted-foreground hover:text-foreground'
             }`}
             data-testid={`${testId}-${option.value}`}
           >

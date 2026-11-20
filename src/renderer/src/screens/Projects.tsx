@@ -86,7 +86,10 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3" role="search">
         <label className="relative min-w-0 max-w-[420px] flex-[1_1_320px]">
           <span className="sr-only">{t('projects.search.label')}</span>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
           <input
             ref={searchField}
             type="search"
@@ -109,27 +112,37 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
           />
         </label>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{t('projects.difficulty')}</span>
+          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            {t('projects.difficulty')}
+          </span>
           <Segmented<LevelFilter>
             label={t('projects.difficulty')}
             value={level}
             options={(['all', 'beginner', 'intermediate', 'advanced'] as const).map((value) => ({
               value,
-              icon: value === 'all' ? null : <span className={`size-2 rounded-full ${LEVEL_DOTS[value]}`} aria-hidden />,
+              icon:
+                value === 'all' ? null : <span className={`size-2 rounded-full ${LEVEL_DOTS[value]}`} aria-hidden />,
               text: value === 'all' ? t('projects.search.all') : t(`projects.difficulties.${value}`),
             }))}
             onChange={setLevel}
             testId="project-level"
           />
         </div>
-        <p className="ml-auto text-sm whitespace-nowrap text-muted-foreground" role="status" data-testid="project-count">
+        <p
+          className="ml-auto text-sm whitespace-nowrap text-muted-foreground"
+          role="status"
+          data-testid="project-count"
+        >
           {t('projects.search.count', { count: visible.length })}
         </p>
       </div>
       {tags.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2" aria-label={t('projects.search.tags')} data-testid="project-tags">
           {tags.map((tag) => (
-            <li key={tag} className="flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 py-0.5 pr-1 pl-3 text-sm font-medium text-primary">
+            <li
+              key={tag}
+              className="flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 py-0.5 pr-1 pl-3 text-sm font-medium text-primary"
+            >
               {tag}
               <button
                 type="button"
@@ -150,7 +163,10 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
           ))}
         </div>
       ) : (
-        <div className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-12 text-center" data-testid="projects-empty">
+        <div
+          className="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-12 text-center"
+          data-testid="projects-empty"
+        >
           <Search className="size-6 text-muted-foreground" aria-hidden />
           <p className="font-semibold text-foreground">{t('projects.search.emptyTitle')}</p>
           <p className="text-sm text-muted-foreground">{t('projects.search.emptyBody')}</p>
@@ -162,7 +178,11 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
       )}
 
       {confirm && (
-        <Modal title={t('projects.confirmTitle', { name: confirm.details?.name[language] ?? confirm.id })} onClose={() => setConfirm(null)} data-testid="switch-dialog">
+        <Modal
+          title={t('projects.confirmTitle', { name: confirm.details?.name[language] ?? confirm.id })}
+          onClose={() => setConfirm(null)}
+          data-testid="switch-dialog"
+        >
           <Notice>
             <p className="text-base leading-relaxed">{t('projects.confirmRemoved')}</p>
             <p className="mt-2 text-base leading-relaxed">{t('projects.confirmKept')}</p>
@@ -170,7 +190,10 @@ export function Projects({ snapshot }: { snapshot: Snapshot }) {
           {/* Less memory than the project needs: said, never blocked. */}
           {neededMemory !== null && dockerMemory !== undefined && dockerMemory < neededMemory && (
             <p className="mt-3 text-base leading-relaxed text-muted-foreground" data-testid="switch-memory-warning">
-              {t('projects.memoryWarning', { needed: gigabytes(neededMemory, language), available: gigabytes(dockerMemory, language) })}
+              {t('projects.memoryWarning', {
+                needed: gigabytes(neededMemory, language),
+                available: gigabytes(dockerMemory, language),
+              })}
             </p>
           )}
           <div className="mt-5 flex justify-end gap-2 whitespace-nowrap" data-testid="switch-actions">

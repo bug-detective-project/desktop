@@ -12,12 +12,19 @@ describe('what counts as a development run', () => {
   });
 
   it('is never the installed app, whatever the environment says', () => {
-    expect(isDevelopmentRun({ packaged: true, env: { ELECTRON_RENDERER_URL: 'http://localhost:5173', BUGDETECTIVE_E2E: '1' } })).toBe(false);
+    expect(
+      isDevelopmentRun({
+        packaged: true,
+        env: { ELECTRON_RENDERER_URL: 'http://localhost:5173', BUGDETECTIVE_E2E: '1' },
+      }),
+    ).toBe(false);
   });
 
   it('is the e2e tests, which cover the development tools, unless a test plays as a player', () => {
     expect(isDevelopmentRun({ packaged: false, env: { BUGDETECTIVE_E2E: '1' } })).toBe(true);
-    expect(isDevelopmentRun({ packaged: false, env: { BUGDETECTIVE_E2E: '1', BUGDETECTIVE_E2E_PLAYER_RUN: '1' } })).toBe(false);
+    expect(
+      isDevelopmentRun({ packaged: false, env: { BUGDETECTIVE_E2E: '1', BUGDETECTIVE_E2E_PLAYER_RUN: '1' } }),
+    ).toBe(false);
   });
 });
 

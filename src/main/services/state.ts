@@ -60,7 +60,16 @@ const ticketSchema = z.object({
     z.object({
       id: z.string(),
       at: z.string(),
-      kind: z.enum(['gate1Failed', 'gate2Failed', 'timeout', 'outOfMemory', 'passed', 'interrupted', 'error', 'branchWarning']),
+      kind: z.enum([
+        'gate1Failed',
+        'gate2Failed',
+        'timeout',
+        'outOfMemory',
+        'passed',
+        'interrupted',
+        'error',
+        'branchWarning',
+      ]),
       attemptId: z.string().optional(),
       failing: z.array(z.object({ name: z.string(), error: z.string().optional() })).optional(),
       unfinished: z.array(z.string()).optional(),
@@ -91,7 +100,17 @@ const activitySchema = z.object({
   at: z.string(),
   actor: z.enum(['player', 'system']),
   reason: z
-    .enum(['unlocked', 'started', 'submitted', 'qaPassed', 'qaFailed', 'qaTimeout', 'qaInterrupted', 'qaError', 'reviewAccepted'])
+    .enum([
+      'unlocked',
+      'started',
+      'submitted',
+      'qaPassed',
+      'qaFailed',
+      'qaTimeout',
+      'qaInterrupted',
+      'qaError',
+      'reviewAccepted',
+    ])
     .optional(),
 });
 
@@ -112,58 +131,65 @@ const projectProgressSchema = z.object({
   inbox: z.array(inboxSchema),
 });
 
-export const gameStateSchema = z.object({
-  schemaVersion: z.literal(SCHEMA_VERSION),
-  project: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/).nullable(),
-  otherProjects: z.record(z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), projectProgressSchema),
-  projectSources: z.record(
-    z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
-    z.object({
-      repository: z.string().regex(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/),
-      qaRef: z.string().min(1).max(100),
-      minVersion: z.string().regex(/^\d+\.\d+\.\d+$/).nullable(),
-    }),
-  ),
-  projectSwitch: z
-    .object({ from: z.string(), to: z.string(), phase: z.literal('cleaning'), startedAt: z.string() })
-    .nullable(),
-  createdAt: z.string(),
-  currentTicket: z.number().int().nullable(),
-  tracks: z.object({ front: z.number().int().min(0), back: z.number().int().min(0) }).nullable(),
-  tickets: z.array(ticketSchema),
-  activity: z.array(activitySchema),
-  inbox: z.array(inboxSchema),
-  settings: z.object({
-    language: z.enum(LANGUAGES),
-    // The minimum was 30 s before it became 1 minute: older states and saves load with 1 minute.
-    qaTimeoutSeconds: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_QA_TIMEOUT_SECONDS)
-      .transform((seconds) => Math.max(MIN_QA_TIMEOUT_SECONDS, seconds)),
-    theme: z.enum(THEMES),
-  }),
-  lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
-  onboardingSeen: z.boolean().optional(),
-  reviewSession: z
-    .object({
-      ticket: z.number().int().min(1),
-      phase: z.enum(['saving', 'switching', 'open', 'returning']),
-      startedAt: z.string(),
-      returnPoint: z.object({
-        branch: z.string().nullable(),
-        head: z.string().regex(/^[0-9a-f]{40,64}$/),
-        indexTree: z.string().regex(/^[0-9a-f]{40,64}$/),
-        excludesFile: z.string().nullable(),
+export const gameStateSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    project: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]{0,39}$/)
+      .nullable(),
+    otherProjects: z.record(z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), projectProgressSchema),
+    projectSources: z.record(
+      z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+      z.object({
+        repository: z.string().regex(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/),
+        qaRef: z.string().min(1).max(100),
+        minVersion: z
+          .string()
+          .regex(/^\d+\.\d+\.\d+$/)
+          .nullable(),
       }),
-      wipCommit: z
-        .string()
-        .regex(/^[0-9a-f]{40,64}$/)
-        .nullable(),
-    })
-    .nullable(),
-})
+    ),
+    projectSwitch: z
+      .object({ from: z.string(), to: z.string(), phase: z.literal('cleaning'), startedAt: z.string() })
+      .nullable(),
+    createdAt: z.string(),
+    currentTicket: z.number().int().nullable(),
+    tracks: z.object({ front: z.number().int().min(0), back: z.number().int().min(0) }).nullable(),
+    tickets: z.array(ticketSchema),
+    activity: z.array(activitySchema),
+    inbox: z.array(inboxSchema),
+    settings: z.object({
+      language: z.enum(LANGUAGES),
+      // The minimum was 30 s before it became 1 minute: older states and saves load with 1 minute.
+      qaTimeoutSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_QA_TIMEOUT_SECONDS)
+        .transform((seconds) => Math.max(MIN_QA_TIMEOUT_SECONDS, seconds)),
+      theme: z.enum(THEMES),
+    }),
+    lastExport: z.object({ at: z.string(), path: z.string() }).nullable().optional(),
+    onboardingSeen: z.boolean().optional(),
+    reviewSession: z
+      .object({
+        ticket: z.number().int().min(1),
+        phase: z.enum(['saving', 'switching', 'open', 'returning']),
+        startedAt: z.string(),
+        returnPoint: z.object({
+          branch: z.string().nullable(),
+          head: z.string().regex(/^[0-9a-f]{40,64}$/),
+          indexTree: z.string().regex(/^[0-9a-f]{40,64}$/),
+          excludesFile: z.string().nullable(),
+        }),
+        wipCommit: z
+          .string()
+          .regex(/^[0-9a-f]{40,64}$/)
+          .nullable(),
+      })
+      .nullable(),
+  })
   // The fields agree with each other as the Kanban rules leave them: tickets are unlocked one after
   // another, the last one is the active one, and only it may be unfinished. A hand-edited state or
   // save that breaks this is invalid, rather than loaded into a game the rules cannot handle.
@@ -178,7 +204,11 @@ export const gameStateSchema = z.object({
       if (track !== ticket.track) {
         issue(`Ticket ${ticket.id} belongs to the ${track} track`, ['tickets', index, 'track']);
       } else if (state.tracks && Number(order) > state.tracks[ticket.track]) {
-        issue(`Ticket ${ticket.id} is not one of the ${state.tracks[ticket.track]} ${ticket.track} tickets`, ['tickets', index, 'id']);
+        issue(`Ticket ${ticket.id} is not one of the ${state.tracks[ticket.track]} ${ticket.track} tickets`, [
+          'tickets',
+          index,
+          'id',
+        ]);
       }
       if (ids.has(ticket.id)) {
         issue(`Ticket ${ticket.id} is unlocked twice`, ['tickets', index, 'id']);
@@ -197,7 +227,10 @@ export const gameStateSchema = z.object({
       issue(`The current ticket must be ${last ?? 'none'}, not ${state.currentTicket ?? 'none'}`, ['currentTicket']);
     }
     if (state.reviewSession && !state.tickets.some((ticket) => ticket.ticket === state.reviewSession!.ticket)) {
-      issue(`The review is for ticket ${state.reviewSession.ticket}, which is not unlocked`, ['reviewSession', 'ticket']);
+      issue(`The review is for ticket ${state.reviewSession.ticket}, which is not unlocked`, [
+        'reviewSession',
+        'ticket',
+      ]);
     }
   });
 
@@ -213,7 +246,9 @@ export function parseState(raw: unknown): GameState {
     throw new StateVersionError(`The saved game was created by a newer version of Bug Detective (schema ${version})`);
   }
   if (!canMigrate(version, SCHEMA_VERSION, STATE_MIGRATIONS)) {
-    throw new StateVersionError(`The saved game was made by an older, unsupported version of Bug Detective (schema ${version})`);
+    throw new StateVersionError(
+      `The saved game was made by an older, unsupported version of Bug Detective (schema ${version})`,
+    );
   }
   return gameStateSchema.parse(migrate(raw, version, SCHEMA_VERSION, STATE_MIGRATIONS)) as GameState;
 }
@@ -224,7 +259,9 @@ const CORRUPT_STATE = /^state\.corrupt-(\d+)\.json$/;
 
 /** Removes the oldest kept-aside states beyond CORRUPT_STATES_KEPT: a folder that never fills up with them. */
 export async function pruneCorruptStates(dir: string, keep = CORRUPT_STATES_KEPT): Promise<string[]> {
-  const names = (await readdir(dir)).filter((name) => CORRUPT_STATE.test(name)).sort((a, b) => Number(CORRUPT_STATE.exec(a)![1]) - Number(CORRUPT_STATE.exec(b)![1]));
+  const names = (await readdir(dir))
+    .filter((name) => CORRUPT_STATE.test(name))
+    .sort((a, b) => Number(CORRUPT_STATE.exec(a)![1]) - Number(CORRUPT_STATE.exec(b)![1]));
   const removed = names.slice(0, Math.max(0, names.length - keep));
   for (const name of removed) {
     await rm(join(dir, name), { force: true });

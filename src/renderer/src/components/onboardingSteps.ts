@@ -28,7 +28,11 @@ const demoTab = (tab: DemoTab) => `${demo('panel')} [data-testid="tab-${tab}"]`;
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   { id: 'currentTask', view: 'dashboard', targets: ['[data-tour="current-task"]'] },
   { id: 'environment', view: 'dashboard', targets: ['[data-testid="environment-card"]'] },
-  { id: 'client', view: 'dashboard', targets: ['[data-testid="desk-client"]', '[data-testid="project-drawer-toggle"]'] },
+  {
+    id: 'client',
+    view: 'dashboard',
+    targets: ['[data-testid="desk-client"]', '[data-testid="project-drawer-toggle"]'],
+  },
   { id: 'inbox', view: 'dashboard', targets: ['[data-tour="inbox"]'] },
   { id: 'message', view: 'dashboard', targets: ['[data-testid="message"]'] },
   { id: 'board', view: 'dashboard', targets: ['[data-testid="nav-board"]'], below: true },
@@ -77,7 +81,10 @@ export function placeBalloon(
     return centered;
   }
   const beside = (left: number) => ({ left, top: clamp(target.top, GAP, viewport.height - balloon.height - GAP) });
-  const across = (top: number) => ({ left: clamp(target.left + target.width / 2 - balloon.width / 2, GAP, viewport.width - balloon.width - GAP), top });
+  const across = (top: number) => ({
+    left: clamp(target.left + target.width / 2 - balloon.width / 2, GAP, viewport.width - balloon.width - GAP),
+    top,
+  });
   const right = target.left + target.width + GAP;
   const left = target.left - GAP - balloon.width;
   const bottom = target.top + target.height + GAP;

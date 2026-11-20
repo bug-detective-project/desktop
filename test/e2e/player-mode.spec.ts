@@ -6,8 +6,14 @@ import { launch } from './fixtures.ts';
 
 test('a build run from source plays like the installed app: no development tools, whatever is set', async () => {
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
-  await writeFile(join(userData, 'catalog.local.json'), JSON.stringify({ projects: { supportdesk: { qaRef: 'not-for-players' } } }));
-  const { page, close } = await launch({}, { userData, catalogFile: false, env: { BUGDETECTIVE_E2E_PLAYER_RUN: '1', BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' } });
+  await writeFile(
+    join(userData, 'catalog.local.json'),
+    JSON.stringify({ projects: { smokedesk: { qaRef: 'not-for-players' } } }),
+  );
+  const { page, close } = await launch(
+    {},
+    { userData, catalogFile: false, env: { BUGDETECTIVE_E2E_PLAYER_RUN: '1', BUGDETECTIVE_DEV_SHOW_PROJECTS: 'true' } },
+  );
   try {
     await page.getByTestId('start-playing').click();
     await expect(page.getByTestId('nav-settings')).toBeVisible();

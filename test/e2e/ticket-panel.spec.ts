@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { dragCard, launch, simulate, startFirstTicket } from './fixtures.ts';
-import { supportdesk } from './content.ts';
+import { smokedesk } from './content.ts';
 
 test('the ticket panel shows the ticket, QA comments, history and the senior-dev conversation', async () => {
   const { app, page, close } = await launch({ qa: ['gate2'] });
@@ -11,7 +11,7 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
     await startFirstTicket(page);
     await page.getByTestId('card-1').click();
     const panel = page.getByTestId('ticket-panel');
-    await expect(panel.getByTestId('ticket-title')).toContainText(supportdesk.key('front-1'));
+    await expect(panel.getByTestId('ticket-title')).toContainText(smokedesk.key('front-1'));
     await expect(panel.getByTestId('ticket-markdown')).toContainText('Steps to reproduce');
     // The Track row shows the card's tag, with the card's wording.
     await expect(panel.getByTestId('ticket-track')).toHaveAttribute('data-track', 'front');
@@ -46,11 +46,11 @@ test('the ticket panel shows the ticket, QA comments, history and the senior-dev
       await expect(panel.getByTestId('chat-hint')).toHaveCount(hint);
       await expect(panel.getByTestId('hints-used')).toContainText(`${hint} of 3`);
     }
-    await expect(panel.getByTestId('chat-hint').first()).toContainText('DevTools');
+    await expect(panel.getByTestId('chat-hint').first()).toContainText(smokedesk.hint('front-1', 1).slice(0, 40));
     await expect(panel.getByTestId('ask-hint')).toHaveCount(0);
     await panel.getByTestId('reveal-solution').click();
     await expect(panel.getByTestId('solution')).toContainText('Root cause');
-    await expect(panel.getByTestId('solution-diff')).toContainText('TicketDetails.tsx');
+    await expect(panel.getByTestId('solution-diff')).toContainText(smokedesk.changedFile('front-1'));
     await expect(panel.getByTestId('reveal-solution')).toHaveCount(0);
 
     // QA failure: comment names the gate, lists failing tests with errors.
@@ -97,12 +97,14 @@ test('the game UI and the game texts switch to Portuguese, and state survives a 
     try {
       await second.page.getByTestId('nav-board').click();
       await second.page.getByTestId('card-1').click();
-      await expect(second.page.getByTestId('ticket-markdown')).toContainText(supportdesk.ticketSection('front-1', 'pt'));
+      await expect(second.page.getByTestId('ticket-markdown')).toContainText(smokedesk.ticketSection('front-1', 'pt'));
       await expect(second.page.getByTestId('ticket-track')).toHaveText('Front-end');
-      await expect(second.page.getByTestId('ticket-title')).toContainText(supportdesk.title('front-1', 'pt').split(': ')[1]);
+      await expect(second.page.getByTestId('ticket-title')).toContainText(
+        smokedesk.title('front-1', 'pt').split(': ')[1],
+      );
       await second.page.getByTestId('close-panel').click();
       await second.page.getByTestId('nav-dashboard').click();
-      await expect(second.page.getByTestId('inbox')).toContainText(supportdesk.assignment('front-1', 'pt'));
+      await expect(second.page.getByTestId('inbox')).toContainText(smokedesk.assignment('front-1', 'pt'));
     } finally {
       await second.close();
     }
@@ -158,7 +160,7 @@ test('a ticket whose texts cannot be loaded says so, and loads after "Try again"
   try {
     await startFirstTicket(page);
     // A damaged package: the hints file is no longer valid JSON.
-    const hints = join(userData, 'projects', 'supportdesk', 'packages', 'stage-1', 'hints.en.json');
+    const hints = join(userData, 'projects', 'smokedesk', 'packages', 'stage-1', 'hints.en.json');
     const original = await readFile(hints, 'utf8');
     await writeFile(hints, '{ damaged');
     await page.getByTestId('card-1').click();
@@ -186,7 +188,9 @@ test('without the project dependencies the dev server cannot be started, on the 
     const start = panel.getByTestId('start-dev-server');
     await expect(start).toBeDisabled();
     await start.hover({ force: true });
-    await expect(panel.getByRole('tooltip').filter({ hasText: 'check the state of the local environment' })).toBeVisible();
+    await expect(
+      panel.getByRole('tooltip').filter({ hasText: 'check the state of the local environment' }),
+    ).toBeVisible();
     await panel.getByTestId('close-panel').click();
 
     await page.getByTestId('nav-dashboard').click();

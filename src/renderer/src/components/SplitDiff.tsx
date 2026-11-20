@@ -45,7 +45,8 @@ function Counts({ file }: { file: DiffFile }) {
   const { added, removed } = changedLines(file);
   return (
     <span className="shrink-0 font-mono text-xs">
-      <span className="text-rose-700 dark:text-rose-400">−{removed}</span> <span className="text-emerald-700 dark:text-emerald-400">+{added}</span>
+      <span className="text-rose-700 dark:text-rose-400">−{removed}</span>{' '}
+      <span className="text-emerald-700 dark:text-emerald-400">+{added}</span>
     </span>
   );
 }
@@ -53,26 +54,49 @@ function Counts({ file }: { file: DiffFile }) {
 function Cell({ cell }: { cell: SplitCell }) {
   return (
     <>
-      <td className={`border-r border-border/60 pr-2 text-right align-top select-none ${NUMBER[cell.kind]}`}>{cell.number ?? ''}</td>
+      <td className={`border-r border-border/60 pr-2 text-right align-top select-none ${NUMBER[cell.kind]}`}>
+        {cell.number ?? ''}
+      </td>
       <td className={`pr-3 pl-2 align-top break-all whitespace-pre-wrap ${CELL[cell.kind]}`}>{cell.text}</td>
     </>
   );
 }
 
-function FileDiff({ file, labels, id, open, onToggle }: { file: DiffFile; labels: SplitLabels; id: string; open: boolean; onToggle: () => void }) {
+function FileDiff({
+  file,
+  labels,
+  id,
+  open,
+  onToggle,
+}: {
+  file: DiffFile;
+  labels: SplitLabels;
+  id: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
   const { added, removed } = changedLines(file);
   const [loaded, setLoaded] = useState(added + removed <= LARGE_DIFF_LINES);
   const name = file.status === 'deleted' ? file.oldPath : file.path;
   return (
-    <section id={id} className="overflow-hidden rounded-lg border border-border" data-testid="comparison-file" data-path={name} data-status={file.status}>
+    <section
+      id={id}
+      className="overflow-hidden rounded-lg border border-border"
+      data-testid="comparison-file"
+      data-path={name}
+      data-status={file.status}
+    >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         className="flex w-full items-center gap-2 border-b border-border bg-muted px-3 py-2 text-left hover:bg-muted/80"
       >
-        <Icon name="chevronDown" className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+        <Icon
+          name="chevronDown"
+          className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+        />
         <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-foreground">
           {file.status === 'renamed' ? `${file.oldPath} → ${file.path}` : name}
         </span>
@@ -87,7 +111,12 @@ function FileDiff({ file, labels, id, open, onToggle }: { file: DiffFile; labels
         ) : !loaded ? (
           <div className="flex items-center justify-between gap-3 px-3 py-3 text-sm text-muted-foreground">
             {t('comparison.large', { count: added + removed })}
-            <button type="button" className="font-medium text-primary hover:underline" onClick={() => setLoaded(true)} data-testid="load-diff">
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => setLoaded(true)}
+              data-testid="load-diff"
+            >
               {t('comparison.loadDiff')}
             </button>
           </div>
@@ -162,12 +191,20 @@ export function SplitDiff({ diff, labels, testId }: { diff: string; labels: Spli
   return (
     <div className="space-y-4" data-testid={testId}>
       <div className="rounded-lg border border-border" data-testid={`${testId}-files`}>
-        <p className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">{t('comparison.files', { count: files.length })}</p>
+        <p className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">
+          {t('comparison.files', { count: files.length })}
+        </p>
         <ul className="divide-y divide-border/60">
           {files.map((file, index) => (
             <li key={`${file.oldPath}:${file.path}`}>
-              <button type="button" onClick={() => show(index)} className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted">
-                <span className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">{file.status === 'deleted' ? file.oldPath : file.path}</span>
+              <button
+                type="button"
+                onClick={() => show(index)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted"
+              >
+                <span className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">
+                  {file.status === 'deleted' ? file.oldPath : file.path}
+                </span>
                 <StatusBadge file={file} labels={labels} />
                 {!file.binary && <Counts file={file} />}
               </button>

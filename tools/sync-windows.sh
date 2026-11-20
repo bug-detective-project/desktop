@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Syncs desktop/, supportdesk/ and supportdesk-qa/ from WSL to a Windows folder, where Windows Node runs Electron,
-# the e2e tests and the installer build. node_modules is never shared between Linux and Windows.
+# Syncs desktop/, smokedesk/ and smokedesk-qa/ (the project the e2e and real-runtime tests play) and
+# supportdesk/ and supportdesk-qa/ (installed-ticket1 still plays it) from WSL to a Windows folder,
+# where Windows Node runs Electron, the e2e tests and the installer build. node_modules is never
+# shared between Linux and Windows.
 #
 #   desktop/tools/sync-windows.sh            (default target: /mnt/c/Users/<you>/bugdetective-dev)
 #   BUGDETECTIVE_WIN_DEV=/mnt/c/dev/bd desktop/tools/sync-windows.sh
+#   desktop/tools/sync-windows.sh librarydesk   (also <project>/ and <project>-qa/, for tools/play-project.sh)
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -17,18 +20,26 @@ rsync -a --delete \
   --exclude test-results --exclude playwright-report \
   "$root/desktop/" "$target/desktop/"
 
-# The whole repository, including .git (LocalContentSource reads the ticket branches), and its qa
-# worktree. A worktree links to its repository by absolute path, so both links are rewritten to
-# the Windows copy.
-rsync -a --delete \
-  --exclude node_modules --exclude 'server/data/*.db*' \
-  "$root/supportdesk/" "$target/supportdesk/"
-rsync -a --delete \
-  --exclude node_modules --exclude '.package-*' \
-  "$root/supportdesk-qa/" "$target/supportdesk-qa/"
 win() { wslpath -m "$1"; }
-worktree_meta="$target/supportdesk/.git/worktrees/supportdesk-qa"
-printf 'gitdir: %s\n' "$(win "$worktree_meta")" > "$target/supportdesk-qa/.git"
-printf '%s\n' "$(win "$target/supportdesk-qa/.git")" > "$worktree_meta/gitdir"
+# A game project: the whole repository, including .git (LocalContentSource reads the ticket
+# branches), and its qa worktree. A worktree links to its repository by absolute path, so both
+# links are rewritten to the Windows copy.
+sync_project() {
+  local name=$1
+  rsync -a --delete \
+    --exclude node_modules --exclude 'server/data/*.db*' \
+    "$root/$name/" "$target/$name/"
+  rsync -a --delete \
+    --exclude node_modules --exclude '.package-*' \
+    "$root/$name-qa/" "$target/$name-qa/"
+  local worktree_meta="$target/$name/.git/worktrees/$name-qa"
+  printf 'gitdir: %s\n' "$(win "$worktree_meta")" > "$target/$name-qa/.git"
+  printf '%s\n' "$(win "$target/$name-qa/.git")" > "$worktree_meta/gitdir"
+}
+sync_project smokedesk
+sync_project supportdesk
+for extra in "$@"; do
+  sync_project "$extra"
+done
 
 echo "Synced to $target"

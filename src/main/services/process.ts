@@ -33,7 +33,9 @@ export class CommandError extends Error {
 
   constructor(command: string, args: readonly string[], result: RunResult) {
     const detail = result.stderr.trim() || result.stdout.toString('utf8').trim();
-    super(`${command} ${args.slice(0, 3).join(' ')} exited with code ${result.code}${detail ? `: ${detail.slice(-2000)}` : ''}`);
+    super(
+      `${command} ${args.slice(0, 3).join(' ')} exited with code ${result.code}${detail ? `: ${detail.slice(-2000)}` : ''}`,
+    );
     this.command = command;
     this.result = result;
   }
@@ -125,7 +127,12 @@ export const runCommand: CommandRunner = (command, args, options = {}) =>
       errLines?.flush();
       if (overflowed) {
         // A partial output (a cut-off git bundle, for example) must never pass for a complete one.
-        resolve({ code: -1, stdout: Buffer.alloc(0), stderr: `${stderr}The output was larger than ${maxStdout} bytes\n`, timedOut });
+        resolve({
+          code: -1,
+          stdout: Buffer.alloc(0),
+          stderr: `${stderr}The output was larger than ${maxStdout} bytes\n`,
+          timedOut,
+        });
         return;
       }
       resolve({ code, stdout: Buffer.concat(stdout), stderr, timedOut });

@@ -25,7 +25,20 @@ async function raw(limits: typeof WORKSPACE_LIMITS, command: string[], timeoutMs
   const name = `${PREFIX}-${names.length + 1}`;
   names.push(name);
   const result = await docker.run(
-    ['run', '--name', name, ...labelArgs('workspace', null), '--init', ...limitArgs(limits), '--network', 'none', '--entrypoint', command[0], image, ...command.slice(1)],
+    [
+      'run',
+      '--name',
+      name,
+      ...labelArgs('workspace', null),
+      '--init',
+      ...limitArgs(limits),
+      '--network',
+      'none',
+      '--entrypoint',
+      command[0],
+      image,
+      ...command.slice(1),
+    ],
     { timeoutMs },
   );
   return { ...result, name, text: result.stdout.toString('utf8') };
@@ -35,8 +48,10 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  image = (JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string }).workspace;
-  if (!(await docker.imageExists(image))) throw new Error(`The workspace image ${image} is not built: run pnpm run prepare:resources`);
+  image = (JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string })
+    .workspace;
+  if (!(await docker.imageExists(image)))
+    throw new Error(`The workspace image ${image} is not built: run pnpm run prepare:resources`);
 });
 
 afterAll(async () => {

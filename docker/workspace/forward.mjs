@@ -3,7 +3,9 @@
 // In the workspace container (no BUGDETECTIVE_FORWARD) it keeps the container alive and forwards
 // 0.0.0.0:15173 to the Vite dev server on localhost:5173. Vite listens on localhost only (::1 or
 // 127.0.0.1, depending on how localhost resolves), so nothing outside could reach it otherwise.
-// SupportDesk itself stays unchanged.
+// SupportDesk itself stays unchanged. A project that declares its ports gets one mirror per port
+// instead: BUGDETECTIVE_WORKSPACE_PORTS lists them, and port p is mirrored at 0.0.0.0:(p + 10000)
+// to localhost:p, whether its server listens on localhost or on 0.0.0.0.
 //
 // In the forwarder container, BUGDETECTIVE_FORWARD lists the routes (listen:host:port, comma
 // separated). That container is on the normal network, where Docker publishes the app's ports on
@@ -13,11 +15,26 @@ import { connect, createServer } from 'node:net';
 
 const LOOPBACK = ['::1', '127.0.0.1'];
 const CLIENT_PORT = Number(process.env.BUGDETECTIVE_CLIENT_PORT ?? 5173);
+const MIRROR_OFFSET = 10000;
 
-/** The routes of a BUGDETECTIVE_FORWARD value, or the workspace's own route without one. */
+/** The workspace's mirrors: one per declared port, or the client's alone when the project declares none. */
+export function workspaceRoutes(declared) {
+  if (!declared) {
+    return [{ listen: 15173, hosts: LOOPBACK, port: CLIENT_PORT }];
+  }
+  return declared.split(',').map((value) => {
+    if (!/^\d+$/.test(value.trim())) {
+      throw new Error(`Invalid declared port: ${value}`);
+    }
+    const port = Number(value);
+    return { listen: port + MIRROR_OFFSET, hosts: LOOPBACK, port };
+  });
+}
+
+/** The routes of a BUGDETECTIVE_FORWARD value, or the workspace's own routes without one. */
 export function parseRoutes(value) {
   if (!value) {
-    return [{ listen: 15173, hosts: LOOPBACK, port: CLIENT_PORT }];
+    return workspaceRoutes(process.env.BUGDETECTIVE_WORKSPACE_PORTS);
   }
   return value.split(',').map((route) => {
     const [listen, host, port] = route.trim().split(':');

@@ -1,36 +1,41 @@
-import type { Snapshot } from '@shared/api.ts'
-import { blocksVSCode } from '@shared/api.ts'
-import { findTicket } from '@shared/kanban.ts'
-import type { GameState, InboxMessage, Language, TicketState, TrackChoice } from '@shared/types.ts'
-import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
-import { api, errorInfo } from '../api.ts'
-import { Icon } from '../components/icons.tsx'
-import { InstallModal } from '../components/InstallModal.tsx'
-import type { InstallKind, InstallPhase } from '../components/InstallModal.tsx'
-import { INSTALL_DISK_BYTES } from '@shared/api.ts'
-import type { IconName } from '../components/icons.tsx'
-import { Markdown } from '../components/Markdown.tsx'
-import { ticketTitle } from '../components/ticketTitle.ts'
-import { Badge, Button, Notice, Spinner, StagePill, Tooltip, Modal } from '../components/ui.tsx'
-import { WorkspaceLostNotice } from '../components/WorkspaceLostNotice.tsx'
-import type { Story } from '../content.ts'
-import { story } from '../content.ts'
-import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx'
-import { useToast } from '../toast-context.ts'
-import { deskState, environmentRows, environmentSummary, inboxMessageText } from './dashboardState.ts'
-import type { DeskState, Tone } from './dashboardState.ts'
+import type { Snapshot } from '@shared/api.ts';
+import { blocksVSCode } from '@shared/api.ts';
+import { findTicket } from '@shared/kanban.ts';
+import type { GameState, InboxMessage, Language, TicketState, TrackChoice } from '@shared/types.ts';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { api, errorInfo } from '../api.ts';
+import { Icon } from '../components/icons.tsx';
+import { InstallModal } from '../components/InstallModal.tsx';
+import type { InstallKind, InstallPhase } from '../components/InstallModal.tsx';
+import { INSTALL_DISK_BYTES } from '@shared/api.ts';
+import type { IconName } from '../components/icons.tsx';
+import { Markdown } from '../components/Markdown.tsx';
+import { ticketTitle } from '../components/ticketTitle.ts';
+import { Badge, Button, Notice, Spinner, StagePill, Tooltip, Modal } from '../components/ui.tsx';
+import { WorkspaceLostNotice } from '../components/WorkspaceLostNotice.tsx';
+import type { Story } from '../content.ts';
+import { story } from '../content.ts';
+import { NextAssignmentMenu } from '../components/NextAssignmentMenu.tsx';
+import { useToast } from '../toast-context.ts';
+import { deskState, environmentRows, environmentSummary, inboxMessageText, portRows } from './dashboardState.ts';
+import type { DeskState, PortRow, Tone } from './dashboardState.ts';
 
-const locale = (language: Language) => (language === 'pt' ? 'pt-BR' : 'en-US')
+const locale = (language: Language) => (language === 'pt' ? 'pt-BR' : 'en-US');
 
 function messageText(content: Story, message: InboxMessage, t: TFunction, state: GameState) {
-  const idOf = (ticket: number) => state.tickets.find((item) => item.ticket === ticket)?.id
-  return inboxMessageText(content.messages, message, {
-    subject: t('dashboard.genericAssignmentSubject'),
-    body: t('dashboard.genericAssignmentBody'),
-  }, idOf)
+  const idOf = (ticket: number) => state.tickets.find((item) => item.ticket === ticket)?.id;
+  return inboxMessageText(
+    content.messages,
+    message,
+    {
+      subject: t('dashboard.genericAssignmentSubject'),
+      body: t('dashboard.genericAssignmentBody'),
+    },
+    idOf,
+  );
 }
 
 /** The first paragraph of a message body, without markdown marks. */
@@ -40,12 +45,12 @@ function preview(body: string): string {
       .split('\n')
       .find((line) => line.trim() !== '')
       ?.replace(/[*_`#]/g, '') ?? ''
-  )
+  );
 }
 
 function threadDate(at: string, language: Language): string {
-  const date = new Date(at)
-  const sameDay = date.toDateString() === new Date().toDateString()
+  const date = new Date(at);
+  const sameDay = date.toDateString() === new Date().toDateString();
   return sameDay
     ? date.toLocaleTimeString(locale(language), {
         hour: '2-digit',
@@ -54,7 +59,7 @@ function threadDate(at: string, language: Language): string {
     : date.toLocaleDateString(locale(language), {
         month: 'short',
         day: 'numeric',
-      })
+      });
 }
 
 function initials(name: string): string {
@@ -63,7 +68,7 @@ function initials(name: string): string {
     .map((part) => part[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase()
+    .toUpperCase();
 }
 
 function Tag({
@@ -71,21 +76,17 @@ function Tag({
   tone = 'muted',
   size = 'sm',
 }: {
-  children: ReactNode
-  tone?: 'muted' | 'primary'
-  size?: 'xs' | 'sm'
+  children: ReactNode;
+  tone?: 'muted' | 'primary';
+  size?: 'xs' | 'sm';
 }) {
   const look =
-    tone === 'primary'
-      ? 'bg-primary/10 font-semibold text-primary'
-      : 'bg-muted font-medium text-muted-foreground'
+    tone === 'primary' ? 'bg-primary/10 font-semibold text-primary' : 'bg-muted font-medium text-muted-foreground';
   return (
-    <span
-      className={`rounded px-1.5 py-0.5 whitespace-nowrap ${size === 'xs' ? 'text-xs' : 'text-sm'} ${look}`}
-    >
+    <span className={`rounded px-1.5 py-0.5 whitespace-nowrap ${size === 'xs' ? 'text-xs' : 'text-sm'} ${look}`}>
       {children}
     </span>
-  )
+  );
 }
 
 /** A section label of the desk and the drawer: 14px icon and a 12px uppercase title, with something on the right. */
@@ -95,66 +96,51 @@ function SectionLabel({
   aside,
   tone,
 }: {
-  icon: IconName
-  children: ReactNode
-  aside?: ReactNode
+  icon: IconName;
+  children: ReactNode;
+  aside?: ReactNode;
   /** Title and icon in green (all fine) or red (a problem) for Local environment; primary for Current task. */
-  tone?: 'ok' | 'danger' | 'primary'
+  tone?: 'ok' | 'danger' | 'primary';
 }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-2">
       <h3
         className={`flex min-w-0 items-center gap-1.5 text-xs font-bold tracking-wider uppercase ${tone === 'danger' ? 'text-destructive' : tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'primary' ? 'text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary' : 'text-foreground'}`}
       >
-        <Icon
-          name={icon}
-          className={`size-3.5 ${tone ? '' : 'text-muted-foreground'}`}
-        />
-        <span
-          className="truncate"
-          title={typeof children === 'string' ? children : undefined}
-        >
+        <Icon name={icon} className={`size-3.5 ${tone ? '' : 'text-muted-foreground'}`} />
+        <span className="truncate" title={typeof children === 'string' ? children : undefined}>
           {children}
         </span>
       </h3>
       {aside && <span className="shrink-0 whitespace-nowrap">{aside}</span>}
     </div>
-  )
+  );
 }
 
 /** The 32px icon tile of the inbox and drawer headers. */
 function IconTile({ icon }: { icon: 'inbox' | 'users' }) {
   return (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-      <Icon
-        name={icon}
-        className="size-[18px]"
-      />
+      <Icon name={icon} className="size-[18px]" />
     </span>
-  )
+  );
 }
 
 interface Actions {
-  openBoard: () => void
-  openTicket: (ticket: number) => void
-  openReview: (ticket: number) => void
-  nextAssignment: (track: TrackChoice) => void
-  run: (id: string, action: () => Promise<unknown>) => void
+  openBoard: () => void;
+  openTicket: (ticket: number) => void;
+  openReview: (ticket: number) => void;
+  nextAssignment: (track: TrackChoice) => void;
+  run: (id: string, action: () => Promise<unknown>) => void;
   /** Downloads the game environment in the install modal. */
-  install: () => void
-  busy: string | null
+  install: () => void;
+  busy: string | null;
 }
 
 /** VS Code and browser buttons with short labels, so they fit side by side; the full label is the tooltip. */
-function WorkspaceButtons({
-  snapshot,
-  actions,
-}: {
-  snapshot: Snapshot
-  actions: Actions
-}) {
-  const { t } = useTranslation()
-  const dockerDown = snapshot.dockerState !== 'running'
+function WorkspaceButtons({ snapshot, actions }: { snapshot: Snapshot; actions: Actions }) {
+  const { t } = useTranslation();
+  const dockerDown = snapshot.dockerState !== 'running';
   return (
     <div className="grid grid-cols-2 gap-2">
       <Button
@@ -166,12 +152,7 @@ function WorkspaceButtons({
         onClick={() => actions.run('vscode', () => api.openVSCode())}
         data-testid="desk-vscode"
       >
-        {actions.busy !== 'vscode' && (
-          <Icon
-            name="code"
-            className="size-3.5"
-          />
-        )}
+        {actions.busy !== 'vscode' && <Icon name="code" className="size-3.5" />}
         {t('dashboard.vscodeShort')}
       </Button>
       <Button
@@ -183,22 +164,17 @@ function WorkspaceButtons({
         onClick={() => actions.run('browser', () => api.openAppInBrowser())}
         data-testid="desk-browser"
       >
-        {actions.busy !== 'browser' && (
-          <Icon
-            name="externalLink"
-            className="size-3.5"
-          />
-        )}
+        {actions.busy !== 'browser' && <Icon name="externalLink" className="size-3.5" />}
         {t('dashboard.browserShort')}
       </Button>
     </div>
-  )
+  );
 }
 
 /** A sentence of the desk that says what to do next. */
 // On the Current task tint, muted-foreground is below 4.5:1: the foreground at 80% is not.
 function DeskSentence({ children }: { children: ReactNode }) {
-  return <p className="text-sm leading-relaxed text-foreground/80">{children}</p>
+  return <p className="text-sm leading-relaxed text-foreground/80">{children}</p>;
 }
 
 /**
@@ -211,20 +187,19 @@ function CurrentTask({
   active,
   actions,
 }: {
-  snapshot: Snapshot
-  active: TicketState | undefined
-  actions: Actions
+  snapshot: Snapshot;
+  active: TicketState | undefined;
+  actions: Actions;
 }) {
-  const { t } = useTranslation()
-  const { state } = snapshot
-  const language = state.settings.language
-  const environment = snapshot.environment
-  const installing = snapshot.busy === 'installing'
-  const dockerDown = snapshot.dockerState !== 'running'
+  const { t } = useTranslation();
+  const { state } = snapshot;
+  const language = state.settings.language;
+  const environment = snapshot.environment;
+  const installing = snapshot.busy === 'installing';
+  const dockerDown = snapshot.dockerState !== 'running';
   const needsEnvironment =
-    environment !== null &&
-    !environment.items.find((item) => item.id === 'workspaceImage')?.ready
-  const desk = deskState(snapshot, active)
+    environment !== null && !environment.items.find((item) => item.id === 'workspaceImage')?.ready;
+  const desk = deskState(snapshot, active);
 
   const section = (state: DeskState, aside: ReactNode, children: ReactNode, testId = 'assignment-card') => (
     // A full-bleed block on top of the desk: a card surface mixed with 22% primary.
@@ -234,16 +209,12 @@ function CurrentTask({
       data-state={state}
       data-tour="current-task"
     >
-      <SectionLabel
-        icon="clipboardList"
-        aside={aside}
-        tone="primary"
-      >
+      <SectionLabel icon="clipboardList" aside={aside} tone="primary">
         {t('dashboard.current')}
       </SectionLabel>
       {children}
     </section>
-  )
+  );
 
   if (desk === 'download') {
     return section(
@@ -260,17 +231,12 @@ function CurrentTask({
           onClick={actions.install}
           data-testid="install-environment"
         >
-          {!installing && (
-            <Icon
-              name="download"
-              className="size-3.5"
-            />
-          )}
+          {!installing && <Icon name="download" className="size-3.5" />}
           {installing ? t('dashboard.envStatus.installing') : t('environment.install')}
         </Button>
       </>,
       'environment-panel',
-    )
+    );
   }
 
   if (desk === 'unlocking') {
@@ -288,50 +254,41 @@ function CurrentTask({
           <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
         </div>
       </>,
-    )
+    );
   }
 
   if (desk === 'active' && active) {
-    const { key, text } = ticketTitle(snapshot, active.ticket, language)
+    const { key, text } = ticketTitle(snapshot, active.ticket, language);
     const primary = {
       todo: { icon: 'play', label: t('dashboard.startOnBoard'), onClick: () => actions.openTicket(active.ticket) },
       inProgress: { icon: 'board', label: t('dashboard.goToBoard'), onClick: () => actions.openTicket(active.ticket) },
       inQa: { icon: 'spinner', label: t('dashboard.viewQa'), onClick: () => actions.openTicket(active.ticket) },
-      codeReview: { icon: 'checkCircle', label: t('dashboard.acceptReview'), onClick: () => actions.openReview(active.ticket) },
+      codeReview: {
+        icon: 'checkCircle',
+        label: t('dashboard.acceptReview'),
+        onClick: () => actions.openReview(active.ticket),
+      },
       done: { icon: 'board', label: t('dashboard.goToBoard'), onClick: actions.openBoard },
-    } as const
-    const action = primary[active.status]
+    } as const;
+    const action = primary[active.status];
     return section(
       'active',
-      <StagePill
-        status={active.status}
-        dot={active.status === 'todo'}
-      />,
+      <StagePill status={active.status} dot={active.status === 'todo'} />,
       <>
         <div className="min-w-0 space-y-2">
-          <span className="block font-mono text-sm font-medium text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary">{key}</span>
+          <span className="block font-mono text-sm font-medium text-[color-mix(in_oklab,var(--primary)_85%,black)] dark:text-primary">
+            {key}
+          </span>
           <p className="text-base leading-snug font-semibold text-foreground">{text}</p>
         </div>
-        <Button
-          size="sm"
-          variant="primary"
-          className="mt-2 w-full"
-          onClick={action.onClick}
-          data-testid="desk-primary"
-        >
-          <Icon
-            name={action.icon}
-            className="size-3.5"
-          />
+        <Button size="sm" variant="primary" className="mt-2 w-full" onClick={action.onClick} data-testid="desk-primary">
+          <Icon name={action.icon} className="size-3.5" />
           <span className="truncate">{action.label}</span>
         </Button>
-        <WorkspaceButtons
-          snapshot={snapshot}
-          actions={actions}
-        />
+        <WorkspaceButtons snapshot={snapshot} actions={actions} />
         {dockerDown && <p className="text-xs text-muted-foreground">{t('dashboard.dockerDownActive')}</p>}
       </>,
-    )
+    );
   }
 
   if (desk === 'dockerDown') {
@@ -349,15 +306,12 @@ function CurrentTask({
             onClick={() => actions.run('docker', () => api.startDocker())}
             data-testid="desk-start-docker"
           >
-            <Icon
-              name="play"
-              className="size-3.5"
-            />
+            <Icon name="play" className="size-3.5" />
             {t('banner.startDocker')}
           </Button>
         )}
       </>,
-    )
+    );
   }
 
   if (desk === 'queued') {
@@ -374,7 +328,7 @@ function CurrentTask({
           testId="next-assignment"
         />
       </>,
-    )
+    );
   }
 
   if (desk === 'allDone') {
@@ -385,16 +339,8 @@ function CurrentTask({
         <DeskSentence>
           {t('dashboard.allDone')} {t('dashboard.allDoneBody')}
         </DeskSentence>
-        <Button
-          size="sm"
-          variant="primary"
-          className="mt-2 w-full"
-          onClick={actions.openBoard}
-        >
-          <Icon
-            name="board"
-            className="size-3.5"
-          />
+        <Button size="sm" variant="primary" className="mt-2 w-full" onClick={actions.openBoard}>
+          <Icon name="board" className="size-3.5" />
           {t('dashboard.goToBoard')}
         </Button>
         <Button
@@ -404,27 +350,25 @@ function CurrentTask({
           busy={actions.busy === 'vscode'}
           onClick={() => actions.run('vscode', () => api.openVSCode())}
         >
-          {actions.busy !== 'vscode' && (
-            <Icon
-              name="code"
-              className="size-3.5"
-            />
-          )}
+          {actions.busy !== 'vscode' && <Icon name="code" className="size-3.5" />}
           {t('ticket.openVSCode')}
         </Button>
       </>,
-    )
+    );
   }
 
-  return section('none', null, <DeskSentence>{t('dashboard.noTicket')}</DeskSentence>)
+  return section('none', null, <DeskSentence>{t('dashboard.noTicket')}</DeskSentence>);
 }
 
 const TONE_STYLES: Record<Tone, { circle: string; text: string }> = {
-  ok: { circle: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', text: 'text-emerald-700 dark:text-emerald-400' },
+  ok: {
+    circle: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    text: 'text-emerald-700 dark:text-emerald-400',
+  },
   warn: { circle: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
   danger: { circle: 'bg-destructive/10 text-destructive', text: 'text-destructive' },
   neutral: { circle: 'bg-muted text-muted-foreground', text: 'text-muted-foreground' },
-}
+};
 
 /**
  * The SupportDesk dev server (npm run dev in the workspace), with a button to start or stop it.
@@ -432,60 +376,60 @@ const TONE_STYLES: Record<Tone, { circle: string; text: string }> = {
  * server started or stopped in the VS Code terminal shows up too.
  */
 function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const dockerUp = snapshot.dockerState === 'running'
-  const [up, setUp] = useState<boolean | null>(null)
+  const { t } = useTranslation();
+  const toast = useToast();
+  const dockerUp = snapshot.dockerState === 'running';
+  const [up, setUp] = useState<boolean | null>(null);
   // Without node_modules `npm run dev` cannot start: the button waits for the install.
-  const [dependenciesReady, setDependenciesReady] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const [dependenciesReady, setDependenciesReady] = useState(true);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!dockerUp) {
-      return undefined
+      return undefined;
     }
-    let ignore = false
+    let ignore = false;
     const check = () =>
       void api
         .workspaceStatus()
         .then((status) => {
           if (!ignore) {
-            setUp(status.devServerUp)
-            setDependenciesReady(status.dependenciesReady)
+            setUp(status.devServerUp);
+            setDependenciesReady(status.dependenciesReady);
           }
         })
-        .catch(() => !ignore && setUp(null))
-    check()
-    const timer = setInterval(check, 5000)
+        .catch(() => !ignore && setUp(null));
+    check();
+    const timer = setInterval(check, 5000);
     return () => {
-      ignore = true
-      clearInterval(timer)
-    }
-  }, [dockerUp])
+      ignore = true;
+      clearInterval(timer);
+    };
+  }, [dockerUp]);
 
   const toggle = async () => {
-    setBusy(true)
+    setBusy(true);
     try {
-      await (up ? api.stopDevServer() : api.startDevServer())
-      setUp((await api.workspaceStatus()).devServerUp)
+      await (up ? api.stopDevServer() : api.startDevServer());
+      setUp((await api.workspaceStatus()).devServerUp);
     } catch (error) {
-      toast.error(error)
+      toast.error(error);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   // Running in green, stopped in amber (worth a look, not an error); unknown in neutral.
-  const tone: Tone = !dockerUp || up === null ? 'neutral' : up ? 'ok' : 'warn'
+  const tone: Tone = !dockerUp || up === null ? 'neutral' : up ? 'ok' : 'warn';
   const status = !dockerUp
     ? t('dashboard.envStatus.needsDocker')
     : up === null
       ? t('dashboard.envStatus.checking')
       : up
         ? t('dashboard.envStatus.running')
-        : t('dashboard.envStatus.notRunning')
-  const blocked = !up && !dependenciesReady
-  const label = up ? t('dashboard.stopServer') : blocked ? t('ticket.dependenciesMissing') : t('dashboard.startServer')
+        : t('dashboard.envStatus.notRunning');
+  const blocked = !up && !dependenciesReady;
+  const label = up ? t('dashboard.stopServer') : blocked ? t('ticket.dependenciesMissing') : t('dashboard.startServer');
   return (
     <li
       className="flex min-w-0 items-center gap-2.5"
@@ -494,22 +438,14 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
       data-up={up === null ? undefined : String(up)}
     >
       <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[tone].circle}`}>
-        <Icon
-          name="laptop"
-          className="size-[13px]"
-        />
+        <Icon name="laptop" className="size-[13px]" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm text-foreground">{t('dashboard.env.devServer')}</span>
         <span className={`block truncate text-xs font-medium ${TONE_STYLES[tone].text}`}>{status}</span>
       </span>
       {dockerUp && up !== null && (
-        <Tooltip
-          content={label}
-          hoverOnly
-          className="shrink-0 self-stretch"
-          panelClassName="right-0 w-max"
-        >
+        <Tooltip content={label} hoverOnly className="shrink-0 self-stretch" panelClassName="right-0 w-max">
           {/* As tall as the name and status lines, and square: play in emerald, pause in amber. */}
           <button
             type="button"
@@ -523,19 +459,12 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
             aria-label={label}
             data-testid={up ? 'desk-stop-server' : 'desk-start-server'}
           >
-            {busy ? (
-              <Spinner className="size-3.5" />
-            ) : (
-              <Icon
-                name={up ? 'pause' : 'play'}
-                className="size-3.5"
-              />
-            )}
+            {busy ? <Spinner className="size-3.5" /> : <Icon name={up ? 'pause' : 'play'} className="size-3.5" />}
           </button>
         </Tooltip>
       )}
     </li>
-  )
+  );
 }
 
 /**
@@ -543,39 +472,33 @@ function DevServerRow({ snapshot }: { snapshot: Snapshot }) {
  * closes it again on the next ticket, on a project switch and when it quits.
  */
 function InternetRow({ snapshot }: { snapshot: Snapshot }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const [busy, setBusy] = useState(false)
-  const [confirming, setConfirming] = useState(false)
-  const on = snapshot.workspaceInternet
-  const tone: Tone = on ? 'warn' : 'ok'
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const on = snapshot.workspaceInternet;
+  const tone: Tone = on ? 'warn' : 'ok';
   const change = async (next: boolean) => {
-    setConfirming(false)
-    setBusy(true)
+    setConfirming(false);
+    setBusy(true);
     try {
-      await api.setWorkspaceInternet(next)
+      await api.setWorkspaceInternet(next);
     } catch (error) {
-      toast.error(error)
+      toast.error(error);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
   return (
-    <li
-      className="flex min-w-0 items-center gap-2.5"
-      data-testid="env-internet"
-      data-tone={tone}
-      data-on={String(on)}
-    >
+    <li className="flex min-w-0 items-center gap-2.5" data-testid="env-internet" data-tone={tone} data-on={String(on)}>
       <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[tone].circle}`}>
-        <Icon
-          name="globe"
-          className="size-[13px]"
-        />
+        <Icon name="globe" className="size-[13px]" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm text-foreground">{t('dashboard.env.internet')}</span>
-        <span className={`block text-xs font-medium ${TONE_STYLES[tone].text}`}>{t(`dashboard.workspaceInternet.${on ? 'on' : 'off'}`)}</span>
+        <span className={`block text-xs font-medium ${TONE_STYLES[tone].text}`}>
+          {t(`dashboard.workspaceInternet.${on ? 'on' : 'off'}`)}
+        </span>
       </span>
       <Button
         size="sm"
@@ -595,78 +518,110 @@ function InternetRow({ snapshot }: { snapshot: Snapshot }) {
           <Notice data-testid="workspace-internet-warning">{t('dashboard.workspaceInternet.text')}</Notice>
           <p className="mt-3 text-base text-muted-foreground">{t('dashboard.workspaceInternet.why')}</p>
           <div className="mt-5 flex justify-end gap-2">
-            <Button
-              onClick={() => setConfirming(false)}
-              data-testid="workspace-internet-cancel"
-            >
+            <Button onClick={() => setConfirming(false)} data-testid="workspace-internet-cancel">
               {t('common.cancel')}
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => void change(true)}
-              data-testid="workspace-internet-confirm"
-            >
+            <Button variant="danger" onClick={() => void change(true)} data-testid="workspace-internet-confirm">
               {t('dashboard.workspaceInternet.confirm')}
             </Button>
           </div>
         </Modal>
       )}
     </li>
-  )
+  );
+}
+
+/** A port the project declares: where it answers on the computer, and "Open" when the project offers it. */
+function PortRowItem({ row }: { row: PortRow }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      await api.openPortInBrowser(row.portName);
+    } catch (error) {
+      toast.error(error);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <li className="flex min-w-0 items-center gap-2.5" data-testid={`env-${row.id}`} data-tone={row.tone}>
+      <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[row.tone].circle}`}>
+        <Icon name="server" className="size-[13px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-foreground">{row.name}</span>
+        <span className={`block text-xs font-medium ${TONE_STYLES[row.tone].text}`}>{row.status}</span>
+      </span>
+      {row.open && (
+        <Button
+          size="sm"
+          busy={busy}
+          disabled={busy}
+          onClick={() => void open()}
+          aria-label={t('dashboard.openPortLabel', { name: row.name })}
+          data-testid={`open-port-${row.portName}`}
+        >
+          {!busy && <Icon name="externalLink" className="size-3.5" />}
+          {t('dashboard.openPort')}
+        </Button>
+      )}
+    </li>
+  );
 }
 
 /** Local environment, always expanded: four rows and a summary badge of their worst state. */
 function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const [retrying, setRetrying] = useState(false)
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [retrying, setRetrying] = useState(false);
   const retryDatabaseReset = async () => {
-    setRetrying(true)
+    setRetrying(true);
     try {
-      await api.retryDatabaseReset()
+      await api.retryDatabaseReset();
     } catch (error) {
-      toast.error(error)
+      toast.error(error);
     } finally {
-      setRetrying(false)
+      setRetrying(false);
     }
-  }
-  const [confirmingRecreate, setConfirmingRecreate] = useState(false)
-  const [recreating, setRecreating] = useState(false)
+  };
+  const [confirmingRecreate, setConfirmingRecreate] = useState(false);
+  const [recreating, setRecreating] = useState(false);
   const recreateServices = async () => {
-    setConfirmingRecreate(false)
-    setRecreating(true)
+    setConfirmingRecreate(false);
+    setRecreating(true);
     try {
-      await api.recreateServices()
+      await api.recreateServices();
     } catch (error) {
-      toast.error(error)
+      toast.error(error);
     } finally {
-      setRecreating(false)
+      setRecreating(false);
     }
-  }
-  const outOfMemory = (snapshot.services ?? []).some((service) => service.state === 'oom' || service.memoryKillAt !== undefined)
+  };
+  const outOfMemory = (snapshot.services ?? []).some(
+    (service) => service.state === 'oom' || service.memoryKillAt !== undefined,
+  );
   // Shown until closed; a later occurrence (another time) shows it again.
-  const [dismissedOom, setDismissedOom] = useState<string | null>(null)
-  const workspaceOom = snapshot.workspaceOutOfMemoryAt && snapshot.workspaceOutOfMemoryAt !== dismissedOom ? snapshot.workspaceOutOfMemoryAt : null
-  const docker = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState
+  const [dismissedOom, setDismissedOom] = useState<string | null>(null);
+  const workspaceOom =
+    snapshot.workspaceOutOfMemoryAt && snapshot.workspaceOutOfMemoryAt !== dismissedOom
+      ? snapshot.workspaceOutOfMemoryAt
+      : null;
+  const docker = snapshot.busy === 'startingDocker' ? 'starting' : snapshot.dockerState;
   // The report is only made after an unlock or a restore: ask for it as soon as Docker runs.
-  const unchecked = docker === 'running' && snapshot.environment === null
+  const unchecked = docker === 'running' && snapshot.environment === null;
   useEffect(() => {
     if (unchecked) {
-      void api.refreshEnvironment().catch(() => {})
+      void api.refreshEnvironment().catch(() => {});
     }
-  }, [unchecked])
-  const rows = environmentRows(snapshot, t)
-  const tone = environmentSummary(rows, snapshot.state.tickets.length > 0 && snapshot.workspaceInternet)
+  }, [unchecked]);
+  const rows = environmentRows(snapshot, t);
+  const tone = environmentSummary(rows, snapshot.state.tickets.length > 0 && snapshot.workspaceInternet);
   return (
-    <section
-      className="flex flex-col gap-3"
-      data-testid="environment-card"
-      data-tone={tone}
-    >
-      <SectionLabel
-        icon="hardDrive"
-        tone={tone === 'warn' ? undefined : tone}
-      >
+    <section className="flex flex-col gap-3" data-testid="environment-card" data-tone={tone}>
+      <SectionLabel icon="hardDrive" tone={tone === 'warn' ? undefined : tone}>
         {t('dashboard.environment')}
       </SectionLabel>
       <ul className="flex flex-col gap-2.5">
@@ -677,11 +632,10 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
             data-testid={`env-${row.id}`}
             data-tone={row.tone}
           >
-            <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[row.tone].circle}`}>
-              <Icon
-                name={row.busy ? 'spinner' : row.icon}
-                className="size-[13px]"
-              />
+            <span
+              className={`flex size-6 shrink-0 items-center justify-center rounded-full ${TONE_STYLES[row.tone].circle}`}
+            >
+              <Icon name={row.busy ? 'spinner' : row.icon} className="size-[13px]" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm text-foreground">{row.name}</span>
@@ -711,29 +665,22 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
             )}
           </li>
         ))}
+        {portRows(snapshot, t).map((row) => (
+          <PortRowItem key={row.id} row={row} />
+        ))}
         {snapshot.state.tickets.length > 0 && <DevServerRow snapshot={snapshot} />}
         {snapshot.state.tickets.length > 0 && <InternetRow snapshot={snapshot} />}
       </ul>
       {workspaceOom && (
-        <div
-          className="flex items-start gap-2"
-          data-testid="workspace-out-of-memory"
-        >
+        <div className="flex items-start gap-2" data-testid="workspace-out-of-memory">
           <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t('dashboard.workspaceOutOfMemory')}</p>
-          <Button
-            size="xs"
-            onClick={() => setDismissedOom(workspaceOom)}
-            data-testid="workspace-out-of-memory-dismiss"
-          >
+          <Button size="xs" onClick={() => setDismissedOom(workspaceOom)} data-testid="workspace-out-of-memory-dismiss">
             {t('common.close')}
           </Button>
         </div>
       )}
       {outOfMemory && (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="services-out-of-memory"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="services-out-of-memory">
           {t('dashboard.recreateServices.outOfMemory')}
         </p>
       )}
@@ -745,24 +692,17 @@ function LocalEnvironment({ snapshot }: { snapshot: Snapshot }) {
         >
           <Notice data-testid="recreate-services-warning">{t('dashboard.recreateServices.text')}</Notice>
           <div className="mt-5 flex justify-end gap-2">
-            <Button
-              onClick={() => setConfirmingRecreate(false)}
-              data-testid="recreate-services-cancel"
-            >
+            <Button onClick={() => setConfirmingRecreate(false)} data-testid="recreate-services-cancel">
               {t('common.cancel')}
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => void recreateServices()}
-              data-testid="recreate-services-confirm"
-            >
+            <Button variant="danger" onClick={() => void recreateServices()} data-testid="recreate-services-confirm">
               {t('dashboard.recreateServices.confirm')}
             </Button>
           </div>
         </Modal>
       )}
     </section>
-  )
+  );
 }
 
 function MessageView({
@@ -771,39 +711,29 @@ function MessageView({
   active,
   actions,
 }: {
-  snapshot: Snapshot
-  message: InboxMessage | undefined
-  active: TicketState | undefined
-  actions: Actions
+  snapshot: Snapshot;
+  message: InboxMessage | undefined;
+  active: TicketState | undefined;
+  actions: Actions;
 }) {
-  const { t } = useTranslation()
-  const language = snapshot.state.settings.language
-  const content = story(language, snapshot.projectStory)
-  const manager = content.people.manager
-  const text = message ? messageText(content, message, t, snapshot.state) : undefined
+  const { t } = useTranslation();
+  const language = snapshot.state.settings.language;
+  const content = story(language, snapshot.projectStory);
+  const manager = content.people.manager;
+  const text = message ? messageText(content, message, t, snapshot.state) : undefined;
   const viewed =
     message?.kind === 'assignment' && message.ticket !== undefined
       ? findTicket(snapshot.state, message.ticket)
-      : undefined
-  const previous =
-    viewed && viewed.status === 'done' && viewed.ticket !== active?.ticket
-  const viewedKey = viewed
-    ? ticketTitle(snapshot, viewed.ticket, language).key
-    : ''
-  const activeKey = active
-    ? ticketTitle(snapshot, active.ticket, language).key
-    : ''
+      : undefined;
+  const previous = viewed && viewed.status === 'done' && viewed.ticket !== active?.ticket;
+  const viewedKey = viewed ? ticketTitle(snapshot, viewed.ticket, language).key : '';
+  const activeKey = active ? ticketTitle(snapshot, active.ticket, language).key : '';
   return (
-    <article
-      className="min-h-0 min-w-0 overflow-y-auto"
-      data-testid="message"
-    >
+    <article className="min-h-0 min-w-0 overflow-y-auto" data-testid="message">
       {message && text && (
         <>
           <header className="flex flex-col gap-[18px] border-b border-border px-8 pt-6 pb-5">
-            <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground">
-              {text.subject}
-            </h1>
+            <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground">{text.subject}</h1>
             <div className="flex min-w-0 items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-base font-bold text-primary">
@@ -816,9 +746,7 @@ function MessageView({
                       &lt;{manager.email}&gt;
                     </span>
                   </div>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {manager.role}
-                  </p>
+                  <p className="truncate text-sm text-muted-foreground">{manager.role}</p>
                 </div>
               </div>
               <span className="shrink-0 text-sm text-muted-foreground">
@@ -837,10 +765,7 @@ function MessageView({
                 data-testid="previous-directive"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="size-2 shrink-0 rounded-full bg-emerald-500"
-                    aria-hidden
-                  />
+                  <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
                   <span className="text-foreground">
                     {active
                       ? t('dashboard.previousDirective', { key: viewedKey, active: activeKey })
@@ -853,18 +778,12 @@ function MessageView({
                   onClick={() => actions.openTicket(viewed.ticket)}
                   data-testid="view-done-ticket"
                 >
-                  <Icon
-                    name="board"
-                    className="size-3.5"
-                  />
+                  <Icon name="board" className="size-3.5" />
                   {t('dashboard.viewOnBoard', { key: viewedKey })}
                 </Button>
               </div>
             )}
-            <Markdown
-              testId="inbox-body"
-              className="text-base"
-            >
+            <Markdown testId="inbox-body" className="text-base">
               {text.body}
             </Markdown>
             {deskState(snapshot, active) === 'queued' && (
@@ -874,7 +793,9 @@ function MessageView({
                 data-testid="email-next"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="mb-0.5 text-xs font-semibold tracking-wider text-primary uppercase">{t('dashboard.nextLabel')}</p>
+                  <p className="mb-0.5 text-xs font-semibold tracking-wider text-primary uppercase">
+                    {t('dashboard.nextLabel')}
+                  </p>
                   <h2 className="text-base font-bold text-foreground">{t('dashboard.nextTitle')}</h2>
                   <p className="mt-0.5 text-base text-muted-foreground">{t('dashboard.nextBody')}</p>
                 </div>
@@ -891,7 +812,7 @@ function MessageView({
         </>
       )}
     </article>
-  )
+  );
 }
 
 /** The drawer with the project context and the contacts; it covers the reading pane. */
@@ -900,31 +821,31 @@ function ProjectDrawer({
   projectStory,
   onClose,
 }: {
-  language: Language
-  projectStory: Snapshot['projectStory']
-  onClose: () => void
+  language: Language;
+  projectStory: Snapshot['projectStory'];
+  onClose: () => void;
 }) {
-  const { t } = useTranslation()
-  const content = story(language, projectStory)
-  const senior = content.people.senior
-  const closeButton = useRef<HTMLButtonElement>(null)
+  const { t } = useTranslation();
+  const content = story(language, projectStory);
+  const senior = content.people.senior;
+  const closeButton = useRef<HTMLButtonElement>(null);
   // The latest onClose, so the effect below runs once per opening, not on every snapshot.
-  const close = useRef(onClose)
+  const close = useRef(onClose);
   useEffect(() => {
-    close.current = onClose
-  })
+    close.current = onClose;
+  });
 
   // Focus moves into the drawer when it opens; Escape closes it.
   useEffect(() => {
-    closeButton.current?.focus()
+    closeButton.current?.focus();
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        close.current()
+        close.current();
       }
-    }
-    document.addEventListener('keydown', escape)
-    return () => document.removeEventListener('keydown', escape)
-  }, [])
+    };
+    document.addEventListener('keydown', escape);
+    return () => document.removeEventListener('keydown', escape);
+  }, []);
 
   const organization = (name: string, tag: ReactNode, description: string, extra?: ReactNode) => (
     <div className="space-y-1.5">
@@ -935,13 +856,10 @@ function ProjectDrawer({
       <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       {extra}
     </div>
-  )
+  );
 
   const contact = (name: string, line: string, own: boolean, badge?: ReactNode) => (
-    <li
-      key={name}
-      className="flex min-w-0 items-center gap-3"
-    >
+    <li key={name} className="flex min-w-0 items-center gap-3">
       <span
         className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
           own ? 'border border-primary/20 bg-primary/15 text-primary' : 'bg-secondary text-secondary-foreground'
@@ -958,7 +876,7 @@ function ProjectDrawer({
         <span className="block truncate text-xs text-muted-foreground">{line}</span>
       </span>
     </li>
-  )
+  );
 
   return (
     <>
@@ -992,19 +910,19 @@ function ProjectDrawer({
             title={t('dashboard.close')}
             data-testid="project-drawer-close"
           >
-            <Icon
-              name="x"
-              className="size-4"
-            />
+            <Icon name="x" className="size-4" />
           </Button>
         </div>
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto p-5">
-          <section
-            className="flex flex-col gap-4"
-            data-testid="project-context"
-          >
+          <section className="flex flex-col gap-4" data-testid="project-context">
             <SectionLabel icon="briefcase">{t('dashboard.projectContext')}</SectionLabel>
-            {organization(content.company.name, <Tag tone="primary" size="xs">{t('dashboard.companyTag')}</Tag>, content.company.summary)}
+            {organization(
+              content.company.name,
+              <Tag tone="primary" size="xs">
+                {t('dashboard.companyTag')}
+              </Tag>,
+              content.company.summary,
+            )}
             {organization(
               content.client.name,
               <Tag size="xs">{t('dashboard.clientTag')}</Tag>,
@@ -1015,43 +933,49 @@ function ProjectDrawer({
             )}
           </section>
           <div className="h-px shrink-0 bg-border" />
-          <section
-            className="flex flex-col gap-3"
-            data-testid="contacts-card"
-          >
+          <section className="flex flex-col gap-3" data-testid="contacts-card">
             <SectionLabel icon="contact">{t('dashboard.contacts')}</SectionLabel>
             <ul className="flex flex-col gap-3">
-              {contact(senior.name, `${senior.role} · ${content.company.name}`, true, <Tag tone="primary" size="xs">{t('dashboard.mentorTag')}</Tag>)}
+              {contact(
+                senior.name,
+                `${senior.role} · ${content.company.name}`,
+                true,
+                <Tag tone="primary" size="xs">
+                  {t('dashboard.mentorTag')}
+                </Tag>,
+              )}
               {contact(content.people.manager.name, `${content.people.manager.role} · ${content.company.name}`, true)}
-              {content.client.reporters.map((person) => contact(person.name, `${person.role} · ${content.client.name}`, false))}
+              {content.client.reporters.map((person) =>
+                contact(person.name, `${person.role} · ${content.client.name}`, false),
+              )}
             </ul>
           </section>
         </div>
       </div>
     </>
-  )
+  );
 }
 
-const DRAWER_OPEN_KEY = 'bd.dashboard.projectDrawerOpen'
+const DRAWER_OPEN_KEY = 'bd.dashboard.projectDrawerOpen';
 
 /** The drawer is closed by default; its state is kept for the session only. */
 function useDrawerOpen(): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(() => {
     try {
-      return sessionStorage.getItem(DRAWER_OPEN_KEY) === 'true'
+      return sessionStorage.getItem(DRAWER_OPEN_KEY) === 'true';
     } catch {
-      return false
+      return false;
     }
-  })
+  });
   const change = (next: boolean) => {
-    setOpen(next)
+    setOpen(next);
     try {
-      sessionStorage.setItem(DRAWER_OPEN_KEY, String(next))
+      sessionStorage.setItem(DRAWER_OPEN_KEY, String(next));
     } catch {
       // Only a convenience: without storage the drawer starts closed.
     }
-  }
-  return [open, change]
+  };
+  return [open, change];
 }
 
 export function Dashboard({
@@ -1062,110 +986,124 @@ export function Dashboard({
   onOpenSettings,
   onboarding = false,
 }: {
-  snapshot: Snapshot
-  onOpenBoard: () => void
-  onOpenTicket: (ticket: number) => void
-  onOpenReview: (ticket: number) => void
+  snapshot: Snapshot;
+  onOpenBoard: () => void;
+  onOpenTicket: (ticket: number) => void;
+  onOpenReview: (ticket: number) => void;
   /** "Restore a backup instead" opens Settings (its Backup pane). */
-  onOpenSettings: () => void
+  onOpenSettings: () => void;
   /** Rafaela's onboarding is showing: the drawer stays closed so it does not cover the steps. */
-  onboarding?: boolean
+  onboarding?: boolean;
 }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const { state } = snapshot
-  const language = state.settings.language
-  const content = story(language, snapshot.projectStory)
-  const threads = [...state.inbox].reverse()
-  const [selectedId, setSelectedId] = useState<string | null>(
-    threads[0]?.id ?? null,
-  )
-  const [busy, setBusy] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useDrawerOpen()
-  const drawerButton = useRef<HTMLButtonElement>(null)
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { state } = snapshot;
+  const language = state.settings.language;
+  const content = story(language, snapshot.projectStory);
+  const threads = [...state.inbox].reverse();
+  const [selectedId, setSelectedId] = useState<string | null>(threads[0]?.id ?? null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useDrawerOpen();
+  const drawerButton = useRef<HTMLButtonElement>(null);
 
   // A new message (a new assignment, the completion) opens on arrival (adjusted during render).
-  const [seenCount, setSeenCount] = useState(state.inbox.length)
+  const [seenCount, setSeenCount] = useState(state.inbox.length);
   if (state.inbox.length !== seenCount) {
-    setSeenCount(state.inbox.length)
-    setSelectedId(threads[0]?.id ?? null)
+    setSeenCount(state.inbox.length);
+    setSelectedId(threads[0]?.id ?? null);
   }
-  const selected =
-    threads.find((message) => message.id === selectedId) ?? threads[0]
-  const current =
-    state.currentTicket !== null
-      ? findTicket(state, state.currentTicket)
-      : undefined
-  const active = current && current.status !== 'done' ? current : undefined
+  const selected = threads.find((message) => message.id === selectedId) ?? threads[0];
+  const current = state.currentTicket !== null ? findTicket(state, state.currentTicket) : undefined;
+  const active = current && current.status !== 'done' ? current : undefined;
 
   // The open message counts as read, also when it opened on its own (on arrival, or the newest
   // one shown when the Dashboard or the inbox button is opened), not only after a click.
-  const openId = selected?.id
-  const openUnread = selected !== undefined && !selected.read
+  const openId = selected?.id;
+  const openUnread = selected !== undefined && !selected.read;
   useEffect(() => {
     if (openId && openUnread) {
-      void api.markInboxRead(openId)
+      void api.markInboxRead(openId);
     }
-  }, [openId, openUnread])
+  }, [openId, openUnread]);
 
-  const select = (message: InboxMessage) => setSelectedId(message.id)
+  const select = (message: InboxMessage) => setSelectedId(message.id);
 
   const run = (id: string, action: () => Promise<unknown>) => {
-    setBusy(id)
+    setBusy(id);
     action()
       .catch(toast.error)
-      .finally(() => setBusy(null))
-  }
+      .finally(() => setBusy(null));
+  };
 
   // The download of the environment, or of a ticket, with its log in the install modal. The
   // environment's stays open until "Close"; a ticket's closes by itself when it succeeds (the
   // Board is the next step) and stays open with the error and the log when it fails.
   const [install, setInstall] = useState<{
-    kind: InstallKind
-    phase: InstallPhase
-    lines: string[]
-    error: string | null
-    retry: (() => void) | null
-    lowDisk?: { freeBytes: number; neededBytes: number }
-  } | null>(null)
+    kind: InstallKind;
+    phase: InstallPhase;
+    lines: string[];
+    error: string | null;
+    retry: (() => void) | null;
+    lowDisk?: { freeBytes: number; neededBytes: number };
+  } | null>(null);
   /** No internet and GitHub's limit pass: the same download is worth repeating as it is. */
-  const retryable = (code: string) => code === 'noConnection' || code === 'githubRateLimited'
+  const retryable = (code: string) => code === 'noConnection' || code === 'githubRateLimited';
   const failed = async (kind: InstallKind, error: unknown, retry: () => void) => {
-    const { code, message } = errorInfo(error)
+    const { code, message } = errorInfo(error);
     if (kind === 'environment' && code === 'lowDiskSpace') {
       // The main process refused the download; the message carries the free bytes. The player may go on anyway.
-      setInstall({ kind, phase: 'lowDisk', lines: (await api.snapshot()).log, error: null, retry: null, lowDisk: { freeBytes: Number(message), neededBytes: INSTALL_DISK_BYTES } })
-      return
+      setInstall({
+        kind,
+        phase: 'lowDisk',
+        lines: (await api.snapshot()).log,
+        error: null,
+        retry: null,
+        lowDisk: { freeBytes: Number(message), neededBytes: INSTALL_DISK_BYTES },
+      });
+      return;
     }
-    setInstall({ kind, phase: 'failed', lines: (await api.snapshot()).log, error: t([`errors.${code}`, 'errors.failed'], { message }), retry: retryable(code) ? retry : null })
-  }
+    setInstall({
+      kind,
+      phase: 'failed',
+      lines: (await api.snapshot()).log,
+      error: t([`errors.${code}`, 'errors.failed'], { message }),
+      retry: retryable(code) ? retry : null,
+    });
+  };
   const nextAssignment = (track: TrackChoice) => {
-    setInstall({ kind: 'ticket', phase: 'running', lines: [], error: null, retry: null })
+    setInstall({ kind: 'ticket', phase: 'running', lines: [], error: null, retry: null });
     api
       .nextAssignment(track)
       .then(
         () => {
-          setInstall(null)
-          onOpenBoard()
+          setInstall(null);
+          onOpenBoard();
         },
         (error: unknown) => failed('ticket', error, () => nextAssignment(track)),
       )
-      .catch(toast.error)
-  }
+      .catch(toast.error);
+  };
   const installEnvironment = (options?: { ignoreDiskSpace: boolean }) => {
-    setInstall({ kind: 'environment', phase: 'running', lines: [], error: null, retry: null })
+    setInstall({ kind: 'environment', phase: 'running', lines: [], error: null, retry: null });
     api
       .installEnvironment(options)
       .then(
-        async () => setInstall({ kind: 'environment', phase: 'done', lines: (await api.snapshot()).log, error: null, retry: null }),
+        async () =>
+          setInstall({
+            kind: 'environment',
+            phase: 'done',
+            lines: (await api.snapshot()).log,
+            error: null,
+            retry: null,
+          }),
         (error: unknown) => failed('environment', error, () => installEnvironment(options)),
       )
-      .catch(toast.error)
-  }
+      .catch(toast.error);
+  };
 
   const rebuildWorkspace = () => {
-    api.rebuildWorkspace().catch(toast.error)
-  }
+    api.rebuildWorkspace().catch(toast.error);
+  };
 
   const actions: Actions = {
     openBoard: onOpenBoard,
@@ -1175,24 +1113,27 @@ export function Dashboard({
     run,
     install: () => installEnvironment(),
     busy,
-  }
+  };
 
   const closeDrawer = () => {
-    setDrawerOpen(false)
-    drawerButton.current?.focus()
-  }
+    setDrawerOpen(false);
+    drawerButton.current?.focus();
+  };
 
   return (
-    <div
-      className="mx-auto h-full min-h-[560px] max-w-10xl p-6"
-      data-testid="dashboard"
-    >
+    <div className="mx-auto h-full min-h-[560px] max-w-10xl p-6" data-testid="dashboard">
       {install && (
         <InstallModal
           kind={install.kind}
           phase={install.phase}
           // While it runs, the live log of that task (the log of an earlier task never shows).
-          lines={install.phase === 'running' ? (snapshot.busy === 'installing' || snapshot.busy === 'unlocking' ? snapshot.log : []) : install.lines}
+          lines={
+            install.phase === 'running'
+              ? snapshot.busy === 'installing' || snapshot.busy === 'unlocking'
+                ? snapshot.log
+                : []
+              : install.lines
+          }
           error={install.error}
           onClose={() => setInstall(null)}
           onRetry={install.retry}
@@ -1212,11 +1153,7 @@ export function Dashboard({
           aria-label={t('dashboard.desk')}
           data-testid="work-desk"
         >
-          <CurrentTask
-            snapshot={snapshot}
-            active={active}
-            actions={actions}
-          />
+          <CurrentTask snapshot={snapshot} active={active} actions={actions} />
           <div className="flex flex-1 flex-col gap-5 p-5">
             {snapshot.workspaceLost && (
               <WorkspaceLostNotice
@@ -1227,10 +1164,7 @@ export function Dashboard({
             )}
             <LocalEnvironment snapshot={snapshot} />
             <div className="h-px shrink-0 bg-border" />
-            <section
-              className="flex flex-col gap-1.5"
-              data-testid="desk-client"
-            >
+            <section className="flex flex-col gap-1.5" data-testid="desk-client">
               <SectionLabel icon="briefcase">{t('dashboard.client')}</SectionLabel>
               <p className="truncate text-sm font-medium text-foreground">{content.client.name}</p>
             </section>
@@ -1243,10 +1177,7 @@ export function Dashboard({
               aria-controls="project-drawer"
               data-testid="project-drawer-toggle"
             >
-              <Icon
-                name="users"
-                className="size-3.5"
-              />
+              <Icon name="users" className="size-3.5" />
               {t('dashboard.projectAndContacts')}
             </Button>
           </div>
@@ -1266,13 +1197,10 @@ export function Dashboard({
               {t('dashboard.inboxCount', { count: threads.length })}
             </span>
           </div>
-          <ul
-            className="min-h-0 flex-1 overflow-y-auto border-t border-border"
-            data-testid="inbox"
-          >
+          <ul className="min-h-0 flex-1 overflow-y-auto border-t border-border" data-testid="inbox">
             {threads.map((message) => {
-              const text = messageText(content, message, t, state)
-              const isOpen = message.id === selected?.id
+              const text = messageText(content, message, t, state);
+              const isOpen = message.id === selected?.id;
               return (
                 <li
                   key={message.id}
@@ -1291,10 +1219,7 @@ export function Dashboard({
                     <span className="flex items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-1.5">
                         {!message.read && (
-                          <span
-                            className="size-1.5 shrink-0 rounded-full bg-primary"
-                            title={t('dashboard.unread')}
-                          />
+                          <span className="size-1.5 shrink-0 rounded-full bg-primary" title={t('dashboard.unread')} />
                         )}
                         <span
                           className={`truncate ${message.read ? 'font-medium text-foreground' : 'font-bold text-primary'}`}
@@ -1311,40 +1236,29 @@ export function Dashboard({
                     >
                       {text.subject}
                     </span>
-                    <span className="mt-0.5 block truncate text-sm text-muted-foreground">
-                      {preview(text.body)}
-                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-muted-foreground">{preview(text.body)}</span>
                   </button>
                 </li>
-              )
+              );
             })}
           </ul>
         </section>
 
-        <MessageView
-          snapshot={snapshot}
-          message={selected}
-          active={active}
-          actions={actions}
-        />
+        <MessageView snapshot={snapshot} message={selected} active={active} actions={actions} />
 
         {drawerOpen && !onboarding && (
-          <ProjectDrawer
-            language={language}
-            projectStory={snapshot.projectStory}
-            onClose={closeDrawer}
-          />
+          <ProjectDrawer language={language} projectStory={snapshot.projectStory} onClose={closeDrawer} />
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /** A project switch whose Docker cleanup did not finish: what is left, and a retry. Nothing else can start meanwhile. */
 function PendingSwitch({ snapshot }: { snapshot: Snapshot }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const left = snapshot.projectSwitchLeft ?? []
+  const { t } = useTranslation();
+  const toast = useToast();
+  const left = snapshot.projectSwitchLeft ?? [];
   return (
     <div
       className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4"
@@ -1374,5 +1288,5 @@ function PendingSwitch({ snapshot }: { snapshot: Snapshot }) {
         {t('switch.retry')}
       </Button>
     </div>
-  )
+  );
 }

@@ -32,12 +32,27 @@ let runtime: DockerRuntime;
 let game: Game;
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: workspaceDir('notes') })).stdout.toString('utf8').trim();
+  return (
+    await docker.execChecked(runtime.names.container, ['sh', '-c', script], {
+      user: 'node',
+      workdir: workspaceDir('notes'),
+    })
+  ).stdout
+    .toString('utf8')
+    .trim();
 }
 
 beforeAll(async () => {
@@ -46,7 +61,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new DockerRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
   game = new Game({
     store: new StateStore(dir),
@@ -75,25 +94,31 @@ afterAll(async () => {
 });
 
 describe('a restored save with a forged stage tag', () => {
-  it('gets the published code back under its stage tag, and the state points at that commit', async () => {
-    const published = await sh('git rev-parse stage-1^{tree}');
-    // What a forged save carries: stage-1 moved to a commit with other code (the player's branch itself stays as it was).
-    await sh("git checkout -q -b forged stage-1 && echo evil > evil.txt && git add evil.txt && git -c user.name=x -c user.email=x@x commit -q -m evil && git tag -f stage-1 HEAD >/dev/null && git checkout -q player/ticket-1 && git branch -q -D forged");
-    expect(await sh('git rev-parse stage-1^{tree}')).not.toBe(published);
-    const file = join(dir, 'forged.bdsave');
-    await game.exportProgress(file);
+  it(
+    'gets the published code back under its stage tag, and the state points at that commit',
+    async () => {
+      const published = await sh('git rev-parse stage-1^{tree}');
+      // What a forged save carries: stage-1 moved to a commit with other code (the player's branch itself stays as it was).
+      await sh(
+        'git checkout -q -b forged stage-1 && echo evil > evil.txt && git add evil.txt && git -c user.name=x -c user.email=x@x commit -q -m evil && git tag -f stage-1 HEAD >/dev/null && git checkout -q player/ticket-1 && git branch -q -D forged',
+      );
+      expect(await sh('git rev-parse stage-1^{tree}')).not.toBe(published);
+      const file = join(dir, 'forged.bdsave');
+      await game.exportProgress(file);
 
-    const { token, summary } = await game.inspectSave(file, 'forged.bdsave');
-    expect(summary.fromThisInstall).toBe(true);
-    await game.restoreProgress(token);
+      const { token, summary } = await game.inspectSave(file, 'forged.bdsave');
+      expect(summary.fromThisInstall).toBe(true);
+      await game.restoreProgress(token);
 
-    expect(await sh('git rev-parse stage-1^{tree}')).toBe(published);
-    expect(game.snapshot().state.tickets[0].stageCommit).toBe(await sh('git rev-parse stage-1'));
-    expect(await sh('git symbolic-ref --short HEAD')).toBe('player/ticket-1');
-    // "Restart the ticket" (the reset to the stage) lands on the published code, not on the forged one.
-    await runtime.resetToStage(1);
-    expect(await sh('git rev-parse HEAD^{tree}')).toBe(published);
-    expect(await sh('test -e evil.txt && echo present || echo absent')).toBe('absent');
-    expect(game.snapshot().log.join('\n')).toContain('» Verified the code of ticket 1 (front-1)');
-  }, 10 * 60_000);
+      expect(await sh('git rev-parse stage-1^{tree}')).toBe(published);
+      expect(game.snapshot().state.tickets[0].stageCommit).toBe(await sh('git rev-parse stage-1'));
+      expect(await sh('git symbolic-ref --short HEAD')).toBe('player/ticket-1');
+      // "Restart the ticket" (the reset to the stage) lands on the published code, not on the forged one.
+      await runtime.resetToStage(1);
+      expect(await sh('git rev-parse HEAD^{tree}')).toBe(published);
+      expect(await sh('test -e evil.txt && echo present || echo absent')).toBe('absent');
+      expect(game.snapshot().log.join('\n')).toContain('» Verified the code of ticket 1 (front-1)');
+    },
+    10 * 60_000,
+  );
 });

@@ -115,7 +115,10 @@ export function Onboarding({
   if (index === WELCOME || index === CLOSING) {
     const welcome = index === WELCOME;
     return (
-      <CenteredCard testId={welcome ? 'onboarding-welcome' : 'onboarding-closing'} label={t(welcome ? 'onboarding.welcome.title' : 'onboarding.closing.title')}>
+      <CenteredCard
+        testId={welcome ? 'onboarding-welcome' : 'onboarding-closing'}
+        label={t(welcome ? 'onboarding.welcome.title' : 'onboarding.closing.title')}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             {avatar('md')}
@@ -126,11 +129,20 @@ export function Onboarding({
           </div>
           {close}
         </div>
-        <h2 className="mt-5 text-xl font-bold tracking-tight text-foreground">{t(welcome ? 'onboarding.welcome.title' : 'onboarding.closing.title')}</h2>
+        <h2 className="mt-5 text-xl font-bold tracking-tight text-foreground">
+          {t(welcome ? 'onboarding.welcome.title' : 'onboarding.closing.title')}
+        </h2>
         <p className="mt-2 text-base leading-relaxed text-muted-foreground">
-          {t(welcome ? 'onboarding.welcome.body' : closable ? 'onboarding.closing.bodyReplay' : 'onboarding.closing.body', {
-            company: company(snapshot.state.settings.language).company.name,
-          })}
+          {t(
+            welcome
+              ? 'onboarding.welcome.body'
+              : closable
+                ? 'onboarding.closing.bodyReplay'
+                : 'onboarding.closing.body',
+            {
+              company: company(snapshot.state.settings.language).company.name,
+            },
+          )}
         </p>
         <div className="mt-6 flex items-center justify-between gap-3">
           <span>{welcome && skip}</span>
@@ -141,7 +153,12 @@ export function Onboarding({
             </Button>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={() => go(CLOSING - 1)} disabled={finishing} data-testid="onboarding-back">
+              <Button
+                variant="ghost"
+                onClick={() => go(CLOSING - 1)}
+                disabled={finishing}
+                data-testid="onboarding-back"
+              >
                 {t('onboarding.back')}
               </Button>
               <Button variant="primary" onClick={finish} busy={finishing} autoFocus data-testid="onboarding-finish">
@@ -215,7 +232,10 @@ function trapTab(event: ReactKeyboardEvent, dialog: RefObject<HTMLElement | null
 function CenteredCard({ testId, label, children }: { testId: string; label: string; children: ReactNode }) {
   const dialog = useRef<HTMLDivElement>(null);
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" data-testid="onboarding">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      data-testid="onboarding"
+    >
       <div
         ref={dialog}
         role="dialog"
@@ -271,15 +291,30 @@ function StepOverlay({ step, children }: { step: OnboardingStep; children: React
 
   const { target, balloon, viewport } = layout;
   const pad = 6;
-  const hole = target && { left: target.left - pad, top: target.top - pad, width: target.width + pad * 2, height: target.height + pad * 2 };
+  const hole = target && {
+    left: target.left - pad,
+    top: target.top - pad,
+    width: target.width + pad * 2,
+    height: target.height + pad * 2,
+  };
   return (
     <div className="fixed inset-0 z-[60]" data-testid="onboarding" data-step={step.id}>
       {step.panelTab && <OnboardingTicketDemo tab={step.panelTab} />}
       {/* The dimmed screen with a hole around the targets, and the primary outline around the hole. */}
       <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden>
-        <path fillRule="evenodd" fill="rgb(0 0 0 / 0.6)" d={`M0 0H${viewport.width}V${viewport.height}H0Z${hole ? roundedRect(hole, 14) : ''}`} />
+        <path
+          fillRule="evenodd"
+          fill="rgb(0 0 0 / 0.6)"
+          d={`M0 0H${viewport.width}V${viewport.height}H0Z${hole ? roundedRect(hole, 14) : ''}`}
+        />
       </svg>
-      {hole && <div className="pointer-events-none absolute rounded-[14px] ring-2 ring-primary" style={hole} data-testid="onboarding-highlight" />}
+      {hole && (
+        <div
+          className="pointer-events-none absolute rounded-[14px] ring-2 ring-primary"
+          style={hole}
+          data-testid="onboarding-highlight"
+        />
+      )}
       <div
         ref={dialog}
         role="dialog"
@@ -300,18 +335,27 @@ function StepOverlay({ step, children }: { step: OnboardingStep; children: React
 function Illustration({ kind }: { kind: OnboardingIllustration }) {
   const { t } = useTranslation();
   return (
-    <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3" aria-hidden data-testid={`onboarding-illustration-${kind}`}>
+    <div
+      className="mt-3 rounded-lg border border-border bg-muted/50 p-3"
+      aria-hidden
+      data-testid={`onboarding-illustration-${kind}`}
+    >
       {kind === 'flow' && (
         <div className="relative">
           <div className="grid grid-cols-5 gap-1">
             {COLUMNS.map((column) => (
-              <div key={column} className={`flex h-14 items-start justify-center rounded border pt-1 ${STAGE[column].pill}`}>
+              <div
+                key={column}
+                className={`flex h-14 items-start justify-center rounded border pt-1 ${STAGE[column].pill}`}
+              >
                 <span className={`size-1.5 rounded-full ${STAGE[column].dot}`} />
               </div>
             ))}
           </div>
           <div className="absolute top-5 left-0 w-1/5 px-0.5 motion-safe:animate-onboarding-flow">
-            <div className="rounded border border-primary/40 bg-background px-1 py-0.5 text-center font-mono text-[9px] font-medium text-primary shadow-sm">SD-000</div>
+            <div className="rounded border border-primary/40 bg-background px-1 py-0.5 text-center font-mono text-[9px] font-medium text-primary shadow-sm">
+              SD-000
+            </div>
           </div>
         </div>
       )}
@@ -319,7 +363,9 @@ function Illustration({ kind }: { kind: OnboardingIllustration }) {
         <div className="mx-auto w-48 rounded-md border border-border bg-background px-2 py-1.5">
           <div className="flex items-center justify-between gap-1">
             <span className="font-mono text-[10px] font-medium text-primary">SD-000</span>
-            <span className="rounded border border-border bg-secondary px-1.5 text-[10px] text-secondary-foreground">{t('board.move')}</span>
+            <span className="rounded border border-border bg-secondary px-1.5 text-[10px] text-secondary-foreground">
+              {t('board.move')}
+            </span>
           </div>
           <p className="mt-0.5 truncate text-[11px] font-medium text-foreground">{t('onboarding.example')}</p>
         </div>

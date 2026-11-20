@@ -6,7 +6,10 @@ import { Button } from './ui.tsx';
 export function ContentError({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-base" data-testid="content-error">
+    <div
+      className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-base"
+      data-testid="content-error"
+    >
       <Icon name="alertTriangle" className="size-4 text-destructive" />
       <span className="text-foreground">{t('common.contentFailed')}</span>
       <Button size="sm" onClick={onRetry} data-testid="content-retry">

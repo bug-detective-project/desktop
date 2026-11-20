@@ -72,13 +72,25 @@ export function planCleanup(found: LabelledResources, options: CleanupPlanOption
   // one that does not start with the active project's stem belongs to a project that was left. A
   // project whose id starts with the active one's (shop, shop-two) is kept: when in doubt, stay.
   const orphanService = (name: string, kind: 'svc' | 'svcdata') =>
-    Boolean(options.activeProject) && name.startsWith(`${options.prefix}-${kind}-`) && !name.startsWith(`${options.prefix}-${kind}-${options.activeProject}-`);
+    Boolean(options.activeProject) &&
+    name.startsWith(`${options.prefix}-${kind}-`) &&
+    !name.startsWith(`${options.prefix}-${kind}-${options.activeProject}-`);
 
   const containers = found.containers.filter(
-    (name) => ours(name) && (everything || isQaContainer(name, options.prefix) || isQaService(name, options.prefix) || orphan(name, 'forward') || orphanService(name, 'svc')),
+    (name) =>
+      ours(name) &&
+      (everything ||
+        isQaContainer(name, options.prefix) ||
+        isQaService(name, options.prefix) ||
+        orphan(name, 'forward') ||
+        orphanService(name, 'svc')),
   );
-  const volumes = found.volumes.filter((name) => ours(name) && (everything || name === options.qaInputVolume || orphanService(name, 'svcdata')));
-  const networks = found.networks.filter((name) => ours(name) && (everything || orphan(name, 'net') || isQaService(name, options.prefix)));
+  const volumes = found.volumes.filter(
+    (name) => ours(name) && (everything || name === options.qaInputVolume || orphanService(name, 'svcdata')),
+  );
+  const networks = found.networks.filter(
+    (name) => ours(name) && (everything || orphan(name, 'net') || isQaService(name, options.prefix)),
+  );
   const images = found.images.filter(({ ref }) => {
     // Untagged images with the app's label ("<none>:<none>", or "repository:<none>") are what a rebuild leaves behind.
     if (untagged(ref)) {

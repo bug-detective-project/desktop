@@ -35,14 +35,21 @@ export async function brokenLinks(urls, fetchUrl = fetch, waitMs = 5000) {
   return problems;
 }
 
-const slug = (heading) => heading.trim().toLowerCase().replace(/[^\p{L}\p{N} -]/gu, '').replace(/ /g, '-');
+const slug = (heading) =>
+  heading
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} -]/gu, '')
+    .replace(/ /g, '-');
 
 /** The links of the project to a section README.md does not have. */
 export function missingAnchors(links, readme) {
   const sections = new Set([...readme.matchAll(/^#{1,6} (.+)$/gm)].map(([, heading]) => slug(heading)));
   return Object.entries(links).flatMap(([name, url]) => {
     const [page, anchor] = url.split('#');
-    return page.startsWith(PROJECT) && anchor && !sections.has(anchor) ? [`${name}: no section "${anchor}" in README.md`] : [];
+    return page.startsWith(PROJECT) && anchor && !sections.has(anchor)
+      ? [`${name}: no section "${anchor}" in README.md`]
+      : [];
   });
 }
 

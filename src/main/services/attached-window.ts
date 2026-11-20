@@ -27,7 +27,12 @@ export interface StaleWindowOptions {
  * Call before attaching. The id is saved first, so the player is asked at most once: a platform that
  * cannot see its windows would otherwise never know the player closed it.
  */
-export async function closeStaleWindow({ file, containerId, containerName, closeWindows }: StaleWindowOptions): Promise<void> {
+export async function closeStaleWindow({
+  file,
+  containerId,
+  containerName,
+  closeWindows,
+}: StaleWindowOptions): Promise<void> {
   const last = (await readFile(file, 'utf8').catch(() => null))?.trim();
   if (last === containerId) {
     return;

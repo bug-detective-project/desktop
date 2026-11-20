@@ -5,7 +5,10 @@ export type LevelFilter = 'all' | ProjectDifficulty;
 
 /** Lower case without accents, so "Inventário" matches "inventario". */
 function fold(text: string): string {
-  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase();
+  return text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase();
 }
 
 /** What a project can be found by, in the active language: name, description, stack and skills. */
@@ -14,7 +17,14 @@ function searchableText(card: ProjectCard, language: Language): string {
   if (!details) {
     return card.id;
   }
-  return [details.name[language], details.about[language], details.stack?.frontend, details.stack?.backend, details.stack?.database, ...details.skills[language]]
+  return [
+    details.name[language],
+    details.about[language],
+    details.stack?.frontend,
+    details.stack?.backend,
+    details.stack?.database,
+    ...details.skills[language],
+  ]
     .filter(Boolean)
     .join('\n');
 }

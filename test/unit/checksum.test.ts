@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { ContentVerificationError, UnsafeArchiveError, readTar, readZip, safeRelativePath, sha256Hex, textFile, treeDigest, writeTar, writeZip } from '@bug-detective/catalog/contract';
+import {
+  ContentVerificationError,
+  UnsafeArchiveError,
+  readTar,
+  readZip,
+  safeRelativePath,
+  sha256Hex,
+  textFile,
+  treeDigest,
+  writeTar,
+  writeZip,
+} from '@bug-detective/catalog/contract';
 import type { TicketEntry } from '@bug-detective/catalog/contract';
 import { verifyTicket } from '../../src/main/services/content/source.ts';
 
@@ -51,7 +62,9 @@ describe('verification', () => {
   });
 
   it('rejects package contents that differ from the manifest', () => {
-    expect(() => verifyTicket({ ...ticket, packageFiles: [textFile('ticket.en.md', '# changed\n'), packageFiles[1]] })).toThrow(ContentVerificationError);
+    expect(() =>
+      verifyTicket({ ...ticket, packageFiles: [textFile('ticket.en.md', '# changed\n'), packageFiles[1]] }),
+    ).toThrow(ContentVerificationError);
     expect(() => verifyTicket({ ...ticket, packageFiles: [packageFiles[0]] })).toThrow(/package/);
   });
 });
@@ -66,7 +79,11 @@ describe('archive path safety', () => {
 
   it('strips the single top-level folder of GitHub archives', () => {
     const github = writeZip(codeFiles.map((file) => ({ ...file, path: `supportdesk-stage-1/${file.path}` })));
-    expect(readZip(github, { stripTopDirectory: true }).map((file) => file.path).sort()).toEqual(['client/src/App.tsx', 'package.json']);
+    expect(
+      readZip(github, { stripTopDirectory: true })
+        .map((file) => file.path)
+        .sort(),
+    ).toEqual(['client/src/App.tsx', 'package.json']);
     expect(() => readZip(writeZip(codeFiles), { stripTopDirectory: true })).toThrow(UnsafeArchiveError);
   });
 });

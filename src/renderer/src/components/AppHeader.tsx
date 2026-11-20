@@ -53,10 +53,17 @@ export function AppHeader({
       <div className="mx-auto flex h-16 max-w-10xl items-center justify-between gap-4 px-6">
         <div className="flex min-w-0 items-center gap-8">
           <div className="flex items-center gap-2.5">
-            <img src={logo} alt="" className="size-9 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15" draggable={false} />
+            <img
+              src={logo}
+              alt=""
+              className="size-9 shrink-0 rounded-[21%] dark:ring-1 dark:ring-white/15"
+              draggable={false}
+            />
             <div className="flex items-center whitespace-nowrap">
               <span className="text-lg font-bold tracking-tight text-foreground">{t('app.name')}</span>
-              <span className="ml-2.5 hidden border-l border-border pl-2.5 text-sm text-muted-foreground 2xl:inline">{company}</span>
+              <span className="ml-2.5 hidden border-l border-border pl-2.5 text-sm text-muted-foreground 2xl:inline">
+                {company}
+              </span>
             </div>
           </div>
           <nav className="flex items-center gap-1" aria-label="Main">
@@ -71,7 +78,9 @@ export function AppHeader({
                   data-testid={`nav-${item.id}`}
                   aria-current={active ? 'page' : undefined}
                   className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-base transition-colors ${
-                    active ? 'bg-primary/10 font-semibold text-primary' : 'font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                    active
+                      ? 'bg-primary/10 font-semibold text-primary'
+                      : 'font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                   }`}
                 >
                   <Icon name={item.icon} />
@@ -129,7 +138,9 @@ export function AppHeader({
             type="button"
             onClick={() => onNavigate('settings')}
             className={`inline-flex size-8 items-center justify-center rounded-full border shadow-xs transition-all ${
-              view === 'settings' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted'
+              view === 'settings'
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-border bg-card text-muted-foreground hover:bg-muted'
             }`}
             title={t('nav.settings')}
             aria-label={t('nav.settings')}
@@ -138,7 +149,10 @@ export function AppHeader({
           >
             <Icon name="settings" className="size-4" />
           </button>
-          <div className="flex size-8 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-sm font-semibold text-primary" aria-hidden>
+          <div
+            className="flex size-8 items-center justify-center rounded-full border border-primary/20 bg-primary/15 text-sm font-semibold text-primary"
+            aria-hidden
+          >
             {t('header.me')}
           </div>
         </div>

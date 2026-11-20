@@ -54,10 +54,17 @@ beforeAll(async () => {
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
   // The test's own image tags, made from the (labelled) workspace image built by the other tests.
-  const built = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
+  const built = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
   dir = await mkdtemp(join(tmpdir(), 'bd-cleanup-'));
   await writeFile(join(dir, 'images.json'), JSON.stringify({ workspace: IMAGES.workspace, qaBase: 'cleanup-test' }));
-  runtime = new DockerRuntime(platform, { contextRoot: dir, qaBuildRoot: join(dir, 'qa'), qaRepository: `${PREFIX}-qa-image`, prefix: PREFIX });
+  runtime = new DockerRuntime(platform, {
+    contextRoot: dir,
+    qaBuildRoot: join(dir, 'qa'),
+    qaRepository: `${PREFIX}-qa-image`,
+    prefix: PREFIX,
+  });
   runtime.setQaTool(QA_TOOL);
   await removeEverythingOfTheTest();
   for (const image of Object.values(IMAGES)) {
@@ -71,7 +78,16 @@ beforeAll(async () => {
     [`${PREFIX}-qa-0001`, 'qa'],
     [`${PREFIX}-forward-other`, 'forwarder'],
   ]) {
-    await docker.checked(['container', 'create', '--name', name, '--label', `${LABEL}=${role}`, IMAGES.workspace, 'true']);
+    await docker.checked([
+      'container',
+      'create',
+      '--name',
+      name,
+      '--label',
+      `${LABEL}=${role}`,
+      IMAGES.workspace,
+      'true',
+    ]);
   }
 });
 
@@ -105,7 +121,9 @@ describe('Docker cleanup', () => {
     expect(await exists.image(IMAGES.workspace)).toBe(false);
     expect(await exists.image(IMAGES.qa)).toBe(false);
     // Another namespace (the image the tags were made from) is untouched.
-    const built = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
+    const built = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+      workspace: string;
+    };
     expect(await exists.image(built.workspace)).toBe(true);
   });
 });

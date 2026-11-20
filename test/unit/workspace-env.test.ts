@@ -1,3 +1,4 @@
+import type { ProjectPorts } from '@bug-detective/catalog/contract';
 import { describe, expect, it } from 'vitest';
 import { Docker } from '../../src/main/services/docker.ts';
 import type { CommandRunner } from '../../src/main/services/process.ts';
@@ -8,11 +9,21 @@ const NETWORK = 'bugdetective-net-shop';
 
 /** A docker CLI over an in-memory set of containers; every other command succeeds. */
 function world() {
-  const containers: Record<string, { running: boolean; labels: Record<string, string>; networks: string[]; ports: Record<string, { HostPort: string }[]> }> = {};
+  const containers: Record<
+    string,
+    {
+      running: boolean;
+      labels: Record<string, string>;
+      networks: string[];
+      ports: Record<string, { HostPort: string }[]>;
+    }
+  > = {};
   const calls: string[][] = [];
   const out = (text = '', code = 0) => ({ code, stdout: Buffer.from(text), stderr: '', timedOut: false });
   const labelsOf = (args: readonly string[]) =>
-    Object.fromEntries(args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])));
+    Object.fromEntries(
+      args.flatMap((arg, index) => (arg === '--label' ? [args[index + 1]!.split(/=(.*)/s).slice(0, 2)] : [])),
+    );
   const runner: CommandRunner = async (_cli, args) => {
     calls.push([...args]);
     const [a, b] = args;
@@ -27,7 +38,12 @@ function world() {
           return [[`${container}/tcp`, [{ HostPort: host! }]]];
         }),
       );
-      containers[name] = { running: a === 'run', labels: labelsOf(args), networks: [args[args.indexOf('--network') + 1]!], ports };
+      containers[name] = {
+        running: a === 'run',
+        labels: labelsOf(args),
+        networks: [args[args.indexOf('--network') + 1]!],
+        ports,
+      };
       return out('id');
     }
     if (a === 'network' && b === 'connect') return (containers[last]!.networks.push(args[2]!), out());
@@ -57,16 +73,27 @@ function world() {
 
 const workspaceOf = (
   docker: Docker,
-  extra: { variables?: Record<string, string>; memory?: string; publishedServices?: { name: string; port: number }[]; isPortFree?: (port: number) => Promise<boolean> } = {},
+  extra: {
+    variables?: Record<string, string>;
+    memory?: string;
+    publishedServices?: { name: string; port: number }[];
+    declaredPorts?: ProjectPorts;
+    isPortFree?: (port: number) => Promise<boolean>;
+    anyFreePort?: () => Promise<number>;
+  } = {},
 ) => new Workspace({ docker, image: IMAGE, isPortFree: async () => true, project: 'shop', ...extra });
 
 /** True when `flag value` appears as two consecutive arguments. */
-const has = (args: string[], flag: string, value: string) => args.some((arg, index) => arg === flag && args[index + 1] === value);
+const has = (args: string[], flag: string, value: string) =>
+  args.some((arg, index) => arg === flag && args[index + 1] === value);
 
 describe("the workspace and the project's services", () => {
   it('starts with the variables of the services and the memory the project asks for', async () => {
     const { docker, runs } = world();
-    await workspaceOf(docker, { variables: { DATABASE_URL: 'pg://db:5432', CACHE_URL: 'redis://cache:6379' }, memory: '4g' }).ensureRunning();
+    await workspaceOf(docker, {
+      variables: { DATABASE_URL: 'pg://db:5432', CACHE_URL: 'redis://cache:6379' },
+      memory: '4g',
+    }).ensureRunning();
     const [run] = runs();
     expect(has(run!, '--env', 'DATABASE_URL=pg://db:5432')).toBe(true);
     expect(has(run!, '--env', 'CACHE_URL=redis://cache:6379')).toBe(true);
@@ -112,7 +139,9 @@ describe("the workspace and the project's services", () => {
     await workspaceOf(docker, { variables: { DATABASE_URL: 'pg://db:5432' } }).ensureRunning();
     await workspaceOf(docker, changed).ensureRunning();
     expect(runs()).toHaveLength(2);
-    expect(calls.filter((call) => call[0] === 'container' && call[1] === 'rm').map((call) => call.at(-1))).toEqual(['bugdetective-workspace']);
+    expect(calls.filter((call) => call[0] === 'container' && call[1] === 'rm').map((call) => call.at(-1))).toEqual([
+      'bugdetective-workspace',
+    ]);
     expect(calls.filter((call) => call[0] === 'volume' && call[1] === 'rm')).toHaveLength(0);
   });
 });
@@ -140,6 +169,20 @@ describe('the published port of a service', () => {
     expect(await workspace.servicePorts()).toEqual({ db: 5433 });
   });
 
+  it('asks the system for a port when every port near the preferred one is reserved', async () => {
+    // Windows can reserve whole blocks (2741 to 3240): no port from 3001 to 3200 can be listened on.
+    const { docker, calls } = world();
+    const handedOut = [55001, 55002];
+    const workspace = workspaceOf(docker, {
+      isPortFree: async (port) => port < 2741 || port > 3240,
+      anyFreePort: async () => handedOut.shift()!,
+    });
+    await workspace.ensureRunning();
+    const [create] = forwarders(calls);
+    expect(has(create!, '--publish', '127.0.0.1:5173:15173')).toBe(true);
+    expect(create!.some((arg) => /^127\.0\.0\.1:55001:/.test(arg))).toBe(true);
+  });
+
   it('gives two services of the same image different ports', async () => {
     const { docker } = world();
     const workspace = workspaceOf(docker, { publishedServices: [...db, { name: 'audit', port: 5432 }] });
@@ -164,5 +207,107 @@ describe('the published port of a service', () => {
     expect(forwarders(calls)).toHaveLength(2);
     await workspaceOf(docker, { publishedServices: db }).ensureRunning();
     expect(forwarders(calls)).toHaveLength(2);
+  });
+});
+
+describe('the ports a project declares', () => {
+  const WORKSPACE = 'bugdetective-workspace';
+  const forwarders = (calls: string[][]) => calls.filter((call) => call[0] === 'container' && call[1] === 'create');
+  const routesOf = (create: string[]) =>
+    create.find((arg) => arg.startsWith('BUGDETECTIVE_FORWARD='))!.slice('BUGDETECTIVE_FORWARD='.length);
+  const envOf = (run: string[], name: string) =>
+    run.flatMap((arg, index) =>
+      arg === '--env' && run[index + 1]!.startsWith(`${name}=`) ? [run[index + 1]!.slice(name.length + 1)] : [],
+    )[0];
+  /** The ports of Smoke Desk. */
+  const smoke: ProjectPorts = {
+    client: { port: 5173, open: true, variables: { CLIENT_ORIGIN: 'http://localhost:{{port}}' } },
+    api: { port: 3001 },
+    audit: { port: 3002, variables: { VITE_AUDIT_URL: 'http://localhost:{{port}}' } },
+  };
+
+  it('publishes client and api as before when the project declares no ports', async () => {
+    const { docker, calls, runs } = world();
+    const workspace = workspaceOf(docker);
+    await workspace.ensureRunning();
+    const [create] = forwarders(calls);
+    expect(routesOf(create!)).toBe(`15173:${WORKSPACE}:15173,3001:${WORKSPACE}:3001`);
+    expect(has(create!, '--publish', '127.0.0.1:5173:15173')).toBe(true);
+    expect(has(create!, '--publish', '127.0.0.1:3001:3001')).toBe(true);
+    expect(envOf(runs()[0]!, 'BUGDETECTIVE_WORKSPACE_PORTS')).toBeUndefined();
+    expect(await workspace.ports()).toEqual({ client: 5173, api: 3001 });
+  });
+
+  it('publishes one route per declared port, mirrored at port + 10000', async () => {
+    const { docker, calls, runs } = world();
+    const workspace = workspaceOf(docker, { declaredPorts: smoke });
+    await workspace.ensureRunning();
+    const [create] = forwarders(calls);
+    expect(routesOf(create!)).toBe(`15173:${WORKSPACE}:15173,13001:${WORKSPACE}:13001,13002:${WORKSPACE}:13002`);
+    expect(has(create!, '--publish', '127.0.0.1:5173:15173')).toBe(true);
+    expect(has(create!, '--publish', '127.0.0.1:3001:13001')).toBe(true);
+    expect(has(create!, '--publish', '127.0.0.1:3002:13002')).toBe(true);
+    expect(envOf(runs()[0]!, 'BUGDETECTIVE_WORKSPACE_PORTS')).toBe('5173,3001,3002');
+    expect(await workspace.ports()).toEqual({ client: 5173, api: 3001, audit: 3002 });
+  });
+
+  it('fills the port variables with the chosen host port when the preferred one is taken', async () => {
+    const { docker, runs } = world();
+    const workspace = workspaceOf(docker, { declaredPorts: smoke, isPortFree: async (port) => port !== 3002 });
+    await workspace.ensureRunning();
+    const [run] = runs();
+    expect(envOf(run!, 'VITE_AUDIT_URL')).toBe('http://localhost:3003');
+    expect(envOf(run!, 'CLIENT_ORIGIN')).toBe('http://localhost:5173');
+    expect(await workspace.ports()).toEqual({ client: 5173, api: 3001, audit: 3003 });
+  });
+
+  it('keeps the services variables next to the port variables', async () => {
+    const { docker, runs } = world();
+    await workspaceOf(docker, {
+      declaredPorts: smoke,
+      variables: { NOTES_DATABASE_URL: 'pg://notes-db:5432' },
+    }).ensureRunning();
+    const [run] = runs();
+    expect(envOf(run!, 'NOTES_DATABASE_URL')).toBe('pg://notes-db:5432');
+    expect(envOf(run!, 'VITE_AUDIT_URL')).toBe('http://localhost:3002');
+  });
+
+  it('keeps the forwarder and the container while the declaration is the same', async () => {
+    const { docker, calls, runs } = world();
+    await workspaceOf(docker, { declaredPorts: smoke }).ensureRunning();
+    await workspaceOf(docker, { declaredPorts: smoke }).ensureRunning();
+    expect(forwarders(calls)).toHaveLength(1);
+    expect(runs()).toHaveLength(1);
+  });
+
+  it('recreates the container when the declared ports change, keeping its volumes', async () => {
+    const { docker, calls, runs } = world();
+    await workspaceOf(docker, { declaredPorts: smoke }).ensureRunning();
+    await workspaceOf(docker, { declaredPorts: { ...smoke, audit: { ...smoke.audit!, port: 3005 } } }).ensureRunning();
+    expect(forwarders(calls)).toHaveLength(2);
+    expect(runs()).toHaveLength(2);
+    expect(envOf(runs()[1]!, 'BUGDETECTIVE_WORKSPACE_PORTS')).toBe('5173,3001,3005');
+    expect(calls.filter((call) => call[0] === 'volume' && call[1] === 'rm')).toHaveLength(0);
+  });
+
+  it('asks the dev server through the mirror of the declared client port', async () => {
+    const { docker, calls } = world();
+    const workspace = workspaceOf(docker, { declaredPorts: { api: { port: 3001 }, client: { port: 4200 } } });
+    await workspace.isDevServerUp();
+    expect(calls.at(-1)).toContain('http://127.0.0.1:14200/');
+  });
+
+  it('keeps a published service clear of the mirror of a declared port', async () => {
+    const { docker, calls } = world();
+    const workspace = workspaceOf(docker, {
+      declaredPorts: { client: { port: 5173 }, admin: { port: 10000 } },
+      publishedServices: [{ name: 'db', port: 5432 }],
+    });
+    await workspace.ensureRunning();
+    const routes = routesOf(forwarders(calls)[0]!)
+      .split(',')
+      .map((route) => Number(route.split(':')[0]));
+    expect(new Set(routes).size).toBe(routes.length);
+    expect(await workspace.servicePorts()).toEqual({ db: 5432 });
   });
 });

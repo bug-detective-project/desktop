@@ -19,7 +19,8 @@ afterEach(() => {
   }
 });
 
-const listen = (server: Server) => new Promise<number>((done) => server.listen(0, '127.0.0.1', () => done((server.address() as AddressInfo).port)));
+const listen = (server: Server) =>
+  new Promise<number>((done) => server.listen(0, '127.0.0.1', () => done((server.address() as AddressInfo).port)));
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -34,8 +35,11 @@ async function echo(prefix: string): Promise<number> {
   return listen(server);
 }
 
-function start(routes: string): Promise<void> {
-  const child = spawn(process.execPath, [script], { env: { ...process.env, BUGDETECTIVE_FORWARD: routes }, stdio: ['ignore', 'pipe', 'inherit'] });
+function start(routes: string, env: Record<string, string> = { BUGDETECTIVE_FORWARD: routes }): Promise<void> {
+  const child = spawn(process.execPath, [script], {
+    env: { ...process.env, ...env },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
   running.push(child);
   const expected = routes.split(',').length;
   return new Promise((done, fail) => {
@@ -60,6 +64,38 @@ const ask = (port: number, text: string) =>
     socket.on('close', () => done(answer));
     socket.on('error', () => done(answer));
   });
+
+/** A port where an echo server answers on 127.0.0.1, with port + 10000 free for its mirror. */
+async function echoWithMirror(prefix: string): Promise<number> {
+  for (;;) {
+    const port = 20000 + Math.floor(Math.random() * 30000);
+    const server = createServer((socket) => socket.on('data', (data) => socket.write(`${prefix}:${data.toString()}`)));
+    const ok = await new Promise<boolean>((done) => {
+      server.once('error', () => done(false));
+      server.listen(port, '127.0.0.1', () => done(true));
+    });
+    if (!ok) continue;
+    const mirror = createServer();
+    const mirrorFree = await new Promise<boolean>((done) => {
+      mirror.once('error', () => done(false));
+      mirror.listen(port + 10000, '0.0.0.0', () => mirror.close(() => done(true)));
+    });
+    if (mirrorFree) {
+      running.push(server);
+      return port;
+    }
+    server.close();
+  }
+}
+
+describe('the workspace mirror', () => {
+  it('mirrors every port of BUGDETECTIVE_WORKSPACE_PORTS', async () => {
+    const [client, audit] = [await echoWithMirror('client'), await echoWithMirror('audit')];
+    await start(`${client},${audit}`, { BUGDETECTIVE_WORKSPACE_PORTS: `${client},${audit}` });
+    expect(await ask(client + 10000, 'hello')).toBe('client:hello');
+    expect(await ask(audit + 10000, 'hello')).toBe('audit:hello');
+  });
+});
 
 describe('the forwarder', () => {
   it('relays every route to its target', async () => {

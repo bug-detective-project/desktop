@@ -24,17 +24,43 @@ import type {
   DevCatalogView,
   LocalCatalog,
   ServiceStatus,
+  DeclaredPortView,
 } from '../shared/api.ts';
 import { INSTALL_DISK_BYTES } from '../shared/api.ts';
 import { blocksVSCode } from '../shared/api.ts';
 import * as rules from '../shared/kanban.ts';
 import type { RuleContext } from '../shared/kanban.ts';
 import { HINTS_PER_TICKET, LANGUAGES, MAX_QA_TIMEOUT_SECONDS, MIN_QA_TIMEOUT_SECONDS } from '../shared/types.ts';
-import type { Column, GameState, Language, ReviewSession, Settings, Track, TrackChoice, TrackCounts } from '../shared/types.ts';
+import type {
+  Column,
+  GameState,
+  Language,
+  ReviewSession,
+  Settings,
+  Track,
+  TrackChoice,
+  TrackCounts,
+} from '../shared/types.ts';
 import type { GameRuntime } from './runtime.ts';
 import { StaleVSCodeWindowError } from './services/attached-window.ts';
 import { createSave, readSave } from './services/backup.ts';
-import { ContentVerificationError, IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, appSupports, compareVersions, countsOf, entryById, fileText, parseReviewConfig, projectContentOf, qaToolFiles, readZip, verifyPackage, writeZip } from '@bug-detective/catalog/contract';
+import {
+  ContentVerificationError,
+  IncompletePublicationError,
+  TicketNotPublishedError,
+  UnsupportedFormatError,
+  appSupports,
+  compareVersions,
+  countsOf,
+  entryById,
+  fileText,
+  parseReviewConfig,
+  projectContentOf,
+  qaToolFiles,
+  readZip,
+  verifyPackage,
+  writeZip,
+} from '@bug-detective/catalog/contract';
 import type { ArchiveFile, ProjectFiles, ReviewConfig, TicketEntry, TicketMeta } from '@bug-detective/catalog/contract';
 import { TICKET_META_FILE, parseTicketMeta, peakMemory } from '@bug-detective/catalog/contract';
 import { metaOfEntry } from '../shared/ticketMeta.ts';
@@ -159,7 +185,12 @@ export interface DevCatalogOptions {
 
 /** The projects catalog (see services/catalog.ts), with each project's content source and data folders. */
 export interface GameProjects {
-  catalog: { current(): Promise<ResolvedProject[]>; refresh(): Promise<boolean>; describe?(): string; usingFallback?(): boolean };
+  catalog: {
+    current(): Promise<ResolvedProject[]>;
+    refresh(): Promise<boolean>;
+    describe?(): string;
+    usingFallback?(): boolean;
+  };
   /** The content source of a project; minVersion is the oldest manifest version it may accept. */
   content(project: ResolvedProject, minVersion: string | null): ContentSource;
   packages(id: string): PackageStore;
@@ -192,6 +223,8 @@ export class Game {
   private dbResetFailed = false;
   /** The project's services as Docker last reported them; refreshed with the environment and around each database reset. */
   private services: ServiceStatus[] = [];
+  /** Where each published port was on the computer at the last check; null before one, or without a forwarder. */
+  private publishedPorts: Record<string, number> | null = null;
   private workspaceOutOfMemoryAt: string | null = null;
   /** When each service last had a process killed for lack of memory while it stayed up. */
   private serviceMemoryKills: Record<string, string> = {};
@@ -252,7 +285,11 @@ export class Game {
   /** Every project the catalog lists or this game played, except the active one. */
   private otherProjectIds(): string[] {
     const active = this.activeProject();
-    const ids = [...this.catalog.map((item) => item.id), ...Object.keys(this.state.projectSources), ...Object.keys(this.state.otherProjects)];
+    const ids = [
+      ...this.catalog.map((item) => item.id),
+      ...Object.keys(this.state.projectSources),
+      ...Object.keys(this.state.otherProjects),
+    ];
     return [...new Set(ids)].filter((id) => id !== active);
   }
 
@@ -303,10 +340,18 @@ export class Game {
       return state;
     }
     const before = state.projectSources[id]?.minVersion ?? null;
-    const raised = entry.official && accepted !== null && (before === null || compareVersions(accepted, before) > 0) ? accepted : before;
+    const raised =
+      entry.official && accepted !== null && (before === null || compareVersions(accepted, before) > 0)
+        ? accepted
+        : before;
     const next = { repository: entry.repository, qaRef: entry.qaRef, minVersion: raised };
     const current = state.projectSources[id];
-    if (current && current.repository === next.repository && current.qaRef === next.qaRef && current.minVersion === next.minVersion) {
+    if (
+      current &&
+      current.repository === next.repository &&
+      current.qaRef === next.qaRef &&
+      current.minVersion === next.minVersion
+    ) {
       return state;
     }
     return { ...state, projectSources: { ...state.projectSources, [id]: next } };
@@ -344,7 +389,11 @@ export class Game {
       testFile: dev.testFile,
       inUse: this.options.projects?.catalog.describe?.() ?? 'official',
       fallback: this.options.projects?.catalog.usingFallback?.() ?? false,
-      projects: this.catalog.map((item) => ({ id: item.id, qaRef: item.qaRef, source: item.qaDir !== undefined ? `local: ${item.qaDir}` : `github: ${item.repository} (${item.qaRef})` })),
+      projects: this.catalog.map((item) => ({
+        id: item.id,
+        qaRef: item.qaRef,
+        source: item.qaDir !== undefined ? `local: ${item.qaDir}` : `github: ${item.repository} (${item.qaRef})`,
+      })),
     };
   }
 
@@ -510,8 +559,12 @@ export class Game {
     // The workspace folder is named after the project and its git identity after the project's
     // name: both come from the manifest, with or without a catalog.
     this.options.runtime.setProject(content.manifest.project.id, content.manifest.project.name);
-    const { services, memory } = content.manifest.project;
-    this.options.runtime.setResources({ ...(services && { services }), ...(memory && { memory }) });
+    const { services, memory, ports } = content.manifest.project;
+    this.options.runtime.setResources({
+      ...(services && { services }),
+      ...(memory && { memory }),
+      ...(ports && { ports }),
+    });
     this.emit();
     const active = this.activeProject();
     if (active && this.withSource(this.state, active, content.manifest.version) !== this.state) {
@@ -537,12 +590,20 @@ export class Game {
     if (!counts) {
       return null;
     }
-    const done = (track?: Track) => this.state.tickets.filter((item) => item.status === 'done' && (!track || item.track === track)).length;
+    const done = (track?: Track) =>
+      this.state.tickets.filter((item) => item.status === 'done' && (!track || item.track === track)).length;
     const queue = (choice: TrackChoice): TrackQueue => {
       const id = rules.nextIdFor(this.state, counts, choice);
       const track = choice === 'fullstack' ? undefined : choice;
       return {
-        next: id ? { id, track: id.split('-')[0] as Track, title: this.titleOf(id), ...metaOfEntry(this.content?.manifest.entries.find((entry) => entry.id === id)) } : null,
+        next: id
+          ? {
+              id,
+              track: id.split('-')[0] as Track,
+              title: this.titleOf(id),
+              ...metaOfEntry(this.content?.manifest.entries.find((entry) => entry.id === id)),
+            }
+          : null,
         done: done(track),
         total: track ? counts[track] : counts.front + counts.back,
       };
@@ -551,7 +612,9 @@ export class Game {
   }
 
   private ticketMetaView(): Snapshot['ticketMeta'] {
-    return Object.fromEntries(this.state.tickets.map((ticket) => [ticket.ticket, metaOfEntry(this.ticketMeta[ticket.ticket])]));
+    return Object.fromEntries(
+      this.state.tickets.map((ticket) => [ticket.ticket, metaOfEntry(this.ticketMeta[ticket.ticket])]),
+    );
   }
 
   /** The skills of the Done tickets that name them. The skills of any other ticket stay in the main process. */
@@ -590,7 +653,10 @@ export class Game {
       projects: this.projectCards(),
       projectNeedsUpdate: this.activeProjectNeedsUpdate(),
       // Nothing played yet: the game cannot start at all.
-      starterNeedsUpdate: this.state.tickets.length === 0 && Object.keys(this.state.otherProjects).length === 0 && this.activeProjectNeedsUpdate(),
+      starterNeedsUpdate:
+        this.state.tickets.length === 0 &&
+        Object.keys(this.state.otherProjects).length === 0 &&
+        this.activeProjectNeedsUpdate(),
       projectSwitchLeft: this.state.projectSwitch ? this.leftovers : null,
       titles: this.titles,
       ticketMeta: this.ticketMetaView(),
@@ -599,7 +665,12 @@ export class Game {
       busy: this.busy,
       workspaceLost: this.workspaceLost,
       dbResetFailed: this.dbResetFailed,
-      services: this.services.map((service) => (this.serviceMemoryKills[service.name] ? { ...service, memoryKillAt: this.serviceMemoryKills[service.name] } : service)),
+      services: this.services.map((service) =>
+        this.serviceMemoryKills[service.name]
+          ? { ...service, memoryKillAt: this.serviceMemoryKills[service.name] }
+          : service,
+      ),
+      declaredPorts: this.declaredPortsView(),
       workspaceOutOfMemoryAt: this.workspaceOutOfMemoryAt,
       workspaceInternet: this.workspaceInternet,
       catalogRefresh: this.catalogRefresh,
@@ -639,7 +710,15 @@ export class Game {
       versions: this.options.versions,
       os: options?.os ?? { platform: process.platform, release: '', version: '', arch: process.arch },
       checks: this.prerequisites?.checks ?? [],
-      project: this.content ? { id: this.content.manifest.project.id, name: this.content.manifest.project.name, manifestVersion: this.content.manifest.version } : active ? { id: active, name: active, manifestVersion: '' } : null,
+      project: this.content
+        ? {
+            id: this.content.manifest.project.id,
+            name: this.content.manifest.project.name,
+            manifestVersion: this.content.manifest.version,
+          }
+        : active
+          ? { id: active, name: active, manifestVersion: '' }
+          : null,
       dockerState: this.dockerState,
       environment: this.environment,
       logLines: options ? await options.recentLog() : this.log,
@@ -708,10 +787,14 @@ export class Game {
       }
       this.titles[ticket.ticket] = titles;
       const hints = await this.packages.readText(ticket.ticket, 'hints.en.json');
-      this.hintsTotal[ticket.ticket] = hints ? (JSON.parse(hints) as { hints: string[] }).hints.length : HINTS_PER_TICKET;
+      this.hintsTotal[ticket.ticket] = hints
+        ? (JSON.parse(hints) as { hints: string[] }).hints.length
+        : HINTS_PER_TICKET;
       // The package was verified against the manifest, whose entry repeats this file.
       const meta = await this.packages.readText(ticket.ticket, TICKET_META_FILE);
-      this.ticketMeta[ticket.ticket] = meta ? parseTicketMeta(JSON.parse(meta), `tickets/${ticket.id}/${TICKET_META_FILE}`) : {};
+      this.ticketMeta[ticket.ticket] = meta
+        ? parseTicketMeta(JSON.parse(meta), `tickets/${ticket.id}/${TICKET_META_FILE}`)
+        : {};
     }
   }
 
@@ -730,7 +813,9 @@ export class Game {
     this.setDockerState(state);
     if (state === 'running' && this.recoverReview && !this.busy) {
       this.recoverReview = false;
-      void this.returnToPlayerCode().catch((error: unknown) => this.appendLog(`» Could not restore your code: ${(error as Error).message}`));
+      void this.returnToPlayerCode().catch((error: unknown) =>
+        this.appendLog(`» Could not restore your code: ${(error as Error).message}`),
+      );
     }
     return state;
   }
@@ -761,7 +846,9 @@ export class Game {
     }
     await this.options.runtime.setWorkspaceInternet(on);
     this.workspaceInternet = on;
-    this.appendLog(on ? '» The workspace can reach the internet until the next ticket' : '» The workspace is closed again');
+    this.appendLog(
+      on ? '» The workspace can reach the internet until the next ticket' : '» The workspace is closed again',
+    );
     this.emit();
   }
 
@@ -863,7 +950,10 @@ export class Game {
       this.appendLog('» The workspace ran out of memory: the kernel stopped a process in it');
     }
     for (const name of await this.options.runtime.servicesOutOfMemory().catch(() => [] as string[])) {
-      this.serviceMemoryKills = { ...this.serviceMemoryKills, [name]: (this.options.clock?.() ?? new Date()).toISOString() };
+      this.serviceMemoryKills = {
+        ...this.serviceMemoryKills,
+        [name]: (this.options.clock?.() ?? new Date()).toISOString(),
+      };
       this.appendLog(`» Service ${name} ran out of memory: the kernel stopped a process in it`);
     }
   }
@@ -872,9 +962,12 @@ export class Game {
   private async refreshServices(): Promise<void> {
     const before = new Map(this.services.map((service) => [service.name, service.state]));
     this.services = await this.options.runtime.servicesStatus().catch(() => []);
+    this.publishedPorts = await this.options.runtime.publishedPorts().catch(() => null);
     for (const service of this.services) {
       if ((service.state === 'failed' || service.state === 'oom') && before.get(service.name) !== service.state) {
-        this.appendLog(`» Service ${service.name} (${service.image}): ${service.state === 'oom' ? 'killed for lack of memory' : (service.reason ?? 'stopped')}`);
+        this.appendLog(
+          `» Service ${service.name} (${service.image}): ${service.state === 'oom' ? 'killed for lack of memory' : (service.reason ?? 'stopped')}`,
+        );
       }
     }
   }
@@ -983,13 +1076,18 @@ export class Game {
       if (!options.ignoreDiskSpace) {
         const free = await this.options.runtime.freeDiskBytes().catch(() => null);
         if (free !== null && free < Game.INSTALL_DISK_BYTES) {
-          this.appendLog(`» ${(free / 1e9).toFixed(1)} GB free on the Docker disk; about ${Math.round(Game.INSTALL_DISK_BYTES / 1e9)} GB are needed`);
+          this.appendLog(
+            `» ${(free / 1e9).toFixed(1)} GB free on the Docker disk; about ${Math.round(Game.INSTALL_DISK_BYTES / 1e9)} GB are needed`,
+          );
           throw new GameError('lowDiskSpace', String(free));
         }
       }
       const left = await this.cleanOtherProjects();
       if (left.length > 0) {
-        throw new GameError('otherProjectsLeft', `Docker still has resources of another project: ${left.map((item) => item.name).join(', ')}`);
+        throw new GameError(
+          'otherProjectsLeft',
+          `Docker still has resources of another project: ${left.map((item) => item.name).join(', ')}`,
+        );
       }
       this.appendLog(`» Downloading the project from ${this.source.describe()}`);
       try {
@@ -1090,10 +1188,13 @@ export class Game {
     }
     const active = this.activeProject();
     // The catalog's projects, without hidden ones nobody played here, then played projects that left the catalog.
-    const played = (id: string) => id === active || this.state.otherProjects[id] !== undefined || this.state.projectSources[id] !== undefined;
+    const played = (id: string) =>
+      id === active || this.state.otherProjects[id] !== undefined || this.state.projectSources[id] !== undefined;
     const ids = [
       ...this.catalog.filter((item) => !item.hidden || played(item.id)).map((item) => item.id),
-      ...[...Object.keys(this.state.otherProjects), active ?? ''].filter((id) => id && !this.catalog.some((item) => item.id === id)),
+      ...[...Object.keys(this.state.otherProjects), active ?? ''].filter(
+        (id) => id && !this.catalog.some((item) => item.id === id),
+      ),
     ];
     return [...new Set(ids)].map((id): ProjectCard => {
       const item = { id };
@@ -1110,18 +1211,34 @@ export class Game {
           skills: { en: story.en.project.skills ?? [], pt: story.pt.project.skills ?? [] },
           difficulty: content.manifest.project.difficulty ?? null,
           counts: countsOf(content.manifest),
-          memoryBytes: Object.keys(content.manifest.project.services ?? {}).length > 0 ? peakMemory(content.manifest.project) : null,
+          memoryBytes:
+            Object.keys(content.manifest.project.services ?? {}).length > 0
+              ? peakMemory(content.manifest.project)
+              : null,
         };
       }
-      const progress = item.id === active ? { tickets: this.state.tickets, tracks: this.state.tracks } : (this.state.otherProjects[item.id] ?? null);
-      const done = (track: Track) => progress?.tickets.filter((ticket) => ticket.track === track && ticket.status === 'done').length ?? 0;
+      const progress =
+        item.id === active
+          ? { tickets: this.state.tickets, tracks: this.state.tracks }
+          : (this.state.otherProjects[item.id] ?? null);
+      const done = (track: Track) =>
+        progress?.tickets.filter((ticket) => ticket.track === track && ticket.status === 'done').length ?? 0;
       return {
         id: item.id,
         active: item.id === active,
         played: progress !== null && progress.tickets.length > 0,
         details,
-        progress: progress?.tracks ? { front: { done: done('front'), total: progress.tracks.front }, back: { done: done('back'), total: progress.tracks.back } } : null,
-        unavailable: this.needsUpdate(item.id) ? 'appTooOld' : this.unavailableProjects.has(item.id) ? 'projectUnavailable' : null,
+        progress: progress?.tracks
+          ? {
+              front: { done: done('front'), total: progress.tracks.front },
+              back: { done: done('back'), total: progress.tracks.back },
+            }
+          : null,
+        unavailable: this.needsUpdate(item.id)
+          ? 'appTooOld'
+          : this.unavailableProjects.has(item.id)
+            ? 'projectUnavailable'
+            : null,
       };
     });
   }
@@ -1174,7 +1291,9 @@ export class Game {
         }
         throw contentError(error);
       }
-      this.appendLog(`» Verified ${fetched.entry.id} (${fetched.codeFiles.length} files and the ticket package, SHA-256)`);
+      this.appendLog(
+        `» Verified ${fetched.entry.id} (${fetched.codeFiles.length} files and the ticket package, SHA-256)`,
+      );
       await this.packages.save(ticket, writeZip(fetched.packageFiles));
       const content = await this.source.current().catch(() => null);
       if (content) {
@@ -1191,7 +1310,13 @@ export class Game {
       await this.options.runtime.checkoutPlayerBranch(ticket);
       this.appendLog(`» Workspace ready for ticket ${ticket} (${fetched.entry.id})`);
       await this.resetDatabase();
-      const info = { id: fetched.entry.id, track: fetched.entry.track, commit, manifestVersion: fetched.manifestVersion, counts: fetched.counts };
+      const info = {
+        id: fetched.entry.id,
+        track: fetched.entry.track,
+        commit,
+        manifestVersion: fetched.manifestVersion,
+        counts: fetched.counts,
+      };
       await this.commit((state, ctx) => rules.unlockTicket(state, ticket, info, ctx));
       await this.loadTicketMeta();
     });
@@ -1222,7 +1347,9 @@ export class Game {
       await this.beforePlayerCode();
       const discarded = await this.options.runtime.resetToStage(ticket);
       if (discarded.changes > 0 || discarded.commits > 0) {
-        this.appendLog(`» Workspace reset to stage ${ticket}: discarded ${discarded.changes} changed file(s) and ${discarded.commits} commit(s)`);
+        this.appendLog(
+          `» Workspace reset to stage ${ticket}: discarded ${discarded.changes} changed file(s) and ${discarded.commits} commit(s)`,
+        );
       }
       await this.resetDatabase();
       await this.commit((state, ctx) => rules.playerMove(state, ticket, 'inProgress', ctx));
@@ -1286,13 +1413,21 @@ export class Game {
       });
       // A pass is recorded only with its approved snapshot; if that cannot be saved, QA did not complete.
       const playerDiff = result.status === 'passed' ? await this.captureApproval(ticket) : null;
-      await this.commit((state, ctx) => rules.recordQaResult(state, ticket, { startedAt, branch, branchWarning, timeoutSeconds, result, playerDiff }, ctx));
+      await this.commit((state, ctx) =>
+        rules.recordQaResult(
+          state,
+          ticket,
+          { startedAt, branch, branchWarning, timeoutSeconds, result, playerDiff },
+          ctx,
+        ),
+      );
     } catch (error) {
       if (this.shuttingDown || this.qaAborted) {
         // shutdown() or suspend() records the run as interrupted (the same path as a crash), once it is over.
         return;
       }
-      const detail = error instanceof DockerUnavailableError ? 'Docker stopped while QA was running.' : (error as Error).message;
+      const detail =
+        error instanceof DockerUnavailableError ? 'Docker stopped while QA was running.' : (error as Error).message;
       await this.commit((state, ctx) => rules.recordQaError(state, ticket, detail.slice(0, 4000), ctx));
       await this.refreshDockerState();
     }
@@ -1308,7 +1443,9 @@ export class Game {
       return;
     }
     this.shuttingDown = true;
-    const stopped = this.options.runtime.shutdown().catch((error: Error) => this.appendLog(`» Shutdown: ${error.message}`));
+    const stopped = this.options.runtime
+      .shutdown()
+      .catch((error: Error) => this.appendLog(`» Shutdown: ${error.message}`));
     // The QA run ends as soon as its container is gone; never wait for it longer than the stop itself.
     await Promise.race([this.qaRun ?? Promise.resolve(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
     await stopped;
@@ -1349,11 +1486,15 @@ export class Game {
   }
 
   async askSenior(ticket: number): Promise<void> {
-    await this.commit((state, ctx) => rules.revealHint(state, ticket, this.hintsTotal[ticket] ?? HINTS_PER_TICKET, ctx));
+    await this.commit((state, ctx) =>
+      rules.revealHint(state, ticket, this.hintsTotal[ticket] ?? HINTS_PER_TICKET, ctx),
+    );
   }
 
   async revealSolution(ticket: number): Promise<void> {
-    await this.commit((state, ctx) => rules.revealSolution(state, ticket, this.hintsTotal[ticket] ?? HINTS_PER_TICKET, ctx));
+    await this.commit((state, ctx) =>
+      rules.revealSolution(state, ticket, this.hintsTotal[ticket] ?? HINTS_PER_TICKET, ctx),
+    );
   }
 
   /** Accepting uses only the approved snapshot; with Docker stopped, the player's code comes back later. */
@@ -1383,7 +1524,9 @@ export class Game {
   /** A fresh game that keeps the preferences; downloaded packages and reviews are removed. */
   private async startOver(): Promise<void> {
     // The repository goes on with the next game: what the old game's code configured in it goes.
-    await this.options.runtime.sanitizeWorkspace().catch((error: Error) => this.appendLog(`» Workspace not sanitized: ${error.message}`));
+    await this.options.runtime
+      .sanitizeWorkspace()
+      .catch((error: Error) => this.appendLog(`» Workspace not sanitized: ${error.message}`));
     const projects = this.options.projects;
     for (const id of projects ? this.catalog.map((item) => item.id) : []) {
       await projects!.packages(id).clear();
@@ -1462,7 +1605,10 @@ export class Game {
   async updateSettings(settings: Partial<Settings>): Promise<void> {
     await this.commit((state) => {
       const next = { ...state.settings, ...settings };
-      next.qaTimeoutSeconds = Math.min(MAX_QA_TIMEOUT_SECONDS, Math.max(MIN_QA_TIMEOUT_SECONDS, Math.round(next.qaTimeoutSeconds)));
+      next.qaTimeoutSeconds = Math.min(
+        MAX_QA_TIMEOUT_SECONDS,
+        Math.max(MIN_QA_TIMEOUT_SECONDS, Math.round(next.qaTimeoutSeconds)),
+      );
       return { ...state, settings: next };
     });
   }
@@ -1554,6 +1700,29 @@ export class Game {
     });
   }
 
+  /** The ports the active project declares, with the port each one got on the computer at the last check. */
+  private declaredPortsView(): DeclaredPortView[] {
+    return Object.entries(this.content?.manifest.project.ports ?? {}).map(([name, port]) => ({
+      name,
+      label: port.label ?? null,
+      port: this.publishedPorts?.[name] ?? null,
+      open: port.open ?? false,
+    }));
+  }
+
+  /** The URL of a declared port that the project marks to open in the browser, on the port it got. */
+  async portUrl(name: string): Promise<string> {
+    await this.requireDocker();
+    if (!this.content?.manifest.project.ports?.[name]?.open) {
+      throw new GameError('notAllowed', `The project does not offer to open the port ${name}`);
+    }
+    const port = (await this.options.runtime.workspacePorts())?.[name];
+    if (!port) {
+      throw new GameError('workspaceNotRunning');
+    }
+    return `http://127.0.0.1:${port}/`;
+  }
+
   /** The URL of the player's app on the published port. */
   async appUrl(): Promise<string> {
     await this.requireDocker();
@@ -1593,7 +1762,11 @@ export class Game {
     return comparison.baseline;
   }
 
-  private buildReviewBranch(meta: Pick<ReviewMeta, 'ticket' | 'approvedAt' | 'language'>, snapshot: ArchiveFile[], reference: ArchiveFile[]) {
+  private buildReviewBranch(
+    meta: Pick<ReviewMeta, 'ticket' | 'approvedAt' | 'language'>,
+    snapshot: ArchiveFile[],
+    reference: ArchiveFile[],
+  ) {
     const projectSettings = reference.find((file) => file.path === '.vscode/settings.json');
     return this.options.runtime.buildReview({
       ticket: meta.ticket,
@@ -1622,9 +1795,15 @@ export class Game {
     let reference: ArchiveFile[];
     try {
       snapshot = await this.options.runtime.referenceFiles(ticket, stored.snapshotDiff);
-      reference = await this.options.runtime.referenceFiles(ticket, (await this.packages.readText(ticket, 'reference.patch')) ?? '');
+      reference = await this.options.runtime.referenceFiles(
+        ticket,
+        (await this.packages.readText(ticket, 'reference.patch')) ?? '',
+      );
     } catch (error) {
-      throw new GameError('reviewUnavailable', `The code of ticket ${ticket} is not in this workspace: ${(error as Error).message}`);
+      throw new GameError(
+        'reviewUnavailable',
+        `The code of ticket ${ticket} is not in this workspace: ${(error as Error).message}`,
+      );
     }
     const commits = await this.buildReviewBranch(stored.meta, snapshot, reference);
     if (JSON.stringify(commits) !== JSON.stringify(stored.meta.commits)) {
@@ -1792,7 +1971,10 @@ export class Game {
       // The save carries its own export record, so a restored game starts as backed up; inside the
       // file only the name: the folder of this computer stays out of a file that may travel.
       const state = { ...this.state, lastExport: { at, path: basename(file) } };
-      await writeFileAtomic(file, createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at, this.installKey()));
+      await writeFileAtomic(
+        file,
+        createSave({ state, bundle, packages, reviews, others }, this.options.appVersion, at, this.installKey()),
+      );
       await this.commit((current) => ({ ...current, lastExport: { at, path: file } }));
     });
   }
@@ -1837,7 +2019,10 @@ export class Game {
    * passes: a package that does not match is a tampered save, and a publication that cannot be
    * reached leaves the save unverified.
    */
-  private async verifySave(save: ValidatedSave, active: string | null): Promise<Map<number, { entry: TicketEntry; codeFiles: ArchiveFile[] }>> {
+  private async verifySave(
+    save: ValidatedSave,
+    active: string | null,
+  ): Promise<Map<number, { entry: TicketEntry; codeFiles: ArchiveFile[] }>> {
     const verified = new Map<number, { entry: TicketEntry; codeFiles: ArchiveFile[] }>();
     const sourceFor = (id: string | null): ContentSource | null => {
       if (!this.options.projects || id === null) {
@@ -1845,7 +2030,12 @@ export class Game {
       }
       return this.sourceOf(id) ? this.contentOf(id) : null;
     };
-    const check = async (project: string | null, tickets: readonly { ticket: number; id: string; manifestVersion: string }[], packages: Map<number, Uint8Array>, withCode: boolean) => {
+    const check = async (
+      project: string | null,
+      tickets: readonly { ticket: number; id: string; manifestVersion: string }[],
+      packages: Map<number, Uint8Array>,
+      withCode: boolean,
+    ) => {
       const source = sourceFor(project);
       if (!source) {
         return; // A project no longer in the catalog: its packages are not restored either.
@@ -1860,7 +2050,10 @@ export class Game {
             content = await source.publication(ticket.manifestVersion);
           } catch (error) {
             if (error instanceof NoConnectionError || error instanceof FirstDownloadError) {
-              throw new GameError('contentNeedsInternet', `The publication ${ticket.manifestVersion} of ${label} is needed to check the save: ${(error as Error).message}`);
+              throw new GameError(
+                'contentNeedsInternet',
+                `The publication ${ticket.manifestVersion} of ${label} is needed to check the save: ${(error as Error).message}`,
+              );
             }
             throw new GameError('saveUnverified', `${label} ${ticket.manifestVersion}: ${(error as Error).message}`);
           }
@@ -1882,7 +2075,10 @@ export class Game {
             codeFiles = await source.codeOf(entry);
           } catch (error) {
             if (error instanceof NoConnectionError || error instanceof FirstDownloadError) {
-              throw new GameError('contentNeedsInternet', `The code of ${ticket.id} is needed to check the save: ${(error as Error).message}`);
+              throw new GameError(
+                'contentNeedsInternet',
+                `The code of ${ticket.id} is needed to check the save: ${(error as Error).message}`,
+              );
             }
             throw new GameError('saveUnverified', `${label} ${ticket.id}: ${(error as Error).message}`);
           }
@@ -1926,7 +2122,11 @@ export class Game {
         this.useProject(active);
       }
       this.appendLog('» Recreating the workspace volume from the save');
-      await this.options.runtime.restoreWorkspace(save.bundle, current === null ? null : playerBranch(current), save.state.createdAt);
+      await this.options.runtime.restoreWorkspace(
+        save.bundle,
+        current === null ? null : playerBranch(current),
+        save.state.createdAt,
+      );
       this.workspaceLost = false;
       await this.packages.clear();
       for (const [stage, zip] of save.packages) {
@@ -1961,7 +2161,9 @@ export class Game {
         }
         const commit = await this.options.runtime.importStage(ticket.ticket, item.codeFiles, item.entry.commitMessage);
         await this.commit((state) => rules.rebuiltStage(state, ticket.ticket, commit));
-        this.appendLog(`» Verified the code of ticket ${ticket.ticket} (${ticket.id}) as commit ${commit.slice(0, 12)}`);
+        this.appendLog(
+          `» Verified the code of ticket ${ticket.ticket} (${ticket.id}) as commit ${commit.slice(0, 12)}`,
+        );
       }
       if (current !== null) {
         await this.options.runtime.checkoutPlayerBranch(current);

@@ -68,8 +68,12 @@ test('an SSH agent or a stored GitHub credential on the computer only warns, wit
   try {
     await expect(page.getByTestId('check-vscode')).toHaveAttribute('data-status', 'ok');
     await expect(page.getByTestId('check-vscode-warning-sshAgent')).toContainText('An SSH agent is running');
-    await expect(page.getByTestId('check-vscode-warning-githubCredential')).toContainText('A GitHub credential is stored');
-    await expect(page.getByTestId('check-vscode').getByRole('button', { name: 'What the app does about it' })).toHaveCount(2);
+    await expect(page.getByTestId('check-vscode-warning-githubCredential')).toContainText(
+      'A GitHub credential is stored',
+    );
+    await expect(
+      page.getByTestId('check-vscode').getByRole('button', { name: 'What the app does about it' }),
+    ).toHaveCount(2);
     await expect(page.getByTestId('start-playing')).toBeEnabled();
     // Agent stopped and credential removed: the warnings go.
     await simulate(app, { sshAgent: false, githubCredential: false });
@@ -100,7 +104,10 @@ test('the app shows a banner and pauses Docker actions when Docker stops mid-ses
     // Retry only if the drop itself was lost (no toast at all).
     for (let attempt = 1; attempt <= 3 && !(await page.getByTestId('toast-error').count()); attempt += 1) {
       await page.getByTestId('card-1').dragTo(page.getByTestId('column-inProgress'));
-      await page.getByTestId('toast-error').waitFor({ timeout: 5000 }).catch(() => console.warn(`drop to In Progress not registered (attempt ${attempt})`));
+      await page
+        .getByTestId('toast-error')
+        .waitFor({ timeout: 5000 })
+        .catch(() => console.warn(`drop to In Progress not registered (attempt ${attempt})`));
     }
     await expect(page.getByTestId('toast-error')).toContainText('Docker is not running');
     await expect(page.getByTestId('card-1')).toHaveAttribute('data-status', 'todo');

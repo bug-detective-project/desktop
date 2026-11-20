@@ -34,6 +34,9 @@ describe('check-installer, which uninstalls and so deletes the player data', () 
     expect(paths.uninstaller).toBe('C:\\L\\Programs\\Bug Detective\\Uninstall Bug Detective.exe');
     expect(paths.removeDockerData).toBe('C:\\L\\Programs\\Bug Detective\\resources\\remove-docker-data.ps1');
     expect(paths.data).toBe('C:\\R\\Bug Detective');
-    expect(paths.shortcuts).toEqual(['C:\\U\\Desktop\\Bug Detective.lnk', 'C:\\R\\Microsoft\\Windows\\Start Menu\\Programs\\Bug Detective.lnk']);
+    expect(paths.shortcuts).toEqual([
+      'C:\\U\\Desktop\\Bug Detective.lnk',
+      'C:\\R\\Microsoft\\Windows\\Start Menu\\Programs\\Bug Detective.lnk',
+    ]);
   });
 });

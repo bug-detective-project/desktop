@@ -56,7 +56,12 @@ let docker: Docker;
 let runtime: FixtureRuntime;
 
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: workspaceDir('tasklist') })).stdout.toString('utf8');
+  return (
+    await docker.execChecked(runtime.names.container, ['sh', '-c', script], {
+      user: 'node',
+      workdir: workspaceDir('tasklist'),
+    })
+  ).stdout.toString('utf8');
 }
 
 const fingerprint = () =>
@@ -67,7 +72,8 @@ find . -path ./.git -prune -o -type f -print | sort | xargs sha256sum`);
 async function fixtureProject(): Promise<{ qaDir: string; patches: Record<string, string> }> {
   const repo = join(dir, 'tasklist');
   const qaDir = join(dir, 'tasklist-qa');
-  const git = async (cwd: string, ...args: string[]) => (await runChecked(runCommand, 'git', ['-C', cwd, ...args])).stdout.toString('utf8');
+  const git = async (cwd: string, ...args: string[]) =>
+    (await runChecked(runCommand, 'git', ['-C', cwd, ...args])).stdout.toString('utf8');
   await mkdir(repo, { recursive: true });
   await git(repo, 'init', '-q', '-b', 'main');
   await git(repo, 'config', 'user.name', 'Fixture');
@@ -78,7 +84,9 @@ async function fixtureProject(): Promise<{ qaDir: string; patches: Record<string
   await git(repo, 'commit', '-q', '-m', 'Tasklist');
 
   // A ticket branch: an orphan commit of main with one file broken; its reference patch fixes it.
-  const patches: Record<string, string> = { 'front-1': await readFile(join(fixture, 'package', 'reference.patch'), 'utf8') };
+  const patches: Record<string, string> = {
+    'front-1': await readFile(join(fixture, 'package', 'reference.patch'), 'utf8'),
+  };
   await git(repo, 'checkout', '-q', '--orphan', 'front-1');
   await git(repo, 'rm', '-rq', '--cached', '.');
   await rm(join(repo, 'app'), { recursive: true });
@@ -142,14 +150,34 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new FixtureRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'tasklist' }).destroy();
+  runtime = new FixtureRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  await new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'tasklist',
+  }).destroy();
 });
 
 afterAll(async () => {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  await new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'tasklist' }).destroy();
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  await new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'tasklist',
+  }).destroy();
   for (const volume of [runtime.names.vscodeVolume, runtime.names.cacheVolume, runtime.names.qaInputVolume]) {
     await docker.removeVolume(volume);
   }
@@ -187,15 +215,24 @@ mkdir -p app/__pycache__ && printf 'bytecode' > app/__pycache__/tasks.cpython-31
 
     // Snapshot and comparison follow the project's configuration plus the built-in defaults.
     const stored = (await new ReviewStore(join(gameDir, 'reviews')).load(1))!;
-    expect((await sh('git ls-tree -r --name-only qa-approved/ticket-1')).trim().split('\n').sort()).toEqual(['README.md', 'app/format.py', 'app/helpers.py', 'app/tasks.py']);
+    expect((await sh('git ls-tree -r --name-only qa-approved/ticket-1')).trim().split('\n').sort()).toEqual([
+      'README.md',
+      'app/format.py',
+      'app/helpers.py',
+      'app/tasks.py',
+    ]);
     expect(stored.snapshotDiff).toContain('app/helpers.py');
-    const files = visibleFiles(parseDiff(stored.meta.comparison.solutionsIgnoringWhitespace)).map((file) => `${file.status} ${file.path}`);
+    const files = visibleFiles(parseDiff(stored.meta.comparison.solutionsIgnoringWhitespace)).map(
+      (file) => `${file.status} ${file.path}`,
+    );
     expect(files.sort()).toEqual(['added tests/test_tasks.py', 'deleted app/helpers.py', 'modified app/tasks.py']);
 
     // Checkout and return: the lockfile change stays uncommitted, generated files untouched.
     const before = await fingerprint();
     await game.openReview(1);
-    expect(await sh('git symbolic-ref --short HEAD; git status --porcelain; cat requirements.lock')).toBe('review/ticket-1\n M requirements.lock\npytest==8.3.4\n');
+    expect(await sh('git symbolic-ref --short HEAD; git status --porcelain; cat requirements.lock')).toBe(
+      'review/ticket-1\n M requirements.lock\npytest==8.3.4\n',
+    );
     expect(await sh('git show --stat --format=%s player/ticket-1')).not.toMatch(/requirements\.lock|\.pyc|sqlite/);
     await game.closeReview();
     expect(await fingerprint()).toBe(before);
@@ -217,10 +254,21 @@ mkdir -p app/__pycache__ && printf 'bytecode' > app/__pycache__/tasks.cpython-31
     });
     await game.init();
     await game.newGame();
-    const completions = () => game.current.inbox.filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion').map((m) => `${m.kind}:${m.track}`);
-    const expected = { 1: [], 2: ['completion:back'], 3: ['completion:back', 'trackCompletion:front', 'trackCompletion:fullstack'] };
+    const completions = () =>
+      game.current.inbox
+        .filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion')
+        .map((m) => `${m.kind}:${m.track}`);
+    const expected = {
+      1: [],
+      2: ['completion:back'],
+      3: ['completion:back', 'trackCompletion:front', 'trackCompletion:fullstack'],
+    };
     // Fullstack alternates, front first: front-1, back-1, then front-2 (the back queue is finished).
-    for (const [position, id] of [[1, 'front-1'], [2, 'back-1'], [3, 'front-2']] as const) {
+    for (const [position, id] of [
+      [1, 'front-1'],
+      [2, 'back-1'],
+      [3, 'front-2'],
+    ] as const) {
       await game.nextAssignment('fullstack');
       expect(rules.findTicket(game.current, position)).toMatchObject({ id, track: id.split('-')[0], status: 'todo' });
       expect(game.current.tracks).toEqual({ front: 2, back: 1 });

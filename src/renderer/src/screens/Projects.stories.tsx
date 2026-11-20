@@ -7,12 +7,27 @@ const both = (text: string) => ({ en: text, pt: text });
 const base = projectCardFixture().details!;
 const projects = [
   projectCardFixture({ id: 'notes', active: true }),
-  projectCardFixture({ id: 'ledger', details: { ...base, name: both('Ledger'), difficulty: 'advanced', stack: { frontend: 'Vue · Vite', backend: 'Python · FastAPI', database: 'PostgreSQL' } } }),
-  projectCardFixture({ id: 'stock', details: { ...base, name: both('Stock Room'), difficulty: 'intermediate', stack: { backend: 'Node.js · Express' } } }),
+  projectCardFixture({
+    id: 'ledger',
+    details: {
+      ...base,
+      name: both('Ledger'),
+      difficulty: 'advanced',
+      stack: { frontend: 'Vue · Vite', backend: 'Python · FastAPI', database: 'PostgreSQL' },
+    },
+  }),
+  projectCardFixture({
+    id: 'stock',
+    details: { ...base, name: both('Stock Room'), difficulty: 'intermediate', stack: { backend: 'Node.js · Express' } },
+  }),
 ];
 
 /** The catalog could not be refreshed: the last saved list, with the warning and its retry. */
-const outdated = () => <Projects snapshot={snapshotFixture('active', { projects, catalogRefresh: { failedAt: '2026-11-04T10:00:00.000Z' } })} />;
+const outdated = () => (
+  <Projects
+    snapshot={snapshotFixture('active', { projects, catalogRefresh: { failedAt: '2026-11-04T10:00:00.000Z' } })}
+  />
+);
 
 const meta = {
   title: 'Screens/Projects',
@@ -47,10 +62,24 @@ export const Portuguese: Story = { globals: { locale: 'pt' } };
 export const CatalogOutdated: Story = { render: outdated };
 
 /** Switching to a project that needs more memory than Docker has warns, and still lets the player go on. */
-const heavy = projectCardFixture({ id: 'ledger', details: { ...base, name: both('Ledger'), memoryBytes: 7.5 * 1024 ** 3 } });
-const dockerWith = (memoryBytes: number) => ({ checks: [{ id: 'docker' as const, status: 'ok' as const, version: '4.37.1', memoryBytes }], allOk: true, dockerState: 'running' as const });
+const heavy = projectCardFixture({
+  id: 'ledger',
+  details: { ...base, name: both('Ledger'), memoryBytes: 7.5 * 1024 ** 3 },
+});
+const dockerWith = (memoryBytes: number) => ({
+  checks: [{ id: 'docker' as const, status: 'ok' as const, version: '4.37.1', memoryBytes }],
+  allOk: true,
+  dockerState: 'running' as const,
+});
 export const SwitchNeedsMoreMemory: Story = {
-  render: () => <Projects snapshot={snapshotFixture('queued', { projects: [projects[0]!, heavy], prerequisites: dockerWith(4 * 1024 ** 3) })} />,
+  render: () => (
+    <Projects
+      snapshot={snapshotFixture('queued', {
+        projects: [projects[0]!, heavy],
+        prerequisites: dockerWith(4 * 1024 ** 3),
+      })}
+    />
+  ),
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByTestId('switch-ledger'));
     const dialog = within(canvasElement.ownerDocument.body);
@@ -60,7 +89,14 @@ export const SwitchNeedsMoreMemory: Story = {
   },
 };
 export const SwitchWithEnoughMemory: Story = {
-  render: () => <Projects snapshot={snapshotFixture('queued', { projects: [projects[0]!, heavy], prerequisites: dockerWith(16 * 1024 ** 3) })} />,
+  render: () => (
+    <Projects
+      snapshot={snapshotFixture('queued', {
+        projects: [projects[0]!, heavy],
+        prerequisites: dockerWith(16 * 1024 ** 3),
+      })}
+    />
+  ),
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByTestId('switch-ledger'));
     const dialog = within(canvasElement.ownerDocument.body);

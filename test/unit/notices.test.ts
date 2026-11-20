@@ -16,7 +16,9 @@ describe('third-party notices', () => {
   });
 
   it('is written after every build and ships with the installer', async () => {
-    const scripts = (JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }).scripts;
+    const scripts = (
+      JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    ).scripts;
     expect(scripts.build).toMatch(/electron-vite build && node tools\/write-notices\.ts$/);
     const builder = await readFile(join(root, 'electron-builder.yml'), 'utf8');
     expect(builder).toMatch(/- from: out\/THIRD_PARTY_NOTICES\.md\n\s+to: THIRD_PARTY_NOTICES\.md/);
@@ -39,7 +41,9 @@ describe('third-party notices', () => {
       ['lucide-react', 'ISC'],
       ['react', 'MIT'],
     ]);
-    expect(packages.find((item) => item.name === 'react')!.licenseText).toMatch(/^MIT License\s+Copyright \(c\) Meta Platforms/);
+    expect(packages.find((item) => item.name === 'react')!.licenseText).toMatch(
+      /^MIT License\s+Copyright \(c\) Meta Platforms/,
+    );
   });
 
   it('puts the vendored files first, then each bundled package once, sorted', () => {
@@ -50,7 +54,11 @@ describe('third-party notices', () => {
       { name: 'isarray', version: '1.0.0', license: 'MIT', licenseText: null },
     ]);
     expect(notices.indexOf('## flag-icons')).toBeLessThan(notices.indexOf('## npm packages bundled into the app'));
-    expect([...notices.matchAll(/^### (.+)$/gm)].map((match) => match[1])).toEqual(['bail 2.0.2', 'isarray 1.0.0', 'zwitch 2.0.4']);
+    expect([...notices.matchAll(/^### (.+)$/gm)].map((match) => match[1])).toEqual([
+      'bail 2.0.2',
+      'isarray 1.0.0',
+      'zwitch 2.0.4',
+    ]);
     expect(notices).toContain('The package ships no license file; its package.json declares the license "MIT".');
   });
 });

@@ -14,10 +14,7 @@
     "name": "Notes",
     "about": "A note-taking app.",
     "stack": "Node.js",
-    "skills": [
-      "Reading a failing test",
-      "Small fixes"
-    ]
+    "skills": ["Reading a failing test", "Small fixes"]
   },
   "messages": {
     "welcome": {

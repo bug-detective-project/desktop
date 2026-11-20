@@ -27,7 +27,9 @@ beforeAll(async () => {
   docker = new Docker(cli, runCommand);
   const notes = await createNotesProject(dir);
   const tool = qaToolFiles(await readQaFiles(notes.qaDir, runCommand));
-  const { qaBase } = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { qaBase: string };
+  const { qaBase } = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    qaBase: string;
+  };
   tag = qaImageTag(qaBase, tool, 'bugdetective-qa-image-test');
   const context = await writeQaContext(join(root, 'build', 'docker', 'qa'), qaBase, tool, join(dir, 'build'));
   await docker.build(platform.dockerHostPath(context), tag, 'qa-image');
@@ -40,7 +42,15 @@ afterAll(async () => {
 
 describe('QA image of a tool without Playwright', () => {
   it('has no Chromium, and runs the tool', async () => {
-    const browsers = await docker.run(['run', '--rm', '--entrypoint', 'sh', tag, '-c', 'ls /ms-playwright 2>/dev/null | wc -l']);
+    const browsers = await docker.run([
+      'run',
+      '--rm',
+      '--entrypoint',
+      'sh',
+      tag,
+      '-c',
+      'ls /ms-playwright 2>/dev/null | wc -l',
+    ]);
     expect(browsers.stdout.toString('utf8').trim()).toBe('0');
     const usage = await docker.run(['run', '--rm', tag]);
     expect(usage.code).toBe(2);

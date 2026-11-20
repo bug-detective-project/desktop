@@ -48,7 +48,12 @@ export function ReviewBanner({ snapshot }: { snapshot: Snapshot }) {
             <Icon name="info" className="size-4 text-amber-500" />
             {t(`review.notice.${notice.kind}`, { ticket: ticketTitle(snapshot, notice.ticket, language).key })}
           </span>
-          <Button size="sm" variant="ghost" onClick={() => void api.dismissReviewNotice()} aria-label={t('common.close')}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void api.dismissReviewNotice()}
+            aria-label={t('common.close')}
+          >
             <Icon name="x" className="size-3.5" />
           </Button>
         </div>

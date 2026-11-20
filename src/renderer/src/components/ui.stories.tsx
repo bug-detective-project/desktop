@@ -2,7 +2,21 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, within } from 'storybook/test';
 import { Icon } from './icons.tsx';
-import { Badge, Button, Card, LogView, Modal, Notice, SectionTitle, Spinner, StagePill, StatusIcon, Tabs, Tooltip, TrackBadge } from './ui.tsx';
+import {
+  Badge,
+  Button,
+  Card,
+  LogView,
+  Modal,
+  Notice,
+  SectionTitle,
+  Spinner,
+  StagePill,
+  StatusIcon,
+  Tabs,
+  Tooltip,
+  TrackBadge,
+} from './ui.tsx';
 
 /** The building blocks of components/ui.tsx, side by side. */
 const meta = { title: 'Components/UI', parameters: { layout: 'padded' } } satisfies Meta;
@@ -97,7 +111,11 @@ function TabsExample() {
 export const TabsBar: Story = { render: () => <TabsExample /> };
 
 export const Log: Story = {
-  render: () => <LogView lines={['» docker build bugdetective-workspace', 'Step 1/8 : FROM node:26', '» docker build bugdetective-qa']} />,
+  render: () => (
+    <LogView
+      lines={['» docker build bugdetective-workspace', 'Step 1/8 : FROM node:26', '» docker build bugdetective-qa']}
+    />
+  ),
 };
 
 export const DialogNormal: Story = {

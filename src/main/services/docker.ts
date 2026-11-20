@@ -74,7 +74,9 @@ export class Docker {
 
   /** The engine version and, under Docker Desktop, the Desktop release; null when the engine does not answer. */
   async versionInfo(timeoutMs = 15_000): Promise<{ engine: string; desktop: string | null } | null> {
-    const result = await this.run(['version', '--format', '{{.Server.Version}}|{{.Server.Platform.Name}}'], { timeoutMs });
+    const result = await this.run(['version', '--format', '{{.Server.Version}}|{{.Server.Platform.Name}}'], {
+      timeoutMs,
+    });
     const [engine, platform = ''] = result.stdout.toString('utf8').trim().split('|');
     if (result.code !== 0 || !engine) {
       return null;
@@ -99,8 +101,11 @@ export class Docker {
 
   /** Sizes in bytes of the given volumes that exist (`docker system df -v` measures them, which takes a few seconds). */
   async volumeSizes(names: readonly string[]): Promise<Record<string, number>> {
-    const result = await this.checked(['system', 'df', '--verbose', '--format', '{{json .Volumes}}'], { timeoutMs: 120_000 });
-    const volumes = JSON.parse(result.stdout.toString('utf8').trim() || '[]') as { Name: string; Size: string }[] | null;
+    const result = await this.checked(['system', 'df', '--verbose', '--format', '{{json .Volumes}}'], {
+      timeoutMs: 120_000,
+    });
+    const volumes = JSON.parse(result.stdout.toString('utf8').trim() || '[]') as
+      { Name: string; Size: string }[] | null;
     const sizes: Record<string, number> = {};
     for (const volume of volumes ?? []) {
       const bytes = parseDockerSize(volume.Size);
@@ -142,14 +147,40 @@ export class Docker {
    * cache down to BUILDER_KEEP_STORAGE: the build cache never grows without limit on the player's
    * computer, and Docker's global cache is never touched.
    */
-  async build(contextDir: string, tag: string, role: string, onLine?: RunOptions['onLine'], signal?: AbortSignal, project?: string | null, prefix = 'bugdetective') {
+  async build(
+    contextDir: string,
+    tag: string,
+    role: string,
+    onLine?: RunOptions['onLine'],
+    signal?: AbortSignal,
+    project?: string | null,
+    prefix = 'bugdetective',
+  ) {
     await this.ensureBuilder(prefix);
     const builder = Docker.builderName(prefix);
-    await this.checked(['buildx', 'build', '--builder', builder, '--load', '--progress', 'plain', ...labelArgs(role, project), '--tag', tag, contextDir], {
-      onLine,
-      signal,
-    });
-    await this.run(['buildx', 'prune', '--builder', builder, '--force', '--keep-storage', Docker.BUILDER_KEEP_STORAGE], { timeoutMs: 120_000 });
+    await this.checked(
+      [
+        'buildx',
+        'build',
+        '--builder',
+        builder,
+        '--load',
+        '--progress',
+        'plain',
+        ...labelArgs(role, project),
+        '--tag',
+        tag,
+        contextDir,
+      ],
+      {
+        onLine,
+        signal,
+      },
+    );
+    await this.run(
+      ['buildx', 'prune', '--builder', builder, '--force', '--keep-storage', Docker.BUILDER_KEEP_STORAGE],
+      { timeoutMs: 120_000 },
+    );
   }
 
   async volumeExists(name: string): Promise<boolean> {
@@ -202,7 +233,9 @@ export class Docker {
 
   /** Whether the kernel killed the container for exceeding its memory limit (exit code 137 without a stop). */
   async oomKilled(name: string): Promise<boolean> {
-    const result = await this.run(['container', 'inspect', '--format', '{{.State.OOMKilled}}', name], { timeoutMs: 30_000 });
+    const result = await this.run(['container', 'inspect', '--format', '{{.State.OOMKilled}}', name], {
+      timeoutMs: 30_000,
+    });
     return result.code === 0 && result.stdout.toString('utf8').trim() === 'true';
   }
 
@@ -212,7 +245,8 @@ export class Docker {
    * container itself stays up when the killed process is not its first one. Null when unreadable.
    */
   async oomKills(name: string): Promise<number | null> {
-    const read = 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null';
+    const read =
+      'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null';
     const result = await this.run(['exec', name, 'sh', '-c', read], { timeoutMs: 30_000 });
     const count = /^oom_kill (\d+)$/m.exec(result.stdout.toString('utf8'))?.[1];
     return result.code === 0 && count !== undefined ? Number(count) : null;
@@ -297,7 +331,15 @@ export class Docker {
 
   /** Names of containers carrying the given role label (running or not). */
   async containersWithRole(role: string): Promise<string[]> {
-    const result = await this.checked(['container', 'ls', '--all', '--filter', `label=${LABEL}=${role}`, '--format', '{{.Names}}']);
+    const result = await this.checked([
+      'container',
+      'ls',
+      '--all',
+      '--filter',
+      `label=${LABEL}=${role}`,
+      '--format',
+      '{{.Names}}',
+    ]);
     return result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
   }
 

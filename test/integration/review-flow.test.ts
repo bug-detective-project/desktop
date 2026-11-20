@@ -59,12 +59,25 @@ function createGame(stateDir: string) {
 }
 
 async function workspace(): Promise<Workspace> {
-  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as { workspace: string };
-  return new Workspace({ docker, image: tags.workspace, isPortFree: platform.isPortFree, names: runtime.names, project: 'notes' });
+  const tags = JSON.parse(await readFile(join(root, 'build', 'docker', 'images.json'), 'utf8')) as {
+    workspace: string;
+  };
+  return new Workspace({
+    docker,
+    image: tags.workspace,
+    isPortFree: platform.isPortFree,
+    names: runtime.names,
+    project: 'notes',
+  });
 }
 
 async function sh(script: string): Promise<string> {
-  return (await docker.execChecked(runtime.names.container, ['sh', '-c', script], { user: 'node', workdir: workspaceDir('notes') })).stdout.toString('utf8');
+  return (
+    await docker.execChecked(runtime.names.container, ['sh', '-c', script], {
+      user: 'node',
+      workdir: workspaceDir('notes'),
+    })
+  ).stdout.toString('utf8');
 }
 
 /** Branch, HEAD, index, status (with ignored files) and a hash of every file, node_modules included. */
@@ -82,7 +95,11 @@ beforeAll(async () => {
   const { cli } = await platform.locateDocker();
   if (!cli) throw new Error('The docker CLI was not found');
   docker = new Docker(cli, runCommand);
-  runtime = new TestRuntime(platform, { contextRoot: join(root, 'build', 'docker'), qaBuildRoot: join(root, 'build', 'qa-contexts'), prefix: PREFIX });
+  runtime = new TestRuntime(platform, {
+    contextRoot: join(root, 'build', 'docker'),
+    qaBuildRoot: join(root, 'build', 'qa-contexts'),
+    prefix: PREFIX,
+  });
   await (await workspace()).destroy();
 });
 
@@ -129,7 +146,9 @@ sed -i 's/$/  /' client/sort.js`);
     expect(await ws.git(['show', 'qa-approved/ticket-1:client/notes.js'])).toBe(await sh('cat client/notes.js'));
     // Only a diff is stored, and the ticket's commit plus that diff is exactly the approved snapshot.
     expect(stored.snapshotDiff).toContain('client/utils/text.js');
-    expect(await ws.git(['diff', '--binary', '--full-index', 'refs/tags/stage-1', 'qa-approved/ticket-1'])).toBe(stored.snapshotDiff);
+    expect(await ws.git(['diff', '--binary', '--full-index', 'refs/tags/stage-1', 'qa-approved/ticket-1'])).toBe(
+      stored.snapshotDiff,
+    );
     // Tag and branch: never on the player branch.
     const { commits } = stored.meta;
     expect((await ws.git(['rev-parse', 'qa-approved/ticket-1'])).trim()).toBe(commits.approved);
@@ -145,16 +164,23 @@ sed -i 's/$/  /' client/sort.js`);
       expect.stringMatching(/Notes release front-1$/),
     ]);
     for (const commit of [meta.commits.reference, meta.commits.snapshot]) {
-      expect(JSON.parse(await ws.git(['show', `${commit}:.vscode/settings.json`]))).toMatchObject({ 'files.readonlyInclude': { '**': true } });
+      expect(JSON.parse(await ws.git(['show', `${commit}:.vscode/settings.json`]))).toMatchObject({
+        'files.readonlyInclude': { '**': true },
+      });
     }
     // The snapshot commit's own diff is the review: the player's extra helper and the reformatted file.
-    expect((await ws.git(['diff', '--name-status', meta.commits.reference, meta.commits.snapshot])).trim().split('\n').sort()).toEqual([
-      'A\tclient/utils/text.js',
-      'M\tclient/sort.js',
-    ]);
+    expect(
+      (await ws.git(['diff', '--name-status', meta.commits.reference, meta.commits.snapshot]))
+        .trim()
+        .split('\n')
+        .sort(),
+    ).toEqual(['A\tclient/utils/text.js', 'M\tclient/sort.js']);
     // In the app: the helper is "only in your solution"; the whitespace-only file shows with the toggle.
     expect(changedFiles(meta.comparison.solutionsIgnoringWhitespace)).toEqual(['deleted client/utils/text.js']);
-    expect(changedFiles(meta.comparison.solutions).sort()).toEqual(['deleted client/utils/text.js', 'modified client/sort.js']);
+    expect(changedFiles(meta.comparison.solutions).sort()).toEqual([
+      'deleted client/utils/text.js',
+      'modified client/sort.js',
+    ]);
     expect(changedFiles(meta.comparison.baselineIgnoringWhitespace)).toContain('modified client/notes.js');
   });
 
@@ -168,11 +194,17 @@ echo notes > NOTES.md && echo SECRET=1 > .env.local`);
 
     await game.openReview(1);
     expect(runtime.vscodeOpened).toBe(1);
-    expect(game.current.reviewSession).toMatchObject({ ticket: 1, phase: 'open', returnPoint: { branch: 'player/ticket-1' } });
+    expect(game.current.reviewSession).toMatchObject({
+      ticket: 1,
+      phase: 'open',
+      returnPoint: { branch: 'player/ticket-1' },
+    });
     expect(await ws.currentBranch()).toBe('review/ticket-1');
     // Source Control is clean during the review: excluded files are hidden, not committed.
     expect((await ws.git(['status', '--porcelain'])).trim()).toBe('');
-    expect(await ws.git(['show', '--stat', '--format=%s', 'player/ticket-1'])).not.toMatch(/\.env\.local|server\/data|node_modules/);
+    expect(await ws.git(['show', '--stat', '--format=%s', 'player/ticket-1'])).not.toMatch(
+      /\.env\.local|server\/data|node_modules/,
+    );
     expect(await sh('cat .env.local; ls server/data')).toMatch(/SECRET=1[\s\S]*notes\.json/);
 
     await game.closeReview();
@@ -190,7 +222,9 @@ echo notes > NOTES.md && echo SECRET=1 > .env.local`);
     await game.closeReview();
     expect(game.snapshot().reviewNotice).toEqual({ ticket: 1, kind: 'editsSaved' });
     expect(await fingerprint()).toBe(before);
-    const [branch] = (await ws.git(['branch', '--list', 'review-edits/ticket-1-*', '--format=%(refname:short)'])).trim().split('\n');
+    const [branch] = (await ws.git(['branch', '--list', 'review-edits/ticket-1-*', '--format=%(refname:short)']))
+      .trim()
+      .split('\n');
     expect(await ws.git(['show', branch, '--', 'client/notes.js'])).toContain('typed in the terminal');
     await game.dismissReviewNotice();
   });
@@ -240,8 +274,12 @@ sed -i "s/\\\`\\\${line.slice(0, 39)}…\\\`/line.slice(0, 39) + '…'/" client/
       'modified client/preview.js',
     ]);
     // Matched by path: the preview file shows the player's version on the left, the reference's on the right.
-    const preview = parseDiff(meta.comparison.solutionsIgnoringWhitespace).find((file) => file.path === 'client/preview.js')!;
-    expect(preview.lines.some((line) => line.kind === 'del' && line.text.includes("line.slice(0, 39) + '…'"))).toBe(true);
+    const preview = parseDiff(meta.comparison.solutionsIgnoringWhitespace).find(
+      (file) => file.path === 'client/preview.js',
+    )!;
+    expect(preview.lines.some((line) => line.kind === 'del' && line.text.includes("line.slice(0, 39) + '…'"))).toBe(
+      true,
+    );
     expect(preview.lines.some((line) => line.kind === 'add' && line.text.includes('${line.slice(0, 39)}…'))).toBe(true);
   });
 
@@ -262,7 +300,9 @@ sed -i "s/\\\`\\\${line.slice(0, 39)}…\\\`/line.slice(0, 39) + '…'/" client/
     expect(await ws.currentBranch()).toBe('player/ticket-3');
     await game.waitForQa();
     const tested = await runtime.testedFiles();
-    expect(Buffer.from(tested.find((file) => file.path === 'server/api.js')!.data).toString('utf8')).toContain('marker of my ticket 3 work');
+    expect(Buffer.from(tested.find((file) => file.path === 'server/api.js')!.data).toString('utf8')).toContain(
+      'marker of my ticket 3 work',
+    );
     const moves = (await ws.git(['reflog', '--format=%gs'])).split('\n').slice(0, -reflogBefore);
     expect(moves.join('\n')).not.toMatch(/to player\/ticket-1\b/);
   });

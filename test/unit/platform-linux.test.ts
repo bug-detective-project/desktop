@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createLinuxPlatform, isWsl } from '../../src/main/platform/linux.ts';
 import type { RunResult } from '../../src/main/services/process.ts';
 
-const ok = (stdout: string, code = 0): RunResult => ({ code, stdout: Buffer.from(stdout), stderr: '', timedOut: false });
+const ok = (stdout: string, code = 0): RunResult => ({
+  code,
+  stdout: Buffer.from(stdout),
+  stderr: '',
+  timedOut: false,
+});
 
 const CODE_CMD = '@echo off\r\n"%~dp0..\\Code.exe" "%~dp0..\\e646868227\\resources\\app\\out\\cli.js" %*\r\n';
 const VSCODE = '/mnt/c/Users/João Silva/AppData/Local/Programs/Microsoft VS Code';
@@ -74,7 +79,9 @@ describe('Linux platform on WSL 2', () => {
     const cli = (await platform().locateVSCode())!;
     expect(cli.source).toBe('user');
     expect(cli.command).toBe(`${VSCODE}/Code.exe`);
-    expect(cli.baseArgs).toEqual(['C:\\Users\\João Silva\\AppData\\Local\\Programs\\Microsoft VS Code\\e646868227\\resources\\app\\out\\cli.js']);
+    expect(cli.baseArgs).toEqual([
+      'C:\\Users\\João Silva\\AppData\\Local\\Programs\\Microsoft VS Code\\e646868227\\resources\\app\\out\\cli.js',
+    ]);
     expect(cli.env.ELECTRON_RUN_AS_NODE).toBe('1');
     expect(cli.env.WSLENV?.split(':')).toContain('ELECTRON_RUN_AS_NODE');
   });
@@ -88,24 +95,40 @@ describe('Linux platform on WSL 2', () => {
 
   it('checks WSL 2 from the kernel and reads the WSL release through interop', async () => {
     expect(await platform().checkWsl()).toMatchObject({ installed: true, version2: true, version: '2.3.24.0' });
-    const wsl1 = createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs({ ...wslFiles, '/proc/version': 'Linux version 4.4.0-19041-Microsoft' }) });
+    const wsl1 = createLinuxPlatform({
+      env: wslEnv,
+      runner: windowsRunner,
+      ...fakeFs({ ...wslFiles, '/proc/version': 'Linux version 4.4.0-19041-Microsoft' }),
+    });
     expect(await wsl1.checkWsl()).toMatchObject({ installed: true, version2: false });
   });
 
   it('opens URLs in the Windows browser and keeps Linux paths for Docker', () => {
-    expect(platform().browserCommand('http://127.0.0.1:5173/')).toEqual({ command: '/mnt/c/Windows/explorer.exe', args: ['http://127.0.0.1:5173/'] });
-    expect(platform().dockerHostPath('/home/u/.config/Bug Detective/packages/stage-1')).toBe('/home/u/.config/Bug Detective/packages/stage-1');
+    expect(platform().browserCommand('http://127.0.0.1:5173/')).toEqual({
+      command: '/mnt/c/Windows/explorer.exe',
+      args: ['http://127.0.0.1:5173/'],
+    });
+    expect(platform().dockerHostPath('/home/u/.config/Bug Detective/packages/stage-1')).toBe(
+      '/home/u/.config/Bug Detective/packages/stage-1',
+    );
   });
 });
 
 describe('VS Code global storage and host credentials', () => {
   it("on WSL, points the attached-container configuration at the Windows VS Code's globalStorage through /mnt/c", async () => {
     const platform = createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) });
-    expect((await platform.locateVSCode())!.globalStorage).toBe('/mnt/c/Users/João Silva/AppData/Roaming/Code/User/globalStorage');
+    expect((await platform.locateVSCode())!.globalStorage).toBe(
+      '/mnt/c/Users/João Silva/AppData/Roaming/Code/User/globalStorage',
+    );
     // A cmd.exe that answers %APPDATA% too.
     const withAppData = async (command: string, args: readonly string[]) =>
-      command.endsWith('cmd.exe') ? ok('C:\\Users\\João Silva\\AppData\\Local|C:\\Program Files|C:\\WINDOWS|D:\\Roaming\r\n') : windowsRunner(command, args);
-    expect((await createLinuxPlatform({ env: wslEnv, runner: withAppData, ...fakeFs(wslFiles) }).locateVSCode())!.globalStorage).toBe('/mnt/d/Roaming/Code/User/globalStorage');
+      command.endsWith('cmd.exe')
+        ? ok('C:\\Users\\João Silva\\AppData\\Local|C:\\Program Files|C:\\WINDOWS|D:\\Roaming\r\n')
+        : windowsRunner(command, args);
+    expect(
+      (await createLinuxPlatform({ env: wslEnv, runner: withAppData, ...fakeFs(wslFiles) }).locateVSCode())!
+        .globalStorage,
+    ).toBe('/mnt/d/Roaming/Code/User/globalStorage');
   });
 
   it('on WSL, asks Windows about the OpenSSH agent service and the stored github.com credential', async () => {
@@ -114,12 +137,21 @@ describe('VS Code global storage and host credentials', () => {
       if (command.endsWith('cmdkey.exe')) return ok('Target: LegacyGeneric:target=git:https://github.com\r\n');
       return windowsRunner(command, args);
     };
-    expect(await createLinuxPlatform({ env: wslEnv, runner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({ sshAgent: true, githubCredential: true });
-    expect(await createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
+    expect(await createLinuxPlatform({ env: wslEnv, runner, ...fakeFs(wslFiles) }).hostCredentials()).toEqual({
+      sshAgent: true,
+      githubCredential: true,
+    });
+    expect(
+      await createLinuxPlatform({ env: wslEnv, runner: windowsRunner, ...fakeFs(wslFiles) }).hostCredentials(),
+    ).toEqual({ sshAgent: false, githubCredential: false });
   });
 
   it('cannot close VS Code windows yet, so the player is asked to', async () => {
-    const platform = createLinuxPlatform({ env: { PATH: '/usr/bin', HOME: '/home/u' }, runner: async () => ok('', 1), ...fakeFs({}) });
+    const platform = createLinuxPlatform({
+      env: { PATH: '/usr/bin', HOME: '/home/u' },
+      runner: async () => ok('', 1),
+      ...fakeFs({}),
+    });
     expect(await platform.closeContainerWindows('bugdetective-workspace')).toBe(false);
   });
 
@@ -129,7 +161,11 @@ describe('VS Code global storage and host credentials', () => {
     const platform = createLinuxPlatform({ env, runner: async () => ok('', 1), ...fakeFs(files) });
     expect((await platform.locateVSCode())!.globalStorage).toBe('/home/u/.config/Code/User/globalStorage');
     expect(await platform.hostCredentials()).toEqual({ sshAgent: true, githubCredential: false });
-    const xdg = createLinuxPlatform({ env: { ...env, XDG_CONFIG_HOME: '/cfg', SSH_AUTH_SOCK: undefined }, runner: async () => ok('', 1), ...fakeFs(files) });
+    const xdg = createLinuxPlatform({
+      env: { ...env, XDG_CONFIG_HOME: '/cfg', SSH_AUTH_SOCK: undefined },
+      runner: async () => ok('', 1),
+      ...fakeFs(files),
+    });
     expect((await xdg.locateVSCode())!.globalStorage).toBe('/cfg/Code/User/globalStorage');
     expect(await xdg.hostCredentials()).toEqual({ sshAgent: false, githubCredential: false });
   });
@@ -166,9 +202,30 @@ describe('Linux platform on plain Linux', () => {
       if (path in disks) return { bsize: 4096, bavail: disks[path] };
       throw new Error('ENOENT');
     };
-    expect(await createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: statfsOf({ '/var/lib/docker': 3_000_000, '/': 500 }), ...fakeFs(files) }).freeDiskBytes()).toBe(4096 * 3_000_000);
-    expect(await createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: statfsOf({ '/': 500 }), ...fakeFs(files) }).freeDiskBytes()).toBe(4096 * 500);
-    const unreadable = createLinuxPlatform({ env, runner: async () => ok('', 1), statfs: async () => { throw new Error('EPERM'); }, ...fakeFs(files) });
+    expect(
+      await createLinuxPlatform({
+        env,
+        runner: async () => ok('', 1),
+        statfs: statfsOf({ '/var/lib/docker': 3_000_000, '/': 500 }),
+        ...fakeFs(files),
+      }).freeDiskBytes(),
+    ).toBe(4096 * 3_000_000);
+    expect(
+      await createLinuxPlatform({
+        env,
+        runner: async () => ok('', 1),
+        statfs: statfsOf({ '/': 500 }),
+        ...fakeFs(files),
+      }).freeDiskBytes(),
+    ).toBe(4096 * 500);
+    const unreadable = createLinuxPlatform({
+      env,
+      runner: async () => ok('', 1),
+      statfs: async () => {
+        throw new Error('EPERM');
+      },
+      ...fakeFs(files),
+    });
     expect(await unreadable.freeDiskBytes()).toBeNull();
   });
 });

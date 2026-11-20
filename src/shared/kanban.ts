@@ -99,7 +99,10 @@ function requireActive(state: GameState, ticket: number): TicketState {
 
 function requireColumn(ticket: TicketState, ...columns: Column[]): void {
   if (!columns.includes(ticket.status)) {
-    throw new GameRuleError('wrongColumn', `Ticket ${ticket.ticket} is in ${ticket.status}, expected ${columns.join(' or ')}`);
+    throw new GameRuleError(
+      'wrongColumn',
+      `Ticket ${ticket.ticket} is in ${ticket.status}, expected ${columns.join(' or ')}`,
+    );
   }
 }
 
@@ -176,7 +179,10 @@ export function unlockTicket(state: GameState, ticket: number, info: UnlockInfo,
     throw new GameRuleError('noMoreTickets', `${info.id} is not in the project`);
   }
   if (ticket !== state.tickets.length + 1 || state.tickets.some((item) => item.id === info.id)) {
-    throw new GameRuleError('wrongTicket', `Ticket ${state.tickets.length + 1} must be a ticket not unlocked yet, not ${info.id}`);
+    throw new GameRuleError(
+      'wrongTicket',
+      `Ticket ${state.tickets.length + 1} must be a ticket not unlocked yet, not ${info.id}`,
+    );
   }
   const created: TicketState = {
     ticket,
@@ -228,7 +234,12 @@ export function addBranchWarning(state: GameState, ticket: number, branch: strin
   return updateTicket(state, ticket, (item) => ({ ...item, comments: [...item.comments, comment] }));
 }
 
-export function commentForResult(result: QaResult, attemptId: string, timeoutSeconds: number, ctx: RuleContext): QaComment {
+export function commentForResult(
+  result: QaResult,
+  attemptId: string,
+  timeoutSeconds: number,
+  ctx: RuleContext,
+): QaComment {
   const base = { id: ctx.id(), at: ctx.now, attemptId };
   const failing = result.tests
     .filter((test) => test.status === 'failed')
@@ -363,7 +374,8 @@ export function completedTracks(state: GameState): TrackChoice[] {
     return [];
   }
   const done = (track: Track) =>
-    counts[track] > 0 && state.tickets.filter((item) => item.track === track && item.status === 'done').length >= counts[track];
+    counts[track] > 0 &&
+    state.tickets.filter((item) => item.track === track && item.status === 'done').length >= counts[track];
   const tracks: TrackChoice[] = TRACKS.filter(done);
   return tracks.length === TRACKS.length ? [...tracks, 'fullstack'] : tracks;
 }
@@ -373,7 +385,9 @@ export function completedTracks(state: GameState): TrackChoice[] {
  * are track completions. Each track gets its message once.
  */
 function withTrackCompletions(state: GameState, ctx: RuleContext): GameState {
-  const announced = new Set(state.inbox.filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion').map((m) => m.track));
+  const announced = new Set(
+    state.inbox.filter((m) => m.kind === 'completion' || m.kind === 'trackCompletion').map((m) => m.track),
+  );
   let inbox = state.inbox;
   for (const track of completedTracks(state).filter((item) => !announced.has(item))) {
     const kind = inbox.some((m) => m.kind === 'completion') ? 'trackCompletion' : 'completion';
@@ -388,7 +402,10 @@ function withTrackCompletions(state: GameState, ctx: RuleContext): GameState {
  */
 export function setTrackCounts(state: GameState, counts: TrackCounts, ctx: RuleContext): GameState {
   const unlockedIn = (track: Track) => state.tickets.filter((item) => item.track === track).length;
-  const tracks = { front: Math.max(counts.front, unlockedIn('front')), back: Math.max(counts.back, unlockedIn('back')) };
+  const tracks = {
+    front: Math.max(counts.front, unlockedIn('front')),
+    back: Math.max(counts.back, unlockedIn('back')),
+  };
   return withTrackCompletions({ ...state, tracks }, ctx);
 }
 
@@ -432,7 +449,13 @@ export function beginSwitch(state: GameState, from: string, to: string, ctx: Rul
   if (!canTakeTicket(state) || state.reviewSession) {
     throw new GameRuleError('ticketNotDone', 'Finish the open ticket and close its review first');
   }
-  const kept: ProjectProgress = { createdAt: state.createdAt, tracks: state.tracks, tickets: state.tickets, activity: state.activity, inbox: state.inbox };
+  const kept: ProjectProgress = {
+    createdAt: state.createdAt,
+    tracks: state.tracks,
+    tickets: state.tickets,
+    activity: state.activity,
+    inbox: state.inbox,
+  };
   const { [to]: back, ...others } = state.otherProjects;
   const progress: ProjectProgress = back ?? {
     createdAt: ctx.now,

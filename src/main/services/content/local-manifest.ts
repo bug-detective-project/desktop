@@ -7,8 +7,25 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runChecked } from '../process.ts';
 import type { CommandRunner } from '../process.ts';
-import { PACKAGE_EXCLUDED, TICKET_ID, TRACKS, parseManifest, projectContentOf, projectServicesProblems, projectStackSchema, ticketMetaOf, treeDigest } from '@bug-detective/catalog/contract';
-import type { ArchiveFile, ProjectManifest, ProjectResources, TicketEntry } from '@bug-detective/catalog/contract';
+import {
+  PACKAGE_EXCLUDED,
+  TICKET_ID,
+  TRACKS,
+  parseManifest,
+  projectContentOf,
+  portsProblems,
+  projectServicesProblems,
+  projectStackSchema,
+  ticketMetaOf,
+  treeDigest,
+} from '@bug-detective/catalog/contract';
+import type {
+  ArchiveFile,
+  ProjectManifest,
+  ProjectPorts,
+  ProjectResources,
+  TicketEntry,
+} from '@bug-detective/catalog/contract';
 import { gitArchive, normalizeLineEndings, resolveBranchRef } from './git.ts';
 
 /** Files and folders every tickets/<id>/ must have. */
@@ -43,14 +60,27 @@ interface Git {
 
 function gitIn(runner: CommandRunner, git: string, dir: string): Git {
   return {
-    text: async (...args) => (await runChecked(runner, git, ['-c', 'safe.directory=*', '-C', dir, ...args])).stdout.toString('utf8').trim(),
+    text: async (...args) =>
+      (await runChecked(runner, git, ['-c', 'safe.directory=*', '-C', dir, ...args])).stdout.toString('utf8').trim(),
   };
 }
 
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
 
 async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
-  let json: { bugDetective?: { project?: { id?: unknown; name?: unknown; difficulty?: unknown; stack?: unknown; services?: unknown; memory?: unknown } } };
+  let json: {
+    bugDetective?: {
+      project?: {
+        id?: unknown;
+        name?: unknown;
+        difficulty?: unknown;
+        stack?: unknown;
+        services?: unknown;
+        memory?: unknown;
+        ports?: unknown;
+      };
+    };
+  };
   try {
     json = JSON.parse(await readFile(join(qaDir, 'package.json'), 'utf8'));
   } catch {
@@ -69,12 +99,14 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
     const parsed = projectStackSchema.safeParse(project.stack);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      throw new Error(`${qaDir}/package.json: bugDetective.project.stack${issue?.path.length ? `.${issue.path.join('.')}` : ''}: ${issue?.message ?? 'invalid'}`);
+      throw new Error(
+        `${qaDir}/package.json: bugDetective.project.stack${issue?.path.length ? `.${issue.path.join('.')}` : ''}: ${issue?.message ?? 'invalid'}`,
+      );
     }
     stack = parsed.data;
   }
-  const { services, memory } = project;
-  const problem = projectServicesProblems({ services, memory })[0];
+  const { services, memory, ports } = project;
+  const problem = [...projectServicesProblems({ services, memory }), ...portsProblems({ ports, services })][0];
   if (problem) {
     throw new Error(`${qaDir}/package.json: bugDetective.project.${problem}`);
   }
@@ -85,6 +117,7 @@ async function readProject(qaDir: string): Promise<ProjectManifest['project']> {
     ...(stack !== undefined && { stack }),
     ...(services !== undefined && { services: services as ProjectResources['services'] }),
     ...(memory !== undefined && { memory: memory as ProjectResources['memory'] }),
+    ...(ports !== undefined && { ports: ports as ProjectPorts }),
   };
 }
 
@@ -109,7 +142,9 @@ function ticketQueue(files: string[]): string[] {
       .sort((a, b) => a - b);
     orders.forEach((order, index) => {
       if (order !== index + 1) {
-        throw new Error(`tickets/: the ${track} tickets must be numbered 1, 2, 3, ... without gaps (found ${track}-${order})`);
+        throw new Error(
+          `tickets/: the ${track} tickets must be numbered 1, 2, 3, ... without gaps (found ${track}-${order})`,
+        );
       }
     });
     return orders.map((order) => `${track}-${order}`);
@@ -151,7 +186,12 @@ export async function readQaFiles(qaDir: string, runner: CommandRunner, git = 'g
 }
 
 /** The verified-content view of one ticket's package, as the manifest describes it. */
-export async function readTicketPackage(qaDir: string, id: string, runner: CommandRunner, git = 'git'): Promise<ArchiveFile[]> {
+export async function readTicketPackage(
+  qaDir: string,
+  id: string,
+  runner: CommandRunner,
+  git = 'git',
+): Promise<ArchiveFile[]> {
   return ticketPackage(qaDir, id, await trackedTicketFiles(gitIn(runner, git, qaDir)));
 }
 
@@ -164,7 +204,9 @@ export async function buildManifest(options: BuildManifestOptions): Promise<Proj
   const project = await readProject(qaDir);
   const git = gitIn(runner, gitCommand, qaDir);
   // The story and the review configuration must be valid before anything is published.
-  const projectFiles = (await readQaFiles(qaDir, runner, gitCommand)).filter((file) => !file.path.startsWith('tickets/'));
+  const projectFiles = (await readQaFiles(qaDir, runner, gitCommand)).filter(
+    (file) => !file.path.startsWith('tickets/'),
+  );
   projectContentOf(projectFiles);
   const files = await trackedTicketFiles(git);
   const queue = ticketQueue(files);
@@ -178,7 +220,9 @@ export async function buildManifest(options: BuildManifestOptions): Promise<Proj
     const ref = await resolveBranchRef(runner, gitCommand, qaDir, id);
     const commit = await git.text('rev-parse', `${ref}^{commit}`);
     const codeFiles = await gitArchive(runner, gitCommand, qaDir, commit);
-    const existing = (await git.text('tag', '--points-at', commit, '--sort=-v:refname', '-l', `${id}-v*`)).split('\n').filter(Boolean)[0];
+    const existing = (await git.text('tag', '--points-at', commit, '--sort=-v:refname', '-l', `${id}-v*`))
+      .split('\n')
+      .filter(Boolean)[0];
     const [track, order] = id.split('-');
     entries.push({
       id,

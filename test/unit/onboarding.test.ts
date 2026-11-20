@@ -58,7 +58,15 @@ describe('the onboarding steps', () => {
     expect(ONBOARDING_STEPS.slice(0, firstBoard).every((step) => step.view === 'dashboard')).toBe(true);
     expect(ONBOARDING_STEPS.slice(firstBoard).every((step) => step.view === 'board')).toBe(true);
     // The example ticket panel opens on each of its tabs, in the real panel's order.
-    expect(ONBOARDING_STEPS.flatMap((step) => (step.panelTab ? [step.panelTab] : []))).toEqual(['ticket', 'ticket', 'ticket', 'ticket', 'qa', 'history', 'senior']);
+    expect(ONBOARDING_STEPS.flatMap((step) => (step.panelTab ? [step.panelTab] : []))).toEqual([
+      'ticket',
+      'ticket',
+      'ticket',
+      'ticket',
+      'qa',
+      'history',
+      'senior',
+    ]);
   });
 
   it('have a title and a text in English and Portuguese', () => {
@@ -79,13 +87,25 @@ describe('placeBalloon', () => {
   const viewport = { width: 1280, height: 640 };
 
   it('goes to the right of the target, then to the left', () => {
-    expect(placeBalloon({ left: 24, top: 90, width: 320, height: 160 }, balloon, viewport)).toEqual({ left: 360, top: 90 });
-    expect(placeBalloon({ left: 760, top: 90, width: 500, height: 520 }, balloon, viewport)).toEqual({ left: 404, top: 90 });
+    expect(placeBalloon({ left: 24, top: 90, width: 320, height: 160 }, balloon, viewport)).toEqual({
+      left: 360,
+      top: 90,
+    });
+    expect(placeBalloon({ left: 760, top: 90, width: 500, height: 520 }, balloon, viewport)).toEqual({
+      left: 404,
+      top: 90,
+    });
   });
 
   it('goes below a header button when asked, centered on it and inside the window', () => {
-    expect(placeBalloon({ left: 380, top: 8, width: 100, height: 48 }, balloon, viewport, true)).toEqual({ left: 260, top: 72 });
-    expect(placeBalloon({ left: 1136, top: 16, width: 32, height: 32 }, balloon, viewport, true)).toEqual({ left: 924, top: 64 });
+    expect(placeBalloon({ left: 380, top: 8, width: 100, height: 48 }, balloon, viewport, true)).toEqual({
+      left: 260,
+      top: 72,
+    });
+    expect(placeBalloon({ left: 1136, top: 16, width: 32, height: 32 }, balloon, viewport, true)).toEqual({
+      left: 924,
+      top: 64,
+    });
   });
 
   it('stays inside the window vertically', () => {
@@ -94,7 +114,10 @@ describe('placeBalloon', () => {
 
   it('is centered without a target, or when no side has room', () => {
     expect(placeBalloon(null, balloon, viewport)).toEqual({ left: 470, top: 220 });
-    expect(placeBalloon({ left: 10, top: 10, width: 1260, height: 620 }, balloon, viewport)).toEqual({ left: 470, top: 220 });
+    expect(placeBalloon({ left: 10, top: 10, width: 1260, height: 620 }, balloon, viewport)).toEqual({
+      left: 470,
+      top: 220,
+    });
   });
 });
 

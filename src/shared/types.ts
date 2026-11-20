@@ -58,14 +58,7 @@ export interface QaAttempt {
 }
 
 export type QaCommentKind =
-  | 'gate1Failed'
-  | 'gate2Failed'
-  | 'timeout'
-  | 'outOfMemory'
-  | 'passed'
-  | 'interrupted'
-  | 'error'
-  | 'branchWarning';
+  'gate1Failed' | 'gate2Failed' | 'timeout' | 'outOfMemory' | 'passed' | 'interrupted' | 'error' | 'branchWarning';
 
 /** A QA comment is stored as data and rendered with the templates of the current language. */
 export interface QaComment {
@@ -122,7 +115,16 @@ export interface ActivityEntry {
   to: Column;
   at: string;
   actor: 'player' | 'system';
-  reason?: 'unlocked' | 'started' | 'submitted' | 'qaPassed' | 'qaFailed' | 'qaTimeout' | 'qaInterrupted' | 'qaError' | 'reviewAccepted';
+  reason?:
+    | 'unlocked'
+    | 'started'
+    | 'submitted'
+    | 'qaPassed'
+    | 'qaFailed'
+    | 'qaTimeout'
+    | 'qaInterrupted'
+    | 'qaError'
+    | 'reviewAccepted';
 }
 
 export type InboxKind = 'welcome' | 'assignment' | 'completion' | 'trackCompletion';
@@ -240,6 +242,10 @@ export function backupStatus(state: GameState): 'none' | 'current' | 'outdated' 
   }
   const changed =
     state.activity.some((entry) => entry.at > since) ||
-    state.tickets.some((ticket) => ticket.conversation.some((entry) => entry.at > since) || ticket.attempts.some((attempt) => attempt.finishedAt > since));
+    state.tickets.some(
+      (ticket) =>
+        ticket.conversation.some((entry) => entry.at > since) ||
+        ticket.attempts.some((attempt) => attempt.finishedAt > since),
+    );
   return changed ? 'outdated' : 'current';
 }

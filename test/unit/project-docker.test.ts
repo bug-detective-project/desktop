@@ -5,16 +5,28 @@ import { Docker, PROJECT_LABEL } from '../../src/main/services/docker.ts';
 import type { CommandRunner } from '../../src/main/services/process.ts';
 
 /** A docker CLI that records every command and answers from a small in-memory world. */
-function recordingDocker(world: { containers: Record<string, string>; volumes: Record<string, string>; images: Record<string, string> }) {
+function recordingDocker(world: {
+  containers: Record<string, string>;
+  volumes: Record<string, string>;
+  images: Record<string, string>;
+}) {
   const calls: string[][] = [];
   const out = (text: string) => ({ code: 0, stdout: Buffer.from(text), stderr: '', timedOut: false });
   const runner: CommandRunner = async (_cli, args) => {
     calls.push([...args]);
     const project = /label=bugdetective\.project=([a-z0-9-]+)/.exec(args.join(' '))?.[1];
-    const of = (items: Record<string, string>) => Object.entries(items).filter(([, p]) => p === project).map(([name]) => name);
+    const of = (items: Record<string, string>) =>
+      Object.entries(items)
+        .filter(([, p]) => p === project)
+        .map(([name]) => name);
     if (args[0] === 'container' && args[1] === 'ls') return out(of(world.containers).join('\n'));
     if (args[0] === 'volume' && args[1] === 'ls') return out(of(world.volumes).join('\n'));
-    if (args[0] === 'image' && args[1] === 'ls') return out(of(world.images).map((ref) => `${ref}|sha256:${ref.length}`).join('\n'));
+    if (args[0] === 'image' && args[1] === 'ls')
+      return out(
+        of(world.images)
+          .map((ref) => `${ref}|sha256:${ref.length}`)
+          .join('\n'),
+      );
     if (args[0] === 'container' && args[1] === 'rm') delete world.containers[args.at(-1)!];
     if (args[0] === 'volume' && args[1] === 'rm') delete world.volumes[args.at(-1)!];
     if (args[0] === 'image' && args[1] === 'rm') delete world.images[args.at(-1)!];
@@ -28,7 +40,15 @@ describe('project labels', () => {
   it('labels a volume with its project', async () => {
     const { docker, calls } = recordingDocker({ containers: {}, volumes: {}, images: {} });
     await docker.createVolume('bugdetective-workspace', 'workspace', 'supportdesk');
-    expect(calls.at(-1)).toEqual(['volume', 'create', '--label', 'bugdetective.role=workspace', '--label', `${PROJECT_LABEL}=supportdesk`, 'bugdetective-workspace']);
+    expect(calls.at(-1)).toEqual([
+      'volume',
+      'create',
+      '--label',
+      'bugdetective.role=workspace',
+      '--label',
+      `${PROJECT_LABEL}=supportdesk`,
+      'bugdetective-workspace',
+    ]);
   });
 
   it('lists the containers, volumes and images of one project', async () => {
@@ -46,7 +66,10 @@ describe('project labels', () => {
 
 describe('removing other projects from Docker', () => {
   const runtimeWith = (docker: Docker) => {
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     (runtime as unknown as Record<string, unknown>).docker = async () => docker;
     return runtime;
   };
@@ -69,7 +92,9 @@ describe('removing other projects from Docker', () => {
     const world = { containers: {}, volumes: { 'bugdetective-workspace': 'old' }, images: {} };
     const { docker } = recordingDocker(world);
     const stubborn = Object.assign(Object.create(docker), { removeVolume: async () => {} }) as Docker;
-    expect(await runtimeWith(stubborn).removeProjects(['old'])).toEqual([{ kind: 'volume', name: 'bugdetective-workspace' }]);
+    expect(await runtimeWith(stubborn).removeProjects(['old'])).toEqual([
+      { kind: 'volume', name: 'bugdetective-workspace' },
+    ]);
   });
 });
 
@@ -79,13 +104,34 @@ describe("a project's services and the internet", () => {
   it('never downloads a service image, nor starts the service, outside "Download and install"', async () => {
     const { docker, calls } = recordingDocker({ containers: {}, volumes: {}, images: {} });
     const withoutImage = Object.assign(Object.create(docker), { imageExists: async () => false }) as Docker;
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     (runtime as unknown as Record<string, unknown>).docker = async () => withoutImage;
     runtime.setProject('shop');
     runtime.setResources({ services });
 
     await (runtime as unknown as { ensureServices: () => Promise<void> }).ensureServices();
     expect(calls.filter((call) => call[0] === 'pull' || call[0] === 'run')).toEqual([]);
+  });
+});
+
+describe("a project's declared ports", () => {
+  it('reach the workspace, which publishes them', async () => {
+    const { docker } = recordingDocker({ containers: {}, volumes: {}, images: {} });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
+    (runtime as unknown as Record<string, unknown>).docker = async () => docker;
+    (runtime as unknown as Record<string, unknown>).imageTags = async () => ({ workspace: 'ws:test' });
+    runtime.setProject('shop');
+    const ports = { client: { port: 5173 }, audit: { port: 3002 } };
+    runtime.setResources({ ports });
+
+    const workspace = await (runtime as unknown as { workspace: () => Promise<object> }).workspace();
+    expect((workspace as unknown as { declaredPorts: unknown }).declaredPorts).toEqual(ports);
   });
 });
 
@@ -96,12 +142,26 @@ describe('a workspace that runs out of memory', () => {
     const docker = new Docker('docker', async (_cli, args) => {
       if (args[0] === 'container' && args[1] === 'inspect') {
         if (args.includes('--format')) return out(String(state.oomKilled ?? false));
-        return out(JSON.stringify([{ Id: state.id, Name: '/bugdetective-workspace', State: { Running: state.running }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+        return out(
+          JSON.stringify([
+            {
+              Id: state.id,
+              Name: '/bugdetective-workspace',
+              State: { Running: state.running },
+              Config: { Image: 'x', Labels: {} },
+              HostConfig: { PortBindings: {} },
+            },
+          ]),
+        );
       }
-      if (args[0] === 'exec') return state.kills === null ? out('', 1) : out(`oom_kill_disable 0\nunder_oom 0\noom_kill ${state.kills}\n`);
+      if (args[0] === 'exec')
+        return state.kills === null ? out('', 1) : out(`oom_kill_disable 0\nunder_oom 0\noom_kill ${state.kills}\n`);
       return out('');
     });
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     (runtime as unknown as Record<string, unknown>).docker = async () => docker;
     return { runtime, state };
   }
@@ -150,12 +210,28 @@ describe('a service that runs out of memory and stays up', () => {
       const service = name.split('-').at(-1)!;
       if (args[0] === 'container' && args[1] === 'inspect') {
         if (!(service in kills)) return out('', 1);
-        return out(JSON.stringify([{ Id: ids[service] ?? `id-${service}`, Name: `/${name}`, State: { Running: true }, Config: { Image: 'x', Labels: {} }, HostConfig: { PortBindings: {} } }]));
+        return out(
+          JSON.stringify([
+            {
+              Id: ids[service] ?? `id-${service}`,
+              Name: `/${name}`,
+              State: { Running: true },
+              Config: { Image: 'x', Labels: {} },
+              HostConfig: { PortBindings: {} },
+            },
+          ]),
+        );
       }
-      if (args[0] === 'exec') return kills[service] === null || kills[service] === undefined ? out('', 1) : out(`oom_kill ${kills[service]}\n`);
+      if (args[0] === 'exec')
+        return kills[service] === null || kills[service] === undefined
+          ? out('', 1)
+          : out(`oom_kill ${kills[service]}\n`);
       return out('');
     });
-    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, { contextRoot: '/nowhere', qaBuildRoot: '/nowhere/qa' });
+    const runtime = new DockerRuntime({ dockerHostPath: (path: string) => path } as unknown as Platform, {
+      contextRoot: '/nowhere',
+      qaBuildRoot: '/nowhere/qa',
+    });
     (runtime as unknown as Record<string, unknown>).docker = async () => docker;
     runtime.setProject('shop');
     runtime.setResources({ services });

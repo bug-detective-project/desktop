@@ -4,7 +4,12 @@
  * sees the player's services or data, has no internet, and leaves no volume behind. Everything
  * carries the roles `qa-service` and `qa-network`, so a crash is swept from Docker's own listing.
  */
-import { SERVICE_READY_TIMEOUT_MS, serviceImageOf, serviceRunArgs, serviceVariables } from '@bug-detective/catalog/contract';
+import {
+  SERVICE_READY_TIMEOUT_MS,
+  serviceImageOf,
+  serviceRunArgs,
+  serviceVariables,
+} from '@bug-detective/catalog/contract';
 import type { ProjectServices as Declared } from '@bug-detective/catalog/contract';
 import { LABEL, PROJECT_LABEL } from './docker.ts';
 import type { Docker } from './docker.ts';
@@ -13,10 +18,17 @@ export const QA_SERVICE_ROLE = 'qa-service';
 export const QA_NETWORK_ROLE = 'qa-network';
 
 /** The network of a QA run and the container of each of its services. */
-export function qaServiceNames(prefix: string, project: string, run: string, services: Declared): { network: string; containers: Record<string, string> } {
+export function qaServiceNames(
+  prefix: string,
+  project: string,
+  run: string,
+  services: Declared,
+): { network: string; containers: Record<string, string> } {
   return {
     network: `${prefix}-qanet-${project}-${run}`,
-    containers: Object.fromEntries(Object.keys(services).map((service) => [service, `${prefix}-qasvc-${project}-${service}-${run}`])),
+    containers: Object.fromEntries(
+      Object.keys(services).map((service) => [service, `${prefix}-qasvc-${project}-${service}-${run}`]),
+    ),
   };
 }
 
@@ -80,7 +92,11 @@ export class QaServices {
             '--detach',
             '--pull',
             'never',
-            ...serviceRunArgs(declared, { name: container, labels: { [LABEL]: QA_SERVICE_ROLE, [PROJECT_LABEL]: this.project }, data: 'tmpfs' }),
+            ...serviceRunArgs(declared, {
+              name: container,
+              labels: { [LABEL]: QA_SERVICE_ROLE, [PROJECT_LABEL]: this.project },
+              data: 'tmpfs',
+            }),
             '--network',
             network,
             '--network-alias',
@@ -90,7 +106,9 @@ export class QaServices {
           { timeoutMs: 120_000, signal },
         );
         if (created.code !== 0) {
-          throw new QaServiceError(`${label} could not be started: ${lastLine(created.stderr) || `exit ${created.code}`}`);
+          throw new QaServiceError(
+            `${label} could not be started: ${lastLine(created.stderr) || `exit ${created.code}`}`,
+          );
         }
         const deadline = Date.now() + this.readyTimeoutMs;
         for (;;) {
@@ -103,7 +121,11 @@ export class QaServices {
             const oom = !running && (await this.docker.oomKilled(container));
             const logs = await this.docker.run(['logs', '--tail', '20', container], { timeoutMs: 30_000 });
             const said = lastLine(`${logs.stdout.toString('utf8')}\n${logs.stderr}`);
-            const reason = oom ? 'it ran out of memory' : running ? `it was not ready after ${this.readyTimeoutMs / 1000} s` : `it stopped${said ? `: ${said}` : ''}`;
+            const reason = oom
+              ? 'it ran out of memory'
+              : running
+                ? `it was not ready after ${this.readyTimeoutMs / 1000} s`
+                : `it stopped${said ? `: ${said}` : ''}`;
             throw new QaServiceError(`${label} did not start: ${reason}`);
           }
           await new Promise((resolve) => setTimeout(resolve, this.pollMs));
@@ -115,7 +137,10 @@ export class QaServices {
     }
     return {
       network,
-      variables: serviceVariables(this.services, (service) => ({ host: service, port: serviceImageOf(this.services[service]!).port })),
+      variables: serviceVariables(this.services, (service) => ({
+        host: service,
+        port: serviceImageOf(this.services[service]!).port,
+      })),
     };
   }
 
@@ -135,11 +160,25 @@ export class QaServices {
  */
 export async function sweepQaServices(docker: Docker, prefix: string): Promise<string[]> {
   const lines = (text: string) => text.split(/\r?\n/).filter((name) => name.startsWith(`${prefix}-`));
-  const containers = lines((await docker.checked(['container', 'ls', '--all', '--filter', `label=${LABEL}=${QA_SERVICE_ROLE}`, '--format', '{{.Names}}'], { timeoutMs: 30_000 })).stdout.toString('utf8'));
+  const containers = lines(
+    (
+      await docker.checked(
+        ['container', 'ls', '--all', '--filter', `label=${LABEL}=${QA_SERVICE_ROLE}`, '--format', '{{.Names}}'],
+        { timeoutMs: 30_000 },
+      )
+    ).stdout.toString('utf8'),
+  );
   for (const container of containers) {
     await docker.removeContainer(container);
   }
-  const networks = lines((await docker.checked(['network', 'ls', '--filter', `label=${LABEL}=${QA_NETWORK_ROLE}`, '--format', '{{.Name}}'], { timeoutMs: 30_000 })).stdout.toString('utf8'));
+  const networks = lines(
+    (
+      await docker.checked(
+        ['network', 'ls', '--filter', `label=${LABEL}=${QA_NETWORK_ROLE}`, '--format', '{{.Name}}'],
+        { timeoutMs: 30_000 },
+      )
+    ).stdout.toString('utf8'),
+  );
   for (const network of networks) {
     await docker.removeNetwork(network).catch(() => {});
   }

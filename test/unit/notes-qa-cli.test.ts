@@ -38,13 +38,34 @@ async function stage(id: string): Promise<{ workspace: string; packageDir: strin
   const packageDir = join(root, 'package');
   await mkdir(workspace);
   await run('sh', ['-c', `git -C "${notes.projectDir}" archive ${id} | tar -x -C "${workspace}"`]);
-  await cp(join(notes.qaDir, 'tickets', id), packageDir, { recursive: true, filter: (source) => !source.endsWith('bug.patch') });
+  await cp(join(notes.qaDir, 'tickets', id), packageDir, {
+    recursive: true,
+    filter: (source) => !source.endsWith('bug.patch'),
+  });
   return { workspace, packageDir };
 }
 
-async function qa(ticket: number, paths: { workspace: string; packageDir: string }, timeoutSeconds = 60): Promise<QaResult> {
+async function qa(
+  ticket: number,
+  paths: { workspace: string; packageDir: string },
+  timeoutSeconds = 60,
+): Promise<QaResult> {
   const out = join(paths.workspace, '..', 'result.json');
-  await run(process.execPath, [join(notes.qaDir, 'run.ts'), '--ticket', String(ticket), '--workspace', paths.workspace, '--package', paths.packageDir, '--lang', 'en', '--json', out, '--timeout', String(timeoutSeconds)]).catch(() => {});
+  await run(process.execPath, [
+    join(notes.qaDir, 'run.ts'),
+    '--ticket',
+    String(ticket),
+    '--workspace',
+    paths.workspace,
+    '--package',
+    paths.packageDir,
+    '--lang',
+    'en',
+    '--json',
+    out,
+    '--timeout',
+    String(timeoutSeconds),
+  ]).catch(() => {});
   // parseQaResult is the desktop's own check of the result file (its schema and the ticket).
   return parseQaResult(await readFile(out, 'utf8'), ticket);
 }
@@ -79,7 +100,10 @@ describe('notes QA CLI', () => {
 
   it('breaking a regression test fails gate 1', async () => {
     const paths = await stage('back-1');
-    await writeFile(join(paths.workspace, 'client', 'sort.js'), 'export function sortNotes(notes) {\n  return notes;\n}\n');
+    await writeFile(
+      join(paths.workspace, 'client', 'sort.js'),
+      'export function sortNotes(notes) {\n  return notes;\n}\n',
+    );
     expect(await qa(3, paths)).toMatchObject({ ticket: 3, gate: 1, status: 'failed' });
   });
 
@@ -96,7 +120,10 @@ describe('notes QA CLI', () => {
     await applyReference('front-1', paths.workspace);
     for (const folder of ['node_modules', '.git']) {
       await mkdir(join(paths.workspace, folder, 'test'), { recursive: true });
-      await writeFile(join(paths.workspace, folder, 'test', 'broken.test.js'), "throw new Error('copied by mistake');\n");
+      await writeFile(
+        join(paths.workspace, folder, 'test', 'broken.test.js'),
+        "throw new Error('copied by mistake');\n",
+      );
     }
     expect(await qa(1, paths)).toMatchObject({ gate: 2, status: 'passed' });
   });
@@ -104,7 +131,18 @@ describe('notes QA CLI', () => {
   it('--deps-only stores the dependencies under the key the workspace computes', async () => {
     const { workspace } = await stage('front-1');
     const cache = join(workspace, '..', 'deps');
-    await run(process.execPath, [join(notes.qaDir, 'run.ts'), '--ticket', '1', '--workspace', workspace, '--deps-cache', cache, '--deps-only', '--timeout', '120']);
+    await run(process.execPath, [
+      join(notes.qaDir, 'run.ts'),
+      '--ticket',
+      '1',
+      '--workspace',
+      workspace,
+      '--deps-cache',
+      cache,
+      '--deps-only',
+      '--timeout',
+      '120',
+    ]);
     // Workspace.dependencyKey: SHA-256 of the lockfile and the Node runtime.
     const key = createHash('sha256')
       .update(await readFile(join(workspace, 'package-lock.json')))
@@ -117,7 +155,19 @@ describe('notes QA CLI', () => {
   it('writes its messages in the language asked for', async () => {
     const paths = await stage('front-1');
     const out = join(paths.workspace, '..', 'result-pt.json');
-    await run(process.execPath, [join(notes.qaDir, 'run.ts'), '--ticket', '1', '--workspace', paths.workspace, '--package', paths.packageDir, '--lang', 'pt', '--json', out]).catch(() => {});
+    await run(process.execPath, [
+      join(notes.qaDir, 'run.ts'),
+      '--ticket',
+      '1',
+      '--workspace',
+      paths.workspace,
+      '--package',
+      paths.packageDir,
+      '--lang',
+      'pt',
+      '--json',
+      out,
+    ]).catch(() => {});
     expect(parseQaResult(await readFile(out, 'utf8'), 1).message).toMatch(/gate 2/i);
     expect(parseQaResult(await readFile(out, 'utf8'), 1).message).toMatch(/falhou/);
   });

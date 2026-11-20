@@ -4,8 +4,23 @@ import type { LabelledResources } from '../../src/main/services/cleanup.ts';
 
 // What `docker … ls --filter label=bugdetective.role` could return on a player's (or developer's) computer.
 const found: LabelledResources = {
-  containers: ['bugdetective-workspace', 'bugdetective-forward-first', 'bugdetective-forward-second', 'bugdetective-qa-1a2b3c4d', 'bugdetective-qa-copy-5e6f7a8b', 'bugdetective-test-workspace', 'someone-else'],
-  volumes: ['bugdetective-workspace', 'bugdetective-vscode-server', 'bugdetective-qa-cache', 'bugdetective-qa-input', 'bugdetective-test-workspace', 'other'],
+  containers: [
+    'bugdetective-workspace',
+    'bugdetective-forward-first',
+    'bugdetective-forward-second',
+    'bugdetective-qa-1a2b3c4d',
+    'bugdetective-qa-copy-5e6f7a8b',
+    'bugdetective-test-workspace',
+    'someone-else',
+  ],
+  volumes: [
+    'bugdetective-workspace',
+    'bugdetective-vscode-server',
+    'bugdetective-qa-cache',
+    'bugdetective-qa-input',
+    'bugdetective-test-workspace',
+    'other',
+  ],
   networks: ['bugdetective-net-first', 'bugdetective-net-second', 'someone-elses-network'],
   images: [
     { ref: 'bugdetective-workspace:281e4701af14', id: 'aaa' },
@@ -20,18 +35,23 @@ const options = {
   qaInputVolume: 'bugdetective-qa-input',
   currentImages: ['bugdetective-workspace:281e4701af14', 'bugdetective-qa:9c8db3bee0fc'],
 };
-const names = (scope: 'leftovers' | 'everything') => planCleanup(found, { ...options, scope }).map((target) => `${target.kind} ${target.name}`);
+const names = (scope: 'leftovers' | 'everything') =>
+  planCleanup(found, { ...options, scope }).map((target) => `${target.kind} ${target.name}`);
 
 describe('Docker cleanup plan', () => {
   it('leftovers: the forwarder and network of a project that is not the active one go; the active one stays', () => {
-    const plan = planCleanup(found, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    const plan = planCleanup(found, { ...options, scope: 'leftovers', activeProject: 'first' }).map(
+      (target) => `${target.kind} ${target.name}`,
+    );
     expect(plan).toContain('container bugdetective-forward-second');
     expect(plan).toContain('network bugdetective-net-second');
     expect(plan).not.toContain('container bugdetective-forward-first');
     expect(plan).not.toContain('network bugdetective-net-first');
     expect(plan).not.toContain('network someone-elses-network');
     // Containers before networks: a network with a container connected cannot be removed.
-    expect(plan.indexOf('container bugdetective-forward-second')).toBeLessThan(plan.indexOf('network bugdetective-net-second'));
+    expect(plan.indexOf('container bugdetective-forward-second')).toBeLessThan(
+      plan.indexOf('network bugdetective-net-second'),
+    );
   });
 
   it('leftovers: QA containers, the QA input volume and images of older versions; the player work stays', () => {
@@ -74,8 +94,16 @@ describe('Docker cleanup plan', () => {
   });
 
   it('a test prefix keeps the player resources', () => {
-    const plan = planCleanup(found, { ...options, prefix: 'bugdetective-test', qaInputVolume: 'bugdetective-test-qa-input', scope: 'everything' });
-    expect(plan.filter((target) => target.kind !== 'image').map((target) => target.name)).toEqual(['bugdetective-test-workspace', 'bugdetective-test-workspace']);
+    const plan = planCleanup(found, {
+      ...options,
+      prefix: 'bugdetective-test',
+      qaInputVolume: 'bugdetective-test-qa-input',
+      scope: 'everything',
+    });
+    expect(plan.filter((target) => target.kind !== 'image').map((target) => target.name)).toEqual([
+      'bugdetective-test-workspace',
+      'bugdetective-test-workspace',
+    ]);
   });
 
   it('removes "repository:<none>" images by id, and only from the app repositories', () => {
@@ -95,17 +123,26 @@ describe('Docker cleanup plan', () => {
   it('leftovers: the services and the service data of a project that is not the active one go; the active one keeps its own', () => {
     const withServices: LabelledResources = {
       ...found,
-      containers: [...found.containers, 'bugdetective-svc-first-db', 'bugdetective-svc-second-db', 'bugdetective-svc-second-cache'],
+      containers: [
+        ...found.containers,
+        'bugdetective-svc-first-db',
+        'bugdetective-svc-second-db',
+        'bugdetective-svc-second-cache',
+      ],
       volumes: [...found.volumes, 'bugdetective-svcdata-first-db-0', 'bugdetective-svcdata-second-db-0'],
     };
-    const plan = planCleanup(withServices, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    const plan = planCleanup(withServices, { ...options, scope: 'leftovers', activeProject: 'first' }).map(
+      (target) => `${target.kind} ${target.name}`,
+    );
     expect(plan).toContain('container bugdetective-svc-second-db');
     expect(plan).toContain('container bugdetective-svc-second-cache');
     expect(plan).toContain('volume bugdetective-svcdata-second-db-0');
     expect(plan).not.toContain('container bugdetective-svc-first-db');
     expect(plan).not.toContain('volume bugdetective-svcdata-first-db-0');
     // Containers before the volumes they hold.
-    expect(plan.indexOf('container bugdetective-svc-second-db')).toBeLessThan(plan.indexOf('volume bugdetective-svcdata-second-db-0'));
+    expect(plan.indexOf('container bugdetective-svc-second-db')).toBeLessThan(
+      plan.indexOf('volume bugdetective-svcdata-second-db-0'),
+    );
   });
 
   it('leftovers: the services and the network of a QA run go, whichever the project', () => {
@@ -114,21 +151,37 @@ describe('Docker cleanup plan', () => {
       containers: [...found.containers, 'bugdetective-qasvc-first-db-1a2b3c4d'],
       networks: [...found.networks, 'bugdetective-qanet-first-1a2b3c4d'],
     };
-    const plan = planCleanup(withQaRun, { ...options, scope: 'leftovers', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    const plan = planCleanup(withQaRun, { ...options, scope: 'leftovers', activeProject: 'first' }).map(
+      (target) => `${target.kind} ${target.name}`,
+    );
     expect(plan).toContain('container bugdetective-qasvc-first-db-1a2b3c4d');
     expect(plan).toContain('network bugdetective-qanet-first-1a2b3c4d');
-    expect(plan.indexOf('container bugdetective-qasvc-first-db-1a2b3c4d')).toBeLessThan(plan.indexOf('network bugdetective-qanet-first-1a2b3c4d'));
+    expect(plan.indexOf('container bugdetective-qasvc-first-db-1a2b3c4d')).toBeLessThan(
+      plan.indexOf('network bugdetective-qanet-first-1a2b3c4d'),
+    );
   });
 
   it('leftovers: without a known active project, no service is taken', () => {
-    const withServices: LabelledResources = { ...found, containers: [...found.containers, 'bugdetective-svc-second-db'], volumes: [...found.volumes, 'bugdetective-svcdata-second-db-0'] };
-    const plan = planCleanup(withServices, { ...options, scope: 'leftovers' }).map((target) => target.name).join('\n');
+    const withServices: LabelledResources = {
+      ...found,
+      containers: [...found.containers, 'bugdetective-svc-second-db'],
+      volumes: [...found.volumes, 'bugdetective-svcdata-second-db-0'],
+    };
+    const plan = planCleanup(withServices, { ...options, scope: 'leftovers' })
+      .map((target) => target.name)
+      .join('\n');
     expect(plan).not.toContain('svc');
   });
 
   it('everything: the services and their data go with the rest', () => {
-    const withServices: LabelledResources = { ...found, containers: [...found.containers, 'bugdetective-svc-first-db'], volumes: [...found.volumes, 'bugdetective-svcdata-first-db-0'] };
-    const plan = planCleanup(withServices, { ...options, scope: 'everything', activeProject: 'first' }).map((target) => `${target.kind} ${target.name}`);
+    const withServices: LabelledResources = {
+      ...found,
+      containers: [...found.containers, 'bugdetective-svc-first-db'],
+      volumes: [...found.volumes, 'bugdetective-svcdata-first-db-0'],
+    };
+    const plan = planCleanup(withServices, { ...options, scope: 'everything', activeProject: 'first' }).map(
+      (target) => `${target.kind} ${target.name}`,
+    );
     expect(plan).toContain('container bugdetective-svc-first-db');
     expect(plan).toContain('volume bugdetective-svcdata-first-db-0');
   });
@@ -140,8 +193,9 @@ describe('Docker cleanup plan', () => {
       networks: [],
       images: [...found.images, { ref: 'bugdetective-tasklist-workspace:0ld0ld0ld0ld', id: 'fff' }],
     };
-    const plan = planCleanup(withAnotherProject, { ...options, scope: 'leftovers' }).map((target) => target.name).join('\n');
+    const plan = planCleanup(withAnotherProject, { ...options, scope: 'leftovers' })
+      .map((target) => target.name)
+      .join('\n');
     expect(plan).not.toContain('tasklist');
   });
 });
-

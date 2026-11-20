@@ -9,15 +9,24 @@ const meta = { title: 'Screens/ProjectFlipCard' } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const card = (overrides: Partial<ProjectCard> = {}) => () => (
-  <div className="w-[450px]">
-    <ProjectFlipCard card={projectCardFixture(overrides)} language={i18n.language === 'pt' ? 'pt' : 'en'} blocked={null} onPlay={fn()} />
-  </div>
-);
+const card =
+  (overrides: Partial<ProjectCard> = {}) =>
+  () => (
+    <div className="w-[450px]">
+      <ProjectFlipCard
+        card={projectCardFixture(overrides)}
+        language={i18n.language === 'pt' ? 'pt' : 'en'}
+        blocked={null}
+        onPlay={fn()}
+      />
+    </div>
+  );
 const details = projectCardFixture().details!;
 
 export const Front: Story = { render: card() };
-export const CurrentProject: Story = { render: card({ active: true, progress: { front: { done: 1, total: 2 }, back: { done: 0, total: 1 } } }) };
+export const CurrentProject: Story = {
+  render: card({ active: true, progress: { front: { done: 1, total: 2 }, back: { done: 0, total: 1 } } }),
+};
 export const Intermediate: Story = { render: card({ details: { ...details, difficulty: 'intermediate' } }) };
 export const Advanced: Story = { render: card({ details: { ...details, difficulty: 'advanced' } }) };
 export const WithoutDetails: Story = { render: card({ details: null }) };
@@ -92,7 +101,15 @@ export const BriefWithoutSkills: Story = {
 
 /** A skill may be 60 characters long: it wraps inside the card instead of pushing it wider. */
 export const BriefWithALongSkill: Story = {
-  render: card({ details: { ...details, skills: { en: ['Tracing a request across services and message queues, end to end'.slice(0, 60)], pt: ['Rastrear uma requisição entre serviços e filas de mensagens, de ponta'.slice(0, 60)] } } }),
+  render: card({
+    details: {
+      ...details,
+      skills: {
+        en: ['Tracing a request across services and message queues, end to end'.slice(0, 60)],
+        pt: ['Rastrear uma requisição entre serviços e filas de mensagens, de ponta'.slice(0, 60)],
+      },
+    },
+  }),
   play: async ({ canvasElement }) => {
     const canvas = await openBrief(canvasElement);
     const list = canvas.getByTestId('project-skills');

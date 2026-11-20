@@ -39,7 +39,10 @@ export interface AttachedContainerConfig {
 }
 
 /** What the app writes for its workspace container; other keys of an existing file are kept. */
-export function attachedContainerConfig(folder: string, existing: Record<string, unknown> = {}): AttachedContainerConfig {
+export function attachedContainerConfig(
+  folder: string,
+  existing: Record<string, unknown> = {},
+): AttachedContainerConfig {
   if (!/^\/workspaces\/[a-z][a-z0-9-]{0,39}$/.test(folder)) {
     throw new Error(`Invalid workspace folder: ${folder}`);
   }
@@ -48,7 +51,10 @@ export function attachedContainerConfig(folder: string, existing: Record<string,
     workspaceFolder: folder,
     remoteUser: 'node',
     remoteEnv: { ...((existing.remoteEnv as Record<string, string | null> | undefined) ?? {}), SSH_AUTH_SOCK: null },
-    settings: { ...((existing.settings as Record<string, string | boolean> | undefined) ?? {}), ...VSCODE_MACHINE_SETTINGS },
+    settings: {
+      ...((existing.settings as Record<string, string | boolean> | undefined) ?? {}),
+      ...VSCODE_MACHINE_SETTINGS,
+    },
   };
 }
 
@@ -116,7 +122,9 @@ export class VSCode {
   async installDevContainers(): Promise<void> {
     const result = await this.run(['--install-extension', DEV_CONTAINERS_EXTENSION], 5 * 60_000);
     if (result.code !== 0) {
-      throw new Error(`Installing the Dev Containers extension failed: ${(result.stderr || result.stdout.toString('utf8')).trim()}`);
+      throw new Error(
+        `Installing the Dev Containers extension failed: ${(result.stderr || result.stdout.toString('utf8')).trim()}`,
+      );
     }
   }
 

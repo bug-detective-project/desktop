@@ -20,7 +20,8 @@ const VARIANTS: Record<Variant, string> = {
   danger: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-95 disabled:opacity-50',
   dangerOutline: 'border border-destructive/50 text-destructive shadow-2xs hover:bg-destructive/10 disabled:opacity-60',
   // The Code Review stage hue (see stage.ts), for actions of a card in Code Review.
-  review: 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600',
+  review:
+    'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600',
 };
 
 const SIZES: Record<Size, string> = {
@@ -54,9 +55,20 @@ export function Spinner({ className = 'size-4' }: { className?: string }) {
   return <Icon name="spinner" className={className} />;
 }
 
-export function Card({ children, className = '', ...props }: { children: ReactNode; className?: string; 'data-testid'?: string }) {
+export function Card({
+  children,
+  className = '',
+  ...props
+}: {
+  children: ReactNode;
+  className?: string;
+  'data-testid'?: string;
+}) {
   return (
-    <section className={`rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm ${className}`} {...props}>
+    <section
+      className={`rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm ${className}`}
+      {...props}
+    >
       {children}
     </section>
   );
@@ -72,8 +84,22 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
 }
 
 // Pill and badge text uses the -800 tone in the light theme: they often sit on another tint (4.5:1).
-export function Badge({ tone = 'neutral', toneClass, children }: { tone?: keyof typeof TONES; /** Classes of a hue outside the tones, instead of `tone`. */ toneClass?: string; children: ReactNode }) {
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${toneClass ?? TONES[tone]}`}>{children}</span>;
+export function Badge({
+  tone = 'neutral',
+  toneClass,
+  children,
+}: {
+  tone?: keyof typeof TONES;
+  /** Classes of a hue outside the tones, instead of `tone`. */ toneClass?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${toneClass ?? TONES[tone]}`}
+    >
+      {children}
+    </span>
+  );
 }
 
 const TRACK_TONES: Record<Track, string> = {
@@ -98,12 +124,25 @@ export function TrackBadge({ track, label, testId = 'card-track' }: { track: Tra
 }
 
 /** The stage name in its hue. The dot shows for the pulsing stages, or always with `dot` (it pulses only where the stage does). */
-export function StagePill({ status, className = '', dot = false }: { status: Column; className?: string; dot?: boolean }) {
+export function StagePill({
+  status,
+  className = '',
+  dot = false,
+}: {
+  status: Column;
+  className?: string;
+  dot?: boolean;
+}) {
   const { t } = useTranslation();
   const stage = STAGE[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${stage.pill} ${className}`} data-stage={status}>
-      {(stage.pulse || dot) && <span className={`size-1.5 rounded-full ${stage.pulse ? 'animate-pulse' : ''} ${stage.dot}`} aria-hidden />}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${stage.pill} ${className}`}
+      data-stage={status}
+    >
+      {(stage.pulse || dot) && (
+        <span className={`size-1.5 rounded-full ${stage.pulse ? 'animate-pulse' : ''} ${stage.dot}`} aria-hidden />
+      )}
       {t(`board.columns.${status}`)}
     </span>
   );
@@ -149,7 +188,10 @@ export function StatusIcon({ status }: { status: 'ok' | 'missing' | 'pending' | 
   };
   const icons = { ok: 'check', missing: 'x', pending: 'spinner', warning: 'alertTriangle' } as const;
   return (
-    <span className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full ${styles[status]}`} aria-hidden>
+    <span
+      className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full ${styles[status]}`}
+      aria-hidden
+    >
       <Icon name={icons[status]} className="size-3.5" />
     </span>
   );
@@ -175,7 +217,9 @@ export function Tabs<T extends string>({
           data-testid={`tab-${tab.id}`}
           onClick={() => onChange(tab.id)}
           className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-base font-medium transition-colors ${
-            tab.id === active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+            tab.id === active
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           {tab.label}
@@ -187,7 +231,15 @@ export function Tabs<T extends string>({
 }
 
 /** The output of a task, most recent last. `follow` keeps the newest line in view while it grows. */
-export function LogView({ lines, className = 'max-h-56', follow = false }: { lines: string[]; className?: string; follow?: boolean }) {
+export function LogView({
+  lines,
+  className = 'max-h-56',
+  follow = false,
+}: {
+  lines: string[];
+  className?: string;
+  follow?: boolean;
+}) {
   const ref = useRef<HTMLPreElement>(null);
   useEffect(() => {
     if (follow && ref.current) {
@@ -226,15 +278,29 @@ export function Modal({
   const { t } = useTranslation();
   const box = size === 'large' ? 'flex h-[80vh] w-[80vw] max-w-[1100px] flex-col' : 'w-full max-w-lg';
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" role="dialog" aria-modal aria-label={title} {...props}>
-      <div className={`${box} rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl`} role="document">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+      role="dialog"
+      aria-modal
+      aria-label={title}
+      {...props}
+    >
+      <div
+        className={`${box} rounded-xl border border-border bg-popover p-6 text-popover-foreground shadow-xl`}
+        role="document"
+      >
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
             {icon}
             {title}
           </h2>
           {onClose && (
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t('common.close')}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={t('common.close')}
+            >
               <Icon name="x" />
             </button>
           )}
@@ -246,11 +312,31 @@ export function Modal({
 }
 
 /** A notice block: warnings and destructive confirmations inside cards and modals. */
-export function Notice({ tone = 'warn', children, ...props }: { tone?: 'warn' | 'danger' | 'success'; children: ReactNode; 'data-testid'?: string }) {
+export function Notice({
+  tone = 'warn',
+  children,
+  ...props
+}: {
+  tone?: 'warn' | 'danger' | 'success';
+  children: ReactNode;
+  'data-testid'?: string;
+}) {
   const styles = {
-    warn: { box: 'border-amber-500/30 bg-amber-500/10 text-foreground', icon: 'alertTriangle', color: 'text-amber-500' },
-    danger: { box: 'border-destructive/40 bg-destructive/5 text-foreground', icon: 'alertTriangle', color: 'text-destructive' },
-    success: { box: 'border-emerald-500/40 bg-emerald-500/5 text-foreground', icon: 'checkCircle', color: 'text-emerald-700 dark:text-emerald-400' },
+    warn: {
+      box: 'border-amber-500/30 bg-amber-500/10 text-foreground',
+      icon: 'alertTriangle',
+      color: 'text-amber-500',
+    },
+    danger: {
+      box: 'border-destructive/40 bg-destructive/5 text-foreground',
+      icon: 'alertTriangle',
+      color: 'text-destructive',
+    },
+    success: {
+      box: 'border-emerald-500/40 bg-emerald-500/5 text-foreground',
+      icon: 'checkCircle',
+      color: 'text-emerald-700 dark:text-emerald-400',
+    },
   } as const;
   const { box, icon, color } = styles[tone];
   return (

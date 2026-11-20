@@ -10,7 +10,16 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ContentVerificationError, countsOf, entryById, packageOf, parseManifest, readZip, verifyCode, writeZip } from '@bug-detective/catalog/contract';
+import {
+  ContentVerificationError,
+  countsOf,
+  entryById,
+  packageOf,
+  parseManifest,
+  readZip,
+  verifyCode,
+  writeZip,
+} from '@bug-detective/catalog/contract';
 import type { ArchiveFile, TicketEntry } from '@bug-detective/catalog/contract';
 import { DownloadError } from './github.ts';
 import type { GitHubContentSource } from './github.ts';
@@ -75,7 +84,9 @@ export class CachedContentSource implements ContentSource {
       return content;
     } catch (error) {
       if (error instanceof DownloadError && !existsSync(join(this.root, 'qa.zip'))) {
-        throw new FirstDownloadError(`Connect to the internet to download the project for the first time (${error.message})`);
+        throw new FirstDownloadError(
+          `Connect to the internet to download the project for the first time (${error.message})`,
+        );
       }
       throw error;
     }

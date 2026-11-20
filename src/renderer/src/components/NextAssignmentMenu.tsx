@@ -100,7 +100,9 @@ export function NextAssignmentMenu({
             TRACK_CHOICES.filter((choice) => {
               const queues = snapshot.queues!;
               // A track without tickets is not offered; fullstack needs both tracks, and a ticket left.
-              return choice === 'fullstack' ? queues.front.total > 0 && queues.back.total > 0 && queues.fullstack.next : queues[choice].total > 0;
+              return choice === 'fullstack'
+                ? queues.front.total > 0 && queues.back.total > 0 && queues.fullstack.next
+                : queues[choice].total > 0;
             }).map((choice) => {
               const { next } = snapshot.queues![choice];
               const finished = !next;

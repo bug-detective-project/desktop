@@ -7,7 +7,11 @@ import { createNotesProject } from '../helpers/notes-project.ts';
 import { launch } from './fixtures.ts';
 
 const services = {
-  db: { image: 'postgres:17', env: { POSTGRES_PASSWORD: 'notes' }, variables: { DATABASE_URL: 'postgres://postgres:notes@{{host}}:{{port}}/postgres' } },
+  db: {
+    image: 'postgres:17',
+    env: { POSTGRES_PASSWORD: 'notes' },
+    variables: { DATABASE_URL: 'postgres://postgres:notes@{{host}}:{{port}}/postgres' },
+  },
 };
 
 /** The notes project with a PostgreSQL declared in its qa package.json (the fake runtime stands in for Docker). */

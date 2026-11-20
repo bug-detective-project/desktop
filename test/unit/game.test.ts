@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeRuntime } from '../../src/main/fake-runtime.ts';
-import { Game } from '../../src/main/game.ts';
+import { Game, GameError } from '../../src/main/game.ts';
 import type { DevCatalogOptions, GameOptions } from '../../src/main/game.ts';
 import type { GameRuntime } from '../../src/main/runtime.ts';
 import { StaleVSCodeWindowError } from '../../src/main/services/attached-window.ts';
@@ -11,7 +11,12 @@ import { LocalContentSource } from '../../src/main/services/content/local.ts';
 import { FirstDownloadError } from '../../src/main/services/content/cache.ts';
 import type { LocalCatalog, ResolvedProject } from '../../src/main/services/catalog.ts';
 import type { ContentSource, ProjectContent } from '../../src/main/services/content/source.ts';
-import { IncompletePublicationError, TicketNotPublishedError, UnsupportedFormatError, readZip } from '@bug-detective/catalog/contract';
+import {
+  IncompletePublicationError,
+  TicketNotPublishedError,
+  UnsupportedFormatError,
+  readZip,
+} from '@bug-detective/catalog/contract';
 import type { ArchiveFile } from '@bug-detective/catalog/contract';
 import { PackageStore } from '../../src/main/services/content/store.ts';
 import { runCommand } from '../../src/main/services/process.ts';
@@ -140,13 +145,24 @@ describe('a restored save', () => {
 
 describe('a restored save is checked against the publication', () => {
   /** Rewrites one entry of a save and signs the manifest again with the given key (what a forged save would do). */
-  async function reforge(file: string, key: Uint8Array, change: (files: ArchiveFile[]) => ArchiveFile[]): Promise<string> {
+  async function reforge(
+    file: string,
+    key: Uint8Array,
+    change: (files: ArchiveFile[]) => ArchiveFile[],
+  ): Promise<string> {
     const { readFile: read, writeFile: write } = await import('node:fs/promises');
     const { signManifest } = await import('../../src/main/services/backup.ts');
     const { readZip, sha256Hex, textFile, writeZip } = await import('@bug-detective/catalog/contract');
     const files = change(readZip(new Uint8Array(await read(file))).filter((item) => item.path !== 'manifest.json'));
-    const original = JSON.parse(Buffer.from(readZip(new Uint8Array(await read(file))).find((item) => item.path === 'manifest.json')!.data).toString()) as Record<string, unknown>;
-    const unsigned: Record<string, unknown> = { ...original, files: Object.fromEntries(files.map((item) => [item.path, sha256Hex(item.data)])) };
+    const original = JSON.parse(
+      Buffer.from(
+        readZip(new Uint8Array(await read(file))).find((item) => item.path === 'manifest.json')!.data,
+      ).toString(),
+    ) as Record<string, unknown>;
+    const unsigned: Record<string, unknown> = {
+      ...original,
+      files: Object.fromEntries(files.map((item) => [item.path, sha256Hex(item.data)])),
+    };
     delete unsigned.hmac;
     const manifest = { ...unsigned, hmac: signManifest(unsigned as never, key) };
     const forged = join(dirname(file), `forged-${basename(file)}`);
@@ -165,7 +181,9 @@ describe('a restored save is checked against the publication', () => {
     const forged = await reforge(file, new Uint8Array(32), (files) =>
       files.map((item) => {
         if (item.path !== 'packages/stage-1.zip') return item;
-        const inside = readZip(item.data).map((entry) => (entry.path === 'reference.patch' ? textFile('reference.patch', 'anything\n') : entry));
+        const inside = readZip(item.data).map((entry) =>
+          entry.path === 'reference.patch' ? textFile('reference.patch', 'anything\n') : entry,
+        );
         return { ...item, data: writeZip(inside) };
       }),
     );
@@ -173,7 +191,10 @@ describe('a restored save is checked against the publication', () => {
     const before = game.current;
     const { token, summary } = await game.inspectSave(forged, 'forged.bdsave');
     expect(summary.fromThisInstall).toBe(true);
-    await expect(game.restoreProgress(token)).rejects.toMatchObject({ code: 'saveTampered', message: expect.stringContaining('front-1') });
+    await expect(game.restoreProgress(token)).rejects.toMatchObject({
+      code: 'saveTampered',
+      message: expect.stringContaining('front-1'),
+    });
     expect(restore).not.toHaveBeenCalled();
     expect(game.current).toEqual(before);
     expect(game.snapshot().busy).toBeNull();
@@ -279,7 +300,9 @@ describe('a failed database reset', () => {
     await game.init();
     await game.nextAssignment();
     expect(game.snapshot().dbResetFailed).toBe(true);
-    expect(game.snapshot().log.join('\n')).toContain('» npm run db:reset failed: npm run db:reset exited with code 1 (fake)');
+    expect(game.snapshot().log.join('\n')).toContain(
+      '» npm run db:reset failed: npm run db:reset exited with code 1 (fake)',
+    );
     expect(status(game)).toBe('todo');
     await game.move(1, 'inProgress');
     expect(status(game)).toBe('inProgress');
@@ -343,7 +366,10 @@ describe('diagnostics', () => {
         },
       },
     });
-    await expect(game.openLogsFolder()).rejects.toMatchObject({ code: 'logsFolderFailed', message: 'No file manager is installed' });
+    await expect(game.openLogsFolder()).rejects.toMatchObject({
+      code: 'logsFolderFailed',
+      message: 'No file manager is installed',
+    });
   });
 });
 
@@ -424,7 +450,11 @@ describe('Game', () => {
     await game.nextAssignment();
     expect(game.current.currentTicket).toBe(1);
     expect(game.current.tracks).toEqual({ front: 2, back: 1 });
-    expect(rules.findTicket(game.current, 1)).toMatchObject({ id: 'front-1', track: 'front', manifestVersion: '0.0.0' });
+    expect(rules.findTicket(game.current, 1)).toMatchObject({
+      id: 'front-1',
+      track: 'front',
+      manifestVersion: '0.0.0',
+    });
     expect(status(game)).toBe('todo');
     expect(game.snapshot().titles[1].en).toBe('An empty title shows nothing');
     expect(game.snapshot().titles[1].pt).toBe('Um título vazio não mostra nada');
@@ -462,7 +492,9 @@ describe('Game', () => {
     expect(game.snapshot().projectStory?.pt.messages.assignments['front-1'].subject).toMatch(/front-1/);
     const tool = setQaTool.mock.calls.at(-1)![0]!.map((file) => file.path);
     expect(tool).toContain('run.ts');
-    expect(tool.some((path) => path.startsWith('tickets/') || path === 'manifest.json' || path.startsWith('story.'))).toBe(false);
+    expect(
+      tool.some((path) => path.startsWith('tickets/') || path === 'manifest.json' || path.startsWith('story.')),
+    ).toBe(false);
   });
 
   it('starts without the project content when nothing was downloaded yet, and downloads it in the background', async () => {
@@ -519,7 +551,10 @@ describe('Game', () => {
       describe: () => 'mock',
       prepare: () => localSource().prepare(),
       current: () => localSource().current(),
-      fetchTicket: vi.fn().mockRejectedValueOnce(new Error('network down')).mockImplementation((id: string) => localSource().fetchTicket(id)),
+      fetchTicket: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('network down'))
+        .mockImplementation((id: string) => localSource().fetchTicket(id)),
       publication: () => localSource().prepare(),
       codeOf: (entry) => localSource().codeOf(entry),
     };
@@ -908,7 +943,10 @@ describe('Game', () => {
     // Saved with the game, and inside the save itself: there with the file name only, never this computer's folder.
     expect(JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')).lastExport.path).toBe(file);
     const saved = readZip(new Uint8Array(await readFile(file))).find((entry) => entry.path === 'state.json')!;
-    expect(JSON.parse(Buffer.from(saved.data).toString('utf8')).lastExport).toEqual({ at: game.current.lastExport!.at, path: 'bug-detective-2026-10-24.bdsave' });
+    expect(JSON.parse(Buffer.from(saved.data).toString('utf8')).lastExport).toEqual({
+      at: game.current.lastExport!.at,
+      path: 'bug-detective-2026-10-24.bdsave',
+    });
     expect(Buffer.from(await readFile(file)).toString('latin1')).not.toContain('Meus saves');
 
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -972,7 +1010,12 @@ describe('Game', () => {
     await expect(game.diskUsage()).rejects.toMatchObject({ code: 'dockerUnavailable' });
     const running = createGame().game;
     await running.init();
-    expect((await running.diskUsage()).map((item) => item.id)).toEqual(['workspaceVolume', 'workspaceImage', 'qaImage', 'qaCache']);
+    expect((await running.diskUsage()).map((item) => item.id)).toEqual([
+      'workspaceVolume',
+      'workspaceImage',
+      'qaImage',
+      'qaCache',
+    ]);
   });
 
   it('clamps the QA timeout setting', async () => {
@@ -1015,7 +1058,13 @@ describe('Game', () => {
     const result = await game.removeDockerData();
     expect(clean).toHaveBeenCalledWith('everything');
     // A failure is reported, and the rest still goes.
-    expect(result.failed).toEqual([{ kind: 'volume', name: 'bugdetective-qa-cache', reason: 'Error response from daemon: bugdetective-qa-cache is in use' }]);
+    expect(result.failed).toEqual([
+      {
+        kind: 'volume',
+        name: 'bugdetective-qa-cache',
+        reason: 'Error response from daemon: bugdetective-qa-cache is in use',
+      },
+    ]);
     expect(result.removed).toBe(8);
     expect(result.workspaceKept).toBe(false);
     expect(game.current.createdAt).not.toBe(firstGame);
@@ -1033,7 +1082,10 @@ describe('Game', () => {
     const createdAt = game.current.createdAt;
     const result = await game.removeDockerData();
     expect(result.workspaceKept).toBe(true);
-    expect(result.failed.map((item) => `${item.kind} ${item.name}`)).toEqual(['container bugdetective-workspace', 'volume bugdetective-workspace']);
+    expect(result.failed.map((item) => `${item.kind} ${item.name}`)).toEqual([
+      'container bugdetective-workspace',
+      'volume bugdetective-workspace',
+    ]);
     expect(game.current.createdAt).toBe(createdAt);
     expect(game.current.currentTicket).toBe(1);
   });
@@ -1076,7 +1128,10 @@ describe('Game', () => {
 
 /** A content source whose manifests carry the given version (the local source always says 0.0.0). */
 function withVersion(source: ContentSource, version: () => string): ContentSource {
-  const content = (value: ProjectContent): ProjectContent => ({ ...value, manifest: { ...value.manifest, version: version() } });
+  const content = (value: ProjectContent): ProjectContent => ({
+    ...value,
+    manifest: { ...value.manifest, version: version() },
+  });
   return {
     kind: source.kind,
     describe: () => source.describe(),
@@ -1112,7 +1167,11 @@ function fakeCatalog(initial: ResolvedProject[]) {
 }
 
 describe('Game with several projects', () => {
-  async function twoProjects(runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] })), firstFront = 1, firstBrief: ProjectBrief = {}) {
+  async function twoProjects(
+    runtime = new FakeRuntime(JSON.stringify({ qaDelayMs: 1, qa: ['passed'] })),
+    firstFront = 1,
+    firstBrief: ProjectBrief = {},
+  ) {
     const repos = {
       first: await createProjectRepo(join(dir, 'repos'), { front: firstFront, back: 0 }, 'First', 'first', firstBrief),
       second: await createProjectRepo(join(dir, 'repos'), { front: 1, back: 1 }, 'Second'),
@@ -1154,7 +1213,10 @@ describe('Game with several projects', () => {
                 codeOf: () => Promise.reject(error),
               };
             }
-            const source = withVersion(new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }), () => versions[project.id] ?? '0.0.0');
+            const source = withVersion(
+              new LocalContentSource({ qaDir: repos[project.id as 'first' | 'second'].qaDir, runner: runCommand }),
+              () => versions[project.id] ?? '0.0.0',
+            );
             return {
               ...source,
               fetchTicket: async (id, signal) => {
@@ -1204,7 +1266,10 @@ describe('Game with several projects', () => {
     expect(game.snapshot().projectsUnlocked).toBe(false);
     await finishFirstTicket(game);
     expect(game.snapshot().projectsUnlocked).toBe(true);
-    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([['first', true], ['second', false]]);
+    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([
+      ['first', true],
+      ['second', false],
+    ]);
 
     const removeProjects = vi.spyOn(runtime, 'removeProjects');
     await game.switchProject('second');
@@ -1267,13 +1332,18 @@ describe('Game with several projects', () => {
     const { make, runtime } = await twoProjects();
     const game = make();
     await game.init();
-    const removeProjects = vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
+    const removeProjects = vi
+      .spyOn(runtime, 'removeProjects')
+      .mockResolvedValue([{ kind: 'image', name: 'bugdetective-qa:old' }]);
     await expect(game.installEnvironment()).rejects.toMatchObject({ code: 'otherProjectsLeft' });
     expect(removeProjects).toHaveBeenCalledWith(['second']);
   });
 
   it('a project card carries the client, the stack and the skills of its brief', async () => {
-    const { make } = await twoProjects(undefined, 1, { stack: { frontend: 'React · Vite', database: 'SQLite' }, skills: { en: ['Async and state'], pt: ['Assincronia e estado'] } });
+    const { make } = await twoProjects(undefined, 1, {
+      stack: { frontend: 'React · Vite', database: 'SQLite' },
+      skills: { en: ['Async and state'], pt: ['Assincronia e estado'] },
+    });
     const game = make();
     await game.init();
     expect(game.snapshot().projects?.[0].details).toMatchObject({
@@ -1297,7 +1367,11 @@ describe('Game with several projects', () => {
     const { make } = await twoProjects();
     const game = make();
     await game.init();
-    expect(game.snapshot().projects?.[0].details).toMatchObject({ stack: null, skills: { en: [], pt: [] }, memoryBytes: null });
+    expect(game.snapshot().projects?.[0].details).toMatchObject({
+      stack: null,
+      skills: { en: [], pt: [] },
+      memoryBytes: null,
+    });
   });
 
   it('fetches the next ticket of a project that moved from the repository the catalog now names', async () => {
@@ -1363,7 +1437,9 @@ describe('Game with several projects', () => {
             base.map((item) => {
               const override = settings.projects?.[item.id];
               if (!override) return item;
-              return 'qaDir' in override ? { ...item, qaDir: override.qaDir, official: false } : { ...item, qaRef: override.qaRef, official: false };
+              return 'qaDir' in override
+                ? { ...item, qaDir: override.qaDir, official: false }
+                : { ...item, qaRef: override.qaRef, official: false };
             }),
           );
         },
@@ -1408,7 +1484,11 @@ describe('Game with several projects', () => {
     expect(dev.written).toEqual([settings]);
     expect(dev.reconfigured).toEqual([settings]);
     expect(game.snapshot().devCatalog?.settings).toEqual(settings);
-    expect(game.snapshot().devCatalog?.projects[0]).toEqual({ id: 'first', qaRef: 'qa-next', source: 'github: owner/first (qa-next)' });
+    expect(game.snapshot().devCatalog?.projects[0]).toEqual({
+      id: 'first',
+      qaRef: 'qa-next',
+      source: 'github: owner/first (qa-next)',
+    });
     await game.nextAssignment('front');
     expect(fetched).toEqual(['owner/first@qa-next']);
   });
@@ -1434,7 +1514,9 @@ describe('Game with several projects', () => {
     const open = hold();
     const unlocking = game.nextAssignment('front');
     await vi.waitFor(() => expect(fetched).toHaveLength(1));
-    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'busy' });
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({
+      code: 'busy',
+    });
     open();
     await unlocking;
     await game.move(1, 'inProgress');
@@ -1443,7 +1525,9 @@ describe('Game with several projects', () => {
     await game.acceptReview(1);
     vi.spyOn(runtime, 'removeProjects').mockResolvedValue([{ kind: 'volume', name: 'bugdetective-workspace' }]);
     await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'switchIncomplete' });
-    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'switchIncomplete' });
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({
+      code: 'switchIncomplete',
+    });
     expect(dev.written).toEqual([]);
   });
 
@@ -1452,7 +1536,9 @@ describe('Game with several projects', () => {
     const dev = fakeDevCatalog(catalog);
     const game = make({ devCatalog: { ...dev.options, testFile: true } });
     await game.init();
-    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'notAllowed' });
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({
+      code: 'notAllowed',
+    });
     expect(dev.written).toEqual([]);
   });
 
@@ -1462,7 +1548,9 @@ describe('Game with several projects', () => {
     dev.failWrite = 'Invalid catalog.local.json: projects.a: Invalid input';
     const game = make({ devCatalog: dev.options });
     await game.init();
-    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({ code: 'invalidCatalogSettings' });
+    await expect(game.applyDevCatalog({ projects: { first: { qaRef: 'qa-next' } } })).rejects.toMatchObject({
+      code: 'invalidCatalogSettings',
+    });
     expect(dev.reconfigured).toEqual([]);
     expect(game.snapshot().devCatalog?.error).toMatch(/Invalid catalog\.local\.json/);
   });
@@ -1618,7 +1706,9 @@ describe('Game with several projects', () => {
     await game.exportProgress(file);
     versions.first = '1.0.0';
     await game.newGame();
-    expect(game.current.projectSources).toEqual({ first: { repository: 'owner/first', qaRef: 'qa', minVersion: '1.0.0' } });
+    expect(game.current.projectSources).toEqual({
+      first: { repository: 'owner/first', qaRef: 'qa', minVersion: '1.0.0' },
+    });
 
     const { token } = await game.inspectSave(file, 'progress.bdsave');
     await game.restoreProgress(token);
@@ -1627,11 +1717,24 @@ describe('Game with several projects', () => {
 
   it('marks a project that needs a newer app, and refuses to switch to it', async () => {
     const { make, catalog } = await twoProjects();
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, minAppVersion: '99.0.0' }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      {
+        id: 'second',
+        repository: 'owner/second',
+        qaRef: 'qa',
+        starter: false,
+        official: true,
+        minAppVersion: '99.0.0',
+      },
+    ]);
     const game = make();
     await game.init();
     await finishFirstTicket(game);
-    expect(game.snapshot().projects?.map((card) => [card.id, card.unavailable])).toEqual([['first', null], ['second', 'appTooOld']]);
+    expect(game.snapshot().projects?.map((card) => [card.id, card.unavailable])).toEqual([
+      ['first', null],
+      ['second', 'appTooOld'],
+    ]);
     await expect(game.switchProject('second')).rejects.toMatchObject({ code: 'appTooOld' });
     expect(game.current.project).toBe('first');
   });
@@ -1649,15 +1752,24 @@ describe('Game with several projects', () => {
     const { make, catalog } = await twoProjects();
     const game = make();
     await game.init();
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true },
+    ]);
     await game.loadProjects();
     expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first']);
 
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
     await game.loadProjects();
     await finishFirstTicket(game);
     await game.switchProject('second');
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true, hidden: true },
+    ]);
     await game.loadProjects();
     expect(game.snapshot().projects?.map((card) => card.id)).toEqual(['first', 'second']);
   });
@@ -1670,12 +1782,18 @@ describe('Game with several projects', () => {
     await game.switchProject('second');
     catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true }]);
     await game.loadProjects();
-    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([['first', false], ['second', true]]);
+    expect(game.snapshot().projects?.map((card) => [card.id, card.active])).toEqual([
+      ['first', false],
+      ['second', true],
+    ]);
   });
 
   it('tells a new game that its starter project needs a newer app', async () => {
     const { make, catalog } = await twoProjects();
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
     const game = make();
     await game.init();
     expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: true, projectNeedsUpdate: true });
@@ -1687,7 +1805,10 @@ describe('Game with several projects', () => {
     await game.init();
     await game.nextAssignment('front');
     expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: false, projectNeedsUpdate: false });
-    catalog.set([{ id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' }, { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true }]);
+    catalog.set([
+      { id: 'first', repository: 'owner/first', qaRef: 'qa', starter: true, official: true, minAppVersion: '99.0.0' },
+      { id: 'second', repository: 'owner/second', qaRef: 'qa', starter: false, official: true },
+    ]);
     await game.refreshCatalog();
     expect(game.snapshot()).toMatchObject({ starterNeedsUpdate: false, projectNeedsUpdate: true });
   });
@@ -1742,7 +1863,10 @@ describe('ticket type and practiced skills', () => {
 
     await game.acceptReview(2);
     expect(game.snapshot().practiced).toEqual({
-      2: { en: ['Building components', 'Routes and navigation'], pt: ['Criação de componentes', 'Criação de rotas e navegação'] },
+      2: {
+        en: ['Building components', 'Routes and navigation'],
+        pt: ['Criação de componentes', 'Criação de rotas e navegação'],
+      },
     });
   });
 
@@ -1780,7 +1904,9 @@ describe('a workspace stopped for lack of memory', () => {
     runtime.simulate({ workspaceOutOfMemory: true });
     await game.refreshEnvironment();
     expect(game.snapshot().workspaceOutOfMemoryAt).toBe('2026-11-17T12:00:00.000Z');
-    expect(game.snapshot().log.join('\n')).toContain('» The workspace ran out of memory: the kernel stopped a process in it');
+    expect(game.snapshot().log.join('\n')).toContain(
+      '» The workspace ran out of memory: the kernel stopped a process in it',
+    );
 
     // The check the screen repeats while it is open notices it too.
     const later = createGame({ clock: () => new Date('2026-11-17T13:00:00.000Z') });
@@ -1823,6 +1949,55 @@ describe('the services of a project', () => {
     expect(handed).toHaveBeenLastCalledWith({ services, memory: { workspace: '4g' } });
   });
 
+  it('hands the declared ports to the runtime', async () => {
+    const ports = { client: { port: 5173, open: true }, audit: { port: 3002 } };
+    await declare({ ports });
+    const { game, runtime } = createGame();
+    const handed = vi.spyOn(runtime, 'setResources');
+    await game.init();
+    await game.nextAssignment();
+    expect(handed).toHaveBeenLastCalledWith({ ports });
+  });
+
+  describe('declared ports', () => {
+    const ports = {
+      client: { port: 5173, open: true, label: { en: 'Smoke Desk', pt: 'Smoke Desk' } },
+      api: { port: 3001 },
+      audit: { port: 3002, open: true, label: { en: 'Audit service', pt: 'Serviço de auditoria' } },
+    };
+
+    it('are shown with the port each one got on the computer', async () => {
+      await declare({ ports });
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      await game.refreshEnvironment();
+      expect(game.snapshot().declaredPorts).toEqual([
+        { name: 'client', label: { en: 'Smoke Desk', pt: 'Smoke Desk' }, port: 5173, open: true },
+        { name: 'api', label: null, port: 3001, open: false },
+        { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3002, open: true },
+      ]);
+    });
+
+    it('are none for a project that declares none', async () => {
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      await game.refreshEnvironment();
+      expect(game.snapshot().declaredPorts).toEqual([]);
+    });
+
+    it('open in the browser when marked open, and only then', async () => {
+      await declare({ ports });
+      const { game } = createGame();
+      await game.init();
+      await game.nextAssignment();
+      expect(await game.portUrl('audit')).toBe('http://127.0.0.1:3002/');
+      await expect(game.portUrl('api')).rejects.toThrow(GameError);
+      await expect(game.portUrl('nope')).rejects.toThrow(GameError);
+    });
+  });
+
   it('hands nothing for a project that declares no services', async () => {
     const { game, runtime } = createGame();
     const handed = vi.spyOn(runtime, 'setResources');
@@ -1855,8 +2030,12 @@ describe('the services of a project', () => {
 
     runtime.simulate({ servicesOutOfMemory: ['db'] });
     await game.workspaceStatus();
-    expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready', memoryKillAt: '2026-11-17T12:00:00.000Z' }]);
-    expect(game.snapshot().log.join('\n')).toContain('» Service db ran out of memory: the kernel stopped a process in it');
+    expect(game.snapshot().services).toEqual([
+      { name: 'db', image: 'postgres:17', state: 'ready', memoryKillAt: '2026-11-17T12:00:00.000Z' },
+    ]);
+    expect(game.snapshot().log.join('\n')).toContain(
+      '» Service db ran out of memory: the kernel stopped a process in it',
+    );
 
     await game.recreateServices();
     expect(game.snapshot().services).toEqual([{ name: 'db', image: 'postgres:17', state: 'ready' }]);
@@ -1872,7 +2051,9 @@ describe('the services of a project', () => {
 
   it('shows a service that failed, with the reason, and lets the game go on', async () => {
     await declare({ services });
-    const { game } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'superuser password is not specified' } } });
+    const { game } = createGame({
+      scenario: { serviceFailure: { name: 'db', reason: 'superuser password is not specified' } },
+    });
     await game.init();
     await game.nextAssignment();
     expect(game.snapshot().services).toEqual([
@@ -1884,7 +2065,9 @@ describe('the services of a project', () => {
 
   it('"Recreate services" recreates them, reseeds the data and clears a failed service', async () => {
     await declare({ services });
-    const { game, runtime } = createGame({ scenario: { serviceFailure: { name: 'db', reason: 'data directory is corrupted' } } });
+    const { game, runtime } = createGame({
+      scenario: { serviceFailure: { name: 'db', reason: 'data directory is corrupted' } },
+    });
     await game.init();
     await game.nextAssignment();
     expect(game.snapshot().services[0]!.state).toBe('failed');

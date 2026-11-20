@@ -6,7 +6,13 @@ import * as rules from '../../src/shared/kanban.ts';
 import { StateStore, StateVersionError, parseState } from '../../src/main/services/state.ts';
 import { unlocked } from '../helpers/tickets.ts';
 
-const ctx = { now: '2026-10-26T10:00:00.000Z', id: (() => { let n = 0; return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`; })() };
+const ctx = {
+  now: '2026-10-26T10:00:00.000Z',
+  id: (() => {
+    let n = 0;
+    return () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`;
+  })(),
+};
 
 let dir: string;
 beforeEach(async () => {
@@ -62,8 +68,12 @@ describe('StateStore', () => {
 describe('state validation', () => {
   it('loads a QA limit under the 1-minute minimum (older versions allowed 30 s) as 1 minute', () => {
     const base = rules.createInitialState(ctx);
-    expect(parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 45 } }).settings.qaTimeoutSeconds).toBe(60);
-    expect(parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 240 } }).settings.qaTimeoutSeconds).toBe(240);
+    expect(
+      parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 45 } }).settings.qaTimeoutSeconds,
+    ).toBe(60);
+    expect(
+      parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 240 } }).settings.qaTimeoutSeconds,
+    ).toBe(240);
     expect(() => parseState({ ...base, settings: { ...base.settings, qaTimeoutSeconds: 5000 } })).toThrow();
   });
 
@@ -111,7 +121,16 @@ describe('state validation', () => {
 
   it('rejects a state whose fields disagree with the Kanban rules', () => {
     const done = (state: ReturnType<typeof rules.createInitialState>, ticket: number) =>
-      rules.acceptReview({ ...state, tickets: state.tickets.map((item) => (item.ticket === ticket ? { ...item, status: 'codeReview' as const } : item)) }, ticket, ctx);
+      rules.acceptReview(
+        {
+          ...state,
+          tickets: state.tickets.map((item) =>
+            item.ticket === ticket ? { ...item, status: 'codeReview' as const } : item,
+          ),
+        },
+        ticket,
+        ctx,
+      );
     let two = rules.unlockTicket(rules.createInitialState(ctx), 1, unlocked(1, 'a'), ctx);
     two = rules.unlockTicket(done(two, 1), 2, unlocked(2, 'b'), ctx);
     // A state the rules made is valid.
@@ -123,7 +142,10 @@ describe('state validation', () => {
       'tickets but no current ticket': { ...two, currentTicket: null },
       'a repeated ticket': { ...two, tickets: [two.tickets[0], two.tickets[0]], currentTicket: 1 },
       'a gap in the tickets': { ...two, tickets: [two.tickets[1]] },
-      'an unfinished ticket before the last': { ...two, tickets: [{ ...two.tickets[0], status: 'inProgress' }, two.tickets[1]] },
+      'an unfinished ticket before the last': {
+        ...two,
+        tickets: [{ ...two.tickets[0], status: 'inProgress' }, two.tickets[1]],
+      },
       'more tickets than the tracks have': {
         ...two,
         tickets: [1, 2, 3, 4, 5].map((ticket) => ({ ...two.tickets[0], ticket, status: 'done' })),

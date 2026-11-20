@@ -31,7 +31,13 @@ describe('QA build context', () => {
     await mkdir(base, { recursive: true });
     await writeFile(join(base, 'Dockerfile'), 'FROM node\n');
     const context = await writeQaContext(base, 'abc123', tool, join(dir, 'build'));
-    expect((await readdir(context, { recursive: true })).sort()).toEqual(['Dockerfile', 'cli', 'cli/run.ts', 'cli/support', 'cli/support/app.ts']);
+    expect((await readdir(context, { recursive: true })).sort()).toEqual([
+      'Dockerfile',
+      'cli',
+      'cli/run.ts',
+      'cli/support',
+      'cli/support/app.ts',
+    ]);
     expect(await readFile(join(context, 'cli', 'run.ts'), 'utf8')).toBe('cli\n');
     // The same tool reuses the same folder.
     expect(await writeQaContext(base, 'abc123', tool, join(dir, 'build'))).toBe(context);

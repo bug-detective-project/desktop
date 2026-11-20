@@ -124,7 +124,9 @@ export interface DiagnosticsInput {
 export function buildDiagnostics(input: DiagnosticsInput): string {
   const check = (id: CheckResult['id']) => {
     const found = input.checks.find((item) => item.id === id);
-    return found ? `${found.status}${found.version ? ` (${found.version})` : ''}${found.reason ? `: ${found.reason}` : ''}` : 'not checked';
+    return found
+      ? `${found.status}${found.version ? ` (${found.version})` : ''}${found.reason ? `: ${found.reason}` : ''}`
+      : 'not checked';
   };
   const lines = [
     `Bug Detective ${input.appVersion} diagnostics, ${input.now.toISOString()}`,

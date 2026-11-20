@@ -13,13 +13,13 @@ A project of someone outside the organization starts in the author's own reposit
 
 ## How a project fits into the app
 
-| Piece | Where | What the desktop does with it |
-| --- | --- | --- |
-| The catalog | `projects.json` on the `main` branch of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) | Lists the projects: `id`, `repository`, optional `qaRef`, `starter`, `minAppVersion` and `hidden`. Downloaded on start, when a ticket is taken and when Projects opens |
-| `main` | The project's repository | The app, with every bug fixed. Never read by the desktop: ticket branches are built from it |
-| `qa` | The project's repository, no history in common with `main` | **The publication.** The desktop downloads it whole: the manifest, the QA CLI (it builds the QA image with it), the story, the review configuration and every ticket package |
-| Ticket branches | `front-1`, `front-2`, …, `back-1`, … | One single-commit branch per ticket: `main` with that ticket's bug. The desktop downloads the commit the manifest names, by digest |
-| Tags | `<id>-v<version>` per ticket, `qa-v<version>` per publication | Keep every published commit reachable after a ticket branch moves |
+| Piece           | Where                                                                                                                       | What the desktop does with it                                                                                                                                                |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The catalog     | `projects.json` on the `main` branch of [`bug-detective-project/catalog`](https://github.com/bug-detective-project/catalog) | Lists the projects: `id`, `repository`, optional `qaRef`, `starter`, `minAppVersion` and `hidden`. Downloaded on start, when a ticket is taken and when Projects opens       |
+| `main`          | The project's repository                                                                                                    | The app, with every bug fixed. Never read by the desktop: ticket branches are built from it                                                                                  |
+| `qa`            | The project's repository, no history in common with `main`                                                                  | **The publication.** The desktop downloads it whole: the manifest, the QA CLI (it builds the QA image with it), the story, the review configuration and every ticket package |
+| Ticket branches | `front-1`, `front-2`, …, `back-1`, …                                                                                        | One single-commit branch per ticket: `main` with that ticket's bug. The desktop downloads the commit the manifest names, by digest                                           |
+| Tags            | `<id>-v<version>` per ticket, `qa-v<version>` per publication                                                               | Keep every published commit reachable after a ticket branch moves                                                                                                            |
 
 The player's code runs in the workspace container (Node 26, the project's repository at
 `/workspaces/<id>` in the workspaces volume, with the git identity `<name> Developer`), and QA runs
@@ -83,16 +83,16 @@ git clone git@github.com:bug-detective-project/<id>.git ../<id>   # next to desk
 `main` is the finished app, with every bug of the game fixed. The workspace and QA expect a Node
 project:
 
-| Requirement | Why |
-| --- | --- |
-| `package.json` and `package-lock.json` at the root | The workspace installs dependencies with `npm ci`, cached by the lockfile |
-| `npm run dev` serves the client on **5173** (on `localhost`) and the API on **3001** | **Start server** and **Open app in browser** reach those ports through the workspace's forwarder; **Stop server** stops `npm run dev` and `node --watch` processes |
-| `npm run db:reset` | The desktop resets the project's data before every ticket |
-| A test suite (`npm test`) | `bd build` turns the project's tests into each ticket's `gate1/` |
-| ESLint and Prettier (TypeScript or JavaScript projects) | Set up like SupportDesk: ESLint formats TS/JS, Prettier the rest, format on save in `.vscode/settings.json`, `lint` and `format` scripts, on `main` and every ticket branch |
-| `.npmrc` with the dependency rules | `allow-git=none`, `allow-remote=none` and `min-release-age=7`; `bd validate` requires it on `main` and on every ticket branch (see [the rules](#rules-every-project-follows)) |
-| The API checks the `Host` header | Answers only `localhost` and `127.0.0.1` (403 to anything else), so a page on the internet cannot reach the player's app through the browser |
-| `.github/workflows/ci.yml` calling the catalog's `app.yml` | The CI of `main`: `npm ci`, `lint`, `format:check` and `test` on every push and pull request. `bd build` keeps `.github/` out of the ticket branches, so players never get workflows |
+| Requirement                                                                                                                              | Why                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package.json` and `package-lock.json` at the root                                                                                       | The workspace installs dependencies with `npm ci`, cached by the lockfile                                                                                                            |
+| `npm run dev` serves the client on **5173** (on `localhost`) and the API on **3001**, or on the ports the project declares (see "Ports") | **Start server** and **Open app in browser** reach those ports through the workspace's forwarder; **Stop server** stops `npm run dev` and `node --watch` processes                   |
+| `npm run db:reset`                                                                                                                       | The desktop resets the project's data before every ticket                                                                                                                            |
+| A test suite (`npm test`)                                                                                                                | `bd build` turns the project's tests into each ticket's `gate1/`                                                                                                                     |
+| ESLint and Prettier (TypeScript or JavaScript projects)                                                                                  | Set up like SupportDesk: ESLint formats TS/JS, Prettier the rest, format on save in `.vscode/settings.json`, `lint` and `format` scripts, on `main` and every ticket branch          |
+| `.npmrc` with the dependency rules                                                                                                       | `allow-git=none`, `allow-remote=none` and `min-release-age=7`; `bd validate` requires it on `main` and on every ticket branch (see [the rules](#rules-every-project-follows))        |
+| The API checks the `Host` header                                                                                                         | Answers only `localhost` and `127.0.0.1` (403 to anything else), so a page on the internet cannot reach the player's app through the browser                                         |
+| `.github/workflows/ci.yml` calling the catalog's `app.yml`                                                                               | The CI of `main`: `npm ci`, `lint`, `format:check` and `test` on every push and pull request. `bd build` keeps `.github/` out of the ticket branches, so players never get workflows |
 
 ```yaml
 # .github/workflows/ci.yml on main
@@ -112,9 +112,9 @@ A project with [services](#services-a-database-for-the-project) also passes the 
 object the `qa` declares (the workflow sees only `main`):
 
 ```yaml
-    with:
-      services-file: services.json
-      catalog-ref: 8547e2d39458d5aa575696d376b3637fb5a1f9a5
+with:
+  services-file: services.json
+  catalog-ref: 8547e2d39458d5aa575696d376b3637fb5a1f9a5
 ```
 
 The job runs `bd with-services --file services.json -- npm test`: `bd` starts each service in Docker
@@ -190,8 +190,9 @@ A project whose code needs a database declares it in the same `bugDetective.proj
 }
 ```
 
-- `image` comes from the catalog's list of allowed images (today only `postgres:17`); a new image
-  enters by pull request to the catalog. The rules and the limits (up to 4 services, 64 MB to 1 GB
+- `image` comes from the catalog's list of allowed images (`postgres:17`, and `mysql:8.4` since
+  catalog 1.8.0, whose default server needs `"memory": "512m"`); a new image enters by pull
+  request to the catalog. The rules and the limits (up to 4 services, 64 MB to 1 GB
   each, a memory peak of 8 GB) are in the catalog's README, "Project services".
 - The app starts each service in its own container next to the workspace, on the project's
   internal network (no internet, no published port), and sets the `variables` on the workspace
@@ -208,16 +209,61 @@ A project whose code needs a database declares it in the same `bugDetective.proj
 - When `db:reset` fails, "Try again" on the Dashboard recreates the services first; "Recreate
   services" does the same for a service that does not start or ran out of memory.
 - **Looking at the data.** Three ways, all optional for the player:
-  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`;
+  - the workspace's terminal has the database's own client: `psql "$DATABASE_URL"`, or `mysql`,
+    which takes no URL: a MySQL project also declares `"MYSQL_HOST": "{{host}}"` and
+    `"MYSQL_TCP_PORT": "{{port}}"`, which the client reads, so `mysql -u root -p <database>` works;
   - `"publish": true` on a service also publishes its port on the player's computer, on
     `127.0.0.1` only and on a free port (the service's own when it is free); the Dashboard shows
     it next to the service (`localhost:5432`), for the player's own database tools;
-  - the project may recommend SQLTools and its PostgreSQL driver in `.vscode/extensions.json`
-    (`mtxr.sqltools`, `mtxr.sqltools-driver-pg`), which connect from inside the workspace to
-    the service by its name.
+  - the project may recommend SQLTools and its driver in `.vscode/extensions.json`
+    (`mtxr.sqltools` with `mtxr.sqltools-driver-pg` or `mtxr.sqltools-driver-mysql`), which
+    connect from inside the workspace to the service by its name.
 - The tests of `main` that need a service run through `bd with-services` (see the `ci.yml` of
   step 1), against a database of their own, never the one the dev server uses.
-- A project with services needs `minAppVersion` 1.2.0 in the catalog.
+- A project with services needs `minAppVersion` 1.2.0 in the catalog; one with MySQL needs 1.3.0,
+  whose workspace image carries the `mysql` client.
+
+### Ports
+
+A project that runs more than a client and an API (two services, an admin page, a micro frontend)
+declares its ports in the same `bugDetective.project`. Smoke Desk, the project of the desktop's
+tests, declares three:
+
+```json
+"ports": {
+  "client": {
+    "port": 5173,
+    "open": true,
+    "label": { "en": "Smoke Desk", "pt": "Smoke Desk" },
+    "variables": { "CLIENT_ORIGIN": "http://localhost:{{port}}" }
+  },
+  "api": { "port": 3001 },
+  "audit": {
+    "port": 3002,
+    "label": { "en": "Audit service", "pt": "Serviço de auditoria" },
+    "variables": { "VITE_AUDIT_URL": "http://localhost:{{port}}" }
+  }
+}
+```
+
+- `port` is where the process listens inside the workspace (1024 to 55535). The app publishes
+  each one on the player's computer, on `127.0.0.1` and on a free port: the declared one when it is
+  free, another one when not (Windows reserves whole blocks of ports).
+- `client` is required: it is the port **Open app in browser** opens. `open: true` on another port
+  gives it an **Open** button on the Dashboard, which lists every declared port with its `label`
+  and the port it got.
+- `variables` tell the code the port it got, through `{{port}}` (the only marker), set on the
+  workspace like the services' variables. Code that the browser runs and that calls another port
+  directly (not through Vite's proxy) must read its address from a variable: the preferred port is
+  not always the one the player has. A port variable may not repeat a service's variable.
+- A server may listen on `localhost` or on `0.0.0.0`: the workspace mirrors each port so both are
+  reached.
+- Up to 6 ports, named with lower-case letters, digits and `-`. The rules are in the catalog's
+  README, "Project ports"; a project with declared ports needs `minAppVersion` 1.3.0 in the catalog.
+- **In the QA CLI**, the app runs inside the QA with nothing published: `run.ts` picks a free port
+  for each name and fills the variables with `portVariables(ports, chosen)` from
+  `@bug-detective/catalog/contract`, as the desktop does. Smoke Desk's `run.ts` is the reference.
+- Without `ports`, the app does what it always did: the client on 5173 and the API on 3001.
 
 ### The QA CLI (`run.ts`)
 
@@ -240,14 +286,20 @@ network. The CLI must accept:
 - If the CLI uses Playwright (browser tests), the image installs Chromium for it; otherwise it
   stays small.
 
-Two references: SupportDesk's `run.ts` (Vitest and Playwright gates) and the minimal one the desktop
+Three references: SupportDesk's `run.ts` (Vitest and Playwright gates), Smoke Desk's (two
+services, two databases and declared ports) and the minimal one the desktop unit and integration
 tests use, [`test/fixtures/notes/qa/run.ts`](../test/fixtures/notes/qa/run.ts) (`node --test`).
 
 ### The story (`story.en.json`, `story.pt.json`)
 
 ```json
 {
-  "client": { "name": "Northwind Supply", "about": "…", "contacts": "…", "reporters": [{ "name": "Grace Lin", "role": "Warehouse manager" }] },
+  "client": {
+    "name": "Northwind Supply",
+    "about": "…",
+    "contacts": "…",
+    "reporters": [{ "name": "Grace Lin", "role": "Warehouse manager" }]
+  },
   "project": {
     "name": "Inventory Tracker",
     "about": "A stock control app: products, warehouses and stock movements.",
@@ -311,17 +363,17 @@ picks a track for every ticket, so:
 
 ## 4. Write each ticket (`tickets/<id>/`)
 
-| File | Content |
-| --- | --- |
-| `bug.patch` | The bug, as a diff from `main` |
-| `reference.patch` | The fix, plus the ticket's regression test as a new file |
-| `gate2/` | The ticket's test, which fails with the bug and passes with the fix |
-| `gate1/` | Generated by `bd build`: the project's tests |
-| `ticket.en.md`, `ticket.pt.md` | The Jira-style ticket; its first heading is `<KEY>: <title>` |
-| `hints.en.json`, `hints.pt.json` | `{ "hints": ["…", "…", "…"] }`, revealed one at a time |
-| `review.en.md`, `review.pt.md` | What the senior developer says in the code review |
-| `solution.en.md`, `solution.pt.md` | The explained solution |
-| `ticket.json` (optional) | The kind of work, the both-sides mark and the skills the ticket trains (below) |
+| File                               | Content                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `bug.patch`                        | The bug, as a diff from `main`                                                 |
+| `reference.patch`                  | The fix, plus the ticket's regression test as a new file                       |
+| `gate2/`                           | The ticket's test, which fails with the bug and passes with the fix            |
+| `gate1/`                           | Generated by `bd build`: the project's tests                                   |
+| `ticket.en.md`, `ticket.pt.md`     | The Jira-style ticket; its first heading is `<KEY>: <title>`                   |
+| `hints.en.json`, `hints.pt.json`   | `{ "hints": ["…", "…", "…"] }`, revealed one at a time                         |
+| `review.en.md`, `review.pt.md`     | What the senior developer says in the code review                              |
+| `solution.en.md`, `solution.pt.md` | The explained solution                                                         |
+| `ticket.json` (optional)           | The kind of work, the both-sides mark and the skills the ticket trains (below) |
 
 ### `ticket.json`
 
@@ -333,11 +385,11 @@ picks a track for every ticket, so:
 }
 ```
 
-| Field | Values | Without it |
-| --- | --- | --- |
-| `type` | `fix`, `build`, `complete`, `refactor`, `optimize`, `upgrade` or `investigate` | `fix` |
-| `bothSides` | `true` when the ticket needs changes in the front end and in the back end; it still belongs to one track, the one where the symptom shows | `false` |
-| `skills` | 1 to 5 skills per language, up to 60 characters each, the same count in `en` and `pt` | none |
+| Field       | Values                                                                                                                                    | Without it |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `type`      | `fix`, `build`, `complete`, `refactor`, `optimize`, `upgrade` or `investigate`                                                            | `fix`      |
+| `bothSides` | `true` when the ticket needs changes in the front end and in the back end; it still belongs to one track, the one where the symptom shows | `false`    |
+| `skills`    | 1 to 5 skills per language, up to 60 characters each, the same count in `en` and `pt`                                                     | none       |
 
 - The card and the "Get next assignment" menu show the type and the "Front + back" mark, so the
   player knows what a ticket asks for before taking it.
@@ -376,7 +428,12 @@ Point the desktop at the local folder, then run it:
 
 ```jsonc
 // ../dev-projects/catalog.json: a file catalog may name a local qaDir instead of a repository
-{ "projects": [{ "id": "supportdesk", "qaDir": "../supportdesk-qa", "starter": true }, { "id": "<id>", "qaDir": "../<id>-qa" }] }
+{
+  "projects": [
+    { "id": "supportdesk", "qaDir": "../supportdesk-qa", "starter": true },
+    { "id": "<id>", "qaDir": "../<id>-qa" },
+  ],
+}
 ```
 
 ```sh
@@ -404,12 +461,26 @@ QA (fail, then pass with the fix), the code review and the next ticket.
    branch. It never pushes `qa` and creates no tags: nothing permanent exists before the merge. Run
    it again after a failed push and it only redoes the pushes; `bd publish --abort --version 1.0.0`
    undoes a publication that was not pushed yet.
-3. Open the pull request into `qa` (the link `bd publish` prints). When `project / validate` passes
-   and a code owner approves, merge it: the merge publishes and tags it `qa-v1.0.0` and each new
+
+3. Play the publication in the desktop, on Windows, before opening the pull request:
+
+   ```sh
+   desktop/tools/play-project.sh <project id>
+   ```
+
+   With the work branch checked out in `<project>-qa/`, it opens the real app with a fresh data
+   folder and that project alone, installs the environment (workspace, services, QA image) and
+   plays **every** ticket of both tracks to Done with its reference fix, skipping everything the
+   check does not need (onboarding, VS Code, dev server). It writes a report with the result and
+   the time of each ticket to `desktop/pr-gate/play-<project>-<time>.md`; it goes into the
+   pull request.
+
+4. Open the pull request into `qa` (the link `bd publish` prints), with the report of step 3. When
+   `project / validate` passes and a code owner approves, merge it: the merge publishes and tags it `qa-v1.0.0` and each new
    ticket commit `<id>-v1.0.0`. Housekeeping on `qa` (README, workflows, `CODEOWNERS`, `.npmrc`)
    needs no new version.
 
-Every later change (tickets, QA CLI, story, review) is a new version through the same three steps.
+Every later change (tickets, QA CLI, story, review) is a new version through the same four steps.
 
 ## 8. List it in the catalog
 
@@ -464,18 +535,18 @@ the approval of a code owner of the organization.
 - [ ] The rules above: offline, dependencies from the registry and at least 7 days old, `.vscode/` and texts within the allowed lists.
 - [ ] `qa` worktree with `package.json` (`bugDetective.project` with `difficulty` and `stack`), `run.ts`, both stories (with their `skills`, the main ones first), `review.json`, `publication.yml`.
 - [ ] Every ticket folder complete, with its `ticket.json` when the ticket is not a plain fix or names skills; `bd build`, `bd verify` and `bd validate` pass.
-- [ ] Played end to end locally through `catalog.local.json`.
+- [ ] Every ticket played to Done in the desktop with `tools/play-project.sh` (report in the publication pull request).
 - [ ] `qa` protected; `bd publish` and the pull request merged (`qa-v1.0.0`).
 - [ ] Catalog pull request merged (first `hidden`), checked in the installed app, then released.
 
 ## Troubleshooting
 
-| Symptom | Cause |
-| --- | --- |
-| "Installing dependencies failed" when downloading the environment | The QA CLI does not support `--deps-only`, or `npm ci` fails on the lockfile |
-| QA always times out | A test hangs, or the CLI does not stop at `--timeout` |
-| "Start server" never turns green | `npm run dev` does not listen on 5173 on `localhost` |
-| The project shows "Update Bug Detective" | Its `minAppVersion` or the manifest's `formatVersion` is newer than the app |
-| `bd validate`: "must be newer" | Every publication needs a version above the one published on `qa` |
-| `bd validate`: "is not allowed" (extension), "pipes a download into a shell" (text), "has been on the registry for" (dependency) | The rules above; the message names the file and the line, or the branch and the package |
-| `bd validate`: "must pin project.yml by commit hash" | `publication.yml` uses a tag; pin the hash of the catalog version `package.json` depends on, with `# vX.Y.Z` |
+| Symptom                                                                                                                          | Cause                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| "Installing dependencies failed" when downloading the environment                                                                | The QA CLI does not support `--deps-only`, or `npm ci` fails on the lockfile                                 |
+| QA always times out                                                                                                              | A test hangs, or the CLI does not stop at `--timeout`                                                        |
+| "Start server" never turns green                                                                                                 | `npm run dev` does not listen on 5173 on `localhost`                                                         |
+| The project shows "Update Bug Detective"                                                                                         | Its `minAppVersion` or the manifest's `formatVersion` is newer than the app                                  |
+| `bd validate`: "must be newer"                                                                                                   | Every publication needs a version above the one published on `qa`                                            |
+| `bd validate`: "is not allowed" (extension), "pipes a download into a shell" (text), "has been on the registry for" (dependency) | The rules above; the message names the file and the line, or the branch and the package                      |
+| `bd validate`: "must pin project.yml by commit hash"                                                                             | `publication.yml` uses a tag; pin the hash of the catalog version `package.json` depends on, with `# vX.Y.Z` |

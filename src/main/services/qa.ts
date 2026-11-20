@@ -151,7 +151,12 @@ export class QaRunner {
    */
   containerArgs(
     name: string,
-    options: { packageDir?: string; network: boolean; source?: string; services?: { network: string; variables: Record<string, string> } },
+    options: {
+      packageDir?: string;
+      network: boolean;
+      source?: string;
+      services?: { network: string; variables: Record<string, string> };
+    },
   ): string[] {
     const args = [
       'run',
@@ -163,15 +168,26 @@ export class QaRunner {
       '--network',
       // A run with services is on the internal network of those services alone: still no internet.
       options.network ? 'bridge' : (options.services?.network ?? 'none'),
-      ...Object.entries(options.services?.variables ?? {}).flatMap(([variable, value]) => ['--env', `${variable}=${value}`]),
+      ...Object.entries(options.services?.variables ?? {}).flatMap(([variable, value]) => [
+        '--env',
+        `${variable}=${value}`,
+      ]),
       '--mount',
       mountArg({ type: 'volume', src: options.source ?? this.names.volume, dst: '/workspace', readonly: true }),
       '--mount',
-      mountArg({ type: 'volume', src: this.names.cacheVolume, dst: '/cache', ...(options.network ? {} : { readonly: true }) }),
+      mountArg({
+        type: 'volume',
+        src: this.names.cacheVolume,
+        dst: '/cache',
+        ...(options.network ? {} : { readonly: true }),
+      }),
     ];
     const { packageDir } = options;
     if (packageDir) {
-      args.push('--mount', mountArg({ type: 'bind', src: this.dockerHostPath(packageDir), dst: '/package', readonly: true }));
+      args.push(
+        '--mount',
+        mountArg({ type: 'bind', src: this.dockerHostPath(packageDir), dst: '/package', readonly: true }),
+      );
     }
     return args;
   }
@@ -252,7 +268,13 @@ export class QaRunner {
     const run = randomUUID().slice(0, 8);
     const name = `${this.names.prefix}-qa-${run}`;
     // The services of this run come up first; that wait is not part of the QA time limit.
-    const qaServices = new QaServices({ docker: this.docker, prefix: this.names.prefix, project: this.projectId(), services: this.services, pollMs: this.servicePollMs });
+    const qaServices = new QaServices({
+      docker: this.docker,
+      prefix: this.names.prefix,
+      project: this.projectId(),
+      services: this.services,
+      pollMs: this.servicePollMs,
+    });
     let services: { network: string; variables: Record<string, string> } | undefined;
     if (qaServices.declared) {
       request.onLine?.('» Starting the services of this QA run', 'stdout');
@@ -267,7 +289,12 @@ export class QaRunner {
     }
     const startedAt = Date.now();
     const args = [
-      ...this.containerArgs(name, { packageDir: request.packageDir, network: false, source: this.names.qaInputVolume, services }),
+      ...this.containerArgs(name, {
+        packageDir: request.packageDir,
+        network: false,
+        source: this.names.qaInputVolume,
+        services,
+      }),
       this.image,
       '--ticket',
       String(request.ticket),

@@ -54,20 +54,28 @@ export class Prerequisites {
       this.dockerState(env),
       env.docker?.versionInfo().catch(() => null) ?? Promise.resolve(null),
       env.docker?.serverInfo().catch(() => null) ?? Promise.resolve(null),
-      this.platform.checkWsl().catch((error: Error): WslStatus => ({ installed: false, version2: false, detail: error.message })),
+      this.platform
+        .checkWsl()
+        .catch((error: Error): WslStatus => ({ installed: false, version2: false, detail: error.message })),
       env.vscode?.version().catch(() => null) ?? Promise.resolve(null),
       // undefined: the extensions could not be listed.
       env.vscode?.devContainersVersion().catch(() => undefined) ?? Promise.resolve(undefined),
       // What an attached VS Code could still carry into the container (a warning, never a failure).
       env.vscodeCli ? this.platform.hostCredentials().catch(() => null) : Promise.resolve(null),
     ]);
-    const vscodeWarnings = [...(host?.sshAgent ? ['sshAgent'] : []), ...(host?.githubCredential ? ['githubCredential'] : [])];
+    const vscodeWarnings = [
+      ...(host?.sshAgent ? ['sshAgent'] : []),
+      ...(host?.githubCredential ? ['githubCredential'] : []),
+    ];
     const version = (value: string | null | undefined) => (value ? { version: value } : {});
     const dockerCheck = (): CheckResult => {
       if (dockerState !== 'running') {
         return { id: 'docker', status: dockerState === 'starting' ? 'pending' : 'missing', reason: dockerState };
       }
-      const docker = { ...version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine)), ...(dockerInfo && { memoryBytes: dockerInfo.memTotalBytes }) };
+      const docker = {
+        ...version(dockerVersion && (dockerVersion.desktop ?? dockerVersion.engine)),
+        ...(dockerInfo && { memoryBytes: dockerInfo.memTotalBytes }),
+      };
       // Docker Desktop switched to Windows containers: the Linux images cannot be built or run.
       if (dockerInfo && dockerInfo.osType !== 'linux') {
         return { id: 'docker', status: 'missing', reason: 'windowsContainers', ...docker };
@@ -82,10 +90,22 @@ export class Prerequisites {
       !wsl.installed
         ? { id: 'wsl', status: 'missing', reason: 'notFound', detail: wsl.detail }
         : wsl.version2
-          ? { id: 'wsl', status: 'ok', detail: wsl.detail, ...(wsl.notNeeded && { reason: 'notNeeded' }), ...version(wsl.version) }
+          ? {
+              id: 'wsl',
+              status: 'ok',
+              detail: wsl.detail,
+              ...(wsl.notNeeded && { reason: 'notNeeded' }),
+              ...version(wsl.version),
+            }
           : { id: 'wsl', status: 'missing', reason: 'wsl1Only', detail: wsl.detail, ...version(wsl.version) },
       env.vscodeCli
-        ? { id: 'vscode', status: 'ok', detail: env.vscodeCli.launcher, ...version(vscodeVersion), ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }) }
+        ? {
+            id: 'vscode',
+            status: 'ok',
+            detail: env.vscodeCli.launcher,
+            ...version(vscodeVersion),
+            ...(vscodeWarnings.length > 0 && { warnings: vscodeWarnings }),
+          }
         : { id: 'vscode', status: 'missing', reason: 'cliNotFound' },
       typeof devcontainers === 'string'
         ? { id: 'devcontainers', status: 'ok', ...version(devcontainers) }
@@ -99,7 +119,11 @@ export class Prerequisites {
   }
 
   /** Starts Docker Desktop and polls until the engine answers, or the timeout passes. */
-  async startDocker(environment: Environment, timeoutMs = 180_000, onPoll?: (state: EngineState) => void): Promise<EngineState> {
+  async startDocker(
+    environment: Environment,
+    timeoutMs = 180_000,
+    onPoll?: (state: EngineState) => void,
+  ): Promise<EngineState> {
     if (!environment.dockerDesktopApp) {
       return 'notInstalled';
     }

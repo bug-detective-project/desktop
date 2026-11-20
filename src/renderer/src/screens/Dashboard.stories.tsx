@@ -9,13 +9,29 @@ const meta = { title: 'Screens/Dashboard', parameters: { layout: 'fullscreen' } 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const show = (snapshot: () => Snapshot) => () => <Dashboard snapshot={snapshot()} onOpenBoard={fn()} onOpenTicket={fn()} onOpenReview={fn()} onOpenSettings={fn()} />;
+const show = (snapshot: () => Snapshot) => () => (
+  <Dashboard snapshot={snapshot()} onOpenBoard={fn()} onOpenTicket={fn()} onOpenReview={fn()} onOpenSettings={fn()} />
+);
 
 export const NextAssignmentQueued: Story = { render: show(() => snapshotFixture('queued')) };
 export const DownloadNeeded: Story = {
-  render: show(() => snapshotFixture('queued', { environment: { items: [{ id: 'workspaceImage', ready: false }, { id: 'qaImage', ready: false }], ready: false } })),
+  render: show(() =>
+    snapshotFixture('queued', {
+      environment: {
+        items: [
+          { id: 'workspaceImage', ready: false },
+          { id: 'qaImage', ready: false },
+        ],
+        ready: false,
+      },
+    }),
+  ),
 };
-export const UnlockingTicket: Story = { render: show(() => snapshotFixture('queued', { busy: 'unlocking', log: ['» Fetching front-1', '» Verified front-1'] })) };
+export const UnlockingTicket: Story = {
+  render: show(() =>
+    snapshotFixture('queued', { busy: 'unlocking', log: ['» Fetching front-1', '» Verified front-1'] }),
+  ),
+};
 export const TicketInProgress: Story = { render: show(() => snapshotFixture('active')) };
 export const TicketInCodeReview: Story = { render: show(() => snapshotFixture('review')) };
 export const DockerStopped: Story = { render: show(() => snapshotFixture('queued', { dockerState: 'notRunning' })) };
@@ -36,9 +52,36 @@ export const ProjectServices: Story = {
     await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('db · postgres:17');
     await expect(canvas.getByTestId('env-service-db')).toHaveTextContent('Ready');
     await expect(canvas.getByTestId('env-service-db')).toHaveAttribute('data-tone', 'ok');
-    await expect(canvas.getByTestId('env-service-audit')).toHaveTextContent('Stopped: Error: superuser password is not specified.');
+    await expect(canvas.getByTestId('env-service-audit')).toHaveTextContent(
+      'Stopped: Error: superuser password is not specified.',
+    );
     await expect(canvas.getByTestId('env-service-audit')).toHaveAttribute('data-tone', 'danger');
     await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Stopped: out of memory');
+  },
+};
+/** A project that declares its ports: one row each, with the port it got; "Open" on those marked open, but the client. */
+const openPortInBrowser = fn(async () => {});
+export const DeclaredPorts: Story = {
+  parameters: { api: { openPortInBrowser } },
+  render: show(() =>
+    snapshotFixture('active', {
+      declaredPorts: [
+        { name: 'client', label: { en: 'Smoke Desk', pt: 'Smoke Desk' }, port: 5173, open: true },
+        { name: 'api', label: null, port: 3001, open: false },
+        { name: 'audit', label: { en: 'Audit service', pt: 'Serviço de auditoria' }, port: 3012, open: true },
+      ],
+    }),
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('env-port-client')).toHaveTextContent('Smoke Desk');
+    await expect(canvas.getByTestId('env-port-client')).toHaveTextContent('localhost:5173');
+    await expect(canvas.getByTestId('env-port-api')).toHaveTextContent('localhost:3001');
+    await expect(canvas.getByTestId('env-port-audit')).toHaveTextContent('localhost:3012');
+    await expect(canvas.queryByTestId('open-port-client')).toBeNull();
+    await expect(canvas.queryByTestId('open-port-api')).toBeNull();
+    await userEvent.click(canvas.getByTestId('open-port-audit'));
+    await expect(openPortInBrowser).toHaveBeenCalledWith('audit');
   },
 };
 /** A stopped service offers "Recreate services", which says first what is erased and what stays. */
@@ -52,7 +95,9 @@ export const RecreateServices: Story = {
     await expect(canvas.getByTestId('services-out-of-memory')).toHaveTextContent("Increase Docker's memory");
     await userEvent.click(canvas.getByTestId('recreate-services'));
     const dialog = within(canvasElement.ownerDocument.body);
-    await expect(dialog.getByTestId('recreate-services-warning')).toHaveTextContent('Your code and your progress stay.');
+    await expect(dialog.getByTestId('recreate-services-warning')).toHaveTextContent(
+      'Your code and your progress stay.',
+    );
     await expect(recreateServices).not.toHaveBeenCalled();
     await userEvent.click(dialog.getByTestId('recreate-services-confirm'));
     await expect(recreateServices).toHaveBeenCalledTimes(1);
@@ -77,16 +122,28 @@ export const ProjectServicesInPortuguese: Story = {
     await expect(canvas.getByTestId('env-service-cache')).toHaveTextContent('Parado: faltou memória');
   },
 };
-export const WorkspaceInternetOn: Story = { render: show(() => snapshotFixture('active', { workspaceInternet: true })) };
+export const WorkspaceInternetOn: Story = {
+  render: show(() => snapshotFixture('active', { workspaceInternet: true })),
+};
 export const WorkspaceInternetOnInPortuguese: Story = { ...WorkspaceInternetOn, globals: { locale: 'pt' } };
 /** Opening asks first: the warning says what else the project's code reaches. */
 export const WorkspaceInternetDialog: Story = {
   render: show(() => snapshotFixture('active')),
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByTestId('workspace-internet-toggle'));
-    await expect(within(canvasElement.ownerDocument.body).getByTestId('workspace-internet-warning')).toHaveTextContent('your local network');
+    await expect(within(canvasElement.ownerDocument.body).getByTestId('workspace-internet-warning')).toHaveTextContent(
+      'your local network',
+    );
   },
 };
 export const WorkspaceLost: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true })) };
-export const WorkspaceRecreating: Story = { render: show(() => snapshotFixture('active', { workspaceLost: true, busy: 'rebuilding', log: ['» Fetching front-1', '» Recreated the code of ticket 1 (front-1)'] })) };
+export const WorkspaceRecreating: Story = {
+  render: show(() =>
+    snapshotFixture('active', {
+      workspaceLost: true,
+      busy: 'rebuilding',
+      log: ['» Fetching front-1', '» Recreated the code of ticket 1 (front-1)'],
+    }),
+  ),
+};
 export const Portuguese: Story = { render: show(() => snapshotFixture('active')), globals: { locale: 'pt' } };

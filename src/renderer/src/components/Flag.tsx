@@ -11,5 +11,13 @@ const FLAGS: Record<Language, string> = { en: us, pt: br };
  * and the game works offline.
  */
 export function Flag({ language }: { language: Language }) {
-  return <img src={FLAGS[language]} alt="" aria-hidden data-testid={`flag-${language}`} className="h-3 w-4 shrink-0 rounded-xs object-cover shadow-2xs" />;
+  return (
+    <img
+      src={FLAGS[language]}
+      alt=""
+      aria-hidden
+      data-testid={`flag-${language}`}
+      className="h-3 w-4 shrink-0 rounded-xs object-cover shadow-2xs"
+    />
+  );
 }

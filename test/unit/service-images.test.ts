@@ -20,8 +20,10 @@ function world(present: string[] = [], options: { pullFails?: boolean; removeFai
     calls.push([...args]);
     const last = args.at(-1)!;
     if (args[0] === 'image' && args[1] === 'inspect') return out(images.has(last) ? 0 : 1);
-    if (args[0] === 'pull') return options.pullFails ? out(1, 'toomanyrequests: rate limit') : (images.add(last), out());
-    if (args[0] === 'image' && args[1] === 'rm') return options.removeFails ? out(1, 'image is being used') : (images.delete(last), out());
+    if (args[0] === 'pull')
+      return options.pullFails ? out(1, 'toomanyrequests: rate limit') : (images.add(last), out());
+    if (args[0] === 'image' && args[1] === 'rm')
+      return options.removeFails ? out(1, 'image is being used') : (images.delete(last), out());
     return out();
   };
   const of = (...start: string[]) => calls.filter((call) => start.every((word, index) => call[index] === word));

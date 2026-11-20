@@ -5,7 +5,15 @@ import { SplitDiff } from './SplitDiff.tsx';
 const meta = {
   title: 'Components/SplitDiff',
   component: SplitDiff,
-  args: { labels: { left: 'Your solution', right: 'Reference', onlyLeft: 'Only in your solution', onlyRight: 'Only in the reference' }, testId: 'split' },
+  args: {
+    labels: {
+      left: 'Your solution',
+      right: 'Reference',
+      onlyLeft: 'Only in your solution',
+      onlyRight: 'Only in the reference',
+    },
+    testId: 'split',
+  },
 } satisfies Meta<typeof SplitDiff>;
 export default meta;
 type Story = StoryObj<typeof meta>;

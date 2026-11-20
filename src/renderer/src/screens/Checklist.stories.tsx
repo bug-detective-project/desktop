@@ -7,7 +7,9 @@ const meta = { title: 'Screens/Checklist', parameters: { layout: 'fullscreen' } 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const EverythingReady: Story = { render: () => <Checklist snapshot={snapshotFixture('queued')} onContinue={fn()} /> };
+export const EverythingReady: Story = {
+  render: () => <Checklist snapshot={snapshotFixture('queued')} onContinue={fn()} />,
+};
 
 /** Docker stopped and the Dev Containers extension missing: their actions show, and the player cannot start. */
 export const SomethingMissing: Story = {
@@ -16,7 +18,13 @@ export const SomethingMissing: Story = {
     const prerequisites = snapshot.prerequisites!;
     prerequisites.allOk = false;
     prerequisites.dockerState = 'notRunning';
-    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'docker' ? { ...check, status: 'missing' } : check.id === 'devcontainers' ? { ...check, status: 'missing' } : check));
+    prerequisites.checks = prerequisites.checks.map((check) =>
+      check.id === 'docker'
+        ? { ...check, status: 'missing' }
+        : check.id === 'devcontainers'
+          ? { ...check, status: 'missing' }
+          : check,
+    );
     return <Checklist snapshot={{ ...snapshot, dockerState: 'notRunning', prerequisites }} onContinue={fn()} />;
   },
 };
@@ -27,7 +35,9 @@ export const WindowsContainers: Story = {
     const snapshot = snapshotFixture('queued');
     const prerequisites = snapshot.prerequisites!;
     prerequisites.allOk = false;
-    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'docker' ? { ...check, status: 'missing', reason: 'windowsContainers' } : check));
+    prerequisites.checks = prerequisites.checks.map((check) =>
+      check.id === 'docker' ? { ...check, status: 'missing', reason: 'windowsContainers' } : check,
+    );
     return <Checklist snapshot={{ ...snapshot, prerequisites }} onContinue={fn()} />;
   },
 };
@@ -37,7 +47,9 @@ export const LowMemory: Story = {
   render: () => {
     const snapshot = snapshotFixture('queued');
     const prerequisites = snapshot.prerequisites!;
-    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'docker' ? { ...check, warnings: ['lowMemory'] } : check));
+    prerequisites.checks = prerequisites.checks.map((check) =>
+      check.id === 'docker' ? { ...check, warnings: ['lowMemory'] } : check,
+    );
     return <Checklist snapshot={{ ...snapshot, prerequisites }} onContinue={fn()} />;
   },
 };
@@ -48,10 +60,14 @@ export const CredentialWarnings: Story = {
   render: () => {
     const snapshot = snapshotFixture('queued');
     const prerequisites = snapshot.prerequisites!;
-    prerequisites.checks = prerequisites.checks.map((check) => (check.id === 'vscode' ? { ...check, warnings: ['sshAgent', 'githubCredential'] } : check));
+    prerequisites.checks = prerequisites.checks.map((check) =>
+      check.id === 'vscode' ? { ...check, warnings: ['sshAgent', 'githubCredential'] } : check,
+    );
     return <Checklist snapshot={{ ...snapshot, prerequisites }} onContinue={fn()} />;
   },
 };
 export const CredentialWarningsInPortuguese: Story = { ...CredentialWarnings, globals: { locale: 'pt' } };
 
-export const DockerStoppedBanner: Story = { render: () => <DockerBanner snapshot={snapshotFixture('active', { dockerState: 'notRunning' })} /> };
+export const DockerStoppedBanner: Story = {
+  render: () => <DockerBanner snapshot={snapshotFixture('active', { dockerState: 'notRunning' })} />,
+};

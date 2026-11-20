@@ -29,7 +29,10 @@ function bytes(size: string): number {
 /** Docker's global build cache size, from `docker system df`. */
 async function globalBuildCache(): Promise<number> {
   const result = await docker.checked(['system', 'df', '--format', '{{.Type}}\t{{.Size}}']);
-  const line = result.stdout.toString('utf8').split('\n').find((item) => item.startsWith('Build Cache'));
+  const line = result.stdout
+    .toString('utf8')
+    .split('\n')
+    .find((item) => item.startsWith('Build Cache'));
   return line ? bytes(line.split('\t')[1]) : 0;
 }
 
@@ -50,20 +53,34 @@ afterAll(async () => {
 });
 
 describe('the app builder', () => {
-  it('is created on demand, builds the workspace image, keeps its cache under 2.5 GB and leaves the global build cache alone', async () => {
-    expect(await builderExists()).toBe(false);
-    const before = await globalBuildCache();
+  it(
+    'is created on demand, builds the workspace image, keeps its cache under 2.5 GB and leaves the global build cache alone',
+    async () => {
+      expect(await builderExists()).toBe(false);
+      const before = await globalBuildCache();
 
-    await docker.build(platform.dockerHostPath(join(root, 'build', 'docker', 'workspace')), IMAGE, 'workspace-image', undefined, undefined, null, PREFIX);
+      await docker.build(
+        platform.dockerHostPath(join(root, 'build', 'docker', 'workspace')),
+        IMAGE,
+        'workspace-image',
+        undefined,
+        undefined,
+        null,
+        PREFIX,
+      );
 
-    expect(await builderExists()).toBe(true);
-    expect(await docker.imageExists(IMAGE)).toBe(true);
-    const du = (await docker.checked(['buildx', 'du', '--builder', Docker.builderName(PREFIX)])).stdout.toString('utf8');
-    const total = /Total:\s+(\S+)/.exec(du)?.[1];
-    expect(total, du).toBeDefined();
-    expect(bytes(total!)).toBeLessThan(2.5e9);
-    expect(Math.abs((await globalBuildCache()) - before)).toBeLessThan(1e6);
-  }, 20 * 60_000);
+      expect(await builderExists()).toBe(true);
+      expect(await docker.imageExists(IMAGE)).toBe(true);
+      const du = (await docker.checked(['buildx', 'du', '--builder', Docker.builderName(PREFIX)])).stdout.toString(
+        'utf8',
+      );
+      const total = /Total:\s+(\S+)/.exec(du)?.[1];
+      expect(total, du).toBeDefined();
+      expect(bytes(total!)).toBeLessThan(2.5e9);
+      expect(Math.abs((await globalBuildCache()) - before)).toBeLessThan(1e6);
+    },
+    20 * 60_000,
+  );
 
   it('is removed with its cache', async () => {
     await docker.removeBuilder(PREFIX);

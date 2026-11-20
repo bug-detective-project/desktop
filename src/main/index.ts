@@ -21,7 +21,13 @@ import { currentPlatform } from './platform/index.ts';
 import type { Platform } from './platform/types.ts';
 import { DockerRuntime } from './runtime.ts';
 import type { GameRuntime } from './runtime.ts';
-import { CatalogService, chooseCatalogSource, parseLocalCatalog, readLocalCatalogFile, writeLocalCatalogFile } from './services/catalog.ts';
+import {
+  CatalogService,
+  chooseCatalogSource,
+  parseLocalCatalog,
+  readLocalCatalogFile,
+  writeLocalCatalogFile,
+} from './services/catalog.ts';
 import { isDevelopmentRun, userDataOverride } from './services/dev-mode.ts';
 import type { LocalCatalog, ResolvedProject } from './services/catalog.ts';
 import { contentSourceFor } from './services/projects.ts';
@@ -30,14 +36,28 @@ import { loadInstallKey } from './services/install-key.ts';
 import { skipWhileRunning } from './services/poll.ts';
 import { ReviewStore } from './services/review/store.ts';
 import { StateStore } from './services/state.ts';
-import { isWsl, logFileName, openLogsFolder, openWithWindowsExplorer, pruneLogs, recentLines, redactPaths } from './services/logs.ts';
+import {
+  isWsl,
+  logFileName,
+  openLogsFolder,
+  openWithWindowsExplorer,
+  pruneLogs,
+  recentLines,
+  redactPaths,
+} from './services/logs.ts';
 
 /** The installer's test build (pnpm run dist:win:test) says so in its package.json. */
 function isTestBuild(): boolean {
   if (!app.isPackaged) {
     return false;
   }
-  return (JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as { bugDetective?: { testBuild?: boolean } }).bugDetective?.testBuild === true;
+  return (
+    (
+      JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
+        bugDetective?: { testBuild?: boolean };
+      }
+    ).bugDetective?.testBuild === true
+  );
 }
 
 // Tests and the "clean profile" checks can point the app at another data folder.
@@ -61,11 +81,16 @@ const home = homedir();
 log.transports.file.resolvePathFn = () => logFile;
 log.transports.file.level = 'info';
 log.transports.console.level = app.isPackaged ? false : 'info';
-log.hooks.push((message) => ({ ...message, data: message.data.map((item) => (typeof item === 'string' ? redactPaths(item, home) : item)) }));
+log.hooks.push((message) => ({
+  ...message,
+  data: message.data.map((item) => (typeof item === 'string' ? redactPaths(item, home) : item)),
+}));
 Object.assign(console, log.functions);
 void pruneLogs(logsDir);
 // The first line of the day's file, so every start leaves a trace for the diagnostics.
-console.info(`Bug Detective ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron}${isWsl() ? ', under WSL' : ''})`);
+console.info(
+  `Bug Detective ${app.getVersion()} started (${process.platform} ${process.arch}, Electron ${process.versions.electron}${isWsl() ? ', under WSL' : ''})`,
+);
 const appRoot = app.getAppPath();
 const devRendererUrl = isDev ? process.env.ELECTRON_RENDERER_URL : undefined;
 // Chrome and React DevTools for development; the e2e tests stay offline and unchanged.
@@ -112,11 +137,16 @@ function localCatalogFile(userData: string): string {
 function catalogService(userData: string): CatalogService {
   const local = localCatalog(localCatalogFile(userData));
   return new CatalogService({
-    choice: chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: local, baseDir: appRoot }),
+    // A run from source in player mode (the real-runtime suite) still honors the tests' catalog
+    // file; catalog.local.json stays development-only (localCatalog), and the installed app always
+    // reads the official catalog.
+    choice: chooseCatalogSource({ packaged: app.isPackaged, env: process.env, localCatalog: local, baseDir: appRoot }),
     overrides: local?.projects ?? {},
     baseDir: appRoot,
     cacheFile: join(userData, 'catalog.json'),
-    fallbackFile: app.isPackaged ? join(process.resourcesPath, 'catalog.fallback.json') : join(appRoot, 'build', 'catalog.fallback.json'),
+    fallbackFile: app.isPackaged
+      ? join(process.resourcesPath, 'catalog.fallback.json')
+      : join(appRoot, 'build', 'catalog.fallback.json'),
     fetchText: fetchTextWith(downloadFetch),
     log: console.log,
   });
@@ -130,7 +160,10 @@ function devCatalogOptions(file: string, catalog: CatalogService): DevCatalogOpt
     read: () => readLocalCatalogFile(file),
     write: (settings) => writeLocalCatalogFile(file, settings),
     reconfigure: (settings) =>
-      catalog.reconfigure(chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: settings, baseDir: appRoot }), settings.projects ?? {}),
+      catalog.reconfigure(
+        chooseCatalogSource({ packaged: !isDev, env: process.env, localCatalog: settings, baseDir: appRoot }),
+        settings.projects ?? {},
+      ),
   };
 }
 
@@ -188,7 +221,9 @@ function hardenSessions(): void {
   // No permission (camera, notifications, ...) is ever needed, except writing to the clipboard
   // ("Copy log"); reading it stays denied.
   const allowed = (permission: string) => permission === 'clipboard-sanitized-write';
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => callback(allowed(permission)));
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) =>
+    callback(allowed(permission)),
+  );
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) => allowed(permission));
 
   app.on('web-contents-created', (_event, contents) => {
@@ -259,7 +294,14 @@ function watchRenderer(window: BrowserWindow, game: Game): void {
     }
     crashes.push(now);
     void dialog
-      .showMessageBox(window, { type: 'error', title: text('rendererGoneTitle'), message: text('rendererGone'), buttons: [text('reload'), text('copyDiagnostics'), text('quit')], defaultId: 0, cancelId: 2 })
+      .showMessageBox(window, {
+        type: 'error',
+        title: text('rendererGoneTitle'),
+        message: text('rendererGone'),
+        buttons: [text('reload'), text('copyDiagnostics'), text('quit')],
+        defaultId: 0,
+        cancelId: 2,
+      })
       .then(async ({ response }) => {
         if (response === 1) {
           await copyDiagnostics();
@@ -274,7 +316,14 @@ function watchRenderer(window: BrowserWindow, game: Game): void {
   window.webContents.on('unresponsive', () => {
     console.error('Renderer unresponsive');
     void dialog
-      .showMessageBox(window, { type: 'warning', title: text('unresponsiveTitle'), message: text('unresponsive'), buttons: [text('wait'), text('reload')], defaultId: 0, cancelId: 0 })
+      .showMessageBox(window, {
+        type: 'warning',
+        title: text('unresponsiveTitle'),
+        message: text('unresponsive'),
+        buttons: [text('wait'), text('reload')],
+        defaultId: 0,
+        cancelId: 0,
+      })
       .then(({ response }) => {
         if (response === 1) window.reload();
       });
@@ -295,7 +344,8 @@ async function main(): Promise<void> {
   const catalog = catalogService(userData);
   // Development and tests only: another content host (an e2e test points it at a closed port to play offline).
   const baseUrl = isDev ? process.env.BUGDETECTIVE_CONTENT_BASE_URL : undefined;
-  const contentSource = (project: ResolvedProject, minVersion: string | null) => contentSourceFor(project, { userData, minVersion, fetch: downloadFetch, baseUrl }, console.log);
+  const contentSource = (project: ResolvedProject, minVersion: string | null) =>
+    contentSourceFor(project, { userData, minVersion, fetch: downloadFetch, baseUrl }, console.log);
   // The starter until the game names its own project (Game.init points everything at that one).
   const starter = (await catalog.current()).find((item) => item.starter)!;
   const installKey = await loadInstallKey(userData);
@@ -365,7 +415,10 @@ async function main(): Promise<void> {
         if (isE2E) {
           // The e2e tests read how the quit went (the fake runtime counts the shutdowns).
           const fake = (globalThis as { bugDetectiveFake?: { shutdownCalls: number } }).bugDetectiveFake;
-          await writeFile(join(userData, 'shutdown.json'), JSON.stringify({ shutdownCalls: fake?.shutdownCalls ?? null })).catch(() => {});
+          await writeFile(
+            join(userData, 'shutdown.json'),
+            JSON.stringify({ shutdownCalls: fake?.shutdownCalls ?? null }),
+          ).catch(() => {});
         }
         app.quit();
       });

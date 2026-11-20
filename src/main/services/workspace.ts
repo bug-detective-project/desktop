@@ -6,9 +6,10 @@
  * environment (WORKSPACE_DIR, PROJECT_ID, PROJECT_NAME), never interpolated into the script.
  */
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:net';
 import { MAX_SAVE_BYTES } from './backup.ts';
-import { readTar, writeTar } from '@bug-detective/catalog/contract';
-import type { ArchiveFile } from '@bug-detective/catalog/contract';
+import { portVariables, readTar, writeTar } from '@bug-detective/catalog/contract';
+import type { ArchiveFile, ProjectPorts } from '@bug-detective/catalog/contract';
 import { labelArgs, mountArg } from './docker.ts';
 import { containerLimits, limitArgs } from './limits.ts';
 import type { ContainerInfo, Docker } from './docker.ts';
@@ -58,9 +59,38 @@ export function resourceNames(prefix = 'bugdetective'): ResourceNames {
     qaInputVolume: `${prefix}-qa-input`,
   };
 }
-/** Container ports: the forwarder in front of Vite, and the Express API. */
+/** Container ports of a project that declares none: the forwarder in front of Vite, and the Express API. */
 export const CONTAINER_PORTS = { client: 15173, api: 3001 } as const;
 const PREFERRED_HOST_PORTS = { client: 5173, api: 3001 } as const;
+/**
+ * A declared port p is mirrored in the workspace at p + 10000 (0.0.0.0, by forward.mjs, to the
+ * process on localhost:p), so a server that listens on localhost only is reached too.
+ */
+export const MIRROR_OFFSET = 10_000;
+/** The workspace's variable that lists the declared ports forward.mjs mirrors. */
+export const WORKSPACE_PORTS_VARIABLE = 'BUGDETECTIVE_WORKSPACE_PORTS';
+
+/** One port the forwarder publishes: its name, the port preferred on the computer and the workspace port it reaches. */
+interface PortRoute {
+  name: string;
+  preferred: number;
+  target: number;
+}
+
+/** The routes of the declared ports, or the app's two ports when the project declares none. */
+function portRoutes(declared: ProjectPorts | undefined): PortRoute[] {
+  if (!declared) {
+    return [
+      { name: 'client', preferred: PREFERRED_HOST_PORTS.client, target: CONTAINER_PORTS.client },
+      { name: 'api', preferred: PREFERRED_HOST_PORTS.api, target: CONTAINER_PORTS.api },
+    ];
+  }
+  return Object.entries(declared).map(([name, port]) => ({
+    name,
+    preferred: port.port,
+    target: port.port + MIRROR_OFFSET,
+  }));
+}
 
 /** The player's branch for a ticket. Internal: never shown in the UI. */
 export const playerBranch = (stage: number) => `player/ticket-${stage}`;
@@ -475,20 +505,19 @@ const ticketArg = (ticket: number) => {
   return String(ticket);
 };
 
-export interface WorkspacePorts {
-  client: number;
-  api: number;
-}
-
-/** The host ports the workspace container publishes. */
-export function publishedPorts(info: ContainerInfo): WorkspacePorts {
-  return { client: info.ports[CONTAINER_PORTS.client], api: info.ports[CONTAINER_PORTS.api] };
-}
+/** The port on the computer of each port the forwarder publishes, by name: client always, then api or the declared ones. */
+export type WorkspacePorts = { client: number } & Record<string, number>;
 
 export interface WorkspaceOptions {
   docker: Docker;
   image: string;
   isPortFree: (port: number) => Promise<boolean>;
+  /**
+   * Any free port the system hands out. The fallback when every port near a preferred one is taken:
+   * Windows (Hyper-V, WinNAT) reserves whole blocks of ports, such as 2741 to 3240, which no
+   * program can listen on.
+   */
+  anyFreePort?: () => Promise<number>;
   names?: ResourceNames;
   /** The game project whose code the workspace holds (labels its container and volumes, names its folder). */
   project?: string | null;
@@ -500,6 +529,8 @@ export interface WorkspaceOptions {
   memory?: string;
   /** The services whose port the project asks to publish on the computer (127.0.0.1 only), through the forwarder. */
   publishedServices?: { name: string; port: number }[];
+  /** The ports the project declares (the manifest's project.ports); without them, the client and the API. */
+  declaredPorts?: ProjectPorts;
 }
 
 /** Changes when the published services do: the forwarder is then recreated. */
@@ -529,6 +560,7 @@ export class Workspace {
   private readonly docker: Docker;
   private readonly image: string;
   private readonly isPortFree: (port: number) => Promise<boolean>;
+  private readonly anyFreePort: () => Promise<number>;
   private readonly names: ResourceNames;
   private readonly project: string | null;
   private readonly projectName: string | null;
@@ -536,30 +568,64 @@ export class Workspace {
   private readonly variables: Record<string, string>;
   private readonly memory: string | undefined;
   private readonly publishedServices: { name: string; port: number }[];
+  private readonly declaredPorts: ProjectPorts | undefined;
+  private readonly routes: PortRoute[];
 
   constructor(options: WorkspaceOptions) {
     this.docker = options.docker;
     this.image = options.image;
     this.isPortFree = options.isPortFree;
+    this.anyFreePort = options.anyFreePort ?? systemFreePort;
     this.names = options.names ?? resourceNames();
     this.project = options.project ?? null;
     this.projectName = options.projectName ?? null;
     this.variables = options.variables ?? {};
     this.memory = options.memory;
     this.publishedServices = options.publishedServices ?? [];
+    this.declaredPorts = options.declaredPorts;
+    this.routes = portRoutes(this.declaredPorts);
   }
 
-  /** A short hash of the published services; empty when there is none. */
+  /** The workspace port the client is reached on: the mirror of the declared client port, or the default 15173. */
+  private get clientTarget(): number {
+    return this.routes.find((route) => route.name === 'client')!.target;
+  }
+
+  /** A short hash of the published services and the declared ports; empty when there is neither. */
   private get forwardKey(): string {
-    return this.publishedServices.length === 0 ? '' : createHash('sha256').update(JSON.stringify(this.publishedServices)).digest('hex').slice(0, 16);
+    if (this.publishedServices.length === 0 && !this.declaredPorts) {
+      return '';
+    }
+    const routes = this.declaredPorts ? this.routes : [];
+    const content = routes.length === 0 ? this.publishedServices : [this.publishedServices, routes];
+    return createHash('sha256').update(JSON.stringify(content)).digest('hex').slice(0, 16);
+  }
+
+  /**
+   * The forwarder port of each published service: from 20000 on, clear of the workspace ports the
+   * declared ones reach (a port 10000 is mirrored at 20000).
+   */
+  private get serviceForwardPorts(): number[] {
+    const taken = new Set(this.routes.map((route) => route.target));
+    const ports: number[] = [];
+    let next = SERVICE_FORWARD_BASE;
+    for (let index = 0; index < this.publishedServices.length; index += 1) {
+      while (taken.has(next)) {
+        next += 1;
+      }
+      ports.push(next);
+      taken.add(next);
+    }
+    return ports;
   }
 
   /** The port on the computer (127.0.0.1) of each published service; empty when the forwarder does not exist. */
   async servicePorts(): Promise<Record<string, number>> {
     const info = await this.docker.inspectContainer(this.forwarder);
+    const forward = this.serviceForwardPorts;
     const ports: Record<string, number> = {};
     this.publishedServices.forEach((service, index) => {
-      const port = info?.ports[SERVICE_FORWARD_BASE + index];
+      const port = info?.ports[forward[index]!];
       if (port) {
         ports[service.name] = port;
       }
@@ -567,13 +633,36 @@ export class Workspace {
     return ports;
   }
 
+  /**
+   * The variables the container is created with: the services', and for declared ports the ports'
+   * own (filled with the ports chosen on the computer) and the list forward.mjs mirrors.
+   */
+  private containerVariables(ports: WorkspacePorts | null): Record<string, string> {
+    if (!this.declaredPorts) {
+      return this.variables;
+    }
+    if (!ports) {
+      throw new Error('The forwarder is not running: the declared ports have no port on the computer');
+    }
+    return {
+      ...this.variables,
+      ...portVariables(this.declaredPorts, ports),
+      [WORKSPACE_PORTS_VARIABLE]: Object.values(this.declaredPorts)
+        .map((port) => port.port)
+        .join(','),
+    };
+  }
+
   /** A short hash of the variables and the memory the container is created with; empty when the project declares neither. */
-  private get envKey(): string {
-    const variables = Object.entries(this.variables).sort(([a], [b]) => a.localeCompare(b));
+  private envKey(containerVariables: Record<string, string>): string {
+    const variables = Object.entries(containerVariables).sort(([a], [b]) => a.localeCompare(b));
     if (variables.length === 0 && this.memory === undefined) {
       return '';
     }
-    return createHash('sha256').update(JSON.stringify([variables, this.memory ?? null])).digest('hex').slice(0, 16);
+    return createHash('sha256')
+      .update(JSON.stringify([variables, this.memory ?? null]))
+      .digest('hex')
+      .slice(0, 16);
   }
 
   /** The project's repository folder in the container. */
@@ -586,7 +675,11 @@ export class Workspace {
 
   /** What the scripts need: the folder and the identity of the project. */
   private get env(): Record<string, string> {
-    return { WORKSPACE_DIR: this.dir, PROJECT_ID: this.project ?? '', PROJECT_NAME: this.projectName ?? this.project ?? '' };
+    return {
+      WORKSPACE_DIR: this.dir,
+      PROJECT_ID: this.project ?? '',
+      PROJECT_NAME: this.projectName ?? this.project ?? '',
+    };
   }
 
   get containerName(): string {
@@ -609,15 +702,25 @@ export class Workspace {
     return forwarderName(this.names.prefix, this.project);
   }
 
-  /** Published host ports (on the forwarder), or null when it does not exist. */
+  /** Published host ports (on the forwarder), by name, or null when it does not exist. */
   async ports(): Promise<WorkspacePorts | null> {
     const info = await this.docker.inspectContainer(this.forwarder);
-    return info ? publishedPorts(info) : null;
+    if (!info) {
+      return null;
+    }
+    return Object.fromEntries(this.routes.map((route) => [route.name, info.ports[route.target]])) as WorkspacePorts;
   }
 
   private async pickPort(preferred: number, avoid: Set<number>): Promise<number> {
     for (let port = preferred; port < preferred + 200; port += 1) {
       if (!avoid.has(port) && (await this.isPortFree(port))) {
+        return port;
+      }
+    }
+    // Nothing near the preferred port: the system knows a free one (its ephemeral range).
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const port = await this.anyFreePort();
+      if (!avoid.has(port)) {
         return port;
       }
     }
@@ -627,11 +730,14 @@ export class Workspace {
   /** Creates the forwarder (normal network, then the internal one) on free ports. */
   private async createForwarder(): Promise<void> {
     const avoid = new Set<number>();
+    const forward = this.serviceForwardPorts;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const client = await this.pickPort(PREFERRED_HOST_PORTS.client, avoid);
-      avoid.add(client);
-      const api = await this.pickPort(PREFERRED_HOST_PORTS.api, avoid);
-      avoid.add(api);
+      const hostPorts: number[] = [];
+      for (const route of this.routes) {
+        const port = await this.pickPort(route.preferred, avoid);
+        avoid.add(port);
+        hostPorts.push(port);
+      }
       // A published service is reached by its name on the internal network, like the workspace.
       const servicePorts: number[] = [];
       for (const service of this.publishedServices) {
@@ -640,8 +746,8 @@ export class Workspace {
         servicePorts.push(port);
       }
       const routes = [
-        ...Object.values(CONTAINER_PORTS).map((port) => `${port}:${this.names.container}:${port}`),
-        ...this.publishedServices.map((service, index) => `${SERVICE_FORWARD_BASE + index}:${service.name}:${service.port}`),
+        ...this.routes.map((route) => `${route.target}:${this.names.container}:${route.target}`),
+        ...this.publishedServices.map((service, index) => `${forward[index]}:${service.name}:${service.port}`),
       ].join(',');
       await this.docker.checked([
         'container',
@@ -656,11 +762,8 @@ export class Workspace {
         OPEN_NETWORK,
         '--env',
         `BUGDETECTIVE_FORWARD=${routes}`,
-        '--publish',
-        `127.0.0.1:${client}:${CONTAINER_PORTS.client}`,
-        '--publish',
-        `127.0.0.1:${api}:${CONTAINER_PORTS.api}`,
-        ...servicePorts.flatMap((port, index) => ['--publish', `127.0.0.1:${port}:${SERVICE_FORWARD_BASE + index}`]),
+        ...this.routes.flatMap((route, index) => ['--publish', `127.0.0.1:${hostPorts[index]}:${route.target}`]),
+        ...servicePorts.flatMap((port, index) => ['--publish', `127.0.0.1:${port}:${forward[index]}`]),
         this.image,
       ]);
       await this.docker.connectNetwork(this.network, this.forwarder);
@@ -678,7 +781,12 @@ export class Workspace {
 
   private async ensureForwarder(): Promise<void> {
     let info = await this.docker.inspectContainer(this.forwarder);
-    if (info && (info.image !== this.image || !info.networks.includes(this.network) || (info.labels[FORWARD_KEY_LABEL] ?? '') !== this.forwardKey)) {
+    if (
+      info &&
+      (info.image !== this.image ||
+        !info.networks.includes(this.network) ||
+        (info.labels[FORWARD_KEY_LABEL] ?? '') !== this.forwardKey)
+    ) {
       await this.docker.removeContainer(this.forwarder);
       info = null;
     }
@@ -696,7 +804,8 @@ export class Workspace {
   }
 
   /** The workspace lives on the internal network only: nothing is published from it. */
-  private async create(): Promise<void> {
+  private async create(variables: Record<string, string>): Promise<void> {
+    const envKey = this.envKey(variables);
     const result = await this.docker.run([
       'run',
       '--detach',
@@ -704,9 +813,9 @@ export class Workspace {
       '--name',
       this.names.container,
       ...labelArgs('workspace', this.project),
-      ...(this.envKey ? ['--label', `${ENV_KEY_LABEL}=${this.envKey}`] : []),
+      ...(envKey ? ['--label', `${ENV_KEY_LABEL}=${envKey}`] : []),
       ...limitArgs(containerLimits('workspace', process.env, this.memory ? { memory: this.memory } : {})),
-      ...Object.entries(this.variables).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
+      ...Object.entries(variables).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
       '--network',
       this.network,
       '--mount',
@@ -734,7 +843,9 @@ export class Workspace {
     if (!info || info.networks.includes(OPEN_NETWORK) === on) {
       return;
     }
-    await (on ? this.docker.connectNetwork(OPEN_NETWORK, this.names.container) : this.docker.disconnectNetwork(OPEN_NETWORK, this.names.container));
+    await (on
+      ? this.docker.connectNetwork(OPEN_NETWORK, this.names.container)
+      : this.docker.disconnectNetwork(OPEN_NETWORK, this.names.container));
   }
 
   /** Stops the forwarder (it comes back with the next action of the game). */
@@ -749,10 +860,19 @@ export class Workspace {
     await this.docker.createVolume(this.names.vscodeVolume, 'vscode-server');
     await this.docker.createVolume(this.names.cacheVolume, 'qa-cache', this.project);
     await this.docker.createInternalNetwork(this.network, 'network', this.project);
+    // The forwarder first: the variables of declared ports carry the ports it got on the computer. It
+    // reaches the workspace by name on each connection, so the container may come after it.
+    await this.ensureForwarder();
+    const variables = this.containerVariables(this.declaredPorts ? await this.ports() : null);
     let info = await this.info();
-    if (info && (info.image !== this.image || !info.networks.includes(this.network) || (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey)) {
+    if (
+      info &&
+      (info.image !== this.image ||
+        !info.networks.includes(this.network) ||
+        (info.labels[ENV_KEY_LABEL] ?? '') !== this.envKey(variables))
+    ) {
       // A newer app version ships a newer image, the container is of another project's network, or the
-      // project's services or memory changed: recreate it, keep the volumes.
+      // project's services, ports or memory changed: recreate it, keep the volumes.
       await this.docker.removeContainer(this.names.container);
       info = null;
     }
@@ -764,9 +884,8 @@ export class Workspace {
       }
     }
     if (!info) {
-      await this.create();
+      await this.create(variables);
     }
-    await this.ensureForwarder();
     const running = await this.info();
     if (!running?.running) {
       throw new Error('The workspace container is not running');
@@ -777,10 +896,19 @@ export class Workspace {
   }
 
   private exec(command: readonly string[], options: Parameters<Docker['exec']>[2] = {}) {
-    return this.docker.execChecked(this.names.container, command, { user: 'node', workdir: this.dir, env: this.env, ...options });
+    return this.docker.execChecked(this.names.container, command, {
+      user: 'node',
+      workdir: this.dir,
+      env: this.env,
+      ...options,
+    });
   }
 
-  private script(name: keyof typeof SCRIPTS, args: readonly string[] = [], options: Parameters<Docker['exec']>[2] = {}) {
+  private script(
+    name: keyof typeof SCRIPTS,
+    args: readonly string[] = [],
+    options: Parameters<Docker['exec']>[2] = {},
+  ) {
     return this.exec(['sh', '-c', SCRIPTS[name], 'sh', ...args], options);
   }
 
@@ -821,17 +949,24 @@ export class Workspace {
     if (!/^[0-9TZ:.-]{10,40}$/.test(gameId)) {
       throw new Error(`Invalid game id: ${gameId}`);
     }
-    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    const stamp = now
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d+Z$/, 'Z');
     const { stdout } = await this.script('claimForGame', [gameId, stamp], { timeoutMs: 60_000 });
     return Number(stdout.toString('utf8').trim().split('\n').at(-1)) || 0;
   }
 
   /** Writes settings into VS Code's machine settings in the container, so the next attach reads them (see vscode.ts). */
   async seedVSCodeMachineSettings(settings: Readonly<Record<string, string | boolean>>): Promise<void> {
-    await this.docker.execChecked(this.names.container, ['node', '-e', MERGE_SETTINGS_SCRIPT, VSCODE_MACHINE_SETTINGS_FILE, JSON.stringify(settings)], {
-      user: 'node',
-      timeoutMs: 30_000,
-    });
+    await this.docker.execChecked(
+      this.names.container,
+      ['node', '-e', MERGE_SETTINGS_SCRIPT, VSCODE_MACHINE_SETTINGS_FILE, JSON.stringify(settings)],
+      {
+        user: 'node',
+        timeoutMs: 30_000,
+      },
+    );
   }
 
   /** Marks the repository as belonging to a game, without archiving anything (used after a restore). */
@@ -883,7 +1018,14 @@ export class Workspace {
     const { messages } = build;
     const { stdout } = await this.script(
       'buildReview',
-      [ticketArg(build.ticket), build.date, messages.approved, messages.reference, messages.snapshot, ...build.excludes],
+      [
+        ticketArg(build.ticket),
+        build.date,
+        messages.approved,
+        messages.reference,
+        messages.snapshot,
+        ...build.excludes,
+      ],
       { input: tar, timeoutMs: 120_000 },
     );
     const [approved, reference, snapshot] = stdout.toString('utf8').trim().split('\n').at(-1)!.split(' ');
@@ -893,28 +1035,49 @@ export class Workspace {
   /** The commits review/ticket-N and qa-approved/ticket-N point at, or null when missing. */
   async reviewRefs(ticket: number): Promise<{ branch: string | null; tag: string | null }> {
     const resolve = async (ref: string) => {
-      const result = await this.docker.exec(this.names.container, ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`], {
-        user: 'node',
-        workdir: this.dir,
-      });
+      const result = await this.docker.exec(
+        this.names.container,
+        ['git', 'rev-parse', '-q', '--verify', `${ref}^{commit}`],
+        {
+          user: 'node',
+          workdir: this.dir,
+        },
+      );
       return result.code === 0 ? result.stdout.toString('utf8').trim() : null;
     };
     const number = ticketArg(ticket);
-    return { branch: await resolve(`refs/heads/review/ticket-${number}`), tag: await resolve(`refs/tags/qa-approved/ticket-${number}`) };
+    return {
+      branch: await resolve(`refs/heads/review/ticket-${number}`),
+      tag: await resolve(`refs/tags/qa-approved/ticket-${number}`),
+    };
   }
 
   /** git diff between two commits, with rename detection. */
-  async diff(from: string, to: string, options: { ignoreWhitespace?: boolean; pathspecs?: readonly string[] } = {}): Promise<string> {
-    const whitespace = options.ignoreWhitespace ? ['--ignore-all-space', '--ignore-cr-at-eol', '--ignore-blank-lines'] : [];
-    return this.git(['diff', '--no-color', '--no-ext-diff', '-M', ...whitespace, from, to, '--', '.', ...(options.pathspecs ?? [])], {
-      timeoutMs: 60_000,
-    });
+  async diff(
+    from: string,
+    to: string,
+    options: { ignoreWhitespace?: boolean; pathspecs?: readonly string[] } = {},
+  ): Promise<string> {
+    const whitespace = options.ignoreWhitespace
+      ? ['--ignore-all-space', '--ignore-cr-at-eol', '--ignore-blank-lines']
+      : [];
+    return this.git(
+      ['diff', '--no-color', '--no-ext-diff', '-M', ...whitespace, from, to, '--', '.', ...(options.pathspecs ?? [])],
+      {
+        timeoutMs: 60_000,
+      },
+    );
   }
 
   async reviewReturnPoint(): Promise<ReturnPoint> {
     const { stdout } = await this.script('reviewReturnPoint', [], { timeoutMs: 60_000 });
     const [branch, head, indexTree, excludesFile] = stdout.toString('utf8').trim().split('\n');
-    return { branch: branch === '-' ? null : branch, head, indexTree, excludesFile: excludesFile === '-' ? null : excludesFile };
+    return {
+      branch: branch === '-' ? null : branch,
+      head,
+      indexTree,
+      excludesFile: excludesFile === '-' ? null : excludesFile,
+    };
   }
 
   /** Commits uncommitted and untracked work, except excluded paths. Returns the commit, or null when nothing changed. */
@@ -961,7 +1124,11 @@ export class Workspace {
   /** "<node version>\0<platform>\0<arch>" of the images, part of the dependency cache key. */
   private async runtime(): Promise<string> {
     this.runtimeKey ??= (
-      await this.exec(['node', '-e', 'process.stdout.write(`${process.version}\\0${process.platform}\\0${process.arch}`)'])
+      await this.exec([
+        'node',
+        '-e',
+        'process.stdout.write(`${process.version}\\0${process.platform}\\0${process.arch}`)',
+      ])
     ).stdout.toString('utf8');
     return this.runtimeKey;
   }
@@ -975,7 +1142,10 @@ export class Workspace {
     if (result.code !== 0) {
       return null;
     }
-    return createHash('sha256').update(result.stdout).update(`\0${await this.runtime()}`).digest('hex');
+    return createHash('sha256')
+      .update(result.stdout)
+      .update(`\0${await this.runtime()}`)
+      .digest('hex');
   }
 
   async installedDependencyKey(): Promise<string | null> {
@@ -987,7 +1157,9 @@ export class Workspace {
   }
 
   async cachedDependencies(key: string): Promise<boolean> {
-    const result = await this.docker.exec(this.names.container, ['test', '-f', `${CACHE_DIR}/deps/${key}.tar`], { user: 'node' });
+    const result = await this.docker.exec(this.names.container, ['test', '-f', `${CACHE_DIR}/deps/${key}.tar`], {
+      user: 'node',
+    });
     return result.code === 0;
   }
 
@@ -1006,7 +1178,16 @@ export class Workspace {
   async isDevServerUp(): Promise<boolean> {
     const result = await this.docker.exec(
       this.names.container,
-      ['curl', '--fail', '--silent', '--output', '/dev/null', '--max-time', '2', `http://127.0.0.1:${CONTAINER_PORTS.client}/`],
+      [
+        'curl',
+        '--fail',
+        '--silent',
+        '--output',
+        '/dev/null',
+        '--max-time',
+        '2',
+        `http://127.0.0.1:${this.clientTarget}/`,
+      ],
       { user: 'node', timeoutMs: 10_000 },
     );
     return result.code === 0;
@@ -1053,13 +1234,20 @@ export class Workspace {
 
   /** Whether `npm run dev` is still running in the container. */
   private async isDevServerStarting(): Promise<boolean> {
-    const result = await this.docker.exec(this.names.container, ['pgrep', '-f', '[n]pm run dev'], { user: 'node', timeoutMs: 10_000 });
+    const result = await this.docker.exec(this.names.container, ['pgrep', '-f', '[n]pm run dev'], {
+      user: 'node',
+      timeoutMs: 10_000,
+    });
     return result.code === 0;
   }
 
   /** The last lines of /tmp/dev-server.log, without colors. */
   private async devServerLogTail(): Promise<string> {
-    const result = await this.docker.exec(this.names.container, ['tail', '-n', String(DEV_SERVER_LOG_LINES), '/tmp/dev-server.log'], { user: 'node', timeoutMs: 10_000 });
+    const result = await this.docker.exec(
+      this.names.container,
+      ['tail', '-n', String(DEV_SERVER_LOG_LINES), '/tmp/dev-server.log'],
+      { user: 'node', timeoutMs: 10_000 },
+    );
     const text = result.stdout
       .toString('utf8')
       // eslint-disable-next-line no-control-regex
@@ -1079,7 +1267,11 @@ export class Workspace {
   async stopDevServer(): Promise<void> {
     await this.docker.exec(
       this.names.container,
-      ['sh', '-c', "pkill -f '[n]pm run dev'; pkill -f '[c]oncurrently'; pkill -f '[n]ode_modules/.bin/vite'; pkill -f '[n]ode --watch'; true"],
+      [
+        'sh',
+        '-c',
+        "pkill -f '[n]pm run dev'; pkill -f '[c]oncurrently'; pkill -f '[n]ode_modules/.bin/vite'; pkill -f '[n]ode --watch'; true",
+      ],
       { user: 'node', timeoutMs: 10_000 },
     );
     await this.waitForDevServer(false, 10_000);
@@ -1115,4 +1307,17 @@ export class Workspace {
     await this.docker.removeNetwork(this.network).catch(() => {});
     await this.docker.removeVolume(this.names.volume);
   }
+}
+
+/** A port the system hands out as free on 127.0.0.1 (listening on port 0), closed again right away. */
+function systemFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen({ port: 0, host: '127.0.0.1', exclusive: true }, () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(() => (port > 0 ? resolve(port) : reject(new Error('The system gave no free port'))));
+    });
+  });
 }

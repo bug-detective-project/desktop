@@ -4,7 +4,10 @@ import { GIT_FLAGS, WORKSPACE_SCRIPTS } from '../../src/main/services/workspace.
 describe('the workspace scripts', () => {
   it('every script defines git without the repository hooks and fsmonitor, right after set -eu', () => {
     for (const [name, script] of Object.entries(WORKSPACE_SCRIPTS)) {
-      expect(script.startsWith('set -eu\ngit() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }\n'), name).toBe(true);
+      expect(
+        script.startsWith('set -eu\ngit() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }\n'),
+        name,
+      ).toBe(true);
     }
   });
 

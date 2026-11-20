@@ -31,7 +31,9 @@ beforeEach(async () => {
   offline = false;
   missingCommits = new Set();
   const zipOf = async (ref: string) =>
-    writeZip((await gitArchive(runCommand, 'git', repo.qaDir, ref)).map((file) => ({ ...file, path: `top/${file.path}` })));
+    writeZip(
+      (await gitArchive(runCommand, 'git', repo.qaDir, ref)).map((file) => ({ ...file, path: `top/${file.path}` })),
+    );
   server = createServer((request, response) => {
     if (offline) {
       request.socket.destroy();
@@ -40,7 +42,14 @@ beforeEach(async () => {
     requests.push(request.url!);
     const sha = /\/archive\/([0-9a-f]{40})\.zip$/.exec(request.url!)?.[1];
     const tag = /\/archive\/refs\/tags\/(qa-v[0-9.]+)\.zip$/.exec(request.url!)?.[1];
-    const ref = request.url === '/owner/demo/archive/refs/heads/qa.zip' ? 'qa' : tag && repo.git(repo.qaDir, 'tag', '-l', tag) ? tag : sha && !missingCommits.has(sha) ? sha : null;
+    const ref =
+      request.url === '/owner/demo/archive/refs/heads/qa.zip'
+        ? 'qa'
+        : tag && repo.git(repo.qaDir, 'tag', '-l', tag)
+          ? tag
+          : sha && !missingCommits.has(sha)
+            ? sha
+            : null;
     if (!ref) {
       response.writeHead(404).end();
       return;
@@ -60,7 +69,10 @@ afterEach(async () => {
 });
 
 const cached = () =>
-  new CachedContentSource(join(dir, 'cache'), new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, retries: 0 }));
+  new CachedContentSource(
+    join(dir, 'cache'),
+    new GitHubContentSource({ repository: 'owner/demo', project: 'demo', baseUrl, retries: 0 }),
+  );
 const commitOf = (id: string) => repo.git(repo.qaDir, 'rev-parse', id);
 
 /** Publishes 1.1.0 with a changed front-2. */
@@ -78,7 +90,12 @@ describe('CachedContentSource', () => {
     expect(await source.current()).toBeNull();
     const content = await source.prepare();
     expect(content.manifest.version).toBe('1.0.0');
-    expect(requests).toEqual(expect.arrayContaining([`/owner/demo/archive/${commitOf('front-1')}.zip`, `/owner/demo/archive/${commitOf('front-2')}.zip`]));
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        `/owner/demo/archive/${commitOf('front-1')}.zip`,
+        `/owner/demo/archive/${commitOf('front-2')}.zip`,
+      ]),
+    );
     expect((await source.current())?.manifest.version).toBe('1.0.0');
   });
 
@@ -108,7 +125,9 @@ describe('CachedContentSource', () => {
     const ticket = await source.fetchTicket('front-2');
     expect(ticket.manifestVersion).toBe('1.1.0');
     expect(ticket.entry.commit).toBe(commitOf('front-2'));
-    expect(requests.filter((url) => /[0-9a-f]{40}\.zip$/.test(url))).toEqual([`/owner/demo/archive/${commitOf('front-2')}.zip`]);
+    expect(requests.filter((url) => /[0-9a-f]{40}\.zip$/.test(url))).toEqual([
+      `/owner/demo/archive/${commitOf('front-2')}.zip`,
+    ]);
   });
 
   it('answers a publication from the cache when it is that version, and downloads another version by its tag', async () => {

@@ -1,0 +1,8 @@
+{
+  // Every file is formatted by Prettier on save (.prettierrc.json); ESLint fixes the TS/JS rules.
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}

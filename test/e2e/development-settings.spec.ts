@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { launch, supportdeskQa, takeNextTicket } from './fixtures.ts';
+import { launch, projectQa, takeNextTicket } from './fixtures.ts';
 
 async function openDevelopment(page: Page): Promise<void> {
   await page.getByTestId('start-playing').click();
@@ -13,11 +13,11 @@ async function openDevelopment(page: Page): Promise<void> {
   await expect(page.getByTestId('settings-pane-development')).toBeVisible();
 }
 
-/** A data folder with a catalog file of its own; `qaDir` is SupportDesk's folder in it. */
+/** A data folder with a catalog file of its own; `qaDir` is the project's folder in it. */
 async function dataFolder(qaDir: string): Promise<{ userData: string; catalog: string }> {
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
   const catalog = join(userData, 'dev-catalog.json');
-  await writeFile(catalog, JSON.stringify({ projects: [{ id: 'supportdesk', qaDir, starter: true }] }));
+  await writeFile(catalog, JSON.stringify({ projects: [{ id: 'smokedesk', qaDir, starter: true }] }));
   return { userData, catalog };
 }
 
@@ -29,7 +29,7 @@ test('development settings: the tab shows the catalog in use, in English and Por
     await expect(pane.getByRole('heading', { level: 2 }).first()).toHaveText('Development');
     await expect(page.getByTestId('dev-catalog-test-file')).toBeVisible();
     await expect(page.getByTestId('dev-catalog-in-use')).toContainText('file ');
-    await expect(page.getByTestId('dev-project-supportdesk-source')).toHaveText(`local: ${supportdeskQa}`);
+    await expect(page.getByTestId('dev-project-smokedesk-source')).toHaveText(`local: ${projectQa}`);
     await expect(page.getByTestId('dev-catalog-apply')).toBeDisabled();
     await expect(page.getByTestId('dev-catalog-reset')).toBeDisabled();
     await page.getByTestId('settings-tab-preferences').click();
@@ -44,17 +44,20 @@ test('development settings: the tab shows the catalog in use, in English and Por
 
 test('development settings: a local folder applies without a restart, and the next ticket comes from it', async () => {
   const { userData, catalog } = await dataFolder(join(tmpdir(), 'no-such-qa-folder'));
-  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } });
+  const { page, close } = await launch(
+    {},
+    { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } },
+  );
   try {
     await openDevelopment(page);
     await expect(page.getByTestId('dev-catalog-source-file')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('dev-catalog-file')).toHaveValue(catalog);
-    await page.getByTestId('dev-project-supportdesk-folder').click();
-    await page.getByTestId('dev-project-supportdesk-folder-path').fill(supportdeskQa);
+    await page.getByTestId('dev-project-smokedesk-folder').click();
+    await page.getByTestId('dev-project-smokedesk-folder-path').fill(projectQa);
     await page.getByTestId('dev-catalog-apply').click();
-    await expect(page.getByTestId('dev-project-supportdesk-source')).toHaveText(`local: ${supportdeskQa}`);
+    await expect(page.getByTestId('dev-project-smokedesk-source')).toHaveText(`local: ${projectQa}`);
     const saved = JSON.parse(await readFile(join(userData, 'catalog.local.json'), 'utf8'));
-    expect(saved).toEqual({ catalog: { file: catalog }, projects: { supportdesk: { qaDir: supportdeskQa } } });
+    expect(saved).toEqual({ catalog: { file: catalog }, projects: { smokedesk: { qaDir: projectQa } } });
 
     await page.getByTestId('nav-dashboard').click();
     await takeNextTicket(page);
@@ -66,8 +69,11 @@ test('development settings: a local folder applies without a restart, and the ne
 });
 
 test('development settings: Restore defaults deletes the file and goes back to the official catalog', async () => {
-  const { userData, catalog } = await dataFolder(supportdeskQa);
-  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } });
+  const { userData, catalog } = await dataFolder(projectQa);
+  const { page, close } = await launch(
+    {},
+    { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } },
+  );
   try {
     await openDevelopment(page);
     await page.getByTestId('dev-catalog-reset').click();
@@ -81,7 +87,7 @@ test('development settings: Restore defaults deletes the file and goes back to t
 });
 
 test('development settings: a broken file opens with its error, and Apply writes over it', async () => {
-  const { userData, catalog } = await dataFolder(supportdeskQa);
+  const { userData, catalog } = await dataFolder(projectQa);
   const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: '{' });
   try {
     await openDevelopment(page);
@@ -92,7 +98,9 @@ test('development settings: a broken file opens with its error, and Apply writes
     await page.getByTestId('dev-catalog-apply').click();
     await expect(page.getByTestId('dev-catalog-error')).toHaveCount(0);
     await expect(page.getByTestId('dev-catalog-in-use')).toContainText(`file ${catalog}`);
-    expect(JSON.parse(await readFile(join(userData, 'catalog.local.json'), 'utf8'))).toEqual({ catalog: { file: catalog } });
+    expect(JSON.parse(await readFile(join(userData, 'catalog.local.json'), 'utf8'))).toEqual({
+      catalog: { file: catalog },
+    });
   } finally {
     await close();
     await rm(userData, { recursive: true, force: true });
@@ -101,7 +109,10 @@ test('development settings: a broken file opens with its error, and Apply writes
 
 test('development settings: a catalog that was never read shows that the bundled copy is in use', async () => {
   const userData = await mkdtemp(join(tmpdir(), 'João Silva e2e-'));
-  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: join(userData, 'no-such-catalog.json') } } });
+  const { page, close } = await launch(
+    {},
+    { userData, catalogFile: false, localCatalog: { catalog: { file: join(userData, 'no-such-catalog.json') } } },
+  );
   try {
     await openDevelopment(page);
     await expect(page.getByTestId('dev-catalog-fallback')).toBeVisible();
@@ -112,17 +123,30 @@ test('development settings: a catalog that was never read shows that the bundled
 });
 
 test('development settings: unsaved edits survive the catalog in use changing in the background', async () => {
-  const { userData, catalog } = await dataFolder(supportdeskQa);
-  const { page, close } = await launch({}, { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } });
+  const { userData, catalog } = await dataFolder(projectQa);
+  const { page, close } = await launch(
+    {},
+    { userData, catalogFile: false, localCatalog: { catalog: { file: catalog } } },
+  );
   try {
     await openDevelopment(page);
-    await page.getByTestId('dev-project-supportdesk-ref').click();
-    await page.getByTestId('dev-project-supportdesk-ref-name').fill('qa-draft');
-    await writeFile(catalog, JSON.stringify({ projects: [{ id: 'supportdesk', qaDir: supportdeskQa, starter: true }, { id: 'second', qaDir: supportdeskQa }] }));
+    await page.getByTestId('dev-project-smokedesk-ref').click();
+    await page.getByTestId('dev-project-smokedesk-ref-name').fill('qa-draft');
+    await writeFile(
+      catalog,
+      JSON.stringify({
+        projects: [
+          { id: 'smokedesk', qaDir: projectQa, starter: true },
+          { id: 'second', qaDir: projectQa },
+        ],
+      }),
+    );
     // Opening Projects refreshes the catalog; here it happens while the tab stays open.
-    await page.evaluate(() => (window as unknown as { bugDetective: { loadProjects(): Promise<void> } }).bugDetective.loadProjects());
+    await page.evaluate(() =>
+      (window as unknown as { bugDetective: { loadProjects(): Promise<void> } }).bugDetective.loadProjects(),
+    );
     await expect(page.getByTestId('dev-project-second')).toBeVisible();
-    await expect(page.getByTestId('dev-project-supportdesk-ref-name')).toHaveValue('qa-draft');
+    await expect(page.getByTestId('dev-project-smokedesk-ref-name')).toHaveValue('qa-draft');
   } finally {
     await close();
     await rm(userData, { recursive: true, force: true });

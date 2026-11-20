@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>();
 vi.mock('electron', () => ({
-  ipcMain: { handle: (name: string, handler: (event: unknown, ...args: unknown[]) => Promise<unknown>) => handlers.set(name, handler) },
+  ipcMain: {
+    handle: (name: string, handler: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
+      handlers.set(name, handler),
+  },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   shell: { openExternal: vi.fn() },
@@ -58,7 +61,11 @@ describe('IPC', () => {
     expect(await call('exportProgress', fromApp)).toEqual({ ok: true, value: { saved: false } });
     expect(await call('inspectSave', fromApp)).toEqual({ ok: true, value: null });
     expect(await call('chooseDevPath', fromApp, 'folder')).toEqual({ ok: true, value: null });
-    expect(shown.map((options) => options.title)).toEqual(['Exportar progresso', 'Restaurar progresso', 'Pasta qa do projeto']);
+    expect(shown.map((options) => options.title)).toEqual([
+      'Exportar progresso',
+      'Restaurar progresso',
+      'Pasta qa do projeto',
+    ]);
     expect((shown[0].filters as { name: string }[])[0].name).toBe('Save do Bug Detective');
   });
 
@@ -70,9 +77,15 @@ describe('IPC', () => {
   });
 
   it('logs a renderer error, within size limits', async () => {
-    expect(await call('reportRendererError', fromApp, 'boom', 'Error: boom\n    at App')).toEqual({ ok: true, value: undefined });
+    expect(await call('reportRendererError', fromApp, 'boom', 'Error: boom\n    at App')).toEqual({
+      ok: true,
+      value: undefined,
+    });
     expect(game.reportRendererError).toHaveBeenCalledWith('boom', 'Error: boom\n    at App');
-    expect(await call('reportRendererError', fromApp, 'x'.repeat(2001), '')).toMatchObject({ ok: false, error: { code: 'invalidInput' } });
+    expect(await call('reportRendererError', fromApp, 'x'.repeat(2001), '')).toMatchObject({
+      ok: false,
+      error: { code: 'invalidInput' },
+    });
   });
 
   it('hands out the diagnostics text and opens the logs folder', async () => {
@@ -82,7 +95,10 @@ describe('IPC', () => {
   });
 
   it('refuses a sender that is not the app renderer, without calling the game', async () => {
-    expect(await call('nextAssignment', { senderFrame: { url: 'https://evil.example/' } }, 'front')).toEqual({ ok: false, error: { code: 'notAllowed', message: 'Untrusted sender' } });
+    expect(await call('nextAssignment', { senderFrame: { url: 'https://evil.example/' } }, 'front')).toEqual({
+      ok: false,
+      error: { code: 'notAllowed', message: 'Untrusted sender' },
+    });
     expect(await call('nextAssignment', {}, 'front')).toMatchObject({ ok: false, error: { code: 'notAllowed' } });
     expect(game.nextAssignment).not.toHaveBeenCalled();
   });
@@ -90,7 +106,9 @@ describe('IPC', () => {
   it('in development, trusts the dev server origin only', async () => {
     handlers.clear();
     registerIpc(game as never, 'http://localhost:5173', openUrl);
-    expect(await call('snapshot', { senderFrame: { url: 'http://localhost:5173/index.html' } })).toMatchObject({ ok: true });
+    expect(await call('snapshot', { senderFrame: { url: 'http://localhost:5173/index.html' } })).toMatchObject({
+      ok: true,
+    });
     expect(await call('snapshot', fromApp)).toMatchObject({ ok: false, error: { code: 'notAllowed' } });
   });
 
@@ -107,14 +125,28 @@ describe('IPC', () => {
 
   it('turns errors into codes: a game error keeps its own, Docker and anything else get theirs', async () => {
     game.nextAssignment.mockRejectedValueOnce(new GameError('ticketNotDone', 'Finish it first'));
-    expect(await call('nextAssignment', fromApp, 'front')).toEqual({ ok: false, error: { code: 'ticketNotDone', message: 'Finish it first' } });
+    expect(await call('nextAssignment', fromApp, 'front')).toEqual({
+      ok: false,
+      error: { code: 'ticketNotDone', message: 'Finish it first' },
+    });
     game.nextAssignment.mockRejectedValueOnce(new DockerUnavailableError('Docker is not running'));
-    expect(await call('nextAssignment', fromApp, 'front')).toMatchObject({ ok: false, error: { code: 'dockerUnavailable' } });
+    expect(await call('nextAssignment', fromApp, 'front')).toMatchObject({
+      ok: false,
+      error: { code: 'dockerUnavailable' },
+    });
     game.nextAssignment.mockRejectedValueOnce(new Error('disk full'));
-    expect(await call('nextAssignment', fromApp, 'front')).toEqual({ ok: false, error: { code: 'failed', message: 'disk full' } });
+    expect(await call('nextAssignment', fromApp, 'front')).toEqual({
+      ok: false,
+      error: { code: 'failed', message: 'disk full' },
+    });
     // A full disk while the state or a package is written gets its own code.
-    game.nextAssignment.mockRejectedValueOnce(Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' }));
-    expect(await call('nextAssignment', fromApp, 'front')).toEqual({ ok: false, error: { code: 'diskFull', message: 'ENOSPC: no space left on device, write' } });
+    game.nextAssignment.mockRejectedValueOnce(
+      Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' }),
+    );
+    expect(await call('nextAssignment', fromApp, 'front')).toEqual({
+      ok: false,
+      error: { code: 'diskFull', message: 'ENOSPC: no space left on device, write' },
+    });
   });
 
   it('passes the install options through, and refuses unknown ones', async () => {
@@ -123,7 +155,10 @@ describe('IPC', () => {
     expect(game.installEnvironment).toHaveBeenLastCalledWith(undefined);
     expect(await call('installEnvironment', fromApp, { ignoreDiskSpace: true })).toMatchObject({ ok: true });
     expect(game.installEnvironment).toHaveBeenLastCalledWith({ ignoreDiskSpace: true });
-    expect(await call('installEnvironment', fromApp, { force: true })).toMatchObject({ ok: false, error: { code: 'invalidInput' } });
+    expect(await call('installEnvironment', fromApp, { force: true })).toMatchObject({
+      ok: false,
+      error: { code: 'invalidInput' },
+    });
   });
 
   it('opens only the workspace app on the loopback address in the browser', async () => {

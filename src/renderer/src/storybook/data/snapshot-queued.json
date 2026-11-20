@@ -101,14 +101,8 @@
           "database": "JSON file"
         },
         "skills": {
-          "en": [
-            "Reading a failing test",
-            "Small fixes"
-          ],
-          "pt": [
-            "Ler um teste que falha",
-            "Correções pequenas"
-          ]
+          "en": ["Reading a failing test", "Small fixes"],
+          "pt": ["Ler um teste que falha", "Correções pequenas"]
         },
         "difficulty": "beginner",
         "counts": {
@@ -131,6 +125,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "declaredPorts": [],
   "workspaceOutOfMemoryAt": null,
   "services": [],
   "workspaceInternet": false,
@@ -197,10 +192,7 @@
         "name": "Notes",
         "about": "A note-taking app.",
         "stack": "Node.js",
-        "skills": [
-          "Reading a failing test",
-          "Small fixes"
-        ]
+        "skills": ["Reading a failing test", "Small fixes"]
       },
       "messages": {
         "welcome": {
@@ -247,10 +239,7 @@
         "name": "Notes",
         "about": "Um app de notas.",
         "stack": "Node.js",
-        "skills": [
-          "Ler um teste que falha",
-          "Correções pequenas"
-        ]
+        "skills": ["Ler um teste que falha", "Correções pequenas"]
       },
       "messages": {
         "welcome": {

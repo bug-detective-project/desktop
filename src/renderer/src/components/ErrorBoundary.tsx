@@ -12,16 +12,24 @@ function CrashScreen({ error }: { error: Error }) {
     api
       .diagnostics()
       .catch((cause: Error) => `diagnostics failed: ${cause.message}`)
-      .then((text) => navigator.clipboard.writeText(`${text}\n## Renderer error\n${error.message}\n${error.stack ?? ''}\n`))
+      .then((text) =>
+        navigator.clipboard.writeText(`${text}\n## Renderer error\n${error.message}\n${error.stack ?? ''}\n`),
+      )
       .then(() => setCopied(true))
       .catch(() => setCopied(false));
   };
   return (
-    <main className="flex h-full min-h-screen items-center justify-center bg-background p-8 text-foreground" data-testid="error-boundary">
+    <main
+      className="flex h-full min-h-screen items-center justify-center bg-background p-8 text-foreground"
+      data-testid="error-boundary"
+    >
       <div className="max-w-lg space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">{t('crash.title')}</h1>
         <p className="text-base text-muted-foreground">{t('crash.text')}</p>
-        <p className="rounded-lg border border-border bg-card p-3 font-mono text-xs text-muted-foreground" data-testid="error-boundary-message">
+        <p
+          className="rounded-lg border border-border bg-card p-3 font-mono text-xs text-muted-foreground"
+          data-testid="error-boundary-message"
+        >
           {error.message}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -46,7 +54,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    void api.reportRendererError(error.message.slice(0, 2000), `${error.stack ?? ''}\n${info.componentStack ?? ''}`.slice(0, 20_000)).catch(() => {});
+    void api
+      .reportRendererError(
+        error.message.slice(0, 2000),
+        `${error.stack ?? ''}\n${info.componentStack ?? ''}`.slice(0, 20_000),
+      )
+      .catch(() => {});
   }
 
   render() {
