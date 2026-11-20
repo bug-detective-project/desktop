@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Syncs desktop/, supportdesk/ and supportdesk-qa/ from WSL to a Windows folder, where Windows Node runs Electron,
-# the e2e tests and the installer build. node_modules is never shared between Linux and Windows.
+# Syncs desktop/, smokedesk/ and smokedesk-qa/ (the project the e2e and real-runtime tests play) and
+# supportdesk/ and supportdesk-qa/ (installed-ticket1 still plays it) from WSL to a Windows folder,
+# where Windows Node runs Electron, the e2e tests and the installer build. node_modules is never
+# shared between Linux and Windows.
 #
 #   desktop/tools/sync-windows.sh            (default target: /mnt/c/Users/<you>/bugdetective-dev)
 #   BUGDETECTIVE_WIN_DEV=/mnt/c/dev/bd desktop/tools/sync-windows.sh
@@ -34,6 +36,7 @@ sync_project() {
   printf 'gitdir: %s\n' "$(win "$worktree_meta")" > "$target/$name-qa/.git"
   printf '%s\n' "$(win "$target/$name-qa/.git")" > "$worktree_meta/gitdir"
 }
+sync_project smokedesk
 sync_project supportdesk
 for extra in "$@"; do
   sync_project "$extra"

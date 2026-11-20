@@ -1,6 +1,6 @@
 /**
  * Task 4.2 (loose-ends item 37): VS Code attaches to the workspace container without the player's
- * credentials. Real Docker and VS Code (Windows, or Linux/WSL 2), the real SupportDesk content.
+ * credentials. Real Docker and VS Code (Windows, or Linux/WSL 2), the real Smoke Desk content.
  *
  *   pnpm run test:real-runtime credentials
  *
@@ -30,7 +30,9 @@ const root = resolve(import.meta.dirname, '..', '..');
 const DOCKER =
   process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
-const WORKSPACE = workspaceDir('supportdesk');
+const WORKSPACE = workspaceDir('smokedesk');
+// The Smoke Desk qa folder: a worktree of its qa branch, next to the ../smokedesk clone.
+const smokedeskQa = resolve(root, '..', 'smokedesk-qa');
 const SETTLE_MS = 60_000;
 
 /** A shell line inside the container, as node, in the workspace; failures are part of the answer, not of the test. */
@@ -86,7 +88,13 @@ async function extensionLogLines(): Promise<string> {
 
 async function open(userData: string): Promise<{ app: ElectronApplication; page: Page }> {
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
-  const app = await electron.launch({ args: [root], env: { ...parentEnv, BUGDETECTIVE_USER_DATA: userData } });
+  // A catalog of Smoke Desk alone, read from its local qa folder (it is not in the official catalog).
+  const catalogFile = join(userData, 'smokedesk-catalog.json');
+  await writeFile(catalogFile, JSON.stringify({ projects: [{ id: 'smokedesk', qaDir: smokedeskQa, starter: true }] }));
+  const app = await electron.launch({
+    args: [root],
+    env: { ...parentEnv, BUGDETECTIVE_USER_DATA: userData, BUGDETECTIVE_CATALOG_FILE: catalogFile },
+  });
   const page = await app.firstWindow();
   return { app, page };
 }

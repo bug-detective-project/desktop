@@ -1,14 +1,16 @@
 /**
- * Drives the real app (real Docker, VS Code and content) through the whole game, on Windows or Linux/WSL 2:
- * checklist, unlock, VS Code attach, QA fail, hints, solution, fix, QA pass, review, Done, for
- * all four tickets; restart during QA; export, volume deletion and restore.
+ * Drives the real app (real Docker, VS Code and content) through the whole game, on Windows or Linux/WSL 2,
+ * with Smoke Desk, the project made for these tests (two services, two databases, three declared
+ * ports): checklist, unlock, VS Code attach, the three ports answering, QA fail, hints, solution,
+ * fix, QA pass, review, Done, for its front ticket and its back ticket; restart during QA; export,
+ * volume deletion and restore.
  *
  *   pnpm run test:real-runtime
  *
  * Uses the real "bugdetective-*" Docker resources, and a fresh data folder per run.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
@@ -18,19 +20,30 @@ import { closeAttachedWindows, finishOnboarding } from './onboarding.ts';
 import { workspaceDir } from '../../src/main/services/workspace.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
-// The SupportDesk qa folder: a worktree of its qa branch, next to the ../supportdesk clone.
-const supportdeskQa = resolve(root, '..', 'supportdesk-qa');
+// The Smoke Desk qa folder: a worktree of its qa branch, next to the ../smokedesk clone.
+const smokedeskQa = resolve(root, '..', 'smokedesk-qa');
 const DOCKER =
   process.platform === 'win32' ? 'C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe' : 'docker';
 const CONTAINER = 'bugdetective-workspace';
-const WORKSPACE = workspaceDir('supportdesk');
+const WORKSPACE = workspaceDir('smokedesk');
+/** Smoke Desk's two tickets, in the order the loop plays them. */
+const TICKETS = [
+  { ticket: 1, id: 'front-1', track: 'front' },
+  { ticket: 2, id: 'back-1', track: 'back' },
+] as const;
 
 const docker = (...args: string[]) => execFileSync(DOCKER, args, { encoding: 'utf8' });
 const log = (message: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
 
 async function open(userData: string): Promise<{ app: ElectronApplication; page: Page }> {
   const { ELECTRON_RUN_AS_NODE: _ignored, ...parentEnv } = process.env;
-  const app = await electron.launch({ args: [root], env: { ...parentEnv, BUGDETECTIVE_USER_DATA: userData } });
+  // A catalog of Smoke Desk alone, read from its local qa folder (it is not in the official catalog).
+  const catalogFile = join(userData, 'smokedesk-catalog.json');
+  await writeFile(catalogFile, JSON.stringify({ projects: [{ id: 'smokedesk', qaDir: smokedeskQa, starter: true }] }));
+  const app = await electron.launch({
+    args: [root],
+    env: { ...parentEnv, BUGDETECTIVE_USER_DATA: userData, BUGDETECTIVE_CATALOG_FILE: catalogFile },
+  });
   const page = await app.firstWindow();
   return { app, page };
 }
@@ -150,10 +163,9 @@ test('the full game loop with real Docker and VS Code', async () => {
   await finishOnboarding(page);
   await installEnvironment(page);
 
-  for (let ticket = 1; ticket <= 4; ticket += 1) {
+  for (const { ticket, id, track } of TICKETS) {
     await page.getByTestId('nav-dashboard').click();
-    // The track menu: every SupportDesk front ticket, in order.
-    await takeNextTicket(page, 'front');
+    await takeNextTicket(page, track);
     // The app switches to the board once the unlock (and its environment check) has finished.
     await expect(page.getByTestId('board')).toBeVisible({ timeout: 5 * 60_000 });
     await cardStatus(page, ticket, 'todo', 120_000);
@@ -188,9 +200,28 @@ test('the full game loop with real Docker and VS Code', async () => {
           timeout: 120_000,
         })
         .toBe(200);
-      const tickets = (await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()) as unknown[];
-      expect(tickets.length).toBeGreaterThan(10);
-      log(`ticket 1: app answers on http://127.0.0.1:${port}/ (${tickets.length} tickets through the Vite proxy)`);
+      const notes = (await (await fetch(`http://127.0.0.1:${port}/api/notes`)).json()) as unknown[];
+      expect(notes.length).toBeGreaterThanOrEqual(3);
+      log(`ticket 1: app answers on http://127.0.0.1:${port}/ (${notes.length} notes through the Vite proxy)`);
+      // The audit service on its own published port, the one VITE_AUDIT_URL names, and allowing
+      // the client's origin (CLIENT_ORIGIN): the declared ports reached the code.
+      await page.getByTestId('close-panel').click();
+      await page.getByTestId('nav-dashboard').click();
+      const auditRow = page.getByTestId('env-port-audit');
+      await expect(auditRow).toContainText('localhost:', { timeout: 60_000 });
+      const auditPort = Number(/localhost:(\d+)/.exec((await auditRow.textContent()) ?? '')?.[1]);
+      expect(await page.getByTestId('env-port-client').textContent()).toContain(`localhost:${port}`);
+      await expect(page.getByTestId('env-port-api')).toContainText('localhost:');
+      const env = docker('exec', CONTAINER, 'printenv', 'VITE_AUDIT_URL', 'CLIENT_ORIGIN').trim().split('\n');
+      expect(env).toEqual([`http://localhost:${auditPort}`, `http://localhost:${port}`]);
+      const events = await fetch(`http://127.0.0.1:${auditPort}/events`, {
+        headers: { Origin: `http://localhost:${port}` },
+      });
+      expect(events.headers.get('access-control-allow-origin')).toBe(`http://localhost:${port}`);
+      expect(((await events.json()) as unknown[]).length).toBeGreaterThanOrEqual(3);
+      log(`ticket 1: the audit service answers on its own port ${auditPort}, for the client's origin`);
+      await page.getByTestId('nav-board').click();
+      await page.getByTestId('card-1').click();
       // VS Code attached and the dev server up: the workspace's heaviest moment.
       await sampleWorkspaceMemory();
       log(`ticket 1: workspace memory peak ${(peaks.workspace / GIB).toFixed(2)} GiB with VS Code and the dev server`);
@@ -242,7 +273,7 @@ test('the full game loop with real Docker and VS Code', async () => {
     log(`ticket ${ticket}: 3 hints and the solution revealed`);
 
     // The player applies the fix in the workspace.
-    const patch = await readFile(join(supportdeskQa, 'tickets', `front-${ticket}`, 'reference.patch'));
+    const patch = await readFile(join(smokedeskQa, 'tickets', id, 'reference.patch'));
     execFileSync(DOCKER, ['exec', '-i', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'apply', '-'], {
       input: patch,
     });
@@ -254,24 +285,31 @@ test('the full game loop with real Docker and VS Code', async () => {
     // The fix applied above is the reference patch itself: the review says so and shows the
     // player's changes against the original code; the separate reference section is left out.
     await expect(page.getByTestId('identical-message')).toContainText('identical to the reference');
-    await expect(page.getByTestId('review-comparison')).toContainText('client/src');
+    await expect(page.getByTestId('review-comparison')).toContainText(track === 'front' ? 'client/src' : 'server/src');
     await expect(page.getByTestId('review-reference')).toHaveCount(0);
     await page.getByTestId('accept-review').click();
     await cardStatus(page, ticket, 'done');
     log(`ticket ${ticket}: review accepted, Done`);
+
+    if (track === 'front') {
+      await page.getByTestId('nav-dashboard').click();
+      await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'completion');
+      // The front track is complete (the project's completion e-mail); the back track is still offered.
+      await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
+      await page.getByTestId('next-assignment').click();
+      // A finished track stays in the menu, disabled, with its progress; the other one can be chosen.
+      await expect(page.getByTestId('next-assignment-front')).toBeDisabled();
+      await expect(page.getByTestId('next-assignment-front')).toContainText('1');
+      await expect(page.getByTestId('next-assignment-back')).toBeEnabled();
+      await page.keyboard.press('Escape');
+      log('front track done: completion message received, back track still offered');
+    }
   }
 
   await page.getByTestId('nav-dashboard').click();
-  await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'completion');
-  // The front track is complete (the project's completion e-mail); the back track is still offered.
-  await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'queued');
-  await page.getByTestId('next-assignment').click();
-  // A finished track stays in the menu, disabled, with its progress; the other one can be chosen.
-  await expect(page.getByTestId('next-assignment-front')).toBeDisabled();
-  await expect(page.getByTestId('next-assignment-front')).toContainText('4');
-  await expect(page.getByTestId('next-assignment-back')).toBeEnabled();
-  await page.keyboard.press('Escape');
-  log('all four front tickets done; completion message received, back track still offered');
+  await expect(page.getByTestId('inbox-message').first()).toHaveAttribute('data-kind', 'trackCompletion');
+  await expect(page.getByTestId('assignment-card')).toHaveAttribute('data-state', 'allDone');
+  log('both tracks done: the track completion message received');
 
   // Export, delete the volume, restore.
   const save = join(userData, 'export test.bdsave');
@@ -305,13 +343,18 @@ test('the full game loop with real Docker and VS Code', async () => {
   });
   expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'rev-parse', 'HEAD').trim()).toBe(head);
   expect(docker('exec', '-u', 'node', '-w', WORKSPACE, CONTAINER, 'git', 'branch', '--list', 'player/*')).toMatch(
-    /player\/ticket-1[\s\S]*player\/ticket-4/,
+    /player\/ticket-1[\s\S]*player\/ticket-2/,
   );
   await page.getByTestId('nav-board').click();
-  for (let ticket = 1; ticket <= 4; ticket += 1) {
+  for (const { ticket } of TICKETS) {
     await expect(page.getByTestId(`card-${ticket}`)).toHaveAttribute('data-status', 'done');
   }
   await installEnvironment(page);
-  log('restored: repository, branches and board state are back');
+  // The project's two databases, each ready on its own service.
+  await page.getByTestId('nav-dashboard').click();
+  for (const service of ['notes-db', 'audit-db']) {
+    await expect(page.getByTestId(`env-service-${service}`)).toHaveAttribute('data-tone', 'ok', { timeout: 120_000 });
+  }
+  log('restored: repository, branches, board state and both services are back');
   await app.close();
 });
