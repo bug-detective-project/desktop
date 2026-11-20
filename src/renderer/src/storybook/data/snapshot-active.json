@@ -191,6 +191,7 @@
   "busy": null,
   "workspaceLost": false,
   "dbResetFailed": false,
+  "declaredPorts": [],
   "workspaceOutOfMemoryAt": null,
   "services": [],
   "workspaceInternet": false,
